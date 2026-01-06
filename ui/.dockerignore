@@ -1,0 +1,5 @@
+.idea/
+bak/
+docs/
+node_modules/
+src-tauri/

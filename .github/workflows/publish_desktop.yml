@@ -1,0 +1,144 @@
+---
+# This workflow will build a Tauri app
+
+name: Publish tauri app
+
+on:
+  push:
+    branches:
+      - release
+    tags:
+      - "v*"
+
+env:
+  AWS_REGION: us-east-1
+  AWS_S3_BUCKET_NAME: geenii-dist
+
+jobs:
+  publish-tauri:
+    name: Publish tauri app
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner_name: 'macos-aarch64'
+            runner: 'macos-latest' # for Arm based macs (M1 and above).
+            rust_target: 'aarch64-apple-darwin'
+            #args: '--target aarch64-apple-darwin'
+
+          #- runner_name: 'macos-x86_64'
+          #  runner: 'macos-latest' # for Intel based macs.
+          #  rust_target: 'x86_64-apple-darwin'
+          #  #args: '--target x86_64-apple-darwin'
+
+          - runner_name: 'linux-x86_64'
+            runner: 'ubuntu-22.04'
+            rust_target: 'x86_64-unknown-linux-gnu'
+
+          #- runner_name: 'linux-aarch64'
+          #  runner: 'ubuntu-22.04'
+          #  rust_target: 'aarch64-unknown-linux-gnu'
+
+          #- runner_name: 'windows-x86_64'
+          #  runner: 'windows-latest'
+          #  rust_target: 'x86_64-pc-windows-msvc'
+
+
+    runs-on: ${{ matrix.runner }}
+    environment: production
+
+    steps:
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.1.0
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          #role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          #role-external-id: ${{ secrets.AWS_ROLE_EXTERNAL_ID }}
+          #role-duration-seconds: 1200
+          #role-session-name: MySessionName
+
+
+      - name: Get AWS caller identity
+        run: |
+          aws sts get-caller-identity
+
+
+      - name: Checkout repo with submodules
+        uses: actions/checkout@v4
+
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.runner == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.runner == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+        
+
+      - name: Build app bundles
+        id: build-bundles
+        run: |
+          set -xe
+          cd ui/
+          npm install -g pnpm
+          pnpm install
+          pnpm tauri build -- --target ${{ matrix.rust_target }}
+
+
+      - name: Upload bundles to aws s3 bucket
+        id: 'upload-s3'
+        run: |
+          aws s3 sync \
+            ${{ github.workspace }}/ui/src-tauri/target/${{ matrix.rust_target }}/release/bundle \
+            s3://${{env.AWS_S3_BUCKET_NAME}}/bundles/${{ github.ref_type }}/${{ github.ref_name }}/ \
+            --exclude "*" \
+            --include "*.deb" \
+            --include "*.rpm" \
+            --include "*.AppImage" \
+            --include "*.msi" \
+            --include "*.dmg" \
+            --include "*.app"
+          
+
+      - name: Upload app bundles as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-bundle-${{ matrix.runner_name }}
+          path: |
+            ui/src-tauri/target/release/bundle/deb/*.deb
+            ui/src-tauri/target/release/bundle/rpm/*.rpm
+            ui/src-tauri/target/release/bundle/appimage/*.AppImage
+            ui/src-tauri/target/release/bundle/msi/*.msi
+            ui/src-tauri/target/release/bundle/dmg/*.dmg
+            ui/src-tauri/target/release/bundle/macos/*.app
+          if-no-files-found: ignore
+          retention-days: 30
+
+
+#      - name: Upload Release Assets
+#        uses: softprops/action-gh-release@v2
+#        if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+#        with:
+#          files: |
+#            src-tauri/target/release/bundle/deb/*.deb
+#            src-tauri/target/release/bundle/rpm/*.rpm
+#            src-tauri/target/release/bundle/appimage/*.AppImage
+#            src-tauri/target/release/bundle/msi/*.msi
+#            src-tauri/target/release/bundle/dmg/*.dmg
+#            src-tauri/target/release/bundle/macos/*.app
+#          token: ${{ secrets.GITHUB_TOKEN }}

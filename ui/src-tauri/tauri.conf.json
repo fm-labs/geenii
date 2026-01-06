@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "geenii-desktop",
+  "version": "0.1.0",
+  "identifier": "io.geenii.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1430",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "geenii",
+        "width": 800,
+        "height": 600
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "withGlobalTauri": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "minSdkVersion": 28
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://geenii-dist.s3.us-east-1.amazonaws.com/updater/latest.json",
+        "https://geenii-dist.s3.us-east-1.amazonaws.com/updater/bundles/{{target}}/{{arch}}/{{current_version}}",
+        "https://geenii.fmlabs.dev/updater/bundles/{{target}}/{{arch}}/{{current_version}}",
+        "https://geenii.fmlabs.dev/updater.php?target={{target}}&arch={{arch}}&current_version={{current_version}}"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ1RjE5RkVBRTEwNkVFMDYKUldRRzdnYmg2cC94UmRNMVg2M2tpT0FzUDFUWlF4WWFkZE0rMU1OY3FDV1VVL1d1d2FUOTVrRTkK"
+    }
+  }
+}

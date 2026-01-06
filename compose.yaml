@@ -1,0 +1,38 @@
+
+
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - "13030:13030"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DATA_DIR=/app/data
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    env_file:
+      - ./.env.local
+
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: ./Dockerfile
+    ports:
+      - "13031:80"
+    profiles:
+      - ui
+
+  #  ollama:
+  #    image: ollama/ollama:latest
+  #    volumes:
+  #      #- ./data/ollama:/root/.ollama
+  #      - ~/.ollama:/root/.ollama
+  #    ports:
+  #      - "11434:11434" # ollama api

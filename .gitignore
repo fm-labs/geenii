@@ -1,0 +1,17 @@
+.idea/
+.venv/
+bak/
+data/
+build/
+dist/
+.env.local
+.env.*
+*.local
+*.bak
+*.log
+__pycache__/
+.DS_Store
+src/*.egg-info/
+src/x*.py
+src/x*.*
+src/xaidev

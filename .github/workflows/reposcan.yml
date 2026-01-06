@@ -1,0 +1,37 @@
+name: Repo Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Run Repo Scan
+      id: repo-scan
+      uses: fm-labs/action-repo-scan@v1
+      with:
+        path: '.'  # Optional: defaults to '.'
+        
+    - name: Display scan results
+      run: |
+        echo "Repo scan completed with exit code: ${{ steps.repo-scan.outputs.exit-code }}"
+        echo ""
+        echo "Scan output:"
+        echo "${{ steps.repo-scan.outputs.scan-output }}"
+        
+    - name: Check scan status
+      run: |
+        if [ "${{ steps.repo-scan.outputs.exit-code }}" != "0" ]; then
+          echo "Repo scan failed!"
+          exit 1
+        else
+          echo "Repo scan passed successfully!"
+        fi

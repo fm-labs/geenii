@@ -1,0 +1,85 @@
+import React from 'react'
+import Layout from '../../components/layout/layout.tsx'
+import TypewriterText from '../../ui/TypewriterText.tsx'
+import { Button } from '../../ui'
+import { useNavigate } from '../../app-router.tsx'
+
+
+const greetings = [
+  "Hello! 👋",
+  "Hi there! 😊",
+  "Greetings! 🙌",
+  "Welcome! 🎉",
+  "Hi",
+  "Hello",
+  "Welcome back",
+  "Howdy",
+  "Greetings",
+  "Salutations",
+  "Good to see you",
+  "Hey there",
+  "Nice to see you",
+  "Good day",
+  "Hola",
+  "Bonjour",
+]
+
+const messages = [
+  "What would you like to do today?",
+  "Ready to start a new conversation?",
+  "How can I assist you today?",
+  "Let's get started!",
+]
+
+const agentSelfIntro = [
+  "I am Geenii, yet another AI assistant.",
+  "Currently in early alpha, I aim to help you with various tasks.",
+  "Feel free to explore my capabilities and provide feedback.",
+]
+
+const getRandomElement = (arr: string[]) => {
+  return arr[Math.floor(Math.random() * arr.length)]
+}
+
+const SelfIntro = () => {
+  const [introIdx, setIntroIdx] = React.useState<number>(0)
+
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setIntroIdx((prevIdx) => (prevIdx + 1) % agentSelfIntro.length)
+    }, 8000) // Change message every 8 seconds
+
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <h2 className="text-xl font-bold">
+      <TypewriterText text={agentSelfIntro[introIdx]} delay={0} showCursor={false} />
+    </h2>
+  )
+}
+
+const WelcomeScreen = () => {
+  const navigate = useNavigate()
+
+  const greeting = getRandomElement(greetings)
+
+  return (
+    <Layout>
+      <div className="text-center mb-4">
+        <h1 className="text-2xl font-bold"><TypewriterText text={greeting} delay={500} showCursor={false} /></h1>
+      </div>
+      <div className="text-center mb-4">
+        <h2 className="text-xl font-bold"><TypewriterText text={getRandomElement(messages)} delay={2000} showCursor={false} /></h2>
+      </div>
+      {/*<div className="text-center mb-4">
+        <SelfIntro />
+      </div>*/}
+      <div className="text-center mb-4">
+        <Button onClick={() => navigate('/chat')}>Start new chat</Button>
+      </div>
+    </Layout>
+  )
+}
+
+export default WelcomeScreen

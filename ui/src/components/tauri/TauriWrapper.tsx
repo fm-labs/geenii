@@ -1,0 +1,12 @@
+import React, { PropsWithChildren } from 'react'
+import TauriPanel from './TauriPanel.tsx'
+
+const TauriWrapper = (props: PropsWithChildren) => {
+  return (
+    <div className={'TauriWrapper'}>
+      {props.children}
+    </div>
+  )
+}
+
+export default TauriWrapper

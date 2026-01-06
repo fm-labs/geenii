@@ -1,0 +1,65 @@
+{
+  "app": {
+    "autoUpdate": true,
+    "theme": "dark",
+    "language": "en-US"
+  },
+  "user": {
+    "name": "John Doe",
+    "email": "jd@example.org"
+  },
+  "plugins": {
+    "xai": {
+      "apiKey": "",
+      "apiUrl": "https://xai.example.com",
+      "timeout": 5000
+    },
+    "openai": {
+      "apiKey": "",
+      "apiUrl": "https://api.openai.com/v1",
+      "model": "gpt-3.5-turbo",
+      "temperature": 0.7
+    },
+    "claude": {
+      "apiKey": "",
+      "apiUrl": "https://api.anthropic.com/v1",
+      "model": "claude-2",
+      "temperature": 0.7
+    },
+    "ollama": {
+      "apiKey": "",
+      "apiUrl": "https://localhost:11434",
+      "model": "claude-2",
+      "temperature": 0.7
+    },
+    "litellm": {
+      "apiKey": "",
+      "apiUrl": "https://localhost:12345",
+      "model": "claude-2",
+      "temperature": 0.7
+    }
+  },
+  "mcpServers": {
+    "default": {
+      "url": "https://mcp.example.com"
+    },
+    "backup": {
+      "url": "https://backup-mcp.example.com"
+    },
+    "docker-mcp": {
+      "command": "docker",
+      "args": [
+        "mcp",
+        "run",
+        "gateway"
+      ]
+    },
+    "computer": {
+      "command": "uv",
+      "args": [
+        "run",
+        "computer-mcp.py"
+      ]
+    }
+  }
+}

@@ -1,0 +1,207 @@
+$chat-base-padding: 1rem;
+
+$chat-input-border: 1px solid #ccc;
+$chat-input-border-radius: 1.5rem;
+$chat-input-background-color: #ffffff;
+$chat-input-color: #333;
+
+$chat-input-user-background-color: #86bec5;
+
+$chat-input-buttons-border-radius: 2rem;
+$chat-input-buttons-border-color-hover: #CCC;
+$chat-input-buttons-border: 1px solid #CCCCCC7C;
+
+$dark-chat-input-background-color: #333;
+$dark-chat-input-color: #f6f6f6;
+
+
+.Chat {
+  //border: 1px solid limegreen;
+}
+
+.Chat-flex {
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.Chat-full-h {
+  display: flex;
+  justify-content: flex-end;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.Chat-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  //margin: 0 auto;
+  //width: 800px;
+
+  //border: 1px solid red;
+
+  .Chat-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+
+  }
+
+  .Chat-message {
+    padding: calc($chat-base-padding/2) 0;
+    border-left: 3px solid transparent;
+    max-width: 100%;
+    overflow: scroll;
+
+    .input-data {
+      background-color: $chat-input-user-background-color;
+      color: $chat-input-color;
+      border-radius: 1rem 0 1rem 0.75rem;
+      padding: calc($chat-base-padding/2);
+    }
+
+    .output-data {
+      font-family: Courier New, monospace;
+      text-align: left;
+      padding: calc($chat-base-padding/2);
+
+      h1,h2,h3,h4,h5,h6 {
+        margin: 1em 0 0.5em 0;
+      }
+
+      ul, ol {
+        margin: 0.5em 0;
+        padding-left: 2em;
+
+        li {
+          margin-bottom: 0.8em;
+        }
+      }
+    }
+
+  }
+
+  .Chat-message[role="user"] {
+    align-self: flex-end;
+    //background-color: #e0f7fa;
+  }
+
+  .Chat-message[role="assistant"] {
+    align-self: flex-start;
+    //border: 1px dashed gray;
+    //background-color: #f1f8e9;
+
+    //&:hover {
+    //  background-color: rgba(240, 240, 240, 0.3);
+    //  border-left: 3px solid $chat-input-buttons-border-color-hover;
+    //}
+  }
+
+  .Chat-input {
+    border: $chat-input-border;
+    border-radius: $chat-input-border-radius;
+    //background-color: $chat-input-background-color;
+    //color: $chat-input-color;
+    margin-bottom: $chat-base-padding;
+
+    &:hover {
+      box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .Chat-input-field {
+    display: flex;
+    align-items: center;
+    //border-bottom: 1px solid lightgray;
+    //padding-top: calc($chat-base-padding/2);
+
+    input[type="text"] {
+      flex-grow: 1;
+      box-shadow: none;
+      border: none;
+      border-radius: $chat-input-border-radius;
+      //background-color: $chat-input-background-color;
+      //color: $chat-input-color;
+      padding: $chat-base-padding;
+    }
+
+    textarea {
+      flex-grow: 1;
+      box-shadow: none;
+      border: none;
+      border-radius: $chat-input-border-radius $chat-input-border-radius 0 0;
+      //background-color: $chat-input-background-color;
+      //color: $chat-input-color;
+      padding: $chat-base-padding;
+      resize: none;
+      max-height: 40vh;
+      overflow-y: scroll;
+      //border-bottom: 1px solid lightgray;
+
+      &:focus {
+        outline: none;
+      }
+    }
+  }
+
+  .Chat-input-buttons {
+    display: flex;
+    justify-content: space-between;
+    padding: calc($chat-base-padding/2);
+  }
+
+  .Chat-input-suggestions {
+    text-align: center;
+
+    ul {
+      display: flex;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      flex-wrap: wrap;
+      gap: calc($chat-base-padding/2);
+    }
+  }
+
+  .Chat-input,
+  .Chat-input-suggestions {
+    button {
+      padding: calc($chat-base-padding/2) $chat-base-padding;
+      //background-color: #007bff;
+      //color: white;
+      //border: none;
+      //border-radius: 0.5rem;
+      border: $chat-input-buttons-border;
+      border-radius: $chat-input-buttons-border-radius;
+      cursor: pointer;
+      box-shadow: none;
+
+      &:hover {
+        background-color: #e0e0e0;
+        border-color: $chat-input-buttons-border-color-hover;
+      }
+    }
+
+    button[disabled] {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    button.border-none {
+      border: none !important;
+    }
+  }
+}
+
+
+//dark theme
+[data-theme="dark"] {
+
+  .Chat-input {
+    background-color: $dark-chat-input-background-color;
+    color: $dark-chat-input-color;
+  }
+}

@@ -1,0 +1,16 @@
+.venv
+bak/
+data/
+build/
+dist/
+__pycache__/
+.DS_Store
+*.log
+*.pyc
+.env
+*.local
+*.env
+*.bak
+*.secret
+*.pass
+*.password
