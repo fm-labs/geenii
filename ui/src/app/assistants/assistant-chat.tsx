@@ -5,21 +5,21 @@ import { ArrowLeft, ImagePlus, MoreVertical, Paperclip, Phone, Plus, Send, Video
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar.tsx'
 import { Fragment } from 'react/jsx-runtime'
 import { format } from 'date-fns'
-import type { ChatUser, Convo } from '@/app/agents/data/chat-types.ts'
+import type { ChatUser, Convo } from '@/app/assistants/data/chat-types.ts'
 import { ChatMessage } from '@/app/chat/components/chat.types.ts'
 import ChatMessages from '@/app/chat/components/ChatMessages.tsx'
 import { ChatContext } from '@/app/chat/components/ChatContext.tsx'
-import AgentChatInputForm from '@/app/agents/agent-chat-input-form.tsx'
+import AssistantChatInputForm from '@/app/assistants/assistant-chat-input-form.tsx'
 import { AppContext } from '@/context/AppContext.tsx'
 import useNotification from '@/hooks/useNotification.ts'
 import { XAI_API_URL } from '@/constants.ts'
 
-interface AgentChatProps {
-  agent: Agent,
+interface AssistantChatProps {
+  assistant: Assistant,
   conversationId?: string | null,
 }
 
-const AgentChat = ({ agent, conversationId: initialConvId }: AgentChatProps) => {
+const AssistantChat = ({ assistant, conversationId: initialConvId }: AssistantChatProps) => {
 
   const appContext = React.useContext(AppContext)
   if (!appContext) {
@@ -71,7 +71,7 @@ const AgentChat = ({ agent, conversationId: initialConvId }: AgentChatProps) => 
 
     setIsThinking(true)
     try {
-      let submitUrl = XAI_API_URL + `ai/v1/agents/${agent.id}/chats`
+      let submitUrl = XAI_API_URL + `ai/v1/assistants/${assistant.id}/chats`
       if (conversationId) {
         submitUrl += `/${conversationId}`
       }
@@ -83,8 +83,8 @@ const AgentChat = ({ agent, conversationId: initialConvId }: AgentChatProps) => 
         },
         body: JSON.stringify({
           input: input,
-          model: agent.model,
-          //tools: agent.tools,
+          model: assistant.model,
+          //tools: assistant.tools,
         }),
       })
       const response = await responseRaw.json()
@@ -167,19 +167,19 @@ const AgentChat = ({ agent, conversationId: initialConvId }: AgentChatProps) => 
           <div className="flex items-center gap-2 lg:gap-4">
             <Avatar className="size-9 lg:size-11">
               <AvatarImage
-                src={agent?.imageUrl}
-                alt={agent?.name}
+                src={assistant?.imageUrl}
+                alt={assistant?.name}
               />
-              <AvatarFallback>{agent.name}</AvatarFallback>
+              <AvatarFallback>{assistant.name}</AvatarFallback>
             </Avatar>
             <div>
               <span className="col-start-2 row-span-2 text-sm font-medium lg:text-base">
-                {agent.name}
+                {assistant.name}
               </span>
               <span
                 className="text-muted-foreground col-start-2 row-span-2 row-start-2 line-clamp-1 block max-w-32 text-xs text-nowrap text-ellipsis lg:max-w-none lg:text-sm">
-                {agent.description}{' '}
-                {`${agent?.tools?.length} Tools available`}
+                {assistant.description}{' '}
+                {`${assistant?.tools?.length} Tools available`}
               </span>
             </div>
           </div>
@@ -254,11 +254,11 @@ const AgentChat = ({ agent, conversationId: initialConvId }: AgentChatProps) => 
           </div>
         </div>
 
-        <AgentChatInputForm onSubmit={submitInput} />
+        <AssistantChatInputForm onSubmit={submitInput} />
 
       </div>
     </div>
   )
 }
 
-export default AgentChat
+export default AssistantChat

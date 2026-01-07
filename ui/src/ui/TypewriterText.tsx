@@ -1,41 +1,5 @@
 import React, { PropsWithChildren, useEffect, useState } from 'react'
-import Markdown from 'react-markdown'
-
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { a11yDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-
-// https://react-syntax-highlighter.github.io/react-syntax-highlighter/demo/prism.html
-const prismStyle = a11yDark
-
-const OutputDataMarkdown = ({ data, showCursor }: { data: string, showCursor?: boolean }) => {
-  return (
-    <Markdown
-      components={{
-        code({ node, className, children, ...props }) {
-          const match = /language-(\w+)/.exec(className || '')
-          return match ? (
-            <SyntaxHighlighter
-              style={prismStyle}
-              showLineNumbers={false}
-              wrapLines={true}
-              language={match[1]}
-              PreTag="div"
-              {...props}
-            >
-              {String(children).replace(/\n$/, '')}
-            </SyntaxHighlighter>
-          ):(
-            <code className={className} {...props}>
-              {children}
-            </code>
-          )
-        },
-      }}
-    >
-      {data}
-    </Markdown>
-  )
-}
+import { OutputDataMarkdown } from '@/ui/OutputDataMarkdown.tsx'
 
 interface TypewriterTextProps extends PropsWithChildren<any> {
   text: string;
@@ -72,6 +36,12 @@ const TypewriterText = ({
   }, [text])
 
   useEffect(() => {
+    if (!text || text.length===0) {
+      setIsComplete(true)
+      onComplete()
+      return
+    }
+
     if (currentIndex < text.length) {
       const calculatedDuration = speed * text.length + delay
       let effectiveSpeed = speed

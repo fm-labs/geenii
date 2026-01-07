@@ -74,11 +74,11 @@ export function NewChatDialog({ users, onOpenChange, open }: NewChatProps) {
           </div>
           <Command className='rounded-lg border'>
             <CommandInput
-              placeholder='Search people...'
+              placeholder='Search assistants...'
               className='text-foreground'
             />
             <CommandList>
-              <CommandEmpty>No people found.</CommandEmpty>
+              <CommandEmpty>No assistants found.</CommandEmpty>
               <CommandGroup>
                 {users.map((user) => (
                   <CommandItem
@@ -97,7 +97,7 @@ export function NewChatDialog({ users, onOpenChange, open }: NewChatProps) {
                           {user.fullName}
                         </span>
                         <span className='text-accent-foreground/70 text-xs'>
-                          {user.username}
+                          {user.title}
                         </span>
                       </div>
                     </div>

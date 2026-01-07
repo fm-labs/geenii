@@ -4,62 +4,63 @@ import { cn } from '@/lib/utils.ts'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar.tsx'
 import { Separator } from '@/components/ui/separator.tsx'
 
-interface AgentChatListProps {
-  agents: Agent[]
+interface AssistantChatListProps {
+  assistants: Assistant[]
   selectedId: string
-  onClickAgent: (agent: Agent) => void
+  onClickAssistant: (assistant: Assistant) => void
 }
 
-const AgentChatList = (props: AgentChatListProps) => {
-  const filteredChatList = props?.agents || []
+const AssistantChatList = (props: AssistantChatListProps) => {
+  const filteredChatList = props?.assistants || []
 
-  const handleUserClick = (agent: any) => {
-    if (props.onClickAgent) {
-      props.onClickAgent(agent)
+  const handleUserClick = (assistant: any) => {
+    if (props.onClickAssistant) {
+      props.onClickAssistant(assistant)
     }
   }
 
   return (
     <div>
-      {filteredChatList.map((agent) => {
-        const { id, name, description, model} = agent
+      {filteredChatList.map((assistant) => {
+        const { id, name, description, model } = assistant
         // const lastConvo = messages[0]
         // const lastMsg =
         //   lastConvo.sender === 'You'
         //     ? `You: ${lastConvo.message}`
         //     : lastConvo.message
         const lastMsg = model || 'No description available.'
-        const username = id;
-        const profile = agent.imageUrl || '/default-agent.png'
+        const username = id
+        const profile = assistant.imageUrl || '/placeholder.svg'
         return (
           <Fragment key={id}>
             <button
-              type='button'
+              type="button"
               className={cn(
                 'group hover:bg-accent hover:text-accent-foreground',
                 `flex w-full rounded-md px-2 py-2 text-start text-sm`,
-                props?.selectedId === id && 'sm:bg-muted'
+                props?.selectedId === id && 'sm:bg-muted',
               )}
               onClick={() => {
-                handleUserClick(agent)
+                handleUserClick(assistant)
               }}
             >
-              <div className='flex gap-2'>
+              <div className="flex gap-2">
                 <Avatar>
                   <AvatarImage src={profile} alt={username} />
                   <AvatarFallback>{username}</AvatarFallback>
                 </Avatar>
                 <div>
-                          <span className='col-start-2 row-span-2 font-medium'>
-                            {name}
-                          </span>
-                  <span className='text-muted-foreground group-hover:text-accent-foreground/90 col-start-2 row-span-2 row-start-2 line-clamp-2 text-ellipsis'>
-                            {lastMsg}
-                          </span>
+                  <span className="col-start-2 row-span-2 font-medium">
+                    {name}
+                  </span>
+                  <span
+                    className="text-muted-foreground group-hover:text-accent-foreground/90 col-start-2 row-span-2 row-start-2 line-clamp-2 text-ellipsis">
+                    {lastMsg}
+                  </span>
                 </div>
               </div>
             </button>
-            <Separator className='my-1' />
+            <Separator className="my-1" />
           </Fragment>
         )
       })}
@@ -67,4 +68,4 @@ const AgentChatList = (props: AgentChatListProps) => {
   )
 }
 
-export default AgentChatList
+export default AssistantChatList

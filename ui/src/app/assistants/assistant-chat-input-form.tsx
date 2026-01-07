@@ -2,12 +2,12 @@ import React, { ChangeEventHandler, KeyboardEventHandler } from 'react'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, ImagePlus, MoreVertical, Paperclip, Phone, Plus, Send, Video } from 'lucide-react'
 
-interface AgentChatInputFormProps {
+interface AssistantChatInputFormProps {
   onChange?: (data: any) => void,
   onSubmit?: (data: any) => Promise<void>
 }
 
-const AgentChatInputForm = (props: AgentChatInputFormProps) => {
+const AssistantChatInputForm = (props: AssistantChatInputFormProps) => {
   const [input, setInput] = React.useState<string>('')
 
   const handleInputChange: ChangeEventHandler<HTMLTextAreaElement|HTMLInputElement> = (e) => {
@@ -111,4 +111,4 @@ const AgentChatInputForm = (props: AgentChatInputFormProps) => {
   )
 }
 
-export default AgentChatInputForm
+export default AssistantChatInputForm

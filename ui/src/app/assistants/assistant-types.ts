@@ -1,5 +1,5 @@
 
-type Agent = {
+type Assistant = {
   id: string;
   name: string;
   description: string;

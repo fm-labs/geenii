@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-export function NewAgentDialog({}) {
+export function NewAssistantDialog({}) {
   return (
     <Dialog>
       <form>

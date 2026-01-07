@@ -6,7 +6,7 @@ import {
 import {
   APP_NAME,
   FEATURE_AGENTS_ENABLED,
-  FEATURE_CHAT_ENABLED,
+  FEATURE_CHAT_ENABLED, FEATURE_COMPLETION_ENABLED,
   FEATURE_FLOWS_ENABLED,
   FEATURE_MCP_ENABLED,
 } from '@/constants.ts'
@@ -18,19 +18,20 @@ const Layout = (props: PropsWithChildren) => {
 
   return (
     <div>
-      <header className={"absolute top-0 left-0 w-full _bg-white border-b border-gray-200 shadow-md z-10"}>
+      <header className={"absolute top-0 left-0 w-full border-b shadow-md z-10"}>
         <div className={"flex flex-row w-full justify-between items-center px-10"}>
           <div className={"flex flex-row"}>
             <BotIcon />
             <span className="ml-2 font-bold text-lg">
-              <a href="#/welcome">{APP_NAME}</a>
+              <a href="#/">{APP_NAME}</a>
             </span>
           </div>
           <div>
             <ul className="space-x-3 p-4 flex items-center justify-center">
               {/*<li className="text-sm text-gray-600 hover:bg-blue-50 px-1"><a href="#/welcome">Start</a></li>*/}
+              {FEATURE_COMPLETION_ENABLED && <li className={navItemStyle}><a href="#/completions">Completions</a></li>}
               {FEATURE_CHAT_ENABLED && <li className={navItemStyle}><a href="#/chat">Chat</a></li>}
-              {FEATURE_AGENTS_ENABLED && <li className={navItemStyle}><a href="#/agents">Agents</a></li>}
+              {FEATURE_AGENTS_ENABLED && <li className={navItemStyle}><a href="#/assistants">Assistants</a></li>}
               {FEATURE_MCP_ENABLED && <li className={navItemStyle}><a href="#/mcp">MCP</a></li>}
               {FEATURE_FLOWS_ENABLED && <li className={navItemStyle}><a href="#/flows">Flows</a></li>}
             </ul>
@@ -43,7 +44,7 @@ const Layout = (props: PropsWithChildren) => {
         </div>
       </header>
 
-      <div className="content _ml-64 mt-10">
+      <div className="content _ml-64 pt-10">
         <div className="flex flex-col justify-center min-h-screen p-4">
           <div className="flex flex-col justify-center mb-4">
             <div className={'grow'}>

@@ -9,14 +9,34 @@ import {
   FunctionPermissionChatMessageContent,
 } from '@/app/chat/components/chat.types.ts'
 import { Button } from '@/components/ui/button.tsx'
+import { CHAT_TYPEWRITER_ENABLED } from '@/constants.ts'
+import { OutputDataMarkdown } from '@/ui/OutputDataMarkdown.tsx'
 
+const ChatMessageOutputText = ({ text, isLast }: { text: string, isLast?: boolean }) => {
+  if (CHAT_TYPEWRITER_ENABLED && isLast) {
+    return <div
+      className={'output-data'}>
+      <TypewriterText text={text.trim()} limit={2500} cursorChar={'_'}>
 
-const ChatMessageItem = ({ message }: { message: ChatMessage }) => {
-  const renderContentPart = (part: ChatMessageContent, partIndex: number) => {
-    if (part.type === 'text') {
-      return <div key={partIndex} className={"whitespace-pre-wrap border"}>{part.text}</div>
+      </TypewriterText>
+    </div>
+  }
+}
+
+const ChatMessageItem = ({ message, isLast }: { message: ChatMessage, isLast?: boolean }) => {
+  const renderContentPart = (part: ChatMessageContent, partIndex: number, isLast: boolean = false) => {
+    if (part.type === 'text' && CHAT_TYPEWRITER_ENABLED && isLast) {
+      return <div
+        className={'output-data'}>
+        <TypewriterText text={part?.text?.trim()} limit={2500} cursorChar={'_'}></TypewriterText>
+      </div>
+    } else if (part.type === 'text') {
+      //return <div key={partIndex} className={"whitespace-pre-wrap overflow-x-clip"}>{part?.text?.trim()}</div>
+      return <div className={'output-data'}>
+        <OutputDataMarkdown data={part?.text?.trim()} />
+      </div>
     } else if (part.type === 'code') {
-      return <pre key={partIndex} className={"rounded border border-white overflow-x-auto mb-1"}><code>{part.text}</code></pre>
+      return <pre key={partIndex} className={"rounded border border-white overflow-x-auto mb-1"}><code>{part?.text?.trim()}</code></pre>
     } else if (part.type === 'image') {
       if (part?.data?.url) {
         return <img key={partIndex} src={part.data.url} alt="Image" className={"max-w-full h-auto"} />
@@ -46,7 +66,7 @@ const ChatMessageItem = ({ message }: { message: ChatMessage }) => {
         <strong>Approval ({approvalPart.data.scope}):</strong> {approvalPart.text}
       </div>
     } else if (part.type === 'task') {
-      return <div key={partIndex} className={"border border-green-700 rounded"}>
+      return <div key={partIndex} className={"text-sm text-muted-foreground"}>
         <strong>Task:</strong> {part.text} - <em>Status: {part.data?.status}</em>
       </div>
     } else {
@@ -54,15 +74,29 @@ const ChatMessageItem = ({ message }: { message: ChatMessage }) => {
     }
   }
 
+  const renderUserContentPart = (part: ChatMessageContent, partIndex: number) => {
+    if (part.type === 'text') {
+      return <div key={partIndex} className={"whitespace-pre-wrap overflow-x-clip"}>{part?.text?.trim()}</div>
+    } else {
+      return <p key={partIndex}>[Unsupported content type in user message: {part.type}]</p>
+    }
+  }
+
   return message.content.map((msgContent: ChatMessageContent, cidx) => {
-    return (<div className={'Chat-message hover:bg-accent'} role={message.role} key={`m-${cidx}`}>
+    if (message.role === 'user') {
+      return (<div className={'Chat-message Chat-message-user'} role={message.role} key={`m-${cidx}`}>
+        {renderUserContentPart(msgContent, cidx)}
+      </div>)
+    }
+
+    return (<div className={`Chat-message Chat-message-${message.role}`} role={message.role} key={`m-${cidx}`}>
       {/*message.role==='user' && msgContent.type==='text'
             ? <div className={'input-data'}>{msgContent.text}</div>
             :<div
               className={'output-data'}>
               <TypewriterText text={msgContent.text} limit={2500} cursorChar={'_'}></TypewriterText>
             </div>*/}
-      {renderContentPart(msgContent, cidx)}
+      {renderContentPart(msgContent, cidx, isLast)}
     </div>)
   })
 }

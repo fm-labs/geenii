@@ -8,10 +8,11 @@ import WizardsPage from '@/app/wizards/wizards-page.tsx'
 import SettingsView from '@/app/settings/SettingsView.tsx'
 import WsChat from '@/app/wschat/WsChat.tsx'
 import WizardApp from '@/app/wizards/WizardApp.tsx'
-import DeveloperPage from '@/app/developer/developer-page.tsx'
-import { AgentsChatsPage } from '@/app/agents/agent-chats-page.tsx'
+import CompletionsPage from '@/app/completion/completions-page.tsx'
+import { AssistantChatsPage } from '@/app/assistants/assistant-chats-page.tsx'
 import SettingsPage from '@/app/settings/SettingsPage.tsx'
 import { McpServersView } from '@/app/mcp-servers/mcp-servers-view.tsx'
+import { NotFoundError } from '@/features/errors/not-found-error.tsx'
 
 
 type Route = {
@@ -24,7 +25,7 @@ const AppRouter = () => {
 
   //const queryParams = new URLSearchParams(window.location.search);
   //const routeQueryPath = queryParams.get('route');
-  const [routePath, setRoutePath] = React.useState<string>(window.location.hash.replace('#', '') || '/welcome')
+  const [routePath, setRoutePath] = React.useState<string>(window.location.hash.replace('#', '') || '/')
 
   console.log('>> AppRouter: current URL', window.location.href)
   //const routePath = window.location.hash.replace('#', '')
@@ -48,16 +49,20 @@ const AppRouter = () => {
 
   const routes = [
     {
-      path: '/welcome',
+      path: '/',
       element: <WelcomeScreen />,
+    },
+    {
+      path: '/completions',
+      element: <CompletionsPage />,
     },
     {
       path: '/chat',
       element: <CompletionChatPage />,
     },
     {
-      path: '/agents',
-      element: <AgentsChatsPage />,
+      path: '/assistants',
+      element: <AssistantChatsPage />,
     },
     {
       path: '/mcp',
@@ -84,10 +89,6 @@ const AppRouter = () => {
       element: <WizardApp />,
     },
     {
-      path: '/dev',
-      element: <DeveloperPage />,
-    },
-    {
       path: '/settings',
       element: <SettingsPage />,
     },
@@ -105,7 +106,7 @@ const AppRouter = () => {
     //return routes[0];
     return {
       path: 'not-found',
-      element: <>Not found</>,
+      element: <NotFoundError />,
     }
   }, [match, routes])
 

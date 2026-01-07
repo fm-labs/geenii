@@ -4,19 +4,21 @@ export const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true' && import.meta.
 
 //export const DEFAULT_XAI_API_URL = import.meta.env.VITE_XAI_API_URL || 'https://xai.fmlabs.kloudia.cloud/api';
 //export const DEFAULT_OLLAMA_API_URL = 'https://xai.fmlabs.kloudia.cloud/proxy/ollama';
-export const XAI_API_URL = import.meta.env.VITE_XAI_API_URL || 'http://10.0.2.2:13030/';
-export const OLLAMA_API_URL = import.meta.env.VITE_OLLAMA_API_URL || 'http://10.0.2.2:13030/ai/proxy/ollama';
+export const XAI_API_URL = import.meta.env.VITE_XAI_API_URL || `${window.location.protocol}//${window.location.hostname}:13030`
+export const OLLAMA_API_URL = import.meta.env.VITE_OLLAMA_API_URL || `${window.location.protocol}//${window.location.hostname}:13030/ai/gateway/ollama`;
+
+export const FEATURE_COMPLETION_ENABLED = import.meta.env.VITE_FEATURE_COMPLETION_ENABLED === 'true' || false;
+export const FEATURE_QUICKGEN_BUTTONS_ENABLED = import.meta.env.VITE_FEATURE_FEATURE_QUICKGEN_BUTTONS_ENABLED === 'true' || false;
 
 export const FEATURE_CHAT_ENABLED = import.meta.env.VITE_FEATURE_CHAT_ENABLED === 'true' || false;
 export const FEATURE_CHAT_FILES_ENABLED = import.meta.env.VITE_FEATURE_CHAT_FILES_ENABLED === 'true' || false;
 export const FEATURE_CHAT_TOOLS_ENABLED = import.meta.env.VITE_FEATURE_CHAT_TOOLS_ENABLED === 'true' || false;
 export const FEATURE_CHAT_MODEL_SELECTION_ENABLED = import.meta.env.VITE_FEATURE_CHAT_MODEL_SELECTION_ENABLED === 'true' || false;
 export const FEATURE_CHAT_PROMPT_SUGGESTIONS_ENABLED = import.meta.env.VITE_FEATURE_CHAT_PROMPT_SUGGESTIONS_ENABLED === 'true' || false;
-export const FEATURE_QUICKGEN_BUTTONS_ENABLED = import.meta.env.VITE_FEATURE_FEATURE_QUICKGEN_BUTTONS_ENABLED === 'true' || false;
-export const FEATURE_WIZARD_ENABLED = import.meta.env.VITE_FEATURE_WIZARD_ENABLED === 'true' || false;
-export const FEATURE_COMPLETION_ENABLED = import.meta.env.VITE_FEATURE_COMPLETION_ENABLED === 'true' || false;
+
 export const FEATURE_VOICE_RECORDING_ENABLED = import.meta.env.VITE_FEATURE_VOICE_RECORDING_ENABLED === 'true' || false;
 export const FEATURE_VOICE_TRANSCRIPTION_ENABLED = import.meta.env.VITE_FEATURE_VOICE_TRANSCRIPTION_ENABLED === 'true' || false;
+export const FEATURE_WIZARD_ENABLED = import.meta.env.VITE_FEATURE_WIZARD_ENABLED === 'true' || false;
 
 export const FEATURE_AGENTS_ENABLED = import.meta.env.VITE_FEATURE_AGENTS_ENABLED === 'true' || false;
 export const FEATURE_MCP_ENABLED = import.meta.env.VITE_FEATURE_MCP_ENABLED === 'true' || false;
@@ -24,6 +26,9 @@ export const FEATURE_FLOWS_ENABLED = import.meta.env.VITE_FEATURE_FLOWS_ENABLED 
 
 export const FEATURE_TAURI_ENABLED = import.meta.env.VITE_FEATURE_TAURI_ENABLED === 'true' || false;
 export const FEATURE_TAURI_XAPI_ENABLED = import.meta.env.VITE_FEATURE_TAURI_XAPI_ENABLED === 'true' || false;
+
+export const CHAT_TYPEWRITER_ENABLED = import.meta.env.VITE_CHAT_TYPEWRITER_ENABLED === 'true' || false;
+
 export const AVAILABLE_MODELS = [
   'ollama:mistral:latest',
   'ollama:llama3.2:3b',

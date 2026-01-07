@@ -3,6 +3,10 @@ import Layout from '../../components/layout/layout.tsx'
 import TypewriterText from '../../ui/TypewriterText.tsx'
 import { Button } from '../../ui'
 import { useNavigate } from '../../app-router.tsx'
+import Header from '@/components/header.tsx'
+import QuickTextGenerationPopupButton from '@/app/completion/components/QuickTextGenerationPopupButton.tsx'
+import QuickImageGenerationPopupButton from '@/app/completion/components/QuickImageGenerationPopupButton.tsx'
+import QuickAudioGenerationPopupButton from '@/app/completion/components/QuickAudioGenerationPopupButton.tsx'
 
 
 const greetings = [
@@ -72,12 +76,15 @@ const WelcomeScreen = () => {
       <div className="text-center mb-4">
         <h2 className="text-xl font-bold"><TypewriterText text={getRandomElement(messages)} delay={2000} showCursor={false} /></h2>
       </div>
-      {/*<div className="text-center mb-4">
-        <SelfIntro />
-      </div>*/}
-      <div className="text-center mb-4">
-        <Button onClick={() => navigate('/chat')}>Start new chat</Button>
+      
+      <div className={"max-w-1/2 mx-auto p-4 text-center"}>
+        <div className="flex flex-col gap-4 justify-center mt-8">
+          <div className="text-center mb-4">
+            <Button onClick={() => navigate('/chat')}>Start new chat</Button>
+          </div>
+        </div>
       </div>
+
     </Layout>
   )
 }

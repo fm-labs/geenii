@@ -1,10 +1,10 @@
 import React from "react";
-import Popup from "../../ui/Popup.tsx";
+import Popup from "../../../ui/Popup.tsx";
 import QuickCompletion from "./QuickCompletion.tsx";
-import { AppContext } from "../../context/AppContext.tsx";
-import { ollamaGenerate } from "../../api/ollama-api.ts";
-import { Button } from "../../ui";
-import useNotification from '../../hooks/useNotification.ts'
+import { AppContext } from "../../../context/AppContext.tsx";
+import { ollamaGenerate } from "../../../api/ollama-api.ts";
+import { Button } from "../../../ui";
+import useNotification from '../../../hooks/useNotification.ts'
 
 const QuickOllamaTextGenerationPopupButton = ({ modelName }) => {
     const [isOpen, setIsOpen] = React.useState(false);

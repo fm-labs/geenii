@@ -21,19 +21,15 @@ import { ScrollArea } from '@/components/ui/scroll-area.tsx'
 import { Separator } from '@/components/ui/separator.tsx'
 import { NewChatDialog } from './components/new-chat-dialog.tsx'
 import { type ChatUser, type Convo } from './data/chat-types.ts'
-// Fake Data
-import { conversations } from './data/convo.json'
 import Layout from '@/components/layout/layout.tsx'
 import { id } from 'date-fns/locale'
-import AgentChat from '@/app/agents/agent-chat.tsx'
+import AssistantChat from '@/app/assistants/assistant-chat.tsx'
 import ChatContextProvider from '@/app/chat/components/ChatContextProvider.tsx'
-import AgentChatList from '@/app/agents/agent-chat-list.tsx'
+import AssistantChatList from '@/app/assistants/assistant-chat-list.tsx'
 import { XAI_API_URL } from '@/constants.ts'
 import '../chat/Chat.scss'
-import { NewAgentDialog } from '@/app/agents/components/new-agent-dialog.tsx'
-import { AlertDialogDemo } from '@/app/agents/components/alert-dialog-demo.tsx'
 
-export function AgentsChatsPage() {
+export function AssistantChatsPage() {
   const [search, setSearch] = useState('')
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null)
   const [mobileSelectedUser, setMobileSelectedUser] = useState<ChatUser | null>(
@@ -42,49 +38,44 @@ export function AgentsChatsPage() {
   const [createConversationDialogOpened, setCreateConversationDialog] =
     useState(false)
 
-  // Filtered data based on the search query
-  const filteredChatList = conversations.filter(({ fullName }) =>
-    fullName.toLowerCase().includes(search.trim().toLowerCase()),
-  )
-
-  const [agents, setAgents] = useState<Agent[]>()
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
-  const [agentChats, setAgentChats] = useState<any[]>()
+  const [assistants, setAssistants] = useState<Assistant[]>()
+  const [selectedAssistant, setSelectedAssistant] = useState<Assistant | null>(null)
+  const [assistantChats, setAssistantChats] = useState<any[]>()
   const [selectedChat, setSelectedChat] = useState<any>()
   const [chatMessages, setChatMessages] = useState<any[]>()
 
-  const fetchAgents = async () => {
-    const response = await fetch(XAI_API_URL + 'ai/v1/agents/', {
+  const fetchAssistants = async () => {
+    const response = await fetch(XAI_API_URL + 'ai/v1/assistants/', {
       headers: {
         "Content-Type": "application/json",
       }
     })
     const data = await response.json()
-    console.log("Fetched agents", data)
+    console.log("Fetched assistants", data)
     return data
   }
 
-  const fetchAgentChats = async (agentId: string) => {
-    const response = await fetch(XAI_API_URL + `ai/v1/agents/${agentId}/chats`, {
+  const fetchAssistantChats = async (assistantId: string) => {
+    const response = await fetch(XAI_API_URL + `ai/v1/assistants/${assistantId}/chats`, {
       headers: {
         "Content-Type": "application/json",
       }
     })
     const data = await response.json()
-    console.log("Fetched agent chats", data)
+    console.log("Fetched assistant chats", data)
     return data
   }
 
 
-  const fetchAgentChat = async (agentId: string, conversationId: string) => {
-    console.log("Fetching AgentChat messages", agentId, conversationId)
-    const response = await fetch(XAI_API_URL + `ai/v1/agents/${agentId}/chats/${conversationId}`, {
+  const fetchAssistantChat = async (assistantId: string, conversationId: string) => {
+    console.log("Fetching AssistantChat messages", assistantId, conversationId)
+    const response = await fetch(XAI_API_URL + `ai/v1/assistants/${assistantId}/chats/${conversationId}`, {
       headers: {
         "Content-Type": "application/json",
       }
     })
     const data = await response.json()
-    console.log("Fetched agent chat", data)
+    console.log("Fetched assistant chat", data)
     return data
   }
 
@@ -107,39 +98,48 @@ export function AgentsChatsPage() {
   // )
 
   React.useEffect(() => {
-    fetchAgents().then((response) => setAgents(response))
+    fetchAssistants().then((response) => setAssistants(response))
   }, [])
 
   React.useEffect(() => {
-    if (selectedAgent !== null) {
-      fetchAgentChats(selectedAgent.id).then((response) => setAgentChats(response))
+    if (selectedAssistant !== null) {
+      fetchAssistantChats(selectedAssistant.id).then((response) => setAssistantChats(response))
     }
-  }, [selectedAgent])
+  }, [selectedAssistant])
 
   React.useEffect(() => {
-    if (selectedAgent && agentChats && agentChats.length > 0) {
-      // find newest agentChats by timestamp
-      const sortedChats = agentChats.sort((a, b) => a.timestamp - b.timestamp)
+    if (selectedAssistant && assistantChats && assistantChats.length > 0) {
+      // find newest assistantChats by timestamp
+      const sortedChats = assistantChats.sort((a, b) => a.timestamp - b.timestamp)
       setSelectedChat(sortedChats[sortedChats.length - 1])
       const lastConversationId = sortedChats[sortedChats.length - 1].id
-      fetchAgentChat(selectedAgent.id, lastConversationId).then((response) => setChatMessages(response.messages))
+      fetchAssistantChat(selectedAssistant.id, lastConversationId).then((response) => setChatMessages(response.messages))
     } else {
       setSelectedChat(undefined)
       setChatMessages([])
     }
-  }, [agentChats, selectedAgent])
+  }, [assistantChats, selectedAssistant])
 
   // React.useEffect(() => {
-  //   if (agents && agents.length > 0 && selectedAgent === null) {
-  //     setSelectedAgent(agents[0])
+  //   if (assistants && assistants.length > 0 && selectedAssistant === null) {
+  //     setSelectedAssistant(assistants[0])
   //   }
-  // }, [agents, selectedAgent])
+  // }, [assistants, selectedAssistant])
 
-  const users = conversations.map(({ messages, ...user }) => user)
+  //const users = conversations.map(({ messages, ...user }) => user)
+
+  const users = assistants ? assistants.map((assistant) => ({
+    id: assistant.id,
+    title: assistant.description,
+    username: assistant.name,
+    fullName: assistant.name,
+    profile: assistant?.imageUrl,
+    //messages: [],
+  })) : []
 
   return (
     <Layout>
-      <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 flex-1 overflow-auto">
+      <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 flex-1 overflow-auto max-w-[1600px] mx-auto">
         <section className="flex h-full min-h-[90vh] gap-6">
           {/* Left Side */}
           <div className="flex w-full flex-col gap-2 sm:w-56 lg:w-72 2xl:w-80">
@@ -147,7 +147,7 @@ export function AgentsChatsPage() {
               className="bg-background sticky top-0 z-10 -mx-4 px-4 pb-3 shadow-md sm:static sm:z-auto sm:mx-0 sm:p-0 sm:shadow-none">
               <div className="flex items-center justify-between py-2">
                 <div className="flex gap-2">
-                  <h1 className="text-2xl font-bold">Agents</h1>
+                  <h1 className="text-2xl font-bold">Assistants</h1>
                   <BotMessageSquare size={20} />
                 </div>
 
@@ -180,10 +180,10 @@ export function AgentsChatsPage() {
             </div>
 
             <ScrollArea className="-mx-3 h-full overflow-scroll p-3">
-              <AgentChatList agents={agents} selectedId={selectedUser?.id} onClickAgent={(agent) => {
-                //setSelectedUser(agent)
-                //setMobileSelectedUser(agent)
-                setSelectedAgent(agent)
+              <AssistantChatList assistants={assistants} selectedId={selectedUser?.id} onClickAssistant={(assistant) => {
+                //setSelectedUser(assistant)
+                //setMobileSelectedUser(assistant)
+                setSelectedAssistant(assistant)
               }} />
               {/*filteredChatList.map((chatUsr) => {
                 const { id, profile, username, messages, fullName } = chatUsr
@@ -230,10 +230,10 @@ export function AgentsChatsPage() {
           </div>
 
           {/* Right Side */}
-          {selectedAgent ? (
+          {selectedAssistant ? (
             <>
               <ChatContextProvider initialMessages={chatMessages}>
-                <AgentChat agent={selectedAgent} conversationId={selectedChat?.id}></AgentChat>
+                <AssistantChat assistant={selectedAssistant} conversationId={selectedChat?.id}></AssistantChat>
               </ChatContextProvider>
             </>
           ):(
@@ -264,7 +264,7 @@ export function AgentsChatsPage() {
           onOpenChange={setCreateConversationDialog}
           open={createConversationDialogOpened}
         />
-        {/*<NewAgentDialog />*/}
+        {/*<NewAssistantDialog />*/}
         {/*<AlertDialogDemo />*/}
       </div>
     </Layout>

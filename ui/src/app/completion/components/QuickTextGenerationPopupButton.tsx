@@ -1,9 +1,9 @@
 import React from 'react'
-import Popup from '../../ui/Popup.tsx'
+import Popup from '../../../ui/Popup.tsx'
 import QuickCompletion from './QuickCompletion.tsx'
-import { AppContext } from '../../context/AppContext.tsx'
-import Button from '../../ui/Button.tsx'
-import useNotification from '../../hooks/useNotification.ts'
+import { AppContext } from '../../../context/AppContext.tsx'
+import Button from '../../../ui/Button.tsx'
+import useNotification from '../../../hooks/useNotification.ts'
 
 const QuickTextGenerationPopupButton = ({ modelName }) => {
   const [isOpen, setIsOpen] = React.useState(false)
@@ -44,14 +44,14 @@ const QuickTextGenerationPopupButton = ({ modelName }) => {
     <>
       <Button
         onClick={() => setIsOpen(true)}
-      >Quick Text Generation
+      >Generate Text
       </Button> {isThinking ? 'Thinking...':''}
 
       {/* Popup for Quick Completion */}
       <Popup show={isOpen} onClose={() => setIsOpen(false)} title="Quick Completion" size="md"
              showCloseButton={true}>
         <div>
-          <h2 className="text-xl font-semibold mb-4">Quick Text Generation</h2>
+          <h2 className="text-xl font-semibold mb-4">Generate Text</h2>
           <p className="text-gray-600 mb-4">
             Quickly generate text completions using the input below. This feature is designed for rapid
             prototyping and testing.
