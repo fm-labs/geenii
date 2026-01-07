@@ -4,8 +4,8 @@ export const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true' && import.meta.
 
 //export const DEFAULT_XAI_API_URL = import.meta.env.VITE_XAI_API_URL || 'https://xai.fmlabs.kloudia.cloud/api';
 //export const DEFAULT_OLLAMA_API_URL = 'https://xai.fmlabs.kloudia.cloud/proxy/ollama';
-export const XAI_API_URL = import.meta.env.VITE_XAI_API_URL || `${window.location.protocol}//${window.location.hostname}:13030`
-export const OLLAMA_API_URL = import.meta.env.VITE_OLLAMA_API_URL || `${window.location.protocol}//${window.location.hostname}:13030/ai/gateway/ollama`;
+export const XAI_API_URL = import.meta.env.VITE_XAI_API_URL || `${window.location.protocol}//${window.location.hostname}:31030/`
+export const OLLAMA_API_URL = import.meta.env.VITE_OLLAMA_API_URL || `${window.location.protocol}//${window.location.hostname}:31030/ai/gateway/ollama/`;
 
 export const FEATURE_COMPLETION_ENABLED = import.meta.env.VITE_FEATURE_COMPLETION_ENABLED === 'true' || false;
 export const FEATURE_QUICKGEN_BUTTONS_ENABLED = import.meta.env.VITE_FEATURE_FEATURE_QUICKGEN_BUTTONS_ENABLED === 'true' || false;

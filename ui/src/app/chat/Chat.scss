@@ -11,7 +11,7 @@ $chat-input-buttons-border-radius: 2rem;
 $chat-input-buttons-border-color-hover: #CCC;
 $chat-input-buttons-border: 1px solid #CCCCCC7C;
 
-$chat-msg-padding: $chat-base-padding / 2;
+$chat-msg-padding: calc($chat-base-padding / 2);
 $chat-msg-border-radius: 10px;
 
 $dark-chat-input-background-color: #333;
