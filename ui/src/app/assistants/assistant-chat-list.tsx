@@ -3,6 +3,7 @@ import { Fragment } from 'react/jsx-runtime'
 import { cn } from '@/lib/utils.ts'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar.tsx'
 import { Separator } from '@/components/ui/separator.tsx'
+import { BotIcon } from 'lucide-react'
 
 interface AssistantChatListProps {
   assistants: Assistant[]
@@ -46,8 +47,8 @@ const AssistantChatList = (props: AssistantChatListProps) => {
             >
               <div className="flex gap-2">
                 <Avatar>
-                  <AvatarImage src={profile} alt={username} />
-                  <AvatarFallback>{username}</AvatarFallback>
+                  <AvatarImage src={null} alt={username} color={"#FFF"} />
+                  <AvatarFallback><BotIcon /></AvatarFallback>
                 </Avatar>
                 <div>
                   <span className="col-start-2 row-span-2 font-medium">

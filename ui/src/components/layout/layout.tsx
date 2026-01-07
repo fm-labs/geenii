@@ -19,7 +19,7 @@ const Layout = (props: PropsWithChildren) => {
   return (
     <div>
       <header className={"absolute top-0 left-0 w-full border-b shadow-md z-10"}>
-        <div className={"flex flex-row w-full justify-between items-center px-10"}>
+        <div className={"flex flex-row w-full justify-between items-center max-w-7xl px-4 mx-auto"}>
           <div className={"flex flex-row"}>
             <BotIcon />
             <span className="ml-2 font-bold text-lg">
@@ -27,7 +27,7 @@ const Layout = (props: PropsWithChildren) => {
             </span>
           </div>
           <div>
-            <ul className="space-x-3 p-4 flex items-center justify-center">
+            <ul className="space-x-3 p-2 flex items-center justify-center">
               {/*<li className="text-sm text-gray-600 hover:bg-blue-50 px-1"><a href="#/welcome">Start</a></li>*/}
               {FEATURE_COMPLETION_ENABLED && <li className={navItemStyle}><a href="#/completions">Completions</a></li>}
               {FEATURE_CHAT_ENABLED && <li className={navItemStyle}><a href="#/chat">Chat</a></li>}
@@ -44,8 +44,8 @@ const Layout = (props: PropsWithChildren) => {
         </div>
       </header>
 
-      <div className="content _ml-64 pt-10">
-        <div className="flex flex-col justify-center min-h-screen p-4">
+      <div className="content max-w-7xl mx-auto pt-12">
+        <div className="flex flex-col justify-center min-h-screen">
           <div className="flex flex-col justify-center mb-4">
             <div className={'grow'}>
               {props.children}

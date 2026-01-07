@@ -96,7 +96,7 @@ export function McpServersView() {
                       <div className="flex gap-2">
                         <Avatar>
                           <AvatarImage src={undefined} alt={name} />
-                          <AvatarFallback>{name}</AvatarFallback>
+                          <AvatarFallback><ServerIcon /></AvatarFallback>
                         </Avatar>
                         <div>
                           <span className="col-start-2 row-span-2 font-medium">

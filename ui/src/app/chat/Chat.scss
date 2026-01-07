@@ -12,7 +12,7 @@ $chat-input-buttons-border-color-hover: #CCC;
 $chat-input-buttons-border: 1px solid #CCCCCC7C;
 
 $chat-msg-padding: $chat-base-padding / 2;
-$chat-msg-border-radius: 15px;
+$chat-msg-border-radius: 10px;
 
 $dark-chat-input-background-color: #333;
 $dark-chat-input-color: #f6f6f6;
@@ -68,7 +68,7 @@ $dark-chat-input-color: #f6f6f6;
     .output-data {
       //font-family: Courier New, monospace;
       //text-align: left;
-      padding: calc($chat-base-padding/2);
+      //padding: calc($chat-base-padding/2);
 
       h1,h2,h3,h4,h5,h6 {
         margin: 1em 0 0.5em 0;
@@ -82,6 +82,11 @@ $dark-chat-input-color: #f6f6f6;
         li {
           margin-bottom: 0.5em;
         }
+      }
+
+      pre {
+        max-width: 860px;
+        margin-bottom: 1rem;
       }
     }
 
@@ -97,9 +102,10 @@ $dark-chat-input-color: #f6f6f6;
   .Chat-message[role="user"] {
     align-self: flex-end;
     background-color: #287679;
-
-    padding: calc($chat-msg-padding/2) $chat-msg-padding;
     border-radius: $chat-msg-border-radius 0 $chat-msg-border-radius $chat-msg-border-radius;
+    padding: $chat-msg-padding;
+    margin-top: $chat-msg-padding*4;
+    margin-bottom: $chat-msg-padding;
   }
 
   .Chat-message[role="assistant"] {

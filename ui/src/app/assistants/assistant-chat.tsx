@@ -5,7 +5,7 @@ import { ArrowLeft, ImagePlus, MoreVertical, Paperclip, Phone, Plus, Send, Video
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar.tsx'
 import { Fragment } from 'react/jsx-runtime'
 import { format } from 'date-fns'
-import type { ChatUser, Convo } from '@/app/assistants/data/chat-types.ts'
+import type { ChatUser, Convo } from '@/app/assistants/chat-types.ts'
 import { ChatMessage } from '@/app/chat/components/chat.types.ts'
 import ChatMessages from '@/app/chat/components/ChatMessages.tsx'
 import { ChatContext } from '@/app/chat/components/ChatContext.tsx'
@@ -148,7 +148,7 @@ const AssistantChat = ({ assistant, conversationId: initialConvId }: AssistantCh
   return (
     <div
       className={cn(
-        'bg-background absolute inset-0 start-full z-50 hidden w-full flex-1 flex-col border shadow-xs sm:static sm:z-auto sm:flex sm:rounded-md',
+        'bg-background absolute inset-0 start-full z-50 hidden w-full max-w-4xl flex-1 flex-col border shadow-xs sm:static sm:z-auto sm:flex sm:rounded-md',
         mobileSelectedUser && 'start-0 flex',
       )}
     >

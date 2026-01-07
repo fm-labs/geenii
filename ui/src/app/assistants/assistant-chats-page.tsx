@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { ScrollArea } from '@/components/ui/scroll-area.tsx'
 import { Separator } from '@/components/ui/separator.tsx'
 import { NewChatDialog } from './components/new-chat-dialog.tsx'
-import { type ChatUser, type Convo } from './data/chat-types.ts'
+import { type ChatUser, type Convo } from './chat-types.ts'
 import Layout from '@/components/layout/layout.tsx'
 import { id } from 'date-fns/locale'
 import AssistantChat from '@/app/assistants/assistant-chat.tsx'
@@ -139,7 +139,7 @@ export function AssistantChatsPage() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 flex-1 overflow-auto max-w-[1600px] mx-auto">
+      <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 flex-1 overflow-auto">
         <section className="flex h-full min-h-[90vh] gap-6">
           {/* Left Side */}
           <div className="flex w-full flex-col gap-2 sm:w-56 lg:w-72 2xl:w-80">

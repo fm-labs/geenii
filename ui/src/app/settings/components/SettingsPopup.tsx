@@ -1,7 +1,7 @@
 import React from 'react'
-import Popup from '../../ui/Popup.tsx'
-import { AppContext } from '../../context/AppContext.tsx'
-import SettingsView from './SettingsView.tsx'
+import Popup from '../../../ui/Popup.tsx'
+import { AppContext } from '../../../context/AppContext.tsx'
+import SettingsView from '../settings-view.tsx'
 
 const SettingsPopup = ({ show, onClose}) => {
   const context = React.useContext(AppContext)
