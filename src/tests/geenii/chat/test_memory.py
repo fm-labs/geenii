@@ -45,7 +45,7 @@ def test_load_messages_from_existing_file(tmp_json_path):
             ],
         },
     ]
-    tmp_json_path.write_text(json.dumps(raw), encoding="utf-8")
+    tmp_json_path.write_text(json.dumps({"messages": raw}), encoding="utf-8")
 
     # Act
     mem = FileChatMemory(str(tmp_json_path), create=True)
@@ -99,8 +99,10 @@ def test_save_messages_writes_valid_json(tmp_json_path):
     mem.add_message(make_message(role="system", text="x"))
 
     data = json.loads(tmp_json_path.read_text(encoding="utf-8"))
-    assert isinstance(data, list)
-    assert len(data) == 1
-    assert data[0]["role"] == "system"
-    assert data[0]["content"][0]["type"] == "text"
-    assert data[0]["content"][0]["text"] == "x"
+    assert "messages" in data
+    messages = data["messages"]
+    assert isinstance(messages, list)
+    assert len(messages) == 1
+    assert messages[0]["role"] == "system"
+    assert messages[0]["content"][0]["type"] == "text"
+    assert messages[0]["content"][0]["text"] == "x"

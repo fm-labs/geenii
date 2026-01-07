@@ -6,7 +6,7 @@ build/
 dist/
 volumes/
 .env.local
-.env.*
+.env
 *.local
 *.bak
 *.log

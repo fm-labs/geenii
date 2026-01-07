@@ -1,5 +1,4 @@
 
-
 services:
 
   api:
@@ -8,16 +7,19 @@ services:
       dockerfile: ./Dockerfile
     ports:
       - "31030:13030"
+    networks:
+      - geenii-net
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - DATA_DIR=/app/data
       - OLLAMA_HOST=http://host.docker.internal:11434
+      - MONGODB_URI=mongodb://geenii:super-secure-password@mongodb:27017?authSource=admin
+      - REDIS_URI=redis://redis:6379/0
     env_file:
-      - ./.env.local
+      - .env
 
   ui:
     build:
@@ -25,11 +27,11 @@ services:
       dockerfile: ./Dockerfile
     ports:
       - "31031:80"
-    profiles:
-      - ui
+    networks:
+      - geenii-net
 
   redis:
-    image: redis:latest
+    image: redis:8.4
     ports:
       - "31379:6379"
     #expose:
@@ -41,12 +43,12 @@ services:
       - ./volumes/redis:/data
 
   mongodb:
-    image: mongo:latest
+    image: mongo:8.2
     ports:
       - "31017:27017"
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=adminpassword
+      - MONGO_INITDB_ROOT_USERNAME=geenii
+      - MONGO_INITDB_ROOT_PASSWORD=super-secure-password
       - MONGO_INITDB_ROOT_AUTHENTICATION_DATABASE=admin
     networks:
       - geenii-net

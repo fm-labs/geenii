@@ -27,3 +27,11 @@ WHISPERCPP_IMAGE="whispercpp:latest"
 
 OPENAI_API_KEY=os.environ.get("OPENAI_API_KEY", "")
 ANTHROPIC_API_KEY=os.environ.get("ANTHROPIC_API_KEY", "")
+
+
+# Database settings
+MONGODB_URI = os.environ.get("MONGODB_URI", "")
+MONGODB_DB_NAME = os.environ.get("MONGODB_DB_NAME", "geenii_brain0")
+
+# Redis settings
+REDIS_URI = os.environ.get("REDIS_URI", "")

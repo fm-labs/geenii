@@ -11,6 +11,7 @@ def generate_completion(request: CompletionApiRequest) -> CompletionApiResponse 
     """
     Generate a completion using the specified AI provider and model.
     """
+    response = None
     try:
         #publish_event(["ai.completion.created"], {"request": request.model_dump()})
 
@@ -31,6 +32,12 @@ def generate_completion(request: CompletionApiRequest) -> CompletionApiResponse 
         #publish_event(["ai.completion.error"], {"error": str(e), "request": request.model_dump()})
 
         return ErrorApiResponse(error=str(e))
+    finally:
+        if response:
+            print(f"Completion response: {response.model_dump()}")
+            response.save()
+            print("Completion response saved.")
+
 
 
 def generate_assistant_completion(request: AssistantApiRequest) -> AssistantApiResponse:

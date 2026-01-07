@@ -1,14 +1,37 @@
-from typing import List, Any
+import abc
+from typing import List, Any, ClassVar
 
 import pydantic
 
 from geenii import settings
+from geenii.modelstore import build_model_store
 
 
-class ErrorApiResponse(pydantic.BaseModel):
+class AbstractModel(pydantic.BaseModel, abc.ABC):
+    uuid : str | None = None
+
+    #COLLECTION_NAME: ClassVar[str] = "my_collection"
+
+    @classmethod
+    #@abc.abstractmethod
+    def __collection_name(cls) -> str:
+        """Returns the collection name for the model class."""
+        #return self.__class__.__name__.lower()
+        # check if class has COLLECTION_NAME attribute
+        if hasattr(cls, "COLLECTION_NAME"):
+            return getattr(cls, "COLLECTION_NAME")
+        return cls.__name__.lower()
+
+    def save(self):
+        """Saves the model instance to the database."""
+        store = build_model_store(model_class=self.__class__, collection_name=self.__collection_name())
+        return store.create(self)
+
+
+class ErrorApiResponse(AbstractModel):
     error: str
 
-class BaseAIProviderApiResponse(pydantic.BaseModel):
+class BaseAIProviderApiResponse(AbstractModel):
     id: str
     timestamp: int
     model: str | None = None
@@ -19,7 +42,7 @@ class BaseAIProviderApiResponse(pydantic.BaseModel):
     model_result: dict = None
 
 # Completion
-class CompletionApiRequest(pydantic.BaseModel):
+class CompletionApiRequest(AbstractModel):
     prompt: str
     model: str | None = settings.DEFAULT_COMPLETION_MODEL
     # Model tweaking parameters
@@ -32,6 +55,9 @@ class CompletionApiRequest(pydantic.BaseModel):
     stream: bool | None = False
 
 class CompletionApiResponse(BaseAIProviderApiResponse):
+
+    COLLECTION_NAME: ClassVar[str] = "completions"
+
     prompt: str
     output: List[dict] | None = None
     output_text: str | None = None
@@ -53,7 +79,7 @@ class AssistantApiResponse(CompletionApiResponse):
 
 
 # Image Generation
-class ImageGenerationApiRequest(pydantic.BaseModel):
+class ImageGenerationApiRequest(AbstractModel):
     prompt: str
     model: str | None = settings.DEFAULT_IMAGE_GENERATION_MODEL
     # Model tweaking parameters
@@ -70,7 +96,7 @@ class ImageGenerationApiResponse(BaseAIProviderApiResponse):
 
 
 # Audio Generation
-class AudioGenerationApiRequest(pydantic.BaseModel):
+class AudioGenerationApiRequest(AbstractModel):
     model: str | None = settings.DEFAULT_AUDIO_GENERATION_MODEL
     text: str
     # Model tweaking parameters
@@ -87,7 +113,7 @@ class AudioGenerationApiResponse(BaseAIProviderApiResponse):
 
 
 # Audio Transcription
-class AudioTranscriptionApiRequest(pydantic.BaseModel):
+class AudioTranscriptionApiRequest(AbstractModel):
     model: str | None = settings.DEFAULT_AUDIO_TRANSCRIPTION_MODEL
     input_file: str  # Path to the audio file to be transcribed
     input_blob: bytes | None = None  # Optional raw audio data
@@ -98,7 +124,7 @@ class AudioTranscriptionApiResponse(BaseAIProviderApiResponse):
 
 
 # Audio Translation
-class AudioTranslationApiRequest(pydantic.BaseModel):
+class AudioTranslationApiRequest(AbstractModel):
     model: str | None = settings.DEFAULT_AUDIO_TRANSLATION_MODEL
     input_file: str  # Path to the audio file to be translated
     source_lang: str | None = "en"  # Default source language
@@ -109,7 +135,7 @@ class AudioTranslationApiResponse(BaseAIProviderApiResponse):
 
 
 # MCP
-class MCPToolCallRequest(pydantic.BaseModel):
+class MCPToolCallRequest(AbstractModel):
     #server_name: str
     tool_name: str
     arguments: dict # | None = pydantic.Field(default_factory=dict)
@@ -118,14 +144,14 @@ class MCPToolCallResponse(MCPToolCallRequest):
     result: dict | list | str | Any | None = None
     error: str | None = None
 
-class MCPServerConfig(pydantic.BaseModel):
+class MCPServerConfig(AbstractModel):
     name: str
     url: str | None = None
     command: str | None = None
     args: List[str] | None = pydantic.Field(default_factory=list)
     env: dict[str, str] | None = pydantic.Field(default_factory=dict)
 
-class MCPServerInfo(pydantic.BaseModel):
+class MCPServerInfo(AbstractModel):
     name: str
     status: str | None = None
     description: str | None = None
