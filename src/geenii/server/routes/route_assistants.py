@@ -15,17 +15,17 @@ from geenii.server.deps import dep_current_user
 from geenii.settings import DATA_DIR
 from geenii.wizard.default import DefaultWizard
 
-router = APIRouter(prefix="/ai/v1/agents", tags=["chats"])
+router = APIRouter(prefix="/ai/v1/assistants", tags=["assistants"])
 
-def get_chat_memory(username: str, agentname: str, conversation_id: str, create=False) -> ChatMemory:
+def get_chat_memory(username: str, assistant_name: str, conversation_id: str, create=False) -> ChatMemory:
     # using a file based chat memory for simplicity
-    file_path = f"{DATA_DIR}/chats/{username}/{agentname}/{conversation_id}/memory.json"
+    file_path = f"{DATA_DIR}/chats/{username}/{assistant_name}/{conversation_id}/memory.json"
     print(f"Loading chat memory from {file_path}", create)
     return FileChatMemory(file_path, create=create)
 
 
-def find_conversations_for_user_in_dir(username: str, agentname: str) -> list[str]:
-    base_path = f"{DATA_DIR}/chats/{username}/{agentname}/"
+def find_conversations_for_user_in_dir(username: str, assistant_name: str) -> list[str]:
+    base_path = f"{DATA_DIR}/chats/{username}/{assistant_name}/"
     # subfolders are conversation IDs
     if not os.path.exists(base_path):
         return []
@@ -33,21 +33,21 @@ def find_conversations_for_user_in_dir(username: str, agentname: str) -> list[st
             if os.path.isdir(os.path.join(base_path, name))]
 
 
-def fetch_agent_configs_for_user(username: str) -> list[dict]:
-    #agents_json_file = f"{DATA_DIR}/users/{username}/agents.json"
-    agents_json_file = f"{DATA_DIR}/agents.json"
+def fetch_assistant_configs_for_user(username: str) -> list[dict]:
+    #assistants_json_file = f"{DATA_DIR}/users/{username}/assistants.json"
+    assistants_json_file = f"{DATA_DIR}/assistants.json"
     import os
-    if not os.path.exists(agents_json_file):
+    if not os.path.exists(assistants_json_file):
         return []
-    with open(agents_json_file, 'r') as f:
+    with open(assistants_json_file, 'r') as f:
         data = json.load(f)
         return data
 
 
-def init_agent_for_user(username: str, agentname: str, conversation_id: str, create=False) -> DefaultWizard:
-    memory = get_chat_memory(username, agentname, conversation_id, create=create)
-    agent = DefaultWizard(memory=memory, context_id=conversation_id)
-    return agent
+def init_assistant_for_user(username: str, assistant_name: str, conversation_id: str, create=False) -> DefaultWizard:
+    memory = get_chat_memory(username, assistant_name, conversation_id, create=create)
+    assistant = DefaultWizard(memory=memory, context_id=conversation_id)
+    return assistant
 
 
 
@@ -64,46 +64,46 @@ class AgentConfig(pydantic.BaseModel):
 
 
 @router.get("/")
-async def list_available_agents(user = Depends(dep_current_user)) -> List[AgentConfig]:
+async def list_available_assistants(user = Depends(dep_current_user)) -> List[AgentConfig]:
     """
-    List all available agentic AI agents.
+    List all available assistantic AI assistants.
     """
-    agent_configs_dict = fetch_agent_configs_for_user(user["username"])
-    return [AgentConfig(**agent) for agent in agent_configs_dict]
+    assistant_configs_dict = fetch_assistant_configs_for_user(user["username"])
+    return [AgentConfig(**assistant) for assistant in assistant_configs_dict]
 
 
 @router.post("/")
-def create_agent(agent_config: AgentConfig, user = Depends(dep_current_user)) -> AgentConfig:
+def create_assistant(assistant_config: AgentConfig, user = Depends(dep_current_user)) -> AgentConfig:
     pass
 
 
-@router.post("/{agent}")
-def configure_agent(agent: str, agent_config: AgentConfig, user = Depends(dep_current_user)) -> AgentConfig:
+@router.post("/{assistant_id}")
+def configure_assistant(assistant_id: str, assistant_config: AgentConfig, user = Depends(dep_current_user)) -> AgentConfig:
     pass
 
 
-@router.get("/{agent}/chats", response_model=List[ChatConversation])
-def list_conversations(agent: str, user = Depends(dep_current_user)):
-    ids = find_conversations_for_user_in_dir(user["username"], agent)
+@router.get("/{assistant_id}/chats", response_model=List[ChatConversation])
+def list_conversations(assistant_id: str, user = Depends(dep_current_user)):
+    ids = find_conversations_for_user_in_dir(user["username"], assistant_id)
     conversations = []
     for conv_id in ids:
         conversations.append(ChatConversation(id=conv_id))
     return conversations
 
 
-@router.post("/{agent}/chats", response_model=ChatConversation)
-def create_conversation(agent: str, input: AgentChatInputRequest, user = Depends(dep_current_user)):
+@router.post("/{assistant_id}/chats", response_model=ChatConversation)
+def create_conversation(assistant_id: str, input: AgentChatInputRequest, user = Depends(dep_current_user)):
     try:
         conversion_id = str(uuid.uuid4().hex)
 
-        # get the default agent for the user
-        _agent = init_agent_for_user(user["username"], agent, conversion_id, create=True)
+        # get the default assistant for the user
+        _assistant = init_assistant_for_user(user["username"], assistant_id, conversion_id, create=True)
         # create a new conversation with the user input as the first message
-        agent_response = _agent.prompt(input.input)
+        assistant_response = _assistant.prompt(input.input)
 
         conv = ChatConversation(id=conversion_id, messages=[])
         conv.add_message(ChatMessage(role="user", content=[ChatMessageContent(type="text", text=input.input)]))
-        for message in map_agent_response_to_chat_messages(agent_response):
+        for message in map_assistant_completion_response_to_chat_messages(assistant_response):
             conv.add_message(message)
 
         return conv
@@ -113,13 +113,13 @@ def create_conversation(agent: str, input: AgentChatInputRequest, user = Depends
                             detail=str(e))
 
 
-@router.get("/{agent}/chats/{conversation_id}", response_model=ChatConversation)
-def get_conversation(agent: str, conversation_id: str, user = Depends(dep_current_user)):
+@router.get("/{assistant_id}/chats/{conversation_id}", response_model=ChatConversation)
+def get_conversation(assistant_id: str, conversation_id: str, user = Depends(dep_current_user)):
     try:
-        _agent = init_agent_for_user(user["username"], agent, conversation_id)
-        #memory = get_chat_memory(user["username"], agent, conversation_id, create=False)
-        if _agent.memory:
-            messages = _agent.memory.get_messages()
+        _assistant = init_assistant_for_user(user["username"], assistant_id, conversation_id)
+        #memory = get_chat_memory(user["username"], assistant, conversation_id, create=False)
+        if _assistant.memory:
+            messages = _assistant.memory.get_messages()
         else:
             messages = ChatMessage(role="system", content=[ChatMessageContent(type="text", text="No conversation history found.")])
         conv = ChatConversation(id=conversation_id, messages=messages)
@@ -129,8 +129,8 @@ def get_conversation(agent: str, conversation_id: str, user = Depends(dep_curren
 
 
 
-@router.post("/{agent}/chats/{conversation_id}", response_model=ChatConversation)
-def process_user_message(agent: str, conversation_id: str, input: AgentChatInputRequest, user = Depends(dep_current_user)):
+@router.post("/{assistant_id}/chats/{conversation_id}", response_model=ChatConversation)
+def process_user_message(assistant_id: str, conversation_id: str, input: AgentChatInputRequest, user = Depends(dep_current_user)):
 
     # def message_generator(num_messages: int = 3) -> Generator[str, None, None]:
     #     for i in range(num_messages):
@@ -141,26 +141,26 @@ def process_user_message(agent: str, conversation_id: str, input: AgentChatInput
     conv.messages.append(user_msg)
 
     try:
-        _agent = init_agent_for_user(user["username"], agent, conversation_id)
+        _assistant = init_assistant_for_user(user["username"], assistant_id, conversation_id)
 
         # a dummy assistant response that echoes the user input
         dummy_msg = ChatMessage(role="assistant", content=[
             ChatMessageContent(type="text", text=f"You said: {input.input}")
         ])
         conv.messages.append(dummy_msg)
-        # another assistant response that indicates an agent task
+        # another assistant response that indicates an assistant task
         # task_msg = ChatMessage(
         #     role="system",
         #     content=[ChatMessageContent(type="task", data={"task_id": str(uuid.uuid4().hex)}, text="A task has been created.")]
         # )
         # conv.messages.append(task_msg)
         # save dummy messages to memory
-        if _agent.memory:
-            _agent.memory.add_message(dummy_msg)
-            #_agent.memory.add_message(task_msg)
+        if _assistant.memory:
+            _assistant.memory.add_message(dummy_msg)
+            #_assistant.memory.add_message(task_msg)
 
-        agent_response = _agent.prompt(input.input)
-        for message in map_agent_response_to_chat_messages(agent_response):
+        assistant_response = _assistant.prompt(input.input)
+        for message in map_assistant_completion_response_to_chat_messages(assistant_response):
             conv.add_message(message)
 
         # simulate streaming by yielding parts of the assistant message
@@ -176,9 +176,9 @@ def process_user_message(agent: str, conversation_id: str, input: AgentChatInput
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND,)
 
 
-def map_agent_response_to_chat_messages(response: CompletionApiResponse) -> List[ChatMessage]:
+def map_assistant_completion_response_to_chat_messages(response: CompletionApiResponse) -> List[ChatMessage]:
     """
-    Map the agent response to a list of ChatMessage objects.
+    Map the assistant response to a list of ChatMessage objects.
     """
     messages = []
 

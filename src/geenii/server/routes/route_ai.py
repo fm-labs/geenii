@@ -35,6 +35,16 @@ async def models() -> list[dict]:
         }
     ]
 
+@router.post("/models/download")
+async def download_model(provider_name: str, model_name: str) -> dict:
+    """
+    Download the specified AI model for local use.
+    """
+    #result = ai_service.download_model(model_name)
+    #return {"status": "success" if result else "failure", "model": model_name}
+    raise NotImplementedError("Model downloading is not implemented yet.")
+
+
 
 @router.post("/completion")
 async def completion(request: CompletionApiRequest) -> CompletionApiResponse | ErrorApiResponse:
