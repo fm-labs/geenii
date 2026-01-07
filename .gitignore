@@ -4,6 +4,7 @@ bak/
 data/
 build/
 dist/
+volumes/
 .env.local
 .env.*
 *.local

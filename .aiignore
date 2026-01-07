@@ -1,8 +1,10 @@
+.idea/
 .venv
 bak/
 data/
 build/
 dist/
+volumes/
 __pycache__/
 .DS_Store
 *.log
