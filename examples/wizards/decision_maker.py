@@ -20,7 +20,7 @@ class DecisionMakerWizard(CompletionWizard):
         self.system = self._build_system_prompt()
 
         # apply default kwargs for the model
-        self.model_settings.update({
+        self.model_parameters.update({
             'system': self.system,
             #'output_format': 'json_object',  # Default output format
             'temperature': 0.3,  # Low temperature for deterministic output

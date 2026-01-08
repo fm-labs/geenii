@@ -9,7 +9,7 @@ import redis.asyncio as redis
 from fastapi import WebSocket, APIRouter
 
 import geenii.service as ai_service
-from geenii.datamodels import CompletionApiRequest
+from geenii.datamodels import CompletionRequest
 
 # topic -> websockets subscribed to that topic (per process)
 subscriptions: DefaultDict[str, Set[WebSocket]] = defaultdict(set)
@@ -135,7 +135,7 @@ def handle_loop(params, ws: WebSocket):
 
 def handle_ai_completion(params, ws: WebSocket):
     print("Handle AI completion with params:", params)
-    args = CompletionApiRequest.model_validate(params)
+    args = CompletionRequest.model_validate(params)
     args.stream = False
     result = ai_service.generate_completion(args)
     print("Result:", result)

@@ -1,5 +1,5 @@
 from geenii import settings
-from geenii.datamodels import CompletionApiResponse
+from geenii.datamodels import CompletionResponse
 from geenii.wizard.completion import CompletionWizard
 
 
@@ -27,7 +27,7 @@ class NewsClassificationWizard(CompletionWizard):
             **kwargs
         )
 
-    def prompt(self, prompt: str, **kwargs) -> CompletionApiResponse:
+    def prompt(self, prompt: str, **kwargs) -> CompletionResponse:
         return super().prompt(
             model=self.model_name,
             format=self.output_format,

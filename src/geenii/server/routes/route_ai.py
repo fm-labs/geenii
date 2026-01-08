@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
-from geenii.datamodels import ErrorApiResponse, CompletionApiRequest, CompletionApiResponse, AssistantApiRequest, \
-    AssistantApiResponse, ImageGenerationApiResponse, \
+from geenii.datamodels import CompletionErrorResponse, CompletionRequest, CompletionResponse, AssistantCompletionRequest, \
+    AssistantCompletionResponse, ImageGenerationApiResponse, \
     ImageGenerationApiRequest, AudioGenerationApiRequest, AudioGenerationApiResponse, AudioTranscriptionApiRequest, \
     AudioTranscriptionApiResponse, AudioTranslationApiResponse, AudioTranslationApiRequest
 import geenii.service as ai_service
@@ -47,7 +47,7 @@ async def download_model(provider_name: str, model_name: str) -> dict:
 
 
 @router.post("/completion")
-async def completion(request: CompletionApiRequest) -> CompletionApiResponse | ErrorApiResponse:
+async def completion(request: CompletionRequest) -> CompletionResponse | CompletionErrorResponse:
     """
     Generate a completion using the specified AI provider and model.
     """
@@ -64,7 +64,7 @@ async def completion(request: CompletionApiRequest) -> CompletionApiResponse | E
 
 ### IMAGE GENERATION
 @router.post("/image/generate")
-async def generate_image(request: ImageGenerationApiRequest) -> ImageGenerationApiResponse | ErrorApiResponse:
+async def generate_image(request: ImageGenerationApiRequest) -> ImageGenerationApiResponse | CompletionErrorResponse:
     """
     Generate an image using the specified AI provider and model.
     """
@@ -73,7 +73,7 @@ async def generate_image(request: ImageGenerationApiRequest) -> ImageGenerationA
 
 # AUDIO GENERATION - TEXT-TO-SPEECH
 @router.post("/audio/speech")
-async def generate_speech(request: AudioGenerationApiRequest) -> AudioGenerationApiResponse | ErrorApiResponse:
+async def generate_speech(request: AudioGenerationApiRequest) -> AudioGenerationApiResponse | CompletionErrorResponse:
     """
     Generate speech from text using the specified AI provider and model.
     """
@@ -82,7 +82,7 @@ async def generate_speech(request: AudioGenerationApiRequest) -> AudioGeneration
 
 # AUDIO TRANSCRIPTION - SPEECH-TO-TEXT
 @router.post("/audio/transcribe")
-async def generate_audio_transcription(request: AudioTranscriptionApiRequest) -> AudioTranscriptionApiResponse | ErrorApiResponse:
+async def generate_audio_transcription(request: AudioTranscriptionApiRequest) -> AudioTranscriptionApiResponse | CompletionErrorResponse:
     """
     Generate a transcription from audio using the specified AI provider and model.
     """
@@ -91,7 +91,7 @@ async def generate_audio_transcription(request: AudioTranscriptionApiRequest) ->
 
 # AUDIO TRANSCRIPTION - SPEECH-TO-TEXT
 @router.post("/audio/translate")
-async def generate_audio_transcription(request: AudioTranslationApiRequest) -> AudioTranslationApiResponse | ErrorApiResponse:
+async def generate_audio_transcription(request: AudioTranslationApiRequest) -> AudioTranslationApiResponse | CompletionErrorResponse:
     """
     Generate a transcription from audio using the specified AI provider and model.
     """

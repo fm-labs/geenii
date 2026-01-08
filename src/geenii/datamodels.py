@@ -7,7 +7,7 @@ from geenii import settings
 from geenii.modelstore import build_model_store
 
 
-class AbstractModel(pydantic.BaseModel, abc.ABC):
+class BaseDatastoreModel(pydantic.BaseModel, abc.ABC):
     uuid : str | None = None
 
     #COLLECTION_NAME: ClassVar[str] = "my_collection"
@@ -28,10 +28,7 @@ class AbstractModel(pydantic.BaseModel, abc.ABC):
         return store.create(self)
 
 
-class ErrorApiResponse(AbstractModel):
-    error: str
-
-class BaseAIProviderApiResponse(AbstractModel):
+class BaseAIProviderApiResponse(BaseDatastoreModel):
     id: str
     timestamp: int
     model: str | None = None
@@ -42,9 +39,13 @@ class BaseAIProviderApiResponse(AbstractModel):
     model_result: dict = None
 
 # Completion
-class CompletionApiRequest(AbstractModel):
+class CompletionErrorResponse(BaseDatastoreModel):
+    error: str
+
+class CompletionRequest(BaseDatastoreModel):
     prompt: str
     model: str | None = settings.DEFAULT_COMPLETION_MODEL
+    system: str | None = None
     # Model tweaking parameters
     temperature: float | None = None
     top_p: float | None = None
@@ -54,7 +55,7 @@ class CompletionApiRequest(AbstractModel):
     # Streaming support
     stream: bool | None = False
 
-class CompletionApiResponse(BaseAIProviderApiResponse):
+class CompletionResponse(BaseAIProviderApiResponse):
 
     COLLECTION_NAME: ClassVar[str] = "completions"
 
@@ -64,13 +65,13 @@ class CompletionApiResponse(BaseAIProviderApiResponse):
 
 
 # Assistant
-class AssistantApiRequest(CompletionApiRequest):
+class AssistantCompletionRequest(CompletionRequest):
     # Tooling support
     tools: List[str] | None = None
     # Context ID for the completion request
     context_id: str | None = None
 
-class AssistantApiResponse(CompletionApiResponse):
+class AssistantCompletionResponse(CompletionResponse):
     prompt: str
     # The response may include additional information about the tools used
     tools_used: List[str] | None = None
@@ -79,7 +80,7 @@ class AssistantApiResponse(CompletionApiResponse):
 
 
 # Image Generation
-class ImageGenerationApiRequest(AbstractModel):
+class ImageGenerationApiRequest(BaseDatastoreModel):
     prompt: str
     model: str | None = settings.DEFAULT_IMAGE_GENERATION_MODEL
     # Model tweaking parameters
@@ -96,7 +97,7 @@ class ImageGenerationApiResponse(BaseAIProviderApiResponse):
 
 
 # Audio Generation
-class AudioGenerationApiRequest(AbstractModel):
+class AudioGenerationApiRequest(BaseDatastoreModel):
     model: str | None = settings.DEFAULT_AUDIO_GENERATION_MODEL
     text: str
     # Model tweaking parameters
@@ -113,7 +114,7 @@ class AudioGenerationApiResponse(BaseAIProviderApiResponse):
 
 
 # Audio Transcription
-class AudioTranscriptionApiRequest(AbstractModel):
+class AudioTranscriptionApiRequest(BaseDatastoreModel):
     model: str | None = settings.DEFAULT_AUDIO_TRANSCRIPTION_MODEL
     input_file: str  # Path to the audio file to be transcribed
     input_blob: bytes | None = None  # Optional raw audio data
@@ -124,7 +125,7 @@ class AudioTranscriptionApiResponse(BaseAIProviderApiResponse):
 
 
 # Audio Translation
-class AudioTranslationApiRequest(AbstractModel):
+class AudioTranslationApiRequest(BaseDatastoreModel):
     model: str | None = settings.DEFAULT_AUDIO_TRANSLATION_MODEL
     input_file: str  # Path to the audio file to be translated
     source_lang: str | None = "en"  # Default source language
@@ -135,7 +136,7 @@ class AudioTranslationApiResponse(BaseAIProviderApiResponse):
 
 
 # MCP
-class MCPToolCallRequest(AbstractModel):
+class MCPToolCallRequest(BaseDatastoreModel):
     #server_name: str
     tool_name: str
     arguments: dict # | None = pydantic.Field(default_factory=dict)
@@ -144,14 +145,14 @@ class MCPToolCallResponse(MCPToolCallRequest):
     result: dict | list | str | Any | None = None
     error: str | None = None
 
-class MCPServerConfig(AbstractModel):
+class MCPServerConfig(BaseDatastoreModel):
     name: str
     url: str | None = None
     command: str | None = None
     args: List[str] | None = pydantic.Field(default_factory=list)
     env: dict[str, str] | None = pydantic.Field(default_factory=dict)
 
-class MCPServerInfo(AbstractModel):
+class MCPServerInfo(BaseDatastoreModel):
     name: str
     status: str | None = None
     description: str | None = None

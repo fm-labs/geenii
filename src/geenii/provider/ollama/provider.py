@@ -5,7 +5,7 @@ from typing import List
 import ollama
 
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIAssistantProvider
-from geenii.datamodels import CompletionApiResponse, AssistantApiResponse
+from geenii.datamodels import CompletionResponse, AssistantCompletionResponse
 from geenii.tools import resolve_tool_defs
 
 
@@ -36,7 +36,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIAssistantProvider):
             "llama2:latest",
         ]
 
-    def generate_completion(self, prompt: str, **kwargs) -> CompletionApiResponse:
+    def generate_completion(self, prompt: str, **kwargs) -> CompletionResponse:
         """
         Get ollama completion for the given prompt via Ollama Responses API.
 
@@ -115,6 +115,8 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIAssistantProvider):
         #     User: {prompt}
         #     """
 
+        print(f"OLLAMA: Generating completion with model: {model}, system: {system}, prompt: {prompt}")
+
         try:
             model_result = ollama.generate(
                 model=model,
@@ -148,7 +150,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIAssistantProvider):
             # )
 
             content = model_result.get('response', '')
-            response = CompletionApiResponse(
+            response = CompletionResponse(
                 id=uuid.uuid4().hex,
                 timestamp=int(time.time()),
                 prompt=prompt,
@@ -344,7 +346,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIAssistantProvider):
 
                     # todo invoke the tool and get the result, then append to output
 
-            response = AssistantApiResponse(
+            response = AssistantCompletionResponse(
                 id=uuid.uuid4().hex,
                 timestamp=int(time.time()),
                 prompt=prompt,

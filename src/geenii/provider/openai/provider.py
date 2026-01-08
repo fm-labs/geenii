@@ -4,7 +4,7 @@ import time
 import uuid
 
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIAssistantProvider, AIImageGeneratorProvider
-from geenii.datamodels import CompletionApiResponse, ImageGenerationApiResponse
+from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse
 from geenii.provider.openai.client import get_openai_client
 
 
@@ -35,7 +35,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIAssistantProvider, AIIm
             "gpt-4.1"]
 
 
-    def generate_completion(self, prompt: str, **kwargs) -> CompletionApiResponse:
+    def generate_completion(self, prompt: str, **kwargs) -> CompletionResponse:
         """
         Get openai completion for the given prompt via OpenAI Responses API.
 
@@ -80,7 +80,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIAssistantProvider, AIIm
         )
 
         output = [item.model_dump() for item in model_result.output]
-        response = CompletionApiResponse(
+        response = CompletionResponse(
             id=uuid.uuid4().hex,
             timestamp=int(time.time()),
             prompt=prompt,

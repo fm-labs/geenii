@@ -1,7 +1,7 @@
 import abc
 from typing import List
 
-from geenii.datamodels import CompletionApiResponse, ImageGenerationApiResponse, AudioTranscriptionApiResponse, \
+from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, AudioTranscriptionApiResponse, \
     AudioGenerationApiResponse, AudioTranslationApiResponse
 
 
@@ -34,7 +34,7 @@ class AICompletionProvider(abc.ABC):
     get completions based on a given prompt.
     """
     @abc.abstractmethod
-    def generate_completion(self, prompt: str, **kwargs) -> CompletionApiResponse:
+    def generate_completion(self, prompt: str, **kwargs) -> CompletionResponse:
         """Get an AI completion for the given prompt"""
         pass
 
