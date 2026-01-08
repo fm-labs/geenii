@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { cn } from '@/lib/utils.ts'
 import { Button } from '@/components/ui/button.tsx'
-import { ArrowLeft, ImagePlus, MoreVertical, Paperclip, Phone, Plus, Send, Video } from 'lucide-react'
+import { ArrowLeft, BotIcon, ImagePlus, MoreVertical, Paperclip, Phone, Plus, Send, Video } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar.tsx'
 import { Fragment } from 'react/jsx-runtime'
 import { format } from 'date-fns'
@@ -170,7 +170,7 @@ const AssistantChat = ({ assistant, conversationId: initialConvId }: AssistantCh
                 src={assistant?.imageUrl}
                 alt={assistant?.name}
               />
-              <AvatarFallback>{assistant.name}</AvatarFallback>
+              <AvatarFallback><BotIcon size={32} /></AvatarFallback>
             </Avatar>
             <div>
               <span className="col-start-2 row-span-2 text-sm font-medium lg:text-base">

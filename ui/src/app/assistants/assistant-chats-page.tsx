@@ -28,6 +28,7 @@ import ChatContextProvider from '@/app/chat/components/ChatContextProvider.tsx'
 import AssistantChatList from '@/app/assistants/assistant-chat-list.tsx'
 import { XAI_API_URL } from '@/constants.ts'
 import '../chat/Chat.scss'
+import { NewAssistantDialogButton } from '@/app/assistants/components/new-assistant-dialog-button.tsx'
 
 export function AssistantChatsPage() {
   const [search, setSearch] = useState('')
@@ -35,8 +36,8 @@ export function AssistantChatsPage() {
   const [mobileSelectedUser, setMobileSelectedUser] = useState<ChatUser | null>(
     null,
   )
-  const [createConversationDialogOpened, setCreateConversationDialog] =
-    useState(false)
+  const [createConversationDialogOpened, setCreateConversationDialog] = useState(false)
+  const [createAssistantDialogOpened, setCreateAssistantDialog] = useState(false)
 
   const [assistants, setAssistants] = useState<Assistant[]>()
   const [selectedAssistant, setSelectedAssistant] = useState<Assistant | null>(null)
@@ -103,6 +104,7 @@ export function AssistantChatsPage() {
 
   React.useEffect(() => {
     if (selectedAssistant !== null) {
+      setSelectedChat(undefined)
       fetchAssistantChats(selectedAssistant.id).then((response) => setAssistantChats(response))
     }
   }, [selectedAssistant])
@@ -255,6 +257,11 @@ export function AssistantChatsPage() {
                 <Button onClick={() => setCreateConversationDialog(true)}>
                   Send message
                 </Button>
+
+                <NewAssistantDialogButton
+                  onOpenChange={setCreateAssistantDialog}
+                  open={createAssistantDialogOpened}
+                />
               </div>
             </div>
           )}
