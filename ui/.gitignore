@@ -2,6 +2,7 @@ bak/
 dist/
 node_modules/
 src-tauri/gen/android/
+src-tauri/binaries/
 
 # Logs
 logs

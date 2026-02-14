@@ -12,6 +12,16 @@ const TauriUpdater = () => {
   const handleCheckUpdate = async () => {
     setIsChecking(true)
     const update: Update | null = await check()
+      .then((update) => {
+        if (update) {
+          console.log(
+            `found update`, update,
+          )
+        } else {
+          console.log('no update found')
+        }
+        return update
+      })
       .catch((e) => {
         console.error('Error checking for updates:', e)
         return null

@@ -8,6 +8,7 @@ import SettingsPage from '@/app/settings/settings-page.tsx'
 import { NotFoundError } from '@/features/errors/not-found-error.tsx'
 import FlowsPage from '@/app/flows/flows-page.tsx'
 import AudioPage from '@/app/aiassist/audio-page.tsx'
+import WelcomeScreen from '@/app/welcome/WelcomeScreen.tsx'
 
 
 type Route = {
@@ -43,12 +44,12 @@ const AppRouter = () => {
   }, [])
 
   const routes = [
-    // {
-    //   path: '/',
-    //   element: <WelcomeScreen />,
-    // },
     {
       path: '/',
+      element: <WelcomeScreen />,
+    },
+    {
+      path: '/chat',
       element: <CompletionChatPage />,
     },
     {

@@ -45,13 +45,35 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
     setXaiApi(xapiClient)
     console.log('API client initialized with base url', serverUrl)
 
-    try {
-      const apiInfo = await xapiClient.getInfo()
-      setBootLog(prev => [...prev, `ℹ️ API Version: ${apiInfo.version}`])
-    } catch (error) {
-      setBootLog(prev => [...prev, `❌ Error fetching API info: ${error.message}`])
-      throw error // Re-throw to handle in the main initialization flow
+
+    const fetchInfo = async () => {
+      try {
+        const apiInfo = await xapiClient.getInfo()
+        setBootLog(prev => [...prev, `ℹ️ API Version: ${apiInfo.version}`])
+      } catch (error) {
+        setBootLog(prev => [...prev, `❌ Error fetching API info: ${error.message}`])
+        throw error // Re-throw to handle in the main initialization flow
+      }
     }
+
+    const fetchInfoWithRetry = async (retries: number, delay: number) => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          await fetchInfo()
+          return // Exit if successful
+        } catch (error) {
+          if (i < retries - 1) {
+            setBootLog(prev => [...prev, `⚠️ Retry ${i + 1} after error: ${error.message}`])
+            await new Promise(res => setTimeout(res, delay)) // Wait before retrying
+          } else {
+            setBootLog(prev => [...prev, `❌ All retries failed: ${error.message}`])
+            throw error // Re-throw after final attempt
+          }
+        }
+      }
+    }
+
+    await fetchInfoWithRetry(3, 2000) // Retry up to 3 times with a 2-second delay
   }
 
   const loadDockerApiClient = async () => {
@@ -59,7 +81,7 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
       try {
         const dockerApiClient = await initTauriDockerApiClient()
         setDockerApi(dockerApiClient)
-        setBootLog(prev => [...prev, '✅ Docker MCP API initialized successfully.'])
+        setBootLog(prev => [...prev, '✅ Docker API client initialized successfully.'])
 
         // checking docker version
         const dockerVersion = await dockerApiClient.getVersion()

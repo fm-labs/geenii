@@ -37,9 +37,9 @@ const ServerContextProvider = (props: PropsWithChildren) => {
   return (
     <ServerContext.Provider value={serverContext}>
       {props.children}
-      <div className={"fixed bottom-0 left-0 w-full bg-accent p-1 shadow-md opacity-80 hover:opacity-100 transition-opacity flex space-x-2 align-middle"}>
+      {/*<div className={"fixed bottom-0 left-0 w-full bg-accent p-1 shadow-md opacity-80 hover:opacity-100 transition-opacity flex space-x-2 align-middle"}>
         <div className="text-sm text-gray-500 flex space-x-2">{" "}Server: {serverUrl}</div>
-      </div>
+      </div>*/}
     </ServerContext.Provider>
   )
 }

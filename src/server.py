@@ -4,6 +4,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Security
 from fastapi.middleware.cors import CORSMiddleware
+
+from fastmcp import Client
+
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
@@ -62,7 +65,6 @@ app.add_middleware(
 # )
 
 app.include_router(app_router, prefix="")
-
 
 
 # # WebSocket endpoint
@@ -132,3 +134,7 @@ app.include_router(app_router, prefix="")
 #
 # if __name__ == "__main__":
 #     test_websocket()
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=13030)

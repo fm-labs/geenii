@@ -5,6 +5,9 @@ from geenii.datamodels import CompletionRequest, CompletionResponse, CompletionE
 from geenii.provider.interfaces import AICompletionProvider, AIProvider, AIImageGeneratorProvider, \
     AIAudioGeneratorProvider, AIAudioTranscriptionProvider, AIAudioTranslationProvider, AIChatCompletionProvider
 
+from geenii.provider.ollama.provider import OllamaAIProvider
+from geenii.provider.openai.provider import OpenAIProvider
+
 type AIProviderType = AICompletionProvider | AIImageGeneratorProvider | AIAudioGeneratorProvider \
                       | AIAudioTranscriptionProvider | AIAudioTranslationProvider | AIProvider
 
@@ -52,16 +55,23 @@ def get_ai_provider(provider: str) -> AIProviderType:
                          f"Did you mean to use a model ID? Use 'get_ai_provider_from_model_id' instead.")
 
     _ai = None
-    provider_module_name = f"geenii.provider.{provider}.provider"
-    attr_name = "ai_provider_class"
-    try:
-        module = __import__(provider_module_name, fromlist=[attr_name])
-        provider_class = getattr(module, attr_name, None)
-        if provider_class is None:
-            raise ImportError(f"No AIProvider subclass found in module {provider_module_name}")
-        _ai = provider_class()
-    except ImportError as e:
-        raise ImportError(f"Could not import provider '{provider}': {str(e)}")
+    # provider_module_name = f"geenii.provider.{provider}.provider"
+    # attr_name = "ai_provider_class"
+    # try:
+    #     module = __import__(provider_module_name, fromlist=[attr_name])
+    #     provider_class = getattr(module, attr_name, None)
+    #     if provider_class is None:
+    #         raise ImportError(f"No AIProvider subclass found in module {provider_module_name}")
+    #     _ai = provider_class()
+    # except ImportError as e:
+    #     raise ImportError(f"Could not import provider '{provider}': {str(e)}")
+
+    if provider.lower() == "ollama":
+        _ai = OllamaAIProvider()
+    elif provider.lower() == "openai":
+        _ai = OpenAIProvider()
+    else:
+        raise ValueError(f"Unsupported provider: {provider}")
 
     # check if the provider supports the requested interface
     # the interface is the module name of the provider interface

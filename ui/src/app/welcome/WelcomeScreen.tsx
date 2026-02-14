@@ -7,38 +7,40 @@ import Header from '@/components/header.tsx'
 import QuickTextGenerationPopupButton from '@/app/completion/components/QuickTextGenerationPopupButton.tsx'
 import QuickImageGenerationPopupButton from '@/app/completion/components/QuickImageGenerationPopupButton.tsx'
 import QuickAudioGenerationPopupButton from '@/app/completion/components/QuickAudioGenerationPopupButton.tsx'
+import { AppContext } from '@/context/AppContext.tsx'
+import TauriUpdater from '@/components/tauri/TauriUpdater.tsx'
 
 
 const greetings = [
-  "Hello! 👋",
-  "Hi there! 😊",
-  "Greetings! 🙌",
-  "Welcome! 🎉",
-  "Hi",
-  "Hello",
-  "Welcome back",
-  "Howdy",
-  "Greetings",
-  "Salutations",
-  "Good to see you",
-  "Hey there",
-  "Nice to see you",
-  "Good day",
-  "Hola",
-  "Bonjour",
+  // "Hello! 👋",
+  // "Hi there! 😊",
+  // "Greetings! 🙌",
+  // "Welcome! 🎉",
+  // "Hi",
+  // "Hello",
+  // "Welcome back",
+  // "Howdy",
+  // "Greetings",
+  // "Salutations",
+  // "Good to see you",
+  // "Hey there",
+  // "Nice to see you",
+  // "Good day",
+  // "Hola",
+  // "Bonjour",
+  "Heyo! 👋",
 ]
 
 const messages = [
-  "What would you like to do today?",
-  "Ready to start a new conversation?",
-  "How can I assist you today?",
-  "Let's get started!",
+  // "What would you like to do today?",
+  // "Ready to start a new conversation?",
+  // "How can I assist you today?",
+  // "Let's get started!",
 ]
 
 const agentSelfIntro = [
   "I am Geenii, yet another AI assistant.",
   "Currently in early alpha, I aim to help you with various tasks.",
-  "Feel free to explore my capabilities and provide feedback.",
 ]
 
 const getRandomElement = (arr: string[]) => {
@@ -65,6 +67,7 @@ const SelfIntro = () => {
 
 const WelcomeScreen = () => {
   const navigate = useNavigate()
+  const { isTauri } = React.useContext(AppContext)
 
   const greeting = getRandomElement(greetings)
 
@@ -76,11 +79,23 @@ const WelcomeScreen = () => {
       <div className="text-center mb-4">
         <h2 className="text-xl font-bold"><TypewriterText text={getRandomElement(messages)} delay={2000} showCursor={false} /></h2>
       </div>
+      {/*<div className="text-center mb-4">
+        <SelfIntro />
+      </div>*/}
       
-      <div className={"max-w-1/2 mx-auto p-4 text-center"}>
+      {/*<div className={"max-w-1/2 mx-auto p-4 text-center"}>
         <div className="flex flex-col gap-4 justify-center mt-8">
           <div className="text-center mb-4">
             <Button onClick={() => navigate('/chat')}>Start new chat</Button>
+          </div>
+        </div>
+      </div>*/}
+
+      <div className={"max-w-1/2 mx-auto p-4 text-center"}>
+        <div className="flex flex-col gap-4 justify-center mt-8">
+          <p>This is an early alpha preview. The release is still hatching... </p>
+          <div className="text-center mb-4">
+            {isTauri && <TauriUpdater />}
           </div>
         </div>
       </div>

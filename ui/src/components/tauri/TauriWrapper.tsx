@@ -5,6 +5,7 @@ const TauriWrapper = (props: PropsWithChildren) => {
   return (
     <div className={'TauriWrapper'}>
       {props.children}
+      <TauriPanel />
     </div>
   )
 }
