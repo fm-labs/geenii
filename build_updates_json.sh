@@ -7,7 +7,7 @@ echo "Building tauri updater json from latest build ..."
 TARGET_TRIPLE=$(rustc --print host-tuple)
 
 APP_NAME="geenii-desktop"
-VERSION="0.1.0"
+VERSION="0.1.1"
 DOWNLOAD_BASE="https://geenii.flowmotion-labs.com/downloads/geenii"
 
 json=$(jq -n '

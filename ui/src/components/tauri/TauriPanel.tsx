@@ -13,7 +13,7 @@ const TAURI_COMMANDS = [
 ]
 
 const TauriPanel = () => {
-  const { isTauri } = React.useContext(AppContext)
+  const { isTauri, apiInfo } = React.useContext(AppContext)
   const notify = useNotification()
 
   if (!isTauri) {
@@ -29,6 +29,11 @@ const TauriPanel = () => {
   return (
     <div className={'TauriPanel fixed w-full left-0 bottom-0 p-2'}>
       <div className={"flex justify-end"}>
+        {apiInfo && apiInfo?.version && (
+          <div className={"mr-4 text-sm opacity-70"}>
+            API Version: {apiInfo.version}
+          </div>
+        )}
         <Settings size={16} onClick={handleSettings} />
       </div>
     </div>

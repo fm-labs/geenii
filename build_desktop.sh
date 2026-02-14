@@ -51,6 +51,4 @@ if ! pnpm tauri build ; then
     exit 1
 fi
 
-source build_updates_json.sh
-
 echo "Build completed successfully."

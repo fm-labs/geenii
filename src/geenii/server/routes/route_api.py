@@ -2,6 +2,8 @@ from typing import List
 
 from fastapi import APIRouter
 
+from geenii.settings import APP_VERSION
+
 router = APIRouter(prefix="/api", tags=["api"])
 
 
@@ -13,6 +15,6 @@ async def health():
 @router.get("/info")
 async def info() -> dict:
     return dict({
-        "version": "0.1.0",
+        "version": APP_VERSION,
     })
 

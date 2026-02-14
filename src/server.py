@@ -18,6 +18,8 @@ from geenii.server.deps import dep_current_token_user
 # from geenii.server.middleware.request_logger_middleware import RequestLoggerMiddleware
 from geenii.server.router import app_router
 from geenii.server.routes.route_ws import manager, process_message, subs_lock, subscriptions, redis_pubsub_listener
+from geenii.settings import APP_VERSION
+
 
 #redis_listener_stop_event = asyncio.Event()
 
@@ -33,7 +35,7 @@ async def lifespan(app: FastAPI):
         #    await task
         pass
 
-app = FastAPI(lifespan=lifespan, title="Geenii API", version="0.1.0")
+app = FastAPI(lifespan=lifespan, title="Geenii API", version=APP_VERSION)
 
 # Note: Middlewares are executed in reverse order of addition (LIFO)
 app.add_middleware(

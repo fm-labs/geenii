@@ -18,9 +18,11 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
 
   //const apiBaseUrl = DEFAULT_XAI_API_URL
 
+  const [apiInfo, setApiInfo] = React.useState<any>(null)
+
   const contextValue = React.useMemo(() => {
-    return { isTauri, xaiApi, dockerApi }
-  }, [xaiApi, dockerApi])
+    return { isTauri, xaiApi, dockerApi, apiInfo }
+  }, [xaiApi, dockerApi, apiInfo])
 
   const [loading, setLoading] = React.useState<boolean>(true)
   const [ready, setReady] = React.useState<boolean>(false)
@@ -50,6 +52,7 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
       try {
         const apiInfo = await xapiClient.getInfo()
         setBootLog(prev => [...prev, `ℹ️ API Version: ${apiInfo.version}`])
+        return apiInfo
       } catch (error) {
         setBootLog(prev => [...prev, `❌ Error fetching API info: ${error.message}`])
         throw error // Re-throw to handle in the main initialization flow
@@ -59,7 +62,8 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
     const fetchInfoWithRetry = async (retries: number, delay: number) => {
       for (let i = 0; i < retries; i++) {
         try {
-          await fetchInfo()
+          const info = await fetchInfo()
+          setApiInfo(info)
           return // Exit if successful
         } catch (error) {
           if (i < retries - 1) {
@@ -73,7 +77,7 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
       }
     }
 
-    await fetchInfoWithRetry(3, 2000) // Retry up to 3 times with a 2-second delay
+    await fetchInfoWithRetry(10, 3000) // Retry up to 10 times with a 3-second delay
   }
 
   const loadDockerApiClient = async () => {

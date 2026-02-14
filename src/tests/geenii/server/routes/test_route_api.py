@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from geenii.settings import APP_VERSION
 from server import app
 
 client = TestClient(app)
@@ -13,4 +14,4 @@ def test_health():
 def test_info():
     r = client.get("/api/info")
     assert r.status_code == 200
-    assert r.json() == {"version": "0.1.0"}
+    assert r.json() == {"version": APP_VERSION}
