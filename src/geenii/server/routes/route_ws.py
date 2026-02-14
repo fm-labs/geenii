@@ -8,7 +8,7 @@ import pydantic
 import redis.asyncio as redis
 from fastapi import WebSocket, APIRouter
 
-import geenii.service as ai_service
+from geenii import ai
 from geenii.datamodels import CompletionRequest
 
 # topic -> websockets subscribed to that topic (per process)
@@ -137,7 +137,7 @@ def handle_ai_completion(params, ws: WebSocket):
     print("Handle AI completion with params:", params)
     args = CompletionRequest.model_validate(params)
     args.stream = False
-    result = ai_service.generate_completion(args)
+    result = ai.generate_completion(args)
     print("Result:", result)
     return result.model_dump()
 rpc_message_handlers["ai/completion"] = handle_ai_completion

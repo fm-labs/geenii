@@ -4,34 +4,43 @@ import MainContent from '@/components/layout/main-content.tsx'
 import Header from '@/components/header.tsx'
 import { Button } from '@/components/ui/button.tsx'
 
-import flowData from './data/example-flow.json'
+import flowData from './data/example-flow1.json'
 import ReactJson from '@microlink/react-json-view'
+import { FlowgraphProvider } from '@/app/flows/components/flowgraph-provider.tsx'
+import FlowgraphCanvas from '@/app/flows/components/flowgraph-canvas.tsx'
+import FlowgraphBackground from '@/app/flows/components/flowgraph-background.tsx'
+import FlowgraphNodes from '@/app/flows/components/flowgraph-nodes.tsx'
+import { FlowgraphNodeType } from '@/app/flows/components/flowgraph-types.ts'
+import FlowgraphEdges from '@/app/flows/components/flowgraph-edges.tsx'
+import FlowgraphEditorPanel from '@/app/flows/components/flowgraph-editor-panel.tsx'
+import FlowgraphEditor from '@/app/flows/components/flowgraph-editor.tsx'
+import FlowgraphSelectedNode from '@/app/flows/components/flowgraph-selected-node.tsx'
 
 const FlowsPage = () => {
   return (
-    <Layout>
-      <MainContent>
-        <Header title={"Flows"} subtitle={"Manage your agentic workflows here"}>
-          <Button>Create Workflow</Button>
-        </Header>
-
-        <div>
-          {flowData?.steps.map(step => (
-            <div key={step.step_id} className="border p-4 mb-2">
-              <h3 className="font-bold">{step.action} - {step.step_id}</h3>
-              <p>{step.name}</p>
-
-              <pre className="p-2 rounded">
-                {JSON.stringify(step, null, 2)}
-              </pre>
+    <div>
+        <FlowgraphProvider nodes={flowData.nodes as FlowgraphNodeType[]} edges={flowData.edges}>
+          <div className={"flex flex-col h-screen w-screen"}>
+            <header className={"bg-accent"}>
+              <FlowgraphEditorPanel />
+            </header>
+            <div className={"flex flex-row flex-1 overflow-hidden"}>
+              <main className={"relative w-7xl flex-1"}>
+                <FlowgraphCanvas>
+                  <FlowgraphEditor />
+                  <FlowgraphBackground />
+                  <FlowgraphNodes />
+                  <FlowgraphEdges />
+                </FlowgraphCanvas>
+                <ReactJson src={flowData} collapsed={true} />
+              </main>
+              <aside style={{width: "300px"}} className={"bg-accent w-[300px] p-2"}>
+                <FlowgraphSelectedNode />
+              </aside>
             </div>
-          ))}
-        </div>
-
-        <ReactJson src={flowData} collapsed={true} />
-
-      </MainContent>
-    </Layout>
+          </div>
+        </FlowgraphProvider>
+    </div>
   )
 }
 

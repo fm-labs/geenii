@@ -1,16 +1,13 @@
 import React from 'react'
 import CompletionChatPage from '@/app/chat/completion-chat-page.tsx'
-import WelcomeScreen from '@/app/welcome/WelcomeScreen.tsx'
 import McpServersPage from '@/app/mcp-servers/mcp-servers-page.tsx'
 import DockerCatalogPage from '@/app/mcp-servers/docker-catalog-page.tsx'
-import FlowsPage from '@/app/flows/flows-page.tsx'
-import WizardsPage from '@/app/wizards/wizards-page.tsx'
-import WsChat from '@/app/wschat/WsChat.tsx'
-import WizardApp from '@/app/wizards/WizardApp.tsx'
 import CompletionsPage from '@/app/completion/completions-page.tsx'
 import { AssistantChatsPage } from '@/app/assistants/assistant-chats-page.tsx'
 import SettingsPage from '@/app/settings/settings-page.tsx'
 import { NotFoundError } from '@/features/errors/not-found-error.tsx'
+import FlowsPage from '@/app/flows/flows-page.tsx'
+import AudioPage from '@/app/aiassist/audio-page.tsx'
 
 
 type Route = {
@@ -46,17 +43,17 @@ const AppRouter = () => {
   }, [])
 
   const routes = [
+    // {
+    //   path: '/',
+    //   element: <WelcomeScreen />,
+    // },
     {
       path: '/',
-      element: <WelcomeScreen />,
+      element: <CompletionChatPage />,
     },
     {
       path: '/completions',
       element: <CompletionsPage />,
-    },
-    {
-      path: '/chat',
-      element: <CompletionChatPage />,
     },
     {
       path: '/assistants',
@@ -75,17 +72,21 @@ const AppRouter = () => {
       element: <FlowsPage />,
     },
     {
-      path: '/wschat',
-      element: <WsChat />,
+      path: '/audio',
+      element: <AudioPage />,
     },
-    {
-      path: '/wizards',
-      element: <WizardsPage />,
-    },
-    {
-      path: '/wizard',
-      element: <WizardApp />,
-    },
+    // {
+    //   path: '/wschat',
+    //   element: <WsChat />,
+    // },
+    // {
+    //   path: '/wizards',
+    //   element: <WizardsPage />,
+    // },
+    // {
+    //   path: '/wizard',
+    //   element: <WizardApp />,
+    // },
     {
       path: '/settings',
       element: <SettingsPage />,

@@ -29,9 +29,9 @@ import { settingsForms } from '@/app/settings/settings-forms.ts'
 const data = {
   nav: [
     //{ name: "Profile", icon: UserIcon },
+    { name: "Default Assistant", icon: BotIcon },
     { name: "AI Models", icon: BotIcon },
-    { name: "Default Models", icon: BotIcon },
-    { name: "MCP Servers", icon: ServerIcon },
+    //{ name: "MCP Servers", icon: ServerIcon },
     //{ name: "Notifications", icon: Bell },
     //{ name: "Navigation", icon: Menu },
     //{ name: "Home", icon: Home },
@@ -40,7 +40,7 @@ const data = {
     //{ name: "Language & region", icon: Globe },
     //{ name: "Accessibility", icon: Keyboard },
     //{ name: "Mark as read", icon: Check },
-    { name: "Audio & video", icon: Video },
+    //{ name: "Audio & video", icon: Video },
     //{ name: "Connected accounts", icon: Link },
     //{ name: "Privacy & visibility", icon: Lock },
     //{ name: "Advanced", icon: Settings },
@@ -62,7 +62,7 @@ const DummySettingsView = () => {
 
 
 const SettingsView = () => {
-  const [activeTab, setActiveTab] = React.useState("Profile");
+  const [activeTab, setActiveTab] = React.useState("Default Models");
 
   const activeTabElement = React.useMemo(() => {
     switch (activeTab) {

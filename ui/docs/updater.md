@@ -83,3 +83,9 @@ The endpoint base URLs must be HTTPS or return a JSON with updater info.
   }
 }
 ```
+
+
+
+For more details, see the official Tauri Updater plugin documentation:
+
+https://tauri.app/plugin/updater/

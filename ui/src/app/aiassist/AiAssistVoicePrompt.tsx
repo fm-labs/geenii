@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { AudioRecorder } from './AudioRecorder.tsx'
+import { XAI_API_URL } from '@/constants.ts'
 
 export interface AiAssistVoicePromptProps {
   onResponse?: (response: any) => void
@@ -16,7 +17,7 @@ export const AiAssistVoicePrompt = ({ ...props }: AiAssistVoicePromptProps) => {
     if (audioBlob) {
       const timestamp = new Date().valueOf()
       const formData = new FormData()
-      formData.append('file', audioBlob, `recordedOrder${timestamp}.wav`)
+      formData.append('input_blob', audioBlob, `recordedOrder${timestamp}.wav`)
 
       try {
         setIsProcessing(true)
@@ -32,7 +33,7 @@ export const AiAssistVoicePrompt = ({ ...props }: AiAssistVoicePromptProps) => {
         //   });
 
 
-        const response = await fetch(`http://voicetransriber-service/openai/configassist`, {
+        const response = await fetch(XAI_API_URL + `ai/v1/audio/transcribe`, {
           method: 'POST',
           body: formData,
         })

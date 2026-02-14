@@ -10,12 +10,12 @@ BUILTIN_AGENTS = {}
 class AgentConfigModelSettings(pydantic.BaseModel):
     model_config = {
         "extra": "allow",
-        "json_schema_extra": {
-            "example": {
-                "debug": False,
-                "mode": "benchmarks"
-            }
-        }
+        # "json_schema_extra": {
+        #     "example": {
+        #         "debug": False,
+        #         "mode": "benchmarks"
+        #     }
+        # }
     }
 
     temperature: float | None = 0.7

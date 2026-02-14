@@ -26,10 +26,11 @@ const ChatInput = (props: ChatInputProps) => {
     }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // handle submission logic here
     if (props?.onSubmit) {
-      props.onSubmit(input)
+      await props.onSubmit(input)
+      setInput('')
     } else {
       console.warn("No onSubmit handler provided")
     }

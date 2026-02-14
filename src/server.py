@@ -65,70 +65,70 @@ app.include_router(app_router, prefix="")
 
 
 
-# WebSocket endpoint
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, user = Security(dep_current_token_user)):
-
-    print(f"WebSocket connection request from user: {user}")
-
-    # get the request headers and query parameters
-    headers = websocket.headers
-    query_params = websocket.query_params
-    print(f"WebSocket connection request", headers, query_params)
-
-    context = {
-        "user": user,
-    }
-
-    await manager.connect(websocket)
-    # await manager.broadcast(json.dumps({
-    #     "type": "client_connected",
-    #     #"client_id": client_id,
-    #     #"message": f"Client {client_id} connected"
-    # }))
-    # await manager.send_json(websocket, {
-    #     "type": "event",
-    #     "event": "connected",
-    #     "data": {
-    #         "message": "WebSocket connection established"
-    #     }
-    # })
-    try:
-        # print number of active connections
-        print(f"Active WebSocket connections: {len(manager.active_connections)}")
-
-        while True:
-            # Receive message from client
-            data = await websocket.receive_text()
-            await process_message(websocket, data, context=context)
-
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        # await manager.broadcast(json.dumps({
-        #     "type": "client_disconnected",
-        #     "message": "A client disconnected"
-        # }))
-        print("WebSocket Disconnected")
-    finally:
-        # Cleanup all topics for this socket
-        async with subs_lock:
-            topics_to_remove = []
-            for topic, sockets in subscriptions.items():
-                if websocket in sockets:
-                    sockets.remove(websocket)
-                    if not sockets:
-                        topics_to_remove.append(topic)
-            for topic in topics_to_remove:
-                del subscriptions[topic]
-
-
-def test_websocket():
-    client = TestClient(app)
-    with client.websocket_connect("/ws") as websocket:
-        data = websocket.receive_json()
-        #assert data == {"msg": "Hello WebSocket"}
-        print("WebSocket Test Received:", data)
-
-
-if __name__ == "__main__":
-    test_websocket()
+# # WebSocket endpoint
+# @app.websocket("/ws")
+# async def websocket_endpoint(websocket: WebSocket, user = Security(dep_current_token_user)):
+#
+#     print(f"WebSocket connection request from user: {user}")
+#
+#     # get the request headers and query parameters
+#     headers = websocket.headers
+#     query_params = websocket.query_params
+#     print(f"WebSocket connection request", headers, query_params)
+#
+#     context = {
+#         "user": user,
+#     }
+#
+#     await manager.connect(websocket)
+#     # await manager.broadcast(json.dumps({
+#     #     "type": "client_connected",
+#     #     #"client_id": client_id,
+#     #     #"message": f"Client {client_id} connected"
+#     # }))
+#     # await manager.send_json(websocket, {
+#     #     "type": "event",
+#     #     "event": "connected",
+#     #     "data": {
+#     #         "message": "WebSocket connection established"
+#     #     }
+#     # })
+#     try:
+#         # print number of active connections
+#         print(f"Active WebSocket connections: {len(manager.active_connections)}")
+#
+#         while True:
+#             # Receive message from client
+#             data = await websocket.receive_text()
+#             await process_message(websocket, data, context=context)
+#
+#     except WebSocketDisconnect:
+#         manager.disconnect(websocket)
+#         # await manager.broadcast(json.dumps({
+#         #     "type": "client_disconnected",
+#         #     "message": "A client disconnected"
+#         # }))
+#         print("WebSocket Disconnected")
+#     finally:
+#         # Cleanup all topics for this socket
+#         async with subs_lock:
+#             topics_to_remove = []
+#             for topic, sockets in subscriptions.items():
+#                 if websocket in sockets:
+#                     sockets.remove(websocket)
+#                     if not sockets:
+#                         topics_to_remove.append(topic)
+#             for topic in topics_to_remove:
+#                 del subscriptions[topic]
+#
+#
+# def test_websocket():
+#     client = TestClient(app)
+#     with client.websocket_connect("/ws") as websocket:
+#         data = websocket.receive_json()
+#         #assert data == {"msg": "Hello WebSocket"}
+#         print("WebSocket Test Received:", data)
+#
+#
+# if __name__ == "__main__":
+#     test_websocket()

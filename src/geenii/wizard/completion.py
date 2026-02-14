@@ -1,9 +1,7 @@
 from geenii import settings
-from geenii.ai import get_ai_provider
+from geenii.ai import get_ai_provider, generate_completion, split_model
 from geenii.datamodels import CompletionResponse, CompletionRequest
 from geenii.provider.interfaces import AIProvider, AICompletionProvider
-from geenii.service import generate_completion
-from geenii.util import split_model
 from geenii.wizard.base import BaseWizard
 
 

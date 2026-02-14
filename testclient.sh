@@ -22,7 +22,7 @@ case "$CMD" in
     echo "Using tools..."
     curl -v --header "Content-Type: application/json" \
          --request POST \
-         --data '{"model": "ollama:mistral:latest", "tools": ["get_weather", "get_geolocation_for_location", "calculate_two_numbers", "get_stock_price"], "prompt": "Get the weather of Bogota and New York. Where is the better temperature. Temperature in degree celcius."}' \
+         --data '{"model": "ollama:mistral:latest", "tools": ["get_weather", "get_geolocation_for_location", "calculate_two_numbers", "get_stock_price"], "prompt": "Get the weather of Bogota and New York. Where is the better temperature. Temperature in degree Celsius. Use tools."}' \
          $BASE_URL/ai/v1/completion
     ;;
   chat)

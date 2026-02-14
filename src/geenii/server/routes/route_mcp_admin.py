@@ -2,9 +2,7 @@ import dataclasses
 from typing import List
 
 from fastapi import APIRouter, HTTPException
-from fastmcp import Client
 from fastmcp.client.client import CallToolResult
-from fastmcp.client.tasks import ToolTask
 from mcp.types import Prompt
 
 from geenii.datamodels import MCPServerConfig, MCPToolCallRequest, MCPServerInfo, MCPToolCallResponse
@@ -93,7 +91,7 @@ async def get_mcp_server_info(server_name: str) -> MCPServerInfo:
     # Create a client that connects to the specified server
     #_config = {"mcpServers": {server_name: server_config}}
     #client = Client(_config)
-    client = get_mcp_client_for_server(server_name=server_name)
+    client = get_mcp_client_for_server(server_name=server_name).client
 
     async with client:
         try:
@@ -153,14 +151,14 @@ async def call_mcp_server_tool(server_name: str, request: MCPToolCallRequest) ->
     tool_name = request.tool_name
     arguments = request.arguments
     try:
-        client = get_mcp_client_for_server(server_name=server_name)
+        client = get_mcp_client_for_server(server_name=server_name).client
     except Exception as e:
         return MCPToolCallResponse(**{"tool_name": tool_name, "arguments": arguments, "error": str(e)})
 
     async with client:
         try:
             print("Calling MCP tool:", tool_name, "with arguments):", arguments)
-            result: CallToolResult = await client.call_tool(tool_name, arguments=arguments)
+            result: CallToolResult = await client.execute_tool_call(tool_name, arguments=arguments)
             return MCPToolCallResponse(**{"tool_name": tool_name, "arguments": arguments, "result": dataclasses.asdict(result)})
         except Exception as e:
             return MCPToolCallResponse(**{"tool_name": tool_name, "arguments": arguments, "error": str(e)})

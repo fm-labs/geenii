@@ -24,6 +24,8 @@ export const FEATURE_AGENTS_ENABLED = import.meta.env.VITE_FEATURE_AGENTS_ENABLE
 export const FEATURE_MCP_ENABLED = import.meta.env.VITE_FEATURE_MCP_ENABLED === 'true' || false;
 export const FEATURE_FLOWS_ENABLED = import.meta.env.VITE_FEATURE_FLOWS_ENABLED === 'true' || false;
 
+export const FEATURE_SETTINGS_ENABLED = import.meta.env.VITE_FEATURE_SETTINGS_ENABLED === 'true' || false;
+
 export const FEATURE_TAURI_ENABLED = import.meta.env.VITE_FEATURE_TAURI_ENABLED === 'true' || false;
 export const FEATURE_TAURI_XAPI_ENABLED = import.meta.env.VITE_FEATURE_TAURI_XAPI_ENABLED === 'true' || false;
 

@@ -2,9 +2,10 @@ import React from 'react'
 import { IAiClient, IDockerApiClient } from '../api/xai.types.ts'
 import { initTauriDockerApiClient, initTauriXapi, initWebXapi } from '../init.ts'
 import { AppContext } from './AppContext.tsx'
-import { XAI_API_URL, FEATURE_TAURI_XAPI_ENABLED } from '../constants.ts'
+import { FEATURE_TAURI_XAPI_ENABLED } from '../constants.ts'
 import TauriWrapper from '../components/tauri/TauriWrapper.tsx'
 import { ServerContext } from './ServerContext.tsx'
+import { Button } from '@/components/ui/button.tsx'
 
 export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   // @ts-ignore
@@ -34,21 +35,21 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
         xapiClient = await initWebXapi(serverUrl)
       }
     } catch (error) {
-      setBootLog(prev => [...prev, `❌ Error initializing XAI api client: ${error.message}`])
+      setBootLog(prev => [...prev, `❌ Error initializing api client: ${error.message}`])
       throw error;
     }
 
     if (!xapiClient) {
-      throw new Error('XAI API client initialization failed.')
+      throw new Error('API client initialization failed.')
     }
     setXaiApi(xapiClient)
-    console.log('XAI API client initialized with base url', serverUrl)
+    console.log('API client initialized with base url', serverUrl)
 
     try {
       const apiInfo = await xapiClient.getInfo()
-      setBootLog(prev => [...prev, `ℹ️ XAI API Status: ${apiInfo.status}`])
+      setBootLog(prev => [...prev, `ℹ️ API Version: ${apiInfo.version}`])
     } catch (error) {
-      setBootLog(prev => [...prev, `❌ Error fetching XAI API info: ${error.message}`])
+      setBootLog(prev => [...prev, `❌ Error fetching API info: ${error.message}`])
       throw error // Re-throw to handle in the main initialization flow
     }
   }
@@ -117,13 +118,13 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
 
   React.useEffect(() => {
     const initialize = async () => {
-      setBootLog(['ℹ️ Starting application...'])
+      setBootLog(['ℹ️ Loading ...'])
       const initResults = await Promise.all([
-        checkApiVersion(),
+        //checkApiVersion(),
         checkUserAgent(),
         //checkTimeout(2000),
         loadXapi(),
-        loadDockerApiClient(),
+        //loadDockerApiClient(),
       ]).then(() => {
         setBootLog(prev => [...prev, '✅ All checks completed.'])
         setLoading(false)
@@ -136,12 +137,13 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
       console.log(initResults)
     }
 
+    // DISABLED FOR NOW TO SPEED UP LOADING
     const timer = setTimeout(() => {
       initialize().catch(error => {
         setBootLog(prev => [...prev, `❌ Initialization error: ${error.message}`])
         //setLoading(false);
       })
-    }, 50) // Delay to prevent double initialization in strict mode
+    }, 10) // Delay to prevent double initialization in strict mode
 
     return () => {
       clearTimeout(timer)
@@ -150,14 +152,13 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
 
   if (loading || !ready) {
     return (<div className="boot-screen container mx-auto p-4">
-      <div>Loading ...</div>
       {/*DEV_MODE &&*/ <div className="boot-log mb-4">
         {bootLog.map((log, index) => (
           <div key={index} className="boot-log">
             {log}
           </div>
         ))}
-        {!ready && <button onClick={() => setReady(true)}>Continue</button>}
+        {!ready && <Button variant={"ghost"} onClick={() => setReady(true)}>Continue</Button>}
       </div>}
     </div>)
   }

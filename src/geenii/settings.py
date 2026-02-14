@@ -7,7 +7,7 @@ dotenv.load_dotenv(".env.local", override=True)
 DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
 DATA_DIR = os.environ.get("DATA_DIR", DEFAULT_DATA_DIR)
 
-MCP_CONFIG_FILE="mcpservers.json"
+MCP_CONFIG_FILE="mcp.json"
 
 # Completion models
 #DEFAULT_COMPLETION_MODEL= "openai:gpt-4o-mini"

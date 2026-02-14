@@ -2,7 +2,7 @@ import abc
 from typing import List
 
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, AudioTranscriptionApiResponse, \
-    AudioGenerationApiResponse, AudioTranslationApiResponse
+    AudioGenerationApiResponse, AudioTranslationApiResponse, ChatCompletionResponse, ChatCompletionRequest
 
 
 class AIProvider(abc.ABC):
@@ -33,31 +33,22 @@ class AICompletionProvider(abc.ABC):
     This class defines the interface for AI completion providers, which can be used to
     get completions based on a given prompt.
     """
+
     @abc.abstractmethod
-    def generate_completion(self, prompt: str, **kwargs) -> CompletionResponse:
+    def generate_completion(self, model: str, prompt: str, **kwargs) -> CompletionResponse:
         """Get an AI completion for the given prompt"""
         pass
 
 
-class ChatCompletionProvider(abc.ABC):
-    """Abstract base class for AI chat completion providers.
-    This class defines the interface for AI chat completion providers, which can be used to
-    get chat completions based on a series of messages and a prompt.
-    """
-    @abc.abstractmethod
-    def generate_chat_completion(self, prompt: str, messages: list, **kwargs):
-        """Get an AI chat completion for the given messages"""
-        pass
-
-
-class AIAssistantProvider(abc.ABC):
-    """Abstract base class for AI tool calling providers.
+class AIChatCompletionProvider(abc.ABC):
+    """Abstract base class for AI chat completion and tool calling providers.
     This class defines the interface for AI tool calling providers, which can be used to
     get tool call completions based on a prompt and a list of tools.
     """
+
     @abc.abstractmethod
-    def generate_assistant_completion(self, prompt: str, tool_names: List[str], **kwargs):
-        """Get an AI assistant completion with tooling support for the given prompt and tools"""
+    def generate_chat_completion(self, request: ChatCompletionRequest) -> ChatCompletionResponse:
+        """Get an AI chat completion with tooling support for the given prompt and tools"""
         pass
 
 
@@ -66,8 +57,9 @@ class AIImageGeneratorProvider(abc.ABC):
     This class defines the interface for AI image generation providers, which can be used to
     generate images based on a given prompt.
     """
+
     @abc.abstractmethod
-    def generate_image(self, prompt: str, **kwargs) -> ImageGenerationApiResponse:
+    def generate_image(self, model: str, prompt: str, **kwargs) -> ImageGenerationApiResponse:
         """Generate an image based on the given prompt"""
         pass
 
@@ -77,8 +69,9 @@ class AIAudioGeneratorProvider(abc.ABC):
     This class defines the interface for AI text-to-speech providers, which can be used to
     convert text into speech.
     """
+
     @abc.abstractmethod
-    def generate_speech(self, text: str, **kwargs) -> AudioGenerationApiResponse:
+    def generate_speech(self, model: str, text: str, **kwargs) -> AudioGenerationApiResponse:
         """Convert the given text into speech"""
         pass
 
@@ -88,8 +81,9 @@ class AIAudioTranscriptionProvider(abc.ABC):
     This class defines the interface for AI speech-to-text providers, which can be used to
     convert speech into text.
     """
+
     @abc.abstractmethod
-    def generate_audio_transcription(self, audio: bytes | str, **kwargs) -> AudioTranscriptionApiResponse:
+    def generate_audio_transcription(self, model: str, audio: bytes | str, **kwargs) -> AudioTranscriptionApiResponse:
         """Convert the given audio into text"""
         pass
 
@@ -99,11 +93,12 @@ class AIAudioTranslationProvider(abc.ABC):
     This class defines the interface for AI audio translation providers, which can be used to
     translate audio from one language to another.
     """
+
     @abc.abstractmethod
-    def generate_audio_translation(self, audio: bytes | str, target_language: str, **kwargs) -> AudioTranslationApiResponse:
+    def generate_audio_translation(self, model: str, audio: bytes | str, target_language: str,
+                                   **kwargs) -> AudioTranslationApiResponse:
         """Translate the given audio into the target language"""
         pass
-
 
 # class AITextTranslationProvider(abc.ABC):
 #     """Abstract base class for AI text translation providers.

@@ -141,6 +141,16 @@ const DockerMcpCatalog = () => {
         return item?.oauth && item?.oauth.providers && item?.oauth.providers.length > 0
     }
 
+    const toolCount = React.useMemo(() => {
+        if (!registry) return 0;
+        let count = 0;
+        Object.values(registry).forEach((item: any) => {
+            if (item.tools && Array.isArray(item.tools)) {
+                count += item.tools.length;
+            }
+        });
+        return count;
+    }, [registry])
 
     const filteredRegistry = React.useMemo(() => {
         if (!registry) return {};
@@ -318,6 +328,7 @@ const DockerMcpCatalog = () => {
             </div>
             <div className={"flex flex-row mb-2 text-muted-foreground"}>
                 {Object.keys(registry).length} servers in registry.{' '}
+                {toolCount} tools available.{' '}
                 {Object.keys(filteredRegistry).length} servers match filters.
             </div>
             {Object.entries(filteredRegistry).map(([key, item]: any) => {

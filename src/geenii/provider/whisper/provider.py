@@ -10,7 +10,7 @@ class WhisperProvider(AIAudioTranscriptionProvider, AIAudioTranslationProvider):
 
     def __init__(self, model_id: str):
         super().__init__(model_id=model_id)
-        self.provider_name = "whispercpp"
+        self.provider_name = "whisper"
         self.model_id = model_id
         self.model = None  # Placeholder for the actual model instance
         self._initialize_model()

@@ -8,9 +8,10 @@ import {
   FEATURE_AGENTS_ENABLED,
   FEATURE_CHAT_ENABLED, FEATURE_COMPLETION_ENABLED,
   FEATURE_FLOWS_ENABLED,
-  FEATURE_MCP_ENABLED,
+  FEATURE_MCP_ENABLED, FEATURE_SETTINGS_ENABLED,
 } from '@/constants.ts'
 
+const SHOW_NAV_MENU = false
 
 const Layout = (props: PropsWithChildren) => {
 
@@ -18,7 +19,7 @@ const Layout = (props: PropsWithChildren) => {
 
   return (
     <div>
-      <header className={"absolute top-0 left-0 w-full border-b shadow-md z-10"}>
+      <header className={"absolute top-0 left-0 w-full border-b shadow-md z-10 p-2"}>
         <div className={"flex flex-row w-full justify-between items-center max-w-7xl px-4 mx-auto"}>
           <div className={"flex flex-row"}>
             <BotIcon />
@@ -27,18 +28,18 @@ const Layout = (props: PropsWithChildren) => {
             </span>
           </div>
           <div>
-            <ul className="space-x-3 p-2 flex items-center justify-center">
+            {SHOW_NAV_MENU && <ul className="space-x-3 flex items-center justify-center">
               {/*<li className="text-sm text-gray-600 hover:bg-blue-50 px-1"><a href="#/welcome">Start</a></li>*/}
               {FEATURE_COMPLETION_ENABLED && <li className={navItemStyle}><a href="#/completions">Completions</a></li>}
               {FEATURE_CHAT_ENABLED && <li className={navItemStyle}><a href="#/chat">Chat</a></li>}
               {FEATURE_AGENTS_ENABLED && <li className={navItemStyle}><a href="#/assistants">Assistants</a></li>}
               {FEATURE_MCP_ENABLED && <li className={navItemStyle}><a href="#/mcp">MCP</a></li>}
               {FEATURE_FLOWS_ENABLED && <li className={navItemStyle}><a href="#/flows">Flows</a></li>}
-            </ul>
+            </ul>}
           </div>
           <div className={"flex flex-row"}>
             {/*<SettingsIcon />*/}
-            <a href="#/settings"><SlidersHorizontalIcon /></a>
+            {FEATURE_SETTINGS_ENABLED && <a href="#/settings"><SlidersHorizontalIcon /></a>}
             {/*<UserIcon />*/}
           </div>
         </div>
