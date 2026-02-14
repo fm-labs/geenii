@@ -8,6 +8,7 @@ set -xe
 echo "Building sidecar binaries for desktop platforms..."
 source ./build_bin.sh
 
+WD=$(pwd)
 TARGET_TRIPLE=$(rustc --print host-tuple)
 
 # Path or content of your private key
@@ -51,4 +52,8 @@ if ! pnpm tauri build ; then
     exit 1
 fi
 
+cd "$WD"
+source ./build_updates_json.sh
+
 echo "Build completed successfully."
+exit 0

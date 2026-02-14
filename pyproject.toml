@@ -16,6 +16,7 @@ dependencies = [
     "py-key-value-aio>=0.3.0",
     "pydantic>=2.11.7",
     "pymongo>=4.15.5",
+    "toml>=0.10.2",
     "uvicorn>=0.35.0",
     "websockets>=15.0.1",
 ]

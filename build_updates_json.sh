@@ -7,7 +7,7 @@ echo "Building tauri updater json from latest build ..."
 TARGET_TRIPLE=$(rustc --print host-tuple)
 
 APP_NAME="geenii-desktop"
-VERSION="0.1.1"
+VERSION=$(cat VERSION)
 DOWNLOAD_BASE="https://geenii.flowmotion-labs.com/downloads/geenii"
 
 json=$(jq -n '
@@ -38,7 +38,7 @@ add_platform() {
 add_pub_date() {
   local json="$1"
   #local pub_date=$(date -u +"%Y-%m-%dT%H:%M:%S%:Z")
-  local pub_date=$(date -u +"%Y-%m-%dT%H:%M:%S.%N%:z")
+  local pub_date=$(date -u +"%Y-%m-%dT%H:%M:%S.%N+00:00")
 
   jq \
     --arg pub_date "$pub_date" \
@@ -77,7 +77,7 @@ if [[ "$TARGET_TRIPLE" == *"aarch64-apple-darwin"* ]]; then
     json=$(add_platform "$json" \
     "darwin-aarch64" \
     "$(cat $SIG_FILE)" \
-    "${DOWNLOAD_BASE}/${VERSION}/${APP_NAME}.app.tar.gz")
+    "${DOWNLOAD_BASE}/${VERSION}/macos/${APP_NAME}.app.tar.gz")
 
     # write to dist/updates.latest.json
     echo "Writing updates JSON to ./updates.latest.json ..."
