@@ -17,3 +17,7 @@ src/*.egg-info/
 src/x*.py
 src/x*.*
 src/xaidev
+
+updater.php
+updates.json
+updates.*.json

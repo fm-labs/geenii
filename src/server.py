@@ -1,6 +1,9 @@
 import asyncio
 import contextlib
+import signal
 from contextlib import asynccontextmanager
+
+import uvicorn
 
 from fastapi import FastAPI, Security
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,18 +19,19 @@ from geenii.server.deps import dep_current_token_user
 from geenii.server.router import app_router
 from geenii.server.routes.route_ws import manager, process_message, subs_lock, subscriptions, redis_pubsub_listener
 
-redis_listener_stop_event = asyncio.Event()
+#redis_listener_stop_event = asyncio.Event()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(redis_pubsub_listener(redis_listener_stop_event))
+    #task = asyncio.create_task(redis_pubsub_listener(redis_listener_stop_event))
     try:
         yield
     finally:
-        redis_listener_stop_event.set()
-        task.cancel()
-        with contextlib.suppress(Exception):
-            await task
+        #redis_listener_stop_event.set()
+        #task.cancel()
+        #with contextlib.suppress(Exception):
+        #    await task
+        pass
 
 app = FastAPI(lifespan=lifespan, title="Geenii API", version="0.1.0")
 
@@ -136,5 +140,19 @@ app.include_router(app_router, prefix="")
 #     test_websocket()
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=13030)
+   uvicorn.run(app, host="127.0.0.1", port=13030, workers=1, reload=False, log_level="info")
+
+# async def serve():
+#     config = uvicorn.Config(app, host="127.0.0.1", port=13030, log_level="info")
+#     server = uvicorn.Server(config)
+#
+#     # Custom shutdown on SIGTERM/SIGINT
+#     loop = asyncio.get_running_loop()
+#     for sig in (signal.SIGTERM, signal.SIGINT):
+#         print(f"Registering signal handler for {sig}")
+#         loop.add_signal_handler(sig, server.handle_exit, sig, None)
+#
+#     await server.serve()
+#
+# if __name__ == "__main__":
+#     asyncio.run(serve())

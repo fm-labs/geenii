@@ -1,5 +1,8 @@
 mod docker;
 
+mod server;
+use server::ServerProcess;
+
 use serde::{Deserialize, Serialize};
 //use tauri::image::Image;
 //use tauri::menu::Menu;
@@ -176,63 +179,63 @@ pub fn setup_autostart(app: &mut App) -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
-async fn start_server_internal(app: AppHandle) -> Result<(), String> {
-    let state = app.state::<ServerState>();
+// async fn start_server_internal(app: AppHandle) -> Result<(), String> {
+//     let state = app.state::<ServerState>();
+//
+//     // prevent double-start (atomic, cross-thread safe)
+//     if state.started.swap(true, Ordering::SeqCst) {
+//         return Ok(());
+//     }
+//
+//     let mut guard = state.child.lock().unwrap();
+//     if guard.is_some() {
+//         return Ok(());
+//     }
+//
+//     let (mut rx, child) = app
+//         .shell()
+//         .sidecar("geenii-srv")
+//         .map_err(|e| e.to_string())?
+//         //.args(["8787"])
+//         .spawn()
+//         .map_err(|e| e.to_string())?;
+//
+//     tauri::async_runtime::spawn(async move {
+//         while let Some(event) = rx.recv().await {
+//             println!("sidecar: {:?}", event);
+//             match event {
+//                 CommandEvent::Stdout(bytes) => {
+//                     print!("{}", String::from_utf8_lossy(&bytes));
+//                 }
+//                 CommandEvent::Stderr(bytes) => {
+//                     eprint!("{}", String::from_utf8_lossy(&bytes));
+//                 }
+//                 CommandEvent::Error(err) => {
+//                     eprintln!("sidecar error: {err}");
+//                 }
+//                 CommandEvent::Terminated(p) => {
+//                     eprintln!(
+//                         "sidecar terminated: code={:?} signal={:?}",
+//                         p.code, p.signal
+//                     );
+//                 }
+//                 _ => {}
+//             }
+//         }
+//     });
+//
+//     *guard = Some(child);
+//     Ok(())
+// }
 
-    // prevent double-start (atomic, cross-thread safe)
-    if state.started.swap(true, Ordering::SeqCst) {
-        return Ok(());
-    }
-
-    let mut guard = state.child.lock().unwrap();
-    if guard.is_some() {
-        return Ok(());
-    }
-
-    let (mut rx, child) = app
-        .shell()
-        .sidecar("geenii-srv")
-        .map_err(|e| e.to_string())?
-        //.args(["8787"])
-        .spawn()
-        .map_err(|e| e.to_string())?;
-
-    tauri::async_runtime::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            println!("sidecar: {:?}", event);
-            match event {
-                CommandEvent::Stdout(bytes) => {
-                    print!("{}", String::from_utf8_lossy(&bytes));
-                }
-                CommandEvent::Stderr(bytes) => {
-                    eprint!("{}", String::from_utf8_lossy(&bytes));
-                }
-                CommandEvent::Error(err) => {
-                    eprintln!("sidecar error: {err}");
-                }
-                CommandEvent::Terminated(p) => {
-                    eprintln!(
-                        "sidecar terminated: code={:?} signal={:?}",
-                        p.code, p.signal
-                    );
-                }
-                _ => {}
-            }
-        }
-    });
-
-    *guard = Some(child);
-    Ok(())
-}
-
-#[tauri::command]
-async fn start_server(app: AppHandle) -> Result<(), String> {
-    start_server_internal(app).await
-}
+// #[tauri::command]
+// async fn start_server(app: AppHandle) -> Result<(), String> {
+//     start_server_internal(app).await
+// }
 
 #[cfg(desktop)]
 pub fn run() {
-    let app = tauri::Builder::default()
+    tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         //.plugin(tauri_plugin_autostart::init())
@@ -281,54 +284,69 @@ pub fn run() {
         // })
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(ServerState {
-            child: Mutex::new(None),
-            started: AtomicBool::new(false),
-        })
+        // .manage(ServerState {
+        //     child: Mutex::new(None),
+        //     started: AtomicBool::new(false),
+        // })
         .invoke_handler(tauri::generate_handler![
             greet,
             prompt,
             execute_command,
-            start_server
+            //start_server
         ])
+        // .setup(|app| {
+        //     let app_handle = app.handle().clone(); // owned, 'static
+        //                                            // fire and forget: start sidecar when app starts
+        //     tauri::async_runtime::spawn(async move {
+        //         eprintln!("Starting sidecar server...");
+        //         if let Err(e) = start_server_internal(app_handle).await {
+        //             eprintln!("Failed to start server: {e}");
+        //         }
+        //     });
+        //
+        //     Ok(())
+        // })
+        .manage(ServerProcess(std::sync::Mutex::new(None)))
         .setup(|app| {
-            let app_handle = app.handle().clone(); // owned, 'static
-                                                   // fire and forget: start sidecar when app starts
-            tauri::async_runtime::spawn(async move {
-                eprintln!("Starting sidecar server...");
-                if let Err(e) = start_server_internal(app_handle).await {
-                    eprintln!("Failed to start server: {e}");
-                }
-            });
-
+            server::start_server(&app.handle())?;
             Ok(())
         })
-        .build(tauri::generate_context!())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                // Fires when the last window closes
+                let app = window.app_handle();
+                if app.webview_windows().is_empty() {
+                    eprintln!("Stopping server because last window was destroyed");
+                    server::stop_server(app);
+                }
+            }
+        })
+        .run(tauri::generate_context!())
         .expect("error while running tauri application");
 
-    app.run(|app_handle, event| {
-        match event {
-            // Fired when the app is about to quit (Cmd+Q, close last window on some platforms, app.exit(), etc.)
-            RunEvent::ExitRequested { .. } => {
-                let state = app_handle.state::<ServerState>();
-                if let Some(child) = state.child.lock().unwrap().take() {
-                    let _ = child.kill();
-                    eprintln!("Sidecar killed on ExitRequested");
-                };
-            }
-
-            // (Optional) extra safety: if you prefer, also handle final exit
-            RunEvent::Exit => {
-                let state = app_handle.state::<ServerState>();
-                if let Some(child) = state.child.lock().unwrap().take() {
-                    let _ = child.kill();
-                    eprintln!("Sidecar killed on Exit");
-                };
-            }
-
-            _ => {}
-        }
-    });
+    // app.run(|app_handle, event| {
+    //     match event {
+    //         // Fired when the app is about to quit (Cmd+Q, close last window on some platforms, app.exit(), etc.)
+    //         RunEvent::ExitRequested { .. } => {
+    //             let state = app_handle.state::<ServerState>();
+    //             if let Some(child) = state.child.lock().unwrap().take() {
+    //                 let _ = child.kill();
+    //                 eprintln!("Sidecar killed on ExitRequested");
+    //             };
+    //         }
+    //
+    //         // (Optional) extra safety: if you prefer, also handle final exit
+    //         RunEvent::Exit => {
+    //             let state = app_handle.state::<ServerState>();
+    //             if let Some(child) = state.child.lock().unwrap().take() {
+    //                 let _ = child.kill();
+    //                 eprintln!("Sidecar killed on Exit");
+    //             };
+    //         }
+    //
+    //         _ => {}
+    //     }
+    // });
 }
 
 // #[cfg_attr(mobile, tauri::mobile_entry_point)]

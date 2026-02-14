@@ -8,9 +8,12 @@ const TauriUpdater = () => {
   const [isChecking, setIsChecking] = React.useState(false)
   const [isUpdating, setIsUpdating] = React.useState(false)
   const [updateInfo, setUpdateInfo] = React.useState<Update|null>(null)
+  const [updateStatus, setUpdateStatus] = React.useState<string>('')
 
   const handleCheckUpdate = async () => {
     setIsChecking(true)
+    setUpdateInfo(null)
+    setUpdateStatus("")
     const update: Update | null = await check()
       .then((update) => {
         if (update) {
@@ -59,26 +62,49 @@ const TauriUpdater = () => {
         case 'Started':
           contentLength = event.data.contentLength
           console.log(`started downloading ${event.data.contentLength} bytes`)
+          setUpdateStatus("Downloading...")
           break
         case 'Progress':
           downloaded += event.data.chunkLength
           console.log(`downloaded ${downloaded} from ${contentLength}`)
+          setUpdateStatus("Downloading... " + Math.round((downloaded / contentLength) * 100) + "%")
           break
         case 'Finished':
           console.log('download finished')
+          setUpdateStatus("Download finished, installing...")
           break
       }
-    }).finally(() => setIsUpdating(false))
+    }).finally(() => {
+      setIsUpdating(false)
+      setUpdateStatus("Finished")
+    })
 
     console.log('update installed')
-    await relaunch()
-
+    //await relaunch()
   }
 
   return (
     <div>
       <Button onClick={handleCheckUpdate}>Check for updates</Button>
-      <Button onClick={handleUpdate}>Update</Button>
+
+      {isChecking && <p>Checking for updates...</p>}
+
+      {updateInfo && (
+        <div>
+          <p>Update found: {updateInfo.version}</p>
+          <Button onClick={handleUpdate} disabled={isUpdating}>
+            {isUpdating ? 'Updating...' : 'Update now'}
+          </Button>
+          {isUpdating && <p>{updateStatus}</p>}
+        </div>
+      )}
+
+      {updateInfo && updateStatus === "Finished" && (
+        <div>
+          <p>Update installed successfully. Please restart the application to apply the update.</p>
+          <Button onClick={() => relaunch()}>Relaunch</Button>
+        </div>
+      )}
     </div>
   )
 }
