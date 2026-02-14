@@ -4,7 +4,7 @@ import dotenv
 dotenv.load_dotenv()
 dotenv.load_dotenv(".env.local", override=True)
 
-APP_VERSION = "0.1.1"
+APP_VERSION = "0.1.2"
 
 DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
 DATA_DIR = os.environ.get("DATA_DIR", DEFAULT_DATA_DIR)
