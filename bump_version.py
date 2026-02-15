@@ -15,7 +15,7 @@ def bump_version_json(file_path: str, key: str, new_version: str, extra: dict = 
     print(f"Bumping version in {file_path}: {key} -> {new_version}")
 
     with open(file_path, "w") as f:
-        json.dump(data, f, indent=4)
+        json.dump(data, f, indent=2)
 
 
 def bump_version_toml(file_path: str, key: str, new_version: str, extra: dict = None):
@@ -77,6 +77,7 @@ if __name__ == "__main__":
     files = [
         ("pyproject.toml", "project.version", bump_version_toml, None),
         ("ui/src-tauri/Cargo.toml", "package.version", bump_version_toml, None),
+        ("ui/src-tauri/tauri.conf.json", "version", bump_version_json, None),
         ("ui/package.json", "version", bump_version_json, None),
         ("src/geenii/settings.py", "APP_VERSION =", bump_version_in_file, {"escape": "true"}),
         ("VERSION", "", write_version_to_file, None),

@@ -1,6 +1,6 @@
 [project]
 name = "geenii"
-version = "0.1.2"
+version = "0.1.3"
 description = "Hybrid AI orchestration platform for llms and agents."
 requires-python = ">=3.13,<4.0"
 dependencies = [

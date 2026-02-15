@@ -1,7 +1,8 @@
 import React from 'react'
 import { AppContext } from '../../context/AppContext.tsx'
-import { Settings } from 'lucide-react'
+import { InfoIcon, Settings } from 'lucide-react'
 import useNotification from '../../hooks/useNotification.ts'
+import TauriUpdater from '@/components/tauri/TauriUpdater.tsx'
 
 const TAURI_COMMANDS = [
   { label: 'echo', command: 'echo', args: ['hello', 'from', 'tauri'] },
@@ -27,13 +28,15 @@ const TauriPanel = () => {
   }
 
   return (
-    <div className={'TauriPanel fixed w-full left-0 bottom-0 p-2'}>
-      <div className={"flex justify-end"}>
+    <div className={'TauriPanel fixed w-full left-0 bottom-0 p-2 pe-3'}>
+      <div className={"flex space-x-1 justify-end"}>
+        <InfoIcon size={16} />
         {apiInfo && apiInfo?.version && (
           <div className={"mr-4 text-sm opacity-70"}>
-            API Version: {apiInfo.version}
+            v{apiInfo.version}
           </div>
         )}
+        <TauriUpdater />
         <Settings size={16} onClick={handleSettings} />
       </div>
     </div>

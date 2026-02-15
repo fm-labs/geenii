@@ -28,7 +28,7 @@ const greetings = [
   // "Good day",
   // "Hola",
   // "Bonjour",
-  "Heyo! 👋",
+  "Hi, I'm Geenii!"
 ]
 
 const messages = [
@@ -39,8 +39,7 @@ const messages = [
 ]
 
 const agentSelfIntro = [
-  "I am Geenii, yet another AI assistant.",
-  "Currently in early alpha, I aim to help you with various tasks.",
+  "I am useless at the moment, but I will be your helpful assistant in the future :)",
 ]
 
 const getRandomElement = (arr: string[]) => {
@@ -79,9 +78,9 @@ const WelcomeScreen = () => {
       <div className="text-center mb-4">
         <h2 className="text-xl font-bold"><TypewriterText text={getRandomElement(messages)} delay={2000} showCursor={false} /></h2>
       </div>
-      {/*<div className="text-center mb-4">
+      <div className="text-center mb-4 max-w-xl mx-auto">
         <SelfIntro />
-      </div>*/}
+      </div>
       
       {/*<div className={"max-w-1/2 mx-auto p-4 text-center"}>
         <div className="flex flex-col gap-4 justify-center mt-8">
@@ -93,10 +92,7 @@ const WelcomeScreen = () => {
 
       <div className={"max-w-1/2 mx-auto p-4 text-center"}>
         <div className="flex flex-col gap-4 justify-center mt-8">
-          <p>This is an early alpha preview. The release is still hatching... </p>
-          <div className="text-center mb-4">
-            {isTauri && <TauriUpdater />}
-          </div>
+          <p>Check for updates!</p>
         </div>
       </div>
 
