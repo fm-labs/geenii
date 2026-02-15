@@ -1,5 +1,5 @@
-import { IDockerApiClient } from "./xai.types.ts";
-import { executeCommand } from "../components/tauri/useTauri.ts";
+import { IDockerApiClient } from '@/api/xai.types.ts';
+import { executeCommand } from "./useTauri.ts";
 
 export const getTauriDockerVersion = async () => {
     const response = executeCommand('docker', ['version'])
@@ -42,7 +42,7 @@ export const getTauriDockerModelVersion = async () => {
     });
 }
 
-const tauriDockerMcpApi: IDockerApiClient = {
+const tauriDockerApi: IDockerApiClient = {
     getVersion: getTauriDockerVersion,
     getInfo: getTauriDockerInfo,
     getMcpVersion: getTauriDockerMcpVersion,
@@ -50,4 +50,4 @@ const tauriDockerMcpApi: IDockerApiClient = {
     getModelVersion: getTauriDockerModelVersion
 }
 
-export default tauriDockerMcpApi;
+export default tauriDockerApi;

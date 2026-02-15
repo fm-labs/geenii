@@ -8,7 +8,7 @@ import QuickTextGenerationPopupButton from '@/app/completion/components/QuickTex
 import QuickImageGenerationPopupButton from '@/app/completion/components/QuickImageGenerationPopupButton.tsx'
 import QuickAudioGenerationPopupButton from '@/app/completion/components/QuickAudioGenerationPopupButton.tsx'
 import { AppContext } from '@/context/AppContext.tsx'
-import TauriUpdater from '@/components/tauri/TauriUpdater.tsx'
+import TauriUpdaterPanelItem from '@/components/tauri/TauriUpdaterPanelItem.tsx'
 
 
 const greetings = [

@@ -57,17 +57,53 @@ docker-compose up
 
 ## For Developers
 
-### Run in development mode from sources
+### Prerequisites
+
+- Python 3.13 or higher installed on your machine.
+- uv for package management and build tool. You can install it with pip: `pip install uv`
+- Node.js and pnpm for building the Web UI. You can install Node.js from [nodejs.org](https://nodejs.org/) and then install pnpm with npm: `npm install -g pnpm`.
+- Rust toolchain for building the Desktop UI. You can install it from [rustup.rs](https://rustup.rs/).
+- (Optional) Docker and Docker Compose installed on your machine. Easiest way is to install is downloading [Docker Desktop](https://www.docker.com/products/docker-desktop).
+
+
+### Install dependencies
+
+```bash
+# Python dependencies
+uv sync
+
+# UI dependencies
+cd ui
+pnpm install
+```
+
+
+### Run server in development mode from sources
 
 ```bash
 uv run uvicorn --app-dir ./src --port 13030 server:app --reload
 ```
 
-### Run in production mode from sources
+### Run server in production mode from sources
 
 ```bash
 uv run uvicorn --app-dir ./src --port 13030 server:app
 ```
+
+### Run desktop UI in development mode
+
+```bash
+cd ui
+pnpm tauri dev
+```
+
+### Run web UI in development mode
+
+```bash
+cd ui
+pnpm run dev
+```
+
 
 ### Run docker compose for development
 

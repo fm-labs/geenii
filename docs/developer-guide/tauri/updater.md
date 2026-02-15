@@ -3,8 +3,8 @@
 ## Generate signing keys
 
 ```bash
-yarn tauri signer generate -w ~/.tauri/signing.key
-yarn run v1.22.22
+pnpm tauri signer generate -w ~/.tauri/signing.key
+pnpm run v1.22.22
 $ tauri signer generate -w /Users/phil/.tauri/signing.key
 Please enter a password to protect the secret key.
 Password: 

@@ -4,7 +4,7 @@ import MainContent from '@/components/layout/main-content.tsx'
 import Header from '@/components/header.tsx'
 import { Button } from '@/components/ui/button.tsx'
 
-import flowData from './data/example-flow1.json'
+//import flowData from './data/example-flow1.json'
 import ReactJson from '@microlink/react-json-view'
 import { FlowgraphProvider } from '@/app/flows/components/flowgraph-provider.tsx'
 import FlowgraphCanvas from '@/app/flows/components/flowgraph-canvas.tsx'
@@ -17,6 +17,22 @@ import FlowgraphEditor from '@/app/flows/components/flowgraph-editor.tsx'
 import FlowgraphSelectedNode from '@/app/flows/components/flowgraph-selected-node.tsx'
 
 const FlowsPage = () => {
+  const [flowData, setFlowData] = React.useState<any>(null)
+
+  if (!flowData) {
+    // Load flow data from local JSON file
+    // React.useEffect(() => {
+    //   fetch('/flows/data/example-flow1.json')
+    //     .then(response => response.json())
+    //     .then(data => setFlowData(data))
+    //     .catch(error => console.error('Error loading flow data:', error))
+    // }, [])
+    //
+    // return <div>Loading flow data...</div>
+
+    return <div>Not implemented yet :)</div>
+  }
+
   return (
     <div>
         <FlowgraphProvider nodes={flowData.nodes as FlowgraphNodeType[]} edges={flowData.edges}>

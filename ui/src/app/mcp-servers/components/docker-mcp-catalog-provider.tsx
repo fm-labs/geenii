@@ -1,5 +1,4 @@
-import { createContext, PropsWithChildren, useContext } from "react";
-import mcpCatalogData from "../data/catalog.json"
+import { createContext, PropsWithChildren, useContext, useState, useEffect } from "react";
 
 type DockerMcpCatalog = {
     version: number;
@@ -17,7 +16,8 @@ const DockerMcpCatalogContext = createContext<DockerMcpCatalogContextType | null
 
 
 export const DockerMcpCatalogProvider = ({children}: PropsWithChildren) => {
-    const mcpCatalog = mcpCatalogData as DockerMcpCatalog;
+    //const mcpCatalog = mcpCatalogData as DockerMcpCatalog;
+    const [mcpCatalog, setMcpCatalog] = useState<DockerMcpCatalog>()
 
     const getServerDef = (name: string): any => {
         return mcpCatalog.registry[name] || null
@@ -27,6 +27,23 @@ export const DockerMcpCatalogProvider = ({children}: PropsWithChildren) => {
         ...mcpCatalog,
         getServerDef
     }
+
+    const fetchCatalog = async () => {
+        try {
+            const response = await fetch('/assets/docker-mcp-catalog.json');
+            if (!response.ok) {
+                throw new Error(`Failed to fetch MCP catalog: ${response.statusText}`);
+            }
+            const data = await response.json();
+            setMcpCatalog(data);
+        } catch (error) {
+            console.error('Error fetching MCP catalog:', error);
+        }
+    }
+
+    useEffect(() => {
+        fetchCatalog();
+    }, [])
 
     return <DockerMcpCatalogContext.Provider value={contextValue}>
         {children}

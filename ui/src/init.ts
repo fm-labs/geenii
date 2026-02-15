@@ -22,9 +22,9 @@ export const initTauriXapi = async (): Promise<IAiClient> => {
 
 export const initTauriDockerApiClient = async (): Promise<IDockerApiClient> => {
     console.log("Initializing Tauri Docker MCP API");
-    const component = await import("./api/tauri-docker-mcp-api.ts");
-    if (!component?.default) {
+    const component = await import("./components/tauri/./tauriDockerApi");
+    if (!component?.tauriDockerApi) {
         throw new Error("Tauri Docker MCP API client not found");
     }
-    return component?.default as IDockerApiClient;
+    return component?.tauriDockerApi as IDockerApiClient;
 };

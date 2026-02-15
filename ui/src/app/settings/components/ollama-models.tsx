@@ -1,6 +1,6 @@
 import React from 'react'
 
-import modelData from '../data/ollama_models.json'
+//import modelData from '../data/ollama_models.json'
 import { Input } from '@/components/ui/input.tsx'
 import { DownloadIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
@@ -40,6 +40,8 @@ import { Badge } from '@/components/ui/badge.tsx'
 const OllamaModels = () => {
   const [searchTerm, setSearchTerm] = React.useState('')
   const [activeModel, setActiveModel] = React.useState<any>(null)
+
+  const [modelData, setModelData] = React.useState<any[]>([])
 
   const modelHasCloudTag = (model: any) => {
     return model.tags.some((tag: any) => tag.name.toLowerCase().includes('cloud'))

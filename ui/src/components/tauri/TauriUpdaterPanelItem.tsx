@@ -1,18 +1,18 @@
 import React from 'react'
-import { Button } from '../../ui'
 import { check, Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { RefreshCcwDot } from 'lucide-react'
+import useNotification from '@/hooks/useNotification.ts'
 
-const TauriUpdater = () => {
+const TauriUpdaterPanelItem = () => {
+  const notify = useNotification()
 
-  //const [isChecking, setIsChecking] = React.useState(false)
-  //const [isUpdating, setIsUpdating] = React.useState(false)
   const [updateInfo, setUpdateInfo] = React.useState<Update|null>(null)
   const [updateStatus, setUpdateStatus] = React.useState<string>('')
 
+  const CHECK_INTERVAL = 1000 * 60 * 60 // check every hour
+
   const handleCheckUpdate = async () => {
-    //setIsChecking(true)
     setUpdateInfo(null)
     setUpdateStatus("Checking for updates...")
     const update: Update | null = await check()
@@ -22,6 +22,7 @@ const TauriUpdater = () => {
             `found update`, update,
           )
           setUpdateStatus("Update available")
+          notify.info(`A new app version is available: ${update.version}`)
         } else {
           console.log('no update found')
           setUpdateStatus("")
@@ -32,12 +33,10 @@ const TauriUpdater = () => {
         console.error('Error checking for updates:', e)
         return null
       })
-      //.finally(() => setIsChecking(false))
     setUpdateInfo(update)
   }
 
   const handleUpdate = async () => {
-    //setIsChecking(true)
     setUpdateInfo(null)
     setUpdateStatus("Checking for updates...")
     const update: Update | null = await check()
@@ -45,8 +44,6 @@ const TauriUpdater = () => {
         console.error('Error checking for updates:', e)
         return null
       })
-      //.finally(() => setIsChecking(false))
-    //setIsChecking(false)
 
     if (!update) {
       console.log('no update found')
@@ -61,7 +58,6 @@ const TauriUpdater = () => {
     let contentLength = 0
 
     // alternatively we could also call update.download() and update.install() separately
-    //setIsUpdating(true)
     setUpdateStatus("Updating...")
     await update.downloadAndInstall((event) => {
       switch (event.event) {
@@ -81,7 +77,6 @@ const TauriUpdater = () => {
           break
       }
     }).finally(() => {
-      //setIsUpdating(false)
       setUpdateStatus("Finished")
     })
 
@@ -89,13 +84,20 @@ const TauriUpdater = () => {
     //await relaunch()
   }
 
+  React.useEffect(() => {
+    handleCheckUpdate() // check for updates on mount
+
+    const interval = setInterval(() => {
+      handleCheckUpdate()
+    }, CHECK_INTERVAL)
+
+    return () => clearInterval(interval)
+  }, []);
+
   return (
     <div>
-
-      {/*<Button onClick={handleCheckUpdate}>Check for updates</Button>*/}
-
       <div className={'flex space-x-1 justify-self-start text-sm'}>
-        <div>
+        <div title={'Check for updates'} className={"cursor-pointer hover:bg-accent rounded"} >
           <RefreshCcwDot size={16} onClick={handleCheckUpdate} />
         </div>
 
@@ -113,11 +115,9 @@ const TauriUpdater = () => {
             <span className={"cursor-pointer hover:bg-accent"} onClick={() => relaunch()}>[Restart App]</span>
           </div>
         )}
-
       </div>
-
     </div>
   )
 }
 
-export default TauriUpdater
+export default TauriUpdaterPanelItem

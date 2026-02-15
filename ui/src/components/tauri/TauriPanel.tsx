@@ -1,44 +1,41 @@
 import React from 'react'
 import { AppContext } from '../../context/AppContext.tsx'
-import { InfoIcon, Settings } from 'lucide-react'
-import useNotification from '../../hooks/useNotification.ts'
-import TauriUpdater from '@/components/tauri/TauriUpdater.tsx'
-
-const TAURI_COMMANDS = [
-  { label: 'echo', command: 'echo', args: ['hello', 'from', 'tauri'] },
-  { label: 'docker info', command: 'docker', args: ['info', '--format', 'json'], outputFormat: 'json' },
-  { label: 'docker model version', command: 'docker', args: ['model', 'version'] },
-  { label: 'docker mcp version', command: 'docker', args: ['mcp', 'version'] },
-  { label: 'docker mcp catalog', command: 'docker', args: ['mcp', 'catalog', 'show', 'docker-mcp'] },
-  { label: 'docker mcp catalog json', command: 'docker', args: ['mcp', 'catalog', 'show', 'docker-mcp', '--format', 'json'], outputFormat: 'json' }
-]
+import TauriUpdaterPanelItem from '@/components/tauri/TauriUpdaterPanelItem.tsx'
+import TauriSettingsPanelItem from '@/components/tauri/TauriSettingsPanelItem.tsx'
+import TauriAppInfoPanelItem from '@/components/tauri/TauriAppInfoPanelItem.tsx'
+import { TauriPanelProvider, useTauriPanel } from '@/components/tauri/TauriPanelContext.tsx'
 
 const TauriPanel = () => {
   const { isTauri, apiInfo } = React.useContext(AppContext)
-  const notify = useNotification()
 
   if (!isTauri) {
     return null // Don't render anything if not in Tauri environment
   }
 
-  const handleSettings = () => {
-    // This function can be used to open a settings dialog or perform other actions
-    console.log('Settings clicked')
-    notify.info("settings clicked")
+  return (
+    <TauriPanelProvider>
+      <div className={'TauriPanel fixed w-full left-0 bottom-0 p-2 pe-3'} style={{zIndex: 10000 }}>
+        <div className={'flex space-x-2 justify-end text-sm'}>
+          <TauriAppInfoPanelItem />
+          <TauriUpdaterPanelItem />
+          <TauriSettingsPanelItem />
+        </div>
+      </div>
+      <TauriPanelBody />
+    </TauriPanelProvider>
+  )
+}
+
+const TauriPanelBody = () => {
+  const { body, isOpen } = useTauriPanel()
+
+  if (!isOpen) {
+    return null
   }
 
   return (
-    <div className={'TauriPanel fixed w-full left-0 bottom-0 p-2 pe-3'}>
-      <div className={"flex space-x-1 justify-end"}>
-        <InfoIcon size={16} />
-        {apiInfo && apiInfo?.version && (
-          <div className={"mr-4 text-sm opacity-70"}>
-            v{apiInfo.version}
-          </div>
-        )}
-        <TauriUpdater />
-        <Settings size={16} onClick={handleSettings} />
-      </div>
+    <div className={'TauriPanelBody fixed w-full max-h-full overflow-y-scroll left-0 bottom-12 p-4 bg-accent'} style={{zIndex: 11000 }}>
+      {body}
     </div>
   )
 }
