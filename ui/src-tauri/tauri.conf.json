@@ -26,7 +26,7 @@
   "bundle": {
     "active": true,
     "targets": [
-      "deb", "rpm", "app", "dmg"
+      "deb", "rpm", "app", "dmg", "appimage"
     ],
     "createUpdaterArtifacts": true,
     "icon": [
