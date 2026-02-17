@@ -106,6 +106,9 @@ if [[ "$1" == "--help" ]]; then
 elif [[ "$1" == "--prepare" ]]; then
     prepare_release "${TARGET_TRIPLE}"
     exit 0
+elif [[ "$1" == "--test-release" ]]; then
+    submit_release_info "${TARGET_TRIPLE}" "dmg" "geenii-desktop_aarch64.dmg"
+    exit 0
 fi
 
 
@@ -142,8 +145,8 @@ elif [[ "$TARGET_TRIPLE" == *"x86_64-apple-darwin"* ]]; then
 elif [[ "$TARGET_TRIPLE" == *"aarch64-unknown-linux"* ]]; then
     # deb
     if [[ -d "./ui/src-tauri/target/release/bundle/deb/" ]]; then
-      upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_aarch64.deb" "/deb/${APP_NAME}_aarch64.deb" && \
-      submit_release_info $TARGET_TRIPLE "deb" "${APP_NAME}_aarch64.deb"
+      upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_aarch64.deb" "/deb/${APP_NAME}_${APP_VERSION}_aarch64.deb" && \
+      submit_release_info $TARGET_TRIPLE "deb" "${APP_NAME}_${APP_VERSION}_aarch64.deb"
     fi
     # rpm
     if [[ -d "./ui/src-tauri/target/release/bundle/rpm/" ]]; then
@@ -154,8 +157,8 @@ elif [[ "$TARGET_TRIPLE" == *"aarch64-unknown-linux"* ]]; then
 elif [[ "$TARGET_TRIPLE" == *"x86_64-unknown-linux"* ]]; then
     # deb
     if [[ -d "./ui/src-tauri/target/release/bundle/deb/" ]]; then
-      upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_amd64.deb" "/deb/${APP_NAME}_amd64.deb" && \
-      submit_release_info $TARGET_TRIPLE "deb" "${APP_NAME}_amd64.deb"
+      upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_amd64.deb" "/deb/${APP_NAME}_${APP_VERSION}_amd64.deb" && \
+      submit_release_info $TARGET_TRIPLE "deb" "${APP_NAME}_${APP_VERSION}_amd64.deb"
     fi
     # rpm
     if [[ -d "./ui/src-tauri/target/release/bundle/rpm/" ]]; then

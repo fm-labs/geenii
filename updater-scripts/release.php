@@ -1,11 +1,8 @@
 <?php
 
-// enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+require_once 'func.inc.php';
 
 const LOG_FILE = 'data/release.log';
-const RELEASES_FILE = 'data/releases.json';
 
 // helper function that writes a JSONL log entry to a file
 function log_entry($entry) {
@@ -14,16 +11,96 @@ function log_entry($entry) {
     file_put_contents($log_file, json_encode($entry) . "\n", FILE_APPEND);
 }
 
-// helper functio that writes a submission entry to a json file
-function add_release($release) {
-    $file = RELEASES_FILE;
-    $releases = [];
-    if (file_exists($file)) {
-        $releases = json_decode(file_get_contents($file), true);
+
+function init_updater_file($version) {
+    $updater_file = RELEASES_DIR . '/' . $version . '/updater.json';
+    if (file_exists($updater_file)) {
+        // read existing updater file
+        $updater_text = file_get_contents($updater_file);
+        $updater_data = json_decode($updater_text, true);
+        if ($updater_data) {
+            return $updater_data;
+        }
     }
-    $releases[] = $release;
-    file_put_contents($file, json_encode($releases, JSON_PRETTY_PRINT));
+
+    $data = [
+        "version" => $version,
+        "notes" => "Release notes for version $version",
+        "pub_date" => date('c'),
+        "platforms" => []
+    ];
+    file_put_contents($updater_file, json_encode($data, JSON_PRETTY_PRINT));
+    return $data;
 }
+
+function update_updater_file($version, $data) {
+    $updater_file = RELEASES_DIR . '/' . $version . '/updater.json';
+    file_put_contents($updater_file, json_encode($data, JSON_PRETTY_PRINT));
+}
+
+function add_release($releaseData) {
+    $name = $releaseData['name'] ?? null;
+    $version = $releaseData['version'] ?? null;
+    $platform = strtolower($releaseData['platform'] ?? '');
+    $bundle = strtolower($releaseData['bundle'] ?? '');
+    $filename = $releaseData['filename'] ?? null;
+
+    // validate required fields
+    if (!$name || !$version || !$platform || !$bundle || !$filename) {
+        throw new Exception("Missing required fields: name, version, platform, bundle and filename");
+    }
+
+    if (!platformToOSArch($platform)) {
+        throw new Exception("Unsupported platform: $platform");
+    }
+
+    // read existing updater file
+    $updater_data = init_updater_file($version);
+
+    // add platform release data
+    //if (!isset($updater_data['platforms'][$platform])) {
+    //    $updater_data['platforms'][$platform] = [];
+    //}
+    $release_path = get_release_path($version, $platform, $bundle, $filename);
+
+    $platform_key = platformToOSArch($platform) . "-" . $bundle;
+    if (!$release_path || !file_exists(RELEASES_DIR . '/' . $release_path)) {
+        return; // skip unsupported platform
+    }
+    $download_url = get_release_download_url($release_path);
+    $sig = get_release_signature($release_path) ?? "";
+
+    $updater_data['platforms'][$platform_key] = [
+        "url" => $download_url,
+        "signature" => $sig
+    ];
+
+    // write updated updater file
+    update_updater_file($version, $updater_data);
+
+    log_entry([
+        "type" => "release_added",
+        "platform" => $platform,
+        "bundle" => $bundle,
+        "filename" => $filename,
+        "version" => $version,
+        "platform_key" => $platform_key,
+        "url" => $download_url,
+        "signature" => $sig
+    ]);
+}
+
+
+//// helper functio that writes a submission entry to a json file
+//function add_release($release) {
+//    $file = RELEASES_FILE;
+//    $releases = [];
+//    if (file_exists($file)) {
+//        $releases = json_decode(file_get_contents($file), true);
+//    }
+//    $releases[] = $release;
+//    file_put_contents($file, json_encode($releases, JSON_PRETTY_PRINT));
+//}
 
 // helper function to ensure a directory exists, and create it recursively if it doesn't
 function ensure_directory_exists($dir) {
@@ -41,10 +118,10 @@ function prepare_release($data) {
     }
 
     $version = $data['version'];
-    $platform = strtolower($data['platform']);
 
-    // make sure directories exist
-    $platform_dir='releases/geenii-desktop/' . $data['version'] . '/' . $platform;
+    $platform = strtolower($data['platform']);
+    // make sure platform- and bundle-directories exist
+    $platform_dir=RELEASES_DIR . '/' . $data['version'] . '/' . $platform;
     ensure_directory_exists($platform_dir);
 
     // for darwin platforms we create subdirs for each bundle
@@ -71,7 +148,15 @@ function prepare_release($data) {
         }
     }
 
-    return ["success" => true];
+    // init updater file for this version
+    init_updater_file($version);
+
+    return [
+        "success" => true,
+        "message" => "Release prepared successfully",
+        "version" => $version,
+        "platform" => $platform
+    ];
 }
 
 // Set JSON header
@@ -112,10 +197,14 @@ $response = [
 ];
 switch ($action) {
     case 'submit':
-          // For now, submit and release are the same, but we can differentiate them later if needed
-          add_release($data);
-          $response = ["success" => true, "message" => "Release submitted successfully"];
-          break;
+        try {
+            add_release($data);
+            $response = ["success" => true, "message" => "Release submitted successfully"];
+        } catch (Exception $e) {
+            http_response_code(400);
+            $response = ["error" => $e->getMessage()];
+        }
+        break;
     case 'prepare':
         $result = prepare_release($data);
         if (isset($result['error'])) {
