@@ -23,20 +23,20 @@ pnpm install --frozen-lockfile || exit 1
 
 BUILD_ARGS=""
 if [[ "$TARGET_TRIPLE" == *"aarch64-unknown-linux"* ]]; then
-    BUILD_ARGS="--bundle deb,rpm"
+    BUILD_ARGS="--bundles deb,rpm"
 
 elif [[ "$TARGET_TRIPLE" == *"darwin"* ]]; then
-    BUILD_ARGS="--bundle app,dmg"
+    BUILD_ARGS="--bundles app,dmg"
 
 elif [[ "$TARGET_TRIPLE" == *"windows"* ]]; then
-    BUILD_ARGS="--bundle exe"
+    BUILD_ARGS="--bundles exe"
 fi
 
 set +x
 export TAURI_SIGNING_PRIVATE_KEY="$KEY_CONTENT"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
 set -x
-if ! pnpm tauri build "$BUILD_ARGS" ; then
+if ! pnpm tauri build $BUILD_ARGS ; then
     echo "Tauri build failed. Exiting."
     cd ..
     exit 1
