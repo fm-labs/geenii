@@ -147,7 +147,7 @@ elif [[ "$TARGET_TRIPLE" == *"aarch64-unknown-linux"* ]]; then
     if [[ -d "./ui/src-tauri/target/release/bundle/deb/" ]]; then
       upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_arm64.deb" "/deb/${APP_NAME}_${APP_VERSION}_arm64.deb" && \
       upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_arm64.deb.sig" "/deb/${APP_NAME}_${APP_VERSION}_arm64.deb.sig" && \
-      submit_release_info $TARGET_TRIPLE "deb" "${APP_NAME}_${APP_VERSION}_arm.deb"
+      submit_release_info $TARGET_TRIPLE "deb" "${APP_NAME}_${APP_VERSION}_arm64.deb"
     fi
     # rpm
     if [[ -d "./ui/src-tauri/target/release/bundle/rpm/" ]]; then
