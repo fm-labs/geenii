@@ -29,15 +29,21 @@ function init_updater_file($version) {
         "pub_date" => date('c'),
         "platforms" => []
     ];
-    file_put_contents($updater_file, json_encode($data, JSON_PRETTY_PRINT));
+    //file_put_contents($updater_file, json_encode($data, JSON_PRETTY_PRINT));
     return $data;
 }
 
 function update_updater_file($version, $data) {
     $updater_file = RELEASES_DIR . '/' . $version . '/updater.json';
+    if (!$data || !is_array($data) || empty($data) || !isset($data['version'])) {
+        throw new Exception("Invalid data for updater file: " . json_encode($data));
+    }
     file_put_contents($updater_file, json_encode($data, JSON_PRETTY_PRINT));
 }
 
+/**
+ * @throws Exception
+ */
 function add_release($releaseData) {
     $name = $releaseData['name'] ?? null;
     $version = $releaseData['version'] ?? null;
@@ -56,38 +62,44 @@ function add_release($releaseData) {
 
     // read existing updater file
     $updater_data = init_updater_file($version);
+    if (!$updater_data) {
+        throw new Exception("Failed to initialize updater file for version: $version");
+    }
 
     // add platform release data
     //if (!isset($updater_data['platforms'][$platform])) {
     //    $updater_data['platforms'][$platform] = [];
     //}
     $release_path = get_release_path($version, $platform, $bundle, $filename);
-
-    $platform_key = platformToOSArch($platform) . "-" . $bundle;
     if (!$release_path || !file_exists(RELEASES_DIR . '/' . $release_path)) {
-        return; // skip unsupported platform
+        //return; // skip unsupported platform
+        throw new Exception("Release file not found for platform: $platform, bundle: $bundle, filename: $filename");
     }
     $download_url = get_release_download_url($release_path);
-    $sig = get_release_signature($release_path) ?? "";
+    $sig = get_release_signature($release_path);
 
+   $platform_key = platformToOSArch($platform) . "-" . $bundle;
+    $updater_data['platforms'] = $updater_data['platforms'] ?? [];
     $updater_data['platforms'][$platform_key] = [
         "url" => $download_url,
         "signature" => $sig
     ];
 
-    // write updated updater file
-    update_updater_file($version, $updater_data);
-
     log_entry([
         "type" => "release_added",
+        "release" => $releaseData,
         "platform" => $platform,
         "bundle" => $bundle,
         "filename" => $filename,
         "version" => $version,
         "platform_key" => $platform_key,
         "url" => $download_url,
-        "signature" => $sig
+        "signature" => $sig,
+//        "updater_data" => $updater_data
     ]);
+
+    // write updated updater file
+    update_updater_file($version, $updater_data);
 }
 
 
@@ -149,13 +161,14 @@ function prepare_release($data) {
     }
 
     // init updater file for this version
-    init_updater_file($version);
+    //$updater_data = init_updater_file($version);
 
     return [
         "success" => true,
         "message" => "Release prepared successfully",
         "version" => $version,
-        "platform" => $platform
+        "platform" => $platform,
+        //"updater_data" => $updater_data
     ];
 }
 

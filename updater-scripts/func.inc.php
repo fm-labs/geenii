@@ -13,13 +13,13 @@ function platformToOSArch($platform)
     } else if ($platform === 'x86_64-apple-darwin') {
         return 'darwin-x86_64';
     } else if ($platform === 'x86_64-unknown-linux-gnu') {
-        return 'linux-unknown-gnu';
+        return 'linux-x86_64';
     } else if ($platform === 'aarch64-unknown-linux-gnu') {
-        return 'linux-aarch64-gnu';
+        return 'linux-aarch64';
     } else if ($platform === 'x86_64-pc-windows-msvc') {
         return 'windows-x86_64';
     } else if ($platform === 'aarch64-pc-windows-msvc') {
-        return 'windows-arm64';
+        return 'windows-aarch64';
     } else {
         return null; // unsupported platform
     }
@@ -43,7 +43,7 @@ function get_release_signature($release_path)
             return file_get_contents($sig_path);
         }
     }
-    return null; // unsupported platform or bundle, or signature file not found
+    return ""; // unsupported platform or bundle, or signature file not found
 }
 
 // helper function to get the relative path to the release file for a given version, platform and bundle
