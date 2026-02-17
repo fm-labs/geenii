@@ -9,6 +9,10 @@ WD=$(pwd)
 SIDECAR_BIN_DIR="./ui/src-tauri/binaries"
 TARGET_TRIPLE=$(rustc --print host-tuple)
 
+# Trap to ensure we return to the original directory on exit
+trap "cd $WD" EXIT
+
+
 # Path or content of your private key
 KEY_PATH="$HOME/.tauri/signing.key"
 KEY_CONTENT=$(cat "$KEY_PATH")
