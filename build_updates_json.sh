@@ -84,6 +84,27 @@ if [[ "$TARGET_TRIPLE" == *"aarch64-apple-darwin"* ]]; then
 
     cat ./data/updater.latest.json
 
+elif [[ "$TARGET_TRIPLE" == *x86_64-unknown-linux-gnu* ]]; then
+    SIG_FILE="./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${VERSION}_amd64.deb.sig"
+    if [[ ! -f "$SIG_FILE" ]]; then
+        echo "Signature file not found at $SIG_FILE. Please run build_desktop.sh first."
+        exit 1
+    fi
+    json=$(add_pub_date "$json")
+    json=$(add_version "$json" "$VERSION")
+    json=$(add_description "$json" "Initial release of Geenii Desktop for Debian-based systems.")
+    json=$(add_platform "$json" \
+    "x86_64-unknown-linux-gnu" \
+    "$(cat $SIG_FILE)" \
+    "${DOWNLOAD_BASE}/${VERSION}/deb/${APP_NAME}_${VERSION}_amd64.deb")
+
+    # write to dist/updates.latest.json
+    echo "Writing updates JSON to ./updates.latest.json ..."
+    echo "$json" > ./updates.latest.json
+
+    cat ./updates.latest.json
+
+
 elif [[ "$TARGET_TRIPLE" == *"windows"* ]]; then
     # pass
     echo "Windows build not implemented yet. Skipping."
