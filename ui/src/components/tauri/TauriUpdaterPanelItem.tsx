@@ -35,6 +35,7 @@ const TauriUpdaterPanelItem = () => {
       })
       .catch((e) => {
         console.error('Error checking for updates:', e)
+        setUpdateStatus("")
         return null
       })
     setUpdateInfo(update)
@@ -46,6 +47,7 @@ const TauriUpdaterPanelItem = () => {
     const update: Update | null = await check()
       .catch((e) => {
         console.error('Error checking for updates:', e)
+        setUpdateStatus("")
         return null
       })
 
@@ -126,7 +128,7 @@ const TauriUpdaterPanelItem = () => {
         {updateInfo && (
           <div>
             {updateStatus === "Update available" &&
-              <span className={"cursor-pointer hover:bg-accent"} onClick={handleUpdate} title={`Update available: ${updateInfo.version}`}>[Install]</span>}
+              <span className={"cursor-pointer hover:bg-accent"} onClick={handleUpdate} title={`Click to install new version ${updateInfo.version}`}>[Install]</span>}
           </div>
         )}
 
