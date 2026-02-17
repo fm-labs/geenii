@@ -13,9 +13,20 @@ TARGET_TRIPLE=$(rustc --print host-tuple)
 KEY_PATH="$HOME/.tauri/signing.key"
 KEY_CONTENT=$(cat "$KEY_PATH")
 
-echo "Building sidecar binaries for desktop platforms..."
-export BUILD_DIST_DIR="$SIDECAR_BIN_DIR"
-source ./build_bin.sh
+SKIP_BUILD_BINARIES=0
+if [[ "$1" == "--skip-build-binaries" ]]; then
+    SKIP_BUILD_BINARIES=1
+    shift
+fi
+
+if [[ $SKIP_BUILD_BINARIES -eq 0 ]]; then
+    echo "Cleaning previous sidecar binaries..."
+    rm -rf "$SIDECAR_BIN_DIR"
+    mkdir -p "$SIDECAR_BIN_DIR"
+    echo "Building sidecar binaries for desktop platforms..."
+    export BUILD_DIST_DIR="$SIDECAR_BIN_DIR"
+    source ./build_bin.sh
+fi
 
 
 cd ./ui
