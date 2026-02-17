@@ -145,12 +145,14 @@ elif [[ "$TARGET_TRIPLE" == *"x86_64-apple-darwin"* ]]; then
 elif [[ "$TARGET_TRIPLE" == *"aarch64-unknown-linux"* ]]; then
     # deb
     if [[ -d "./ui/src-tauri/target/release/bundle/deb/" ]]; then
-      upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_aarch64.deb" "/deb/${APP_NAME}_${APP_VERSION}_aarch64.deb" && \
-      submit_release_info $TARGET_TRIPLE "deb" "${APP_NAME}_${APP_VERSION}_aarch64.deb"
+      upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_arm64.deb" "/deb/${APP_NAME}_${APP_VERSION}_arm64.deb" && \
+      upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_arm64.deb.sig" "/deb/${APP_NAME}_${APP_VERSION}_arm64.deb.sig" && \
+      submit_release_info $TARGET_TRIPLE "deb" "${APP_NAME}_${APP_VERSION}_arm.deb"
     fi
     # rpm
     if [[ -d "./ui/src-tauri/target/release/bundle/rpm/" ]]; then
       upload_ssh "./ui/src-tauri/target/release/bundle/rpm/${APP_NAME}-${APP_VERSION}-1.aarch64.rpm" "/rpm/${APP_NAME}-${APP_VERSION}-1.aarch64.rpm" && \
+      upload_ssh "./ui/src-tauri/target/release/bundle/rpm/${APP_NAME}-${APP_VERSION}-1.aarch64.rpm.sig" "/rpm/${APP_NAME}-${APP_VERSION}-1.aarch64.rpm.sig" && \
       submit_release_info $TARGET_TRIPLE "rpm" "${APP_NAME}-${APP_VERSION}-1.aarch64.rpm"
     fi
 # Linux AMD64
@@ -158,11 +160,13 @@ elif [[ "$TARGET_TRIPLE" == *"x86_64-unknown-linux"* ]]; then
     # deb
     if [[ -d "./ui/src-tauri/target/release/bundle/deb/" ]]; then
       upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_amd64.deb" "/deb/${APP_NAME}_${APP_VERSION}_amd64.deb" && \
+      upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_amd64.deb.sig" "/deb/${APP_NAME}_${APP_VERSION}_amd64.deb.sig" && \
       submit_release_info $TARGET_TRIPLE "deb" "${APP_NAME}_${APP_VERSION}_amd64.deb"
     fi
     # rpm
     if [[ -d "./ui/src-tauri/target/release/bundle/rpm/" ]]; then
       upload_ssh "./ui/src-tauri/target/release/bundle/rpm/${APP_NAME}-${APP_VERSION}-1.x86_64.rpm" "/rpm/${APP_NAME}-${APP_VERSION}-1.x86_64.rpm" && \
+      upload_ssh "./ui/src-tauri/target/release/bundle/rpm/${APP_NAME}-${APP_VERSION}-1.x86_64.rpm.sig" "/rpm/${APP_NAME}-${APP_VERSION}-1.x86_64.rpm.sig" && \
       submit_release_info $TARGET_TRIPLE "rpm" "${APP_NAME}-${APP_VERSION}-1.x86_64.rpm"
     fi
 else
