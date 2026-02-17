@@ -10,6 +10,8 @@ mkdir -p "$BUILD_DIST_DIR"
 
 TARGET_TRIPLE=$(rustc --print host-tuple)
 
+uv sync --frozen
+
 uv run pyinstaller --clean --onefile --distpath $BUILD_DIST_DIR --workpath ./build --specpath ./build \
   --name geenii-${TARGET_TRIPLE} \
   ./src/cli.py
