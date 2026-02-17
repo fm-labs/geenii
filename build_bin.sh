@@ -2,12 +2,20 @@
 
 mkdir -p ./build
 rm -rf ./build/
-mkdir -p ./dist/bin
-rm -rf ./dist/bin
+#mkdir -p ./dist/bin
+#rm -rf ./dist/bin
 
-uv run pyinstaller --clean --onefile --distpath ./dist/bin --workpath ./build --specpath ./build --name geenii ./src/cli.py
+BUILD_DIST_DIR=${BUILD_DIST_DIR:-./dist/bin}
+mkdir -p "$BUILD_DIST_DIR"
 
-uv run pyinstaller --clean --onefile --distpath ./dist/bin --workpath ./build --specpath ./build --name geenii-srv \
+TARGET_TRIPLE=$(rustc --print host-tuple)
+
+uv run pyinstaller --clean --onefile --distpath $BUILD_DIST_DIR --workpath ./build --specpath ./build \
+  --name geenii-${TARGET_TRIPLE} \
+  ./src/cli.py
+
+uv run pyinstaller --clean --onefile --distpath $BUILD_DIST_DIR --workpath ./build --specpath ./build \
+  --name geeniid-${TARGET_TRIPLE} \
   --copy-metadata fastmcp \
   --collect-submodules geenii.provider \
   ./src/server.py

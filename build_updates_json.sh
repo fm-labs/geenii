@@ -16,8 +16,7 @@ json=$(jq -n '
   notes: "",
   pub_date: "",
   platforms: {}
-}
-')
+}')
 
 add_platform() {
   local json="$1"
@@ -80,10 +79,10 @@ if [[ "$TARGET_TRIPLE" == *"aarch64-apple-darwin"* ]]; then
     "${DOWNLOAD_BASE}/${VERSION}/macos/${APP_NAME}.app.tar.gz")
 
     # write to dist/updates.latest.json
-    echo "Writing updates JSON to ./updates.latest.json ..."
-    echo "$json" > ./updates.latest.json
+    echo "Writing updates JSON to ./data/updater.latest.json ..."
+    echo "$json" > ./data/updater.latest.json
 
-    cat ./updates.latest.json
+    cat ./data/updater.latest.json
 
 elif [[ "$TARGET_TRIPLE" == *"windows"* ]]; then
     # pass
