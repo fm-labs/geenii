@@ -6,6 +6,8 @@ APP_NAME="geenii-desktop"
 APP_VERSION=$(cat ./VERSION)
 TARGET_TRIPLE=$(rustc --print host-tuple)
 
+SCP_BIN=$(which scp)
+
 [[ -f .env.local ]] && source .env.local
 
 SSH_USER=${DEPLOY_SSH_USER:?"Environment variable DEPLOY_SSH_USER is not set"}
@@ -24,7 +26,8 @@ function upload_ssh() {
     local remote_path="$2"
 
     echo "Uploading $local_path -> $SSH_USER@$SSH_HOST:${SSH_REMOTE_DIR}$remote_path"
-    scp -o ConnectTimeout=10 -i "$SSH_KEY_PATH" -P "$SSH_PORT" "$local_path" "$SSH_USER@$SSH_HOST:${SSH_REMOTE_DIR}$remote_path"
+    # -s = Force SFTP subsystem
+    $SCP_BIN -s -o ConnectTimeout=10 -i "$SSH_KEY_PATH" -P "$SSH_PORT" "$local_path" "$SSH_USER@$SSH_HOST:${SSH_REMOTE_DIR}$remote_path"
 }
 
 # function to prepare release via API
@@ -109,7 +112,7 @@ fi
 echo "Preparing release for $APP_NAME version $APP_VERSION on platform $TARGET_TRIPLE"
 prepare_release "$TARGET_TRIPLE"
 
-# Release MacOS bundles
+# MacOS ARM bundles
 if [[ "$TARGET_TRIPLE" == *"aarch64-apple-darwin"* ]]; then
     # dmg
     if [[ -d "./ui/src-tauri/target/release/bundle/dmg/" ]]; then
@@ -122,6 +125,7 @@ if [[ "$TARGET_TRIPLE" == *"aarch64-apple-darwin"* ]]; then
       upload_ssh "./ui/src-tauri/target/release/bundle/macos/${APP_NAME}.app.tar.gz.sig" "/app/${APP_NAME}.app.tar.gz.sig" && \
       submit_release_info $TARGET_TRIPLE "app" "${APP_NAME}.app.tar.gz"
     fi
+# MacOS AMD64 bundles
 elif [[ "$TARGET_TRIPLE" == *"x86_64-apple-darwin"* ]]; then
     # dmg
     if [[ -d "./ui/src-tauri/target/release/bundle/dmg/" ]]; then
@@ -133,6 +137,30 @@ elif [[ "$TARGET_TRIPLE" == *"x86_64-apple-darwin"* ]]; then
       upload_ssh "./ui/src-tauri/target/release/bundle/macos/${APP_NAME}.app.tar.gz" "/app/${APP_NAME}.app.tar.gz" && \
       upload_ssh "./ui/src-tauri/target/release/bundle/macos/${APP_NAME}.app.tar.gz.sig" "/app/${APP_NAME}.app.tar.gz.sig" && \
       submit_release_info $TARGET_TRIPLE "app" "${APP_NAME}.app.tar.gz"
+    fi
+# Linux ARM64
+elif [[ "$TARGET_TRIPLE" == *"aarch64-unknown-linux"* ]]; then
+    # deb
+    if [[ -d "./ui/src-tauri/target/release/bundle/deb/" ]]; then
+      upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_aarch64.deb" "/deb/${APP_NAME}_aarch64.deb" && \
+      submit_release_info $TARGET_TRIPLE "deb" "${APP_NAME}_aarch64.deb"
+    fi
+    # rpm
+    if [[ -d "./ui/src-tauri/target/release/bundle/rpm/" ]]; then
+      upload_ssh "./ui/src-tauri/target/release/bundle/rpm/${APP_NAME}-${APP_VERSION}-1.aarch64.rpm" "/rpm/${APP_NAME}-${APP_VERSION}-1.aarch64.rpm" && \
+      submit_release_info $TARGET_TRIPLE "rpm" "${APP_NAME}-${APP_VERSION}-1.aarch64.rpm"
+    fi
+# Linux AMD64
+elif [[ "$TARGET_TRIPLE" == *"x86_64-unknown-linux"* ]]; then
+    # deb
+    if [[ -d "./ui/src-tauri/target/release/bundle/deb/" ]]; then
+      upload_ssh "./ui/src-tauri/target/release/bundle/deb/${APP_NAME}_${APP_VERSION}_amd64.deb" "/deb/${APP_NAME}_amd64.deb" && \
+      submit_release_info $TARGET_TRIPLE "deb" "${APP_NAME}_amd64.deb"
+    fi
+    # rpm
+    if [[ -d "./ui/src-tauri/target/release/bundle/rpm/" ]]; then
+      upload_ssh "./ui/src-tauri/target/release/bundle/rpm/${APP_NAME}-${APP_VERSION}-1.x86_64.rpm" "/rpm/${APP_NAME}-${APP_VERSION}-1.x86_64.rpm" && \
+      submit_release_info $TARGET_TRIPLE "rpm" "${APP_NAME}-${APP_VERSION}-1.x86_64.rpm"
     fi
 else
     echo "Release for target triple $TARGET_TRIPLE is not implemented yet. Skipping."

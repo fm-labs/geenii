@@ -62,7 +62,6 @@ if ! pnpm tauri build ; then
 fi
 
 cd "$WD"
-source ./build_updates_json.sh
 
 echo "Build completed successfully."
 exit 0
