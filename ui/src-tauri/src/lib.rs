@@ -76,7 +76,7 @@ async fn execute_command(
 // async fn start_python_sidecar(app: &tauri::AppHandle) -> Result<(), String> {
 //     let sidecar_cmd = app
 //         .shell()
-//         .sidecar("binaries/geenii-srv")
+//         .sidecar("binaries/geeniid")
 //         .map_err(|e| e.to_string())?;
 //
 //     // no args in this example; you could pass e.g. ["--port", "8765"]
@@ -194,7 +194,7 @@ pub fn setup_autostart(app: &mut App) -> Result<(), Box<dyn std::error::Error>> 
 //
 //     let (mut rx, child) = app
 //         .shell()
-//         .sidecar("geenii-srv")
+//         .sidecar("geeniid")
 //         .map_err(|e| e.to_string())?
 //         //.args(["8787"])
 //         .spawn()
@@ -308,7 +308,12 @@ pub fn run() {
         // })
         .manage(ServerProcess(std::sync::Mutex::new(None)))
         .setup(|app| {
-            server::start_server(&app.handle())?;
+            if tauri::is_dev() {
+                println!("Running in dev mode. Skipping server startup.");
+            } else {
+                server::start_server(&app.handle())?;
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {

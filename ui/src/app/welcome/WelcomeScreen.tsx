@@ -9,7 +9,7 @@ import QuickImageGenerationPopupButton from '@/app/completion/components/QuickIm
 import QuickAudioGenerationPopupButton from '@/app/completion/components/QuickAudioGenerationPopupButton.tsx'
 import { AppContext } from '@/context/AppContext.tsx'
 import TauriUpdaterPanelItem from '@/components/tauri/TauriUpdaterPanelItem.tsx'
-
+import "@/Animate.scss"
 
 const greetings = [
   // "Hello! 👋",
@@ -28,7 +28,7 @@ const greetings = [
   // "Good day",
   // "Hola",
   // "Bonjour",
-  "Hi, I'm Geenii!"
+  "h1, 1'm g33n11"
 ]
 
 const messages = [
@@ -39,7 +39,7 @@ const messages = [
 ]
 
 const agentSelfIntro = [
-  "I am useless at the moment, but I will be your helpful assistant in the future :)",
+  //"1 am still under development, but 1 will be ready s00n :)",
 ]
 
 const getRandomElement = (arr: string[]) => {
@@ -58,7 +58,7 @@ const SelfIntro = () => {
   }, [])
 
   return (
-    <h2 className="text-xl font-bold">
+    <h2 className="text-lg font-medium">
       <TypewriterText text={agentSelfIntro[introIdx]} delay={0} showCursor={false} />
     </h2>
   )
@@ -71,32 +71,43 @@ const WelcomeScreen = () => {
   const greeting = getRandomElement(greetings)
 
   return (
-    <Layout>
-      <div className="text-center mb-4">
-        <h1 className="text-2xl font-bold"><TypewriterText text={greeting} delay={500} showCursor={false} /></h1>
-      </div>
-      <div className="text-center mb-4">
-        <h2 className="text-xl font-bold"><TypewriterText text={getRandomElement(messages)} delay={2000} showCursor={false} /></h2>
-      </div>
-      <div className="text-center mb-4 max-w-xl mx-auto">
-        <SelfIntro />
-      </div>
-      
-      {/*<div className={"max-w-1/2 mx-auto p-4 text-center"}>
-        <div className="flex flex-col gap-4 justify-center mt-8">
+    <div className="flex flex-col justify-center min-h-screen">
+      <div className="flex flex-col justify-center mb-4">
+        <div className={'grow'}>
+
+          <div className={"text-center"}>
+            <div className={"relative my-6"}>
+              <img src={'/bot_white.svg'} alt="logo" className={"inline-block w-1/3 max-w-3xl pulse rotate-burst"} />
+            </div>
+          </div>
+
           <div className="text-center mb-4">
-            <Button onClick={() => navigate('/chat')}>Start new chat</Button>
+            <h1 className="text-2xl font-bold"><TypewriterText text={greeting} delay={500} showCursor={false} /></h1>
+          </div>
+          {/*<div className="text-center mb-4">
+            <h2 className="text-xl font-bold"><TypewriterText text={getRandomElement(messages)} delay={2000} showCursor={false} /></h2>
+          </div>*/}
+          {/*<div className="text-center mb-4 max-w-xl mx-auto">
+            <SelfIntro />
+          </div>*/}
+
+          {/*<div className={"max-w-1/2 mx-auto p-4 text-center"}>
+            <div className="flex flex-col gap-4 justify-center mt-8">
+              <div className="text-center mb-4">
+                <Button onClick={() => navigate('/chat')}>Start new chat</Button>
+              </div>
+            </div>
+          </div>*/}
+
+          <div className={"max-w-1/2 mx-auto p-4 text-center"}>
+            <div className="flex flex-col gap-1 justify-center mt-8">
+              <p className={"text-muted-foreground"}>currently incubating. stay tuned. check for updates.</p>
+            </div>
           </div>
         </div>
-      </div>*/}
-
-      <div className={"max-w-1/2 mx-auto p-4 text-center"}>
-        <div className="flex flex-col gap-4 justify-center mt-8">
-          <p>Check for updates!</p>
-        </div>
       </div>
 
-    </Layout>
+    </div>
   )
 }
 

@@ -22,6 +22,7 @@ export const FEATURE_WIZARD_ENABLED = import.meta.env.VITE_FEATURE_WIZARD_ENABLE
 
 export const FEATURE_AGENTS_ENABLED = import.meta.env.VITE_FEATURE_AGENTS_ENABLED === 'true' || false;
 export const FEATURE_MCP_ENABLED = import.meta.env.VITE_FEATURE_MCP_ENABLED === 'true' || false;
+export const FEATURE_TOOLS_ENABLED = import.meta.env.VITE_FEATURE_TOOLS_ENABLED === 'true' || false;
 export const FEATURE_FLOWS_ENABLED = import.meta.env.VITE_FEATURE_FLOWS_ENABLED === 'true' || false;
 
 export const FEATURE_SETTINGS_ENABLED = import.meta.env.VITE_FEATURE_SETTINGS_ENABLED === 'true' || false;
@@ -54,3 +55,6 @@ export const PROMPT_INPUT_SUGGESTIONS = [
   'What is the best way to learn programming?',
   'Tell me about the history of the internet.',
 ]
+
+
+export const TAURI_UPDATER_CHECK_INTERVAL = 1000 * 60 * 60 // Check for updates every hour

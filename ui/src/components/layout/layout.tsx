@@ -8,10 +8,10 @@ import {
   FEATURE_AGENTS_ENABLED,
   FEATURE_CHAT_ENABLED, FEATURE_COMPLETION_ENABLED,
   FEATURE_FLOWS_ENABLED,
-  FEATURE_MCP_ENABLED, FEATURE_SETTINGS_ENABLED,
+  FEATURE_MCP_ENABLED, FEATURE_SETTINGS_ENABLED, FEATURE_TOOLS_ENABLED,
 } from '@/constants.ts'
 
-const SHOW_NAV_MENU = false
+const SHOW_NAV_MENU = true
 
 const Layout = (props: PropsWithChildren) => {
 
@@ -33,6 +33,7 @@ const Layout = (props: PropsWithChildren) => {
               {FEATURE_COMPLETION_ENABLED && <li className={navItemStyle}><a href="#/completions">Completions</a></li>}
               {FEATURE_CHAT_ENABLED && <li className={navItemStyle}><a href="#/chat">Chat</a></li>}
               {FEATURE_AGENTS_ENABLED && <li className={navItemStyle}><a href="#/assistants">Assistants</a></li>}
+              {FEATURE_TOOLS_ENABLED && <li className={navItemStyle}><a href="#/tools">Tools</a></li>}
               {FEATURE_MCP_ENABLED && <li className={navItemStyle}><a href="#/mcp">MCP</a></li>}
               {FEATURE_FLOWS_ENABLED && <li className={navItemStyle}><a href="#/flows">Flows</a></li>}
             </ul>}

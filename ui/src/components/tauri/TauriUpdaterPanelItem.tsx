@@ -3,6 +3,10 @@ import { check, Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { RefreshCcwDot } from 'lucide-react'
 import useNotification from '@/hooks/useNotification.ts'
+import { TAURI_UPDATER_CHECK_INTERVAL } from '@/constants.ts'
+import "@/Animate.scss"
+
+const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 const TauriUpdaterPanelItem = () => {
   const notify = useNotification()
@@ -10,11 +14,11 @@ const TauriUpdaterPanelItem = () => {
   const [updateInfo, setUpdateInfo] = React.useState<Update|null>(null)
   const [updateStatus, setUpdateStatus] = React.useState<string>('')
 
-  const CHECK_INTERVAL = 1000 * 60 * 60 // check every hour
-
   const handleCheckUpdate = async () => {
     setUpdateInfo(null)
     setUpdateStatus("Checking for updates...")
+    await sleep(3000)
+
     const update: Update | null = await check()
       .then((update) => {
         if (update) {
@@ -89,16 +93,32 @@ const TauriUpdaterPanelItem = () => {
 
     const interval = setInterval(() => {
       handleCheckUpdate()
-    }, CHECK_INTERVAL)
+    }, TAURI_UPDATER_CHECK_INTERVAL)
 
     return () => clearInterval(interval)
   }, []);
+
+  const getIconClass = () => {
+    switch (updateStatus) {
+      case "Checking for updates...":
+        return "animate-spin"
+      case "Update available":
+        return "text-yellow-500 animate-pulse"
+      case "Updating...":
+      case "Downloading...":
+        return "text-orange-500 animate-spin"
+      case "Finished":
+        return "text-green-500"
+      default:
+        return ""
+    }
+  }
 
   return (
     <div>
       <div className={'flex space-x-1 justify-self-start text-sm'}>
         <div title={'Check for updates'} className={"cursor-pointer hover:bg-accent rounded"} >
-          <RefreshCcwDot size={16} onClick={handleCheckUpdate} />
+          <RefreshCcwDot size={16} onClick={handleCheckUpdate} className={getIconClass()} />
         </div>
 
         <div>{updateStatus}</div>

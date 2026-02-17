@@ -9,6 +9,7 @@ import { NotFoundError } from '@/features/errors/not-found-error.tsx'
 import FlowsPage from '@/app/flows/flows-page.tsx'
 import AudioPage from '@/app/aiassist/audio-page.tsx'
 import WelcomeScreen from '@/app/welcome/WelcomeScreen.tsx'
+import ToolsPage from '@/app/tools/tools.page.tsx'
 
 
 type Route = {
@@ -59,6 +60,10 @@ const AppRouter = () => {
     {
       path: '/assistants',
       element: <AssistantChatsPage />,
+    },
+    {
+      path: '/tools',
+      element: <ToolsPage />,
     },
     {
       path: '/mcp',

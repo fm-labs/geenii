@@ -22,7 +22,7 @@ pub fn start_server(app: &tauri::AppHandle) -> Result<(), String> {
 
     let (mut rx, child) = app
         .shell()
-        .sidecar("geenii-srv")
+        .sidecar("geeniid")
         .map_err(|e| e.to_string())?
         //.args(["8787"])
         .spawn()
@@ -97,7 +97,7 @@ pub fn stop_server(app: &tauri::AppHandle) {
 /// Returns platform-specific binary name
 fn server_binary_name() -> &'static str {
     #[cfg(target_os = "windows")]
-    return "geenii-srv.exe";
+    return "geeniid.exe";
     #[cfg(not(target_os = "windows"))]
-    return "geenii-srv";
+    return "geeniid";
 }
