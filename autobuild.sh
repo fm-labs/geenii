@@ -29,7 +29,7 @@ while true; do
       #git reset --hard @{u}
       #git clean -fd
 
-      if ! bash build_desktop.sh --skip-build-binaries ; then
+      if ! bash build_desktop.sh ; then
           echo "Build failed !!!"
       fi
   else
