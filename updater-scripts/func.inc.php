@@ -25,6 +25,11 @@ function platformToOSArch($platform)
     }
 }
 
+//function get_release_credentials() {
+//    return 'admin:admin'; // TODO read from config file
+//}
+
+
 // helper function to get the download URL for a given version, platform and bundle
 function get_release_download_url($release_path)
 {

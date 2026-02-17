@@ -184,6 +184,14 @@ header('Content-Type: application/json');
 //     exit;
 // }
 
+//$auth_header = "Basic " . base64_encode(get_release_credentials());
+//if (!isset($_SERVER['HTTP_AUTHORIZATION']) || $_SERVER['HTTP_AUTHORIZATION'] !== $auth_header) {
+//    http_response_code(401);
+//    echo json_encode(["error" => "Unauthorized"]);
+//    exit;
+//}
+
+
 $reqid = uniqid('req');
 
 $method = $_SERVER['REQUEST_METHOD'];

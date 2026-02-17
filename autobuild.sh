@@ -25,6 +25,10 @@ while true; do
   if [ "$LOCAL" != "$REMOTE" ]; then
       echo "New changes detected, rebuilding..."
 
+      if ! git pull --quiet; then
+          echo "Failed to pull latest changes. Please check your network connection and repository status."
+          exit 1
+      fi
       # WARNING: destroys local changes
       #git reset --hard @{u}
       #git clean -fd
