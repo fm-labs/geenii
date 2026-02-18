@@ -1,5 +1,15 @@
 <?php
-
+/**
+ * This script serves as the backend for the update checking mechanism of the Geenii Desktop application.
+ *
+ * It reads the current version of the application from a VERSION file, checks for an updater.json
+ * file in the corresponding release directory, and returns the update information in JSON format.
+ *
+ * The script also logs all requests and responses to a log file in JSONL format for auditing and debugging purposes.
+ *
+ * @version 0.1
+ * @author fm-labs
+ */
 require_once 'func.inc.php';
 
 const LOG_FILE = 'data/updater.log';
@@ -33,7 +43,7 @@ log_entry([
     "type" => "request",
     "method" => $_SERVER['REQUEST_METHOD'],
     "query" => $_GET,
-    "post_data" => file_get_contents('php://input')
+    //"post_data" => file_get_contents('php://input')
 ]);
 
 // read query parameters
@@ -50,7 +60,7 @@ if (!$latest_version) {
     exit;
 }
 
-// draft a default response with the latest version and empty platforms, which will be filled in if the updater file exists
+// draft a default response with the latest version and empty platforms
 $response = [
     "version" => $latest_version,
     "notes" => "Geenii Desktop version $latest_version",
@@ -78,5 +88,5 @@ log_entry([
     "response" => $response
 ]);
 
-// Output file contents
+// emit response as JSON
 echo json_encode($response, JSON_PRETTY_PRINT);

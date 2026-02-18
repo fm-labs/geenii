@@ -30,37 +30,6 @@ function upload_ssh() {
     $SCP_BIN -s -o ConnectTimeout=10 -i "$SSH_KEY_PATH" -P "$SSH_PORT" "$local_path" "$SSH_USER@$SSH_HOST:${SSH_REMOTE_DIR}$remote_path"
 }
 
-# function to prepare release via API
-# send platform and version to API
-function prepare_release() {
-    local platform=$1
-
-    local api_url=${RELEASE_API_URL:?"Environment variable RELEASE_API_URL is not set"}
-    local api_auth_user=${RELEASE_API_AUTH_USER:?"Environment variable RELEASE_API_AUTH_USER is not set"}
-    local api_auth_pass=${RELEASE_API_AUTH_PASS:?"Environment variable RELEASE_API_AUTH_PASS is not set"}
-
-    local payload=$(jq -n \
-        --arg name "$APP_NAME" \
-        --arg version "$APP_VERSION" \
-        --arg platform "$platform" \
-        '{
-            "name": $name,
-            "version": $version,
-            "platform": $platform
-        }')
-
-    echo "Preparing release via API: $payload"
-    if curl -X POST \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Basic $(echo -n "$api_auth_user:$api_auth_pass" | base64)" \
-        -d "$payload" \
-        "$api_url?action=prepare"; then
-      echo "Release prepared successfully."
-    else
-      echo "Failed to prepare release."
-    fi
-}
-
 
 # function to submit release info to API
 function submit_release_info() {
@@ -103,17 +72,8 @@ if [[ "$1" == "--help" ]]; then
     echo "Usage: $0"
     echo "This script uploads the built application bundles to the server and submits release info to the API."
     exit 0
-elif [[ "$1" == "--prepare" ]]; then
-    prepare_release "${TARGET_TRIPLE}"
-    exit 0
-elif [[ "$1" == "--test-release" ]]; then
-    submit_release_info "${TARGET_TRIPLE}" "dmg" "geenii-desktop_aarch64.dmg"
-    exit 0
 fi
 
-
-echo "Preparing release for $APP_NAME version $APP_VERSION on platform $TARGET_TRIPLE"
-prepare_release "$TARGET_TRIPLE"
 
 # MacOS ARM bundles
 if [[ "$TARGET_TRIPLE" == *"aarch64-apple-darwin"* ]]; then

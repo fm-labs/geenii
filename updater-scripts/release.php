@@ -1,5 +1,14 @@
 <?php
-
+/**
+ * Simple release management script for Geenii Desktop updater bundles.
+ *
+ * This script provides an API endpoint to submit new releases, which will be added to the corresponding updater.json
+ * file for the version.
+ * The script also logs all requests and responses to a log file in JSONL format for auditing and debugging purposes.
+ *
+ * @version 0.1
+ * @author fm-labs
+ */
 require_once 'func.inc.php';
 
 const LOG_FILE = 'data/release.log';
@@ -60,16 +69,15 @@ function add_release($releaseData) {
         throw new Exception("Unsupported platform: $platform");
     }
 
+    // make sure release directories exist
+    ensure_release_dirs($version, $platform);
+
     // read existing updater file
     $updater_data = init_updater_file($version);
     if (!$updater_data) {
         throw new Exception("Failed to initialize updater file for version: $version");
     }
 
-    // add platform release data
-    //if (!isset($updater_data['platforms'][$platform])) {
-    //    $updater_data['platforms'][$platform] = [];
-    //}
     $release_path = get_release_path($version, $platform, $bundle, $filename);
     if (!$release_path || !file_exists(RELEASES_DIR . '/' . $release_path)) {
         //return; // skip unsupported platform
@@ -78,7 +86,11 @@ function add_release($releaseData) {
     $download_url = get_release_download_url($release_path);
     $sig = get_release_signature($release_path);
 
-   $platform_key = platformToOSArch($platform) . "-" . $bundle;
+    $platform_key = platformToOSArch($platform) . "-" . $bundle;
+    if ($platform_key === "linux-x86_64-appimage") {
+        $platform_key = "linux-x86_64"; // special case for linux appimage bundle, which has a different platform key in the updater file
+    }
+
     $updater_data['platforms'] = $updater_data['platforms'] ?? [];
     $updater_data['platforms'][$platform_key] = [
         "url" => $download_url,
@@ -95,10 +107,8 @@ function add_release($releaseData) {
         "platform_key" => $platform_key,
         "url" => $download_url,
         "signature" => $sig,
-//        "updater_data" => $updater_data
     ]);
 
-    // write updated updater file
     update_updater_file($version, $updater_data);
 }
 
@@ -123,17 +133,9 @@ function ensure_directory_exists($dir) {
 
 
 // helper function to prepare a release (setup dirs, validate data, etc)
-function prepare_release($data) {
-    // validate data
-    if (!isset($data['version']) || !isset($data['platform'])) {
-        return ["error" => "Missing required fields: version, bundle and platform"];
-    }
-
-    $version = $data['version'];
-
-    $platform = strtolower($data['platform']);
+function ensure_release_dirs($version, $platform) {
     // make sure platform- and bundle-directories exist
-    $platform_dir=RELEASES_DIR . '/' . $data['version'] . '/' . $platform;
+    $platform_dir=RELEASES_DIR . '/' . $version . '/' . $platform;
     ensure_directory_exists($platform_dir);
 
     // for darwin platforms we create subdirs for each bundle
@@ -159,30 +161,10 @@ function prepare_release($data) {
             ensure_directory_exists($platform_dir . '/' . $bundle);
         }
     }
-
-    // init updater file for this version
-    //$updater_data = init_updater_file($version);
-
-    return [
-        "success" => true,
-        "message" => "Release prepared successfully",
-        "version" => $version,
-        "platform" => $platform,
-        //"updater_data" => $updater_data
-    ];
 }
 
 // Set JSON header
 header('Content-Type: application/json');
-
-// $file = 'versions.json';
-//
-// // Check if file exists
-// if (!file_exists($file)) {
-//     http_response_code(404);
-//     echo json_encode(["error" => "File not found"]);
-//     exit;
-// }
 
 //$auth_header = "Basic " . base64_encode(get_release_credentials());
 //if (!isset($_SERVER['HTTP_AUTHORIZATION']) || $_SERVER['HTTP_AUTHORIZATION'] !== $auth_header) {
@@ -193,11 +175,8 @@ header('Content-Type: application/json');
 
 
 $reqid = uniqid('req');
-
 $method = $_SERVER['REQUEST_METHOD'];
-// read action from query parameters
 $action = $_GET['action'] ?? 'default';
-// read JSON POST data
 $data = [];
 if ($method === 'POST') {
   $data = json_decode(file_get_contents('php://input'), true);
@@ -226,20 +205,11 @@ switch ($action) {
             $response = ["error" => $e->getMessage()];
         }
         break;
-    case 'prepare':
-        $result = prepare_release($data);
-        if (isset($result['error'])) {
-            http_response_code(400);
-            $response = ["error" => $result['error']];
-            break;
-        }
-        $response = ["success" => true, "message" => "Release prepared successfully"];
-        break;
     default:
         //http_response_code(400);
         //$response = ["error" => "Unknown action"]
         $response = [
-            "success" => true,
+            "success" => false,
             "_action" => $action,
             "_data" => $data
         ];
@@ -252,4 +222,5 @@ log_entry([
     "response" => $response
 ]);
 
+// emit response as JSON
 echo json_encode($response);
