@@ -3,7 +3,7 @@ from typing import List
 from geenii.ai import generate_chat_completion
 from geenii.datamodels import ModelMessage, ToolCallResultContent
 from geenii.g import execute_tool_call, init_tool_registry
-from geenii.settings import DEFAULT_COMPLETION_MODEL
+from geenii.config import DEFAULT_COMPLETION_MODEL
 from geenii.tools import ToolRegistry
 
 

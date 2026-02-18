@@ -1,7 +1,7 @@
 import redis
 from redis import asyncio as aioredis
 
-from geenii import settings
+from geenii import config
 
 aio_redis_global = aioredis.Redis | None
 redis_global = redis.Redis | None

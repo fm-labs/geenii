@@ -5,7 +5,7 @@ import Header from '@/components/header.tsx'
 import { Button } from '@/components/ui/button.tsx'
 
 //import flowData from './data/example-flow1.json'
-import ReactJson from '@microlink/react-json-view'
+import JsonView from "@/components/json-view.tsx";
 import { FlowgraphProvider } from '@/app/flows/components/flowgraph-provider.tsx'
 import FlowgraphCanvas from '@/app/flows/components/flowgraph-canvas.tsx'
 import FlowgraphBackground from '@/app/flows/components/flowgraph-background.tsx'
@@ -48,7 +48,7 @@ const FlowsPage = () => {
                   <FlowgraphNodes />
                   <FlowgraphEdges />
                 </FlowgraphCanvas>
-                <ReactJson src={flowData} collapsed={true} />
+                <JsonView src={flowData} collapsed={true} />
               </main>
               <aside style={{width: "300px"}} className={"bg-accent w-[300px] p-2"}>
                 <FlowgraphSelectedNode />

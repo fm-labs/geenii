@@ -1,4 +1,4 @@
-from geenii import settings
+from geenii import config
 from geenii.datamodels import CompletionResponse
 from geenii.wizard.completion import CompletionWizard
 

@@ -2,7 +2,7 @@ import { useMcpServer } from "@/app/mcp-servers/components/mcp-server-provider.t
 import { Button } from "@/components/ui/button.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import React, { useState } from "react";
-import ReactJson from "@microlink/react-json-view";
+import JsonView from "@/components/json-view.tsx";
 import McpServerToolForm from "@/app/mcp-servers/components/mcp-server-tool-form.tsx";
 import { Badge } from '@/components/ui/badge.tsx'
 

@@ -24,7 +24,7 @@ def init_tool_registry():
     return registry
 
 
-def init_builtin_tools(registry: ToolRegistry):
+async def init_builtin_tools(registry: ToolRegistry):
     # registry.register(PythonTool(
     #     name="file_exists",
     #     description="Check if a file exists at the specified path.",
@@ -60,7 +60,7 @@ def init_builtin_tools(registry: ToolRegistry):
     for name, tool in geenii_tools._tools.items():
         registry.register(tool)
 
-def init_mcp_server_tools(registry: ToolRegistry):
+async def init_mcp_server_tools(registry: ToolRegistry):
     # mcp_servers = {
     #     "duckduckgo": {
     #         "command": "docker",
@@ -75,10 +75,10 @@ def init_mcp_server_tools(registry: ToolRegistry):
     mcp_config = get_mcp_config()
 
     @cached(ttl=3600)
-    def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
+    async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
         try:
             mcp_client = McpClient(server_name, server_conf)
-            tools = mcp_client.list_tools_sync()
+            tools = await mcp_client.list_tools()
             return tools
         except Exception as e:
             print(f"Error retrieving tools from MCP server {server_name}: {e}")
@@ -86,7 +86,7 @@ def init_mcp_server_tools(registry: ToolRegistry):
 
     for server_name, server_conf in mcp_config["mcpServers"].items():
         try:
-            mcp_tools = read_mcp_server_tools(server_name, server_conf)
+            mcp_tools = await read_mcp_server_tools(server_name, server_conf)
 
             # map the MCP tool definitions to the internal tool representation and register them in the registry
             registry.register_mcp_tools(
@@ -98,10 +98,8 @@ def init_mcp_server_tools(registry: ToolRegistry):
             continue
 
 
-
-
 def execute_tool_call(registry: ToolRegistry, tool_name: str, **kwargs) -> any:
-    tool = registry._tools.get(tool_name)
+    tool = registry.get(tool_name)
     if tool is None:
         raise ValueError(f"Tool {tool_name!r} is not registered")
     print(f'$> Calling tool "{tool_name}" with args {kwargs}')

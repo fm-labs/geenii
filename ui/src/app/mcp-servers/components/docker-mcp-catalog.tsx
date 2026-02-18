@@ -3,7 +3,7 @@ import { useDockerMcpCatalog } from "@/app/mcp-servers/components/docker-mcp-cat
 import { Button } from "@/components/ui/button";
 import Form from "@rjsf/shadcn";
 import validator from "@rjsf/validator-ajv8";
-import ReactJson from "@microlink/react-json-view";
+import JsonView from "@/components/json-view.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import {RJSFSchema} from "@rjsf/utils";
 import { Input } from '@/components/ui/input.tsx'
@@ -116,7 +116,7 @@ import { Input } from '@/components/ui/input.tsx'
  * @constructor
  */
 const DockerMcpCatalog = () => {
-    const { registry } = useDockerMcpCatalog()
+    const { catalog } = useDockerMcpCatalog()
     const [selectedServerKey, setSelectedServerKey] = React.useState<string | null>(null);
     const [selectedServer, setSelectedServer] = React.useState<any | null>(null);
     const [result, setResult] = React.useState<any | null>(null);
@@ -124,6 +124,7 @@ const DockerMcpCatalog = () => {
     const [searchTerm, setSearchTerm] = React.useState<string>("");
     const [searchFilter, setSearchFilter] = React.useState<any>({"hasTools": false, "hasConfig": false, "hasSecrets": false, "hasOauth": false, "hasNoConfig": false, "hasNoSecrets": false});
 
+    const registry = catalog && catalog?.registry ? catalog.registry : null;
 
     const itemHasSecrets = (item: any) => {
         return item?.secrets && item?.secrets.length > 0
@@ -327,7 +328,7 @@ const DockerMcpCatalog = () => {
                 </div>
             </div>
             <div className={"flex flex-row mb-2 text-muted-foreground"}>
-                {Object.keys(registry).length} servers in registry.{' '}
+                {registry && Object.keys(registry).length} servers in registry.{' '}
                 {toolCount} tools available.{' '}
                 {Object.keys(filteredRegistry).length} servers match filters.
             </div>
@@ -357,7 +358,7 @@ const DockerMcpCatalog = () => {
                                     </div>
                                 </div>
                                 {/*<div>
-                                    <ReactJson src={item} collapsed={true} />
+                                    <JsonView src={item} collapsed={true} />
                                 </div>*/}
                             </div>
                             <Button variant={"outline"}
@@ -376,7 +377,7 @@ const DockerMcpCatalog = () => {
                                   validator={validator}
                                   onSubmit={handleSubmit}
                             ><Button>Connect</Button></Form>
-                            {result && <ReactJson src={result} />}
+                            {result && <JsonView src={result} />}
                         </div>}
                     </div>
                 )

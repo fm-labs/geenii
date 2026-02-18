@@ -13,22 +13,40 @@ from fastmcp import Client
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
+from geenii.g import init_builtin_tools, init_mcp_server_tools
 from geenii.server.deps import dep_current_token_user
 # from geenii.server.middleware.proxy_middleware import ProxyMiddleware
 # from geenii.server.middleware.request_logger_middleware import RequestLoggerMiddleware
 from geenii.server.router import app_router
 from geenii.server.routes.route_ws import manager, process_message, subs_lock, subscriptions, redis_pubsub_listener
-from geenii.settings import APP_VERSION
+from geenii.config import APP_VERSION
+from geenii.tools import ToolRegistry
 
 
 #redis_listener_stop_event = asyncio.Event()
 
+
+async def initialize_tool_registry():
+    print("Initializing tool registry...")
+    registry = ToolRegistry()
+    await init_builtin_tools(registry)
+    await init_mcp_server_tools(registry)
+    return registry
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     #task = asyncio.create_task(redis_pubsub_listener(redis_listener_stop_event))
+    # store the tool registry in the app state for access in routes
+    app.state.tool_registry = await initialize_tool_registry()
     try:
         yield
     finally:
+        # cleanup tool registry if needed
+        if app.state.tool_registry:
+            del app.state.tool_registry
+
+        # signal the Redis listener to stop
         #redis_listener_stop_event.set()
         #task.cancel()
         #with contextlib.suppress(Exception):

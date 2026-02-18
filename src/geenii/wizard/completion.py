@@ -1,4 +1,4 @@
-from geenii import settings
+from geenii import config
 from geenii.ai import get_ai_provider, generate_completion, split_model
 from geenii.datamodels import CompletionResponse, CompletionRequest
 from geenii.provider.interfaces import AIProvider, AICompletionProvider
@@ -15,7 +15,7 @@ class CompletionWizard(BaseWizard):
 
     def __init__(self,
                  name: str,
-                 model=settings.DEFAULT_COMPLETION_MODEL,
+                 model=config.DEFAULT_COMPLETION_MODEL,
                  model_parameters: dict = None,
                  system: str = None,
                  output_format: str = None, **kwargs):

@@ -1,5 +1,5 @@
 from openai import OpenAI
-from geenii import settings
+from geenii import config
 
 def get_openai_client():
     """

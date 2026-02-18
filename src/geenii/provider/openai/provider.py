@@ -27,7 +27,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         self.client = get_openai_client()
 
     def get_capabilities(self) -> list[str]:
-        return ['completion', 'chat_completion', 'function_calling']
+        return ['completion', 'chat_completion', 'function_calling', 'image_generation']
 
     def get_models(self) -> list[str]:
         return [

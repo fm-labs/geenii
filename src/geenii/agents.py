@@ -3,7 +3,7 @@ import json
 import pydantic
 from pydantic import ConfigDict
 
-from geenii.settings import DATA_DIR
+from geenii.config import DATA_DIR
 
 BUILTIN_AGENTS = {}
 

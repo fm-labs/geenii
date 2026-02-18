@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import Button from '@/ui/Button.tsx'
 import McpServerToolForm from '@/app/mcp-servers/components/mcp-server-tool-form.tsx'
-import ReactJson from '@microlink/react-json-view'
+import JsonView from "@/components/json-view.tsx";
 import { useMcpServer } from '@/app/mcp-servers/components/mcp-server-provider.tsx'
 
 const McpServerActions = () => {
@@ -19,10 +19,10 @@ const McpServerActions = () => {
           <p>{tool.description}</p>
 
           {selectedTool && selectedTool.name === tool.name && (
-            <>
+            <div className={"_bg-accent"}>
               <McpServerToolForm tool={tool} />
-              <ReactJson src={tool} collapsed={true} />
-            </>
+              <JsonView src={tool} collapsed={true} theme={"apathy"} />
+            </div>
           )}
         </div>
       ))}

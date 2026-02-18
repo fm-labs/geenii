@@ -2,7 +2,7 @@ import React, { useCallback } from "react";
 import Form from "@rjsf/shadcn";
 import validator from "@rjsf/validator-ajv8";
 import { useMcpServer } from "@/app/mcp-servers/components/mcp-server-provider.tsx";
-import ReactJson from "@microlink/react-json-view";
+import JsonView from "@/components/json-view.tsx";
 
 const McpServerToolForm = ({ tool }: { tool: McpServerTool }) => {
     const { callTool } = useMcpServer();
@@ -25,7 +25,7 @@ const McpServerToolForm = ({ tool }: { tool: McpServerTool }) => {
                   validator={validator}
                   onSubmit={handleSubmit}
             />
-            {result && <ReactJson src={result} />}
+            {result && <JsonView src={result} />}
         </div>
     );
 };

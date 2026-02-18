@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import Query, Depends
 
-from geenii import settings
+from geenii import config
 from geenii.db.mongodb import get_mongo_client
 
 

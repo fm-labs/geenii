@@ -2,7 +2,7 @@ from typing import List
 
 from pymongo import MongoClient
 
-from geenii import settings
+from geenii import config
 
 mongo: MongoClient | None = None
 

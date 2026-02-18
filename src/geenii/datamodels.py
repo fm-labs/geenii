@@ -4,7 +4,7 @@ from typing import List, Any, ClassVar, Union
 import pydantic
 from fastapi import UploadFile, File
 
-from geenii import settings
+from geenii import config
 
 
 # class ModelParameters(pydantic.BaseModel):
@@ -71,7 +71,7 @@ class CompletionErrorResponse(pydantic.BaseModel):
 
 class CompletionRequest(pydantic.BaseModel):
     prompt: str
-    model: str | None = settings.DEFAULT_COMPLETION_MODEL
+    model: str | None = config.DEFAULT_COMPLETION_MODEL
     system: str | None = None
     # Model tweaking parameters
     temperature: float | None = None
@@ -121,7 +121,7 @@ class ChatCompletionResponse(CompletionResponse):
 # Image Generation
 class ImageGenerationApiRequest(pydantic.BaseModel):
     prompt: str
-    model: str | None = settings.DEFAULT_IMAGE_GENERATION_MODEL
+    model: str | None = config.DEFAULT_IMAGE_GENERATION_MODEL
     # Model tweaking parameters
     size: str | None = "1024x1024"  # Default image size
     # style: str | None = None  # Optional style parameter
@@ -138,7 +138,7 @@ class ImageGenerationApiResponse(BaseCompletionResponse):
 
 # Audio Generation
 class AudioGenerationApiRequest(pydantic.BaseModel):
-    model: str | None = settings.DEFAULT_AUDIO_GENERATION_MODEL
+    model: str | None = config.DEFAULT_AUDIO_GENERATION_MODEL
     text: str
     # Model tweaking parameters
     duration: int | None = 30  # Default duration in seconds
@@ -156,7 +156,7 @@ class AudioGenerationApiResponse(BaseCompletionResponse):
 
 # Audio Transcription
 class AudioTranscriptionApiRequest(pydantic.BaseModel):
-    model: str | None = settings.DEFAULT_AUDIO_TRANSCRIPTION_MODEL
+    model: str | None = config.DEFAULT_AUDIO_TRANSCRIPTION_MODEL
     input_file: str = None  # Path to the audio file to be transcribed
     input_blob: UploadFile | None = None  # File(...)  # Optional audio file as blob
     source_lang: str | None = "en"  # Default source language
@@ -168,7 +168,7 @@ class AudioTranscriptionApiResponse(BaseCompletionResponse):
 
 # Audio Translation
 class AudioTranslationApiRequest(pydantic.BaseModel):
-    model: str | None = settings.DEFAULT_AUDIO_TRANSLATION_MODEL
+    model: str | None = config.DEFAULT_AUDIO_TRANSLATION_MODEL
     input_file: str  # Path to the audio file to be translated
     source_lang: str | None = "en"  # Default source language
     target_lang: str | None = "de"  # Default target language

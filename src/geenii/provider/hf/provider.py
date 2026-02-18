@@ -4,7 +4,7 @@ import tempfile
 import time
 import uuid
 
-from geenii import settings
+from geenii import config
 from geenii.datamodels import AudioGenerationApiResponse
 #from xai.provider.hf.tts_kokoro import run_tts_pipeline
 from geenii.provider.interfaces import AIAudioGeneratorProvider

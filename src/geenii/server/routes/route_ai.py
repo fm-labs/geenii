@@ -9,7 +9,7 @@ from geenii.datamodels import CompletionErrorResponse, CompletionRequest, Comple
     ChatCompletionResponse, ImageGenerationApiResponse, \
     ImageGenerationApiRequest, AudioGenerationApiRequest, AudioGenerationApiResponse, AudioTranscriptionApiRequest, \
     AudioTranscriptionApiResponse, AudioTranslationApiResponse, AudioTranslationApiRequest
-from geenii.settings import DATA_DIR, DEFAULT_AUDIO_TRANSCRIPTION_MODEL
+from geenii.config import DATA_DIR, DEFAULT_AUDIO_TRANSCRIPTION_MODEL
 
 router = APIRouter(prefix="/ai/v1", tags=["ai"])
 

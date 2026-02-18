@@ -12,7 +12,7 @@ from redis import Redis
 # from pydantic_core import core_schema
 
 from geenii.db.mongodb import get_mongo_collection, get_mongo_client
-from geenii.settings import MONGODB_DB_NAME
+from geenii.config import MONGODB_DB_NAME
 
 
 class ModelStore(abc.ABC):

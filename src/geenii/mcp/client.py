@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -5,7 +6,7 @@ from fastmcp import Client
 from fastmcp.mcp_config import MCPConfig
 from fastmcp.prompts import Prompt
 
-from geenii.settings import MCP_CONFIG_FILE, DATA_DIR
+from geenii.config import MCP_CONFIG_FILE, DATA_DIR
 
 config = None
 client = None
@@ -140,9 +141,9 @@ class McpClient:
 
     def list_tools_sync(self):
         # This is a synchronous wrapper around the asynchronous list_tools method.
-        import asyncio
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(self.list_tools())
+        #loop = asyncio.get_event_loop()
+        #return loop.run_until_complete(self.list_tools())
+        return asyncio.run(self.list_tools())
 
     async def call_tool(self, tool_name: str, args: dict) -> any:
         async with self.client:

@@ -5,7 +5,7 @@ import click
 from geenii.ai import generate_completion, generate_chat_completion
 from geenii.datamodels import ModelMessage
 from geenii.g import get_tool_registry
-from geenii.settings import DEFAULT_COMPLETION_MODEL, APP_VERSION
+from geenii.config import DEFAULT_COMPLETION_MODEL, APP_VERSION
 
 
 @click.group()

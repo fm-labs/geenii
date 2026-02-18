@@ -1,5 +1,5 @@
 import React from 'react'
-import ReactJson from '@microlink/react-json-view'
+import JsonView from "@/components/json-view.tsx";
 import { AiAssistVoicePrompt } from './AiAssistVoicePrompt.tsx'
 import './AiAssist.scss'
 
@@ -16,7 +16,7 @@ export const AiAssistPanel = () => {
         <AiAssistVoicePrompt onResponse={(data) => setCompletions(data)} />
       </div>
 
-      <div>{completions && <ReactJson src={completions} />}</div>
+      <div>{completions && <JsonView src={completions} />}</div>
     </div>
   )
 }

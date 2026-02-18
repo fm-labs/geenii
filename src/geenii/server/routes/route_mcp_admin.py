@@ -1,5 +1,4 @@
 import dataclasses
-from typing import List
 
 from fastapi import APIRouter, HTTPException
 from fastmcp.client.client import CallToolResult
@@ -8,22 +7,31 @@ from mcp.types import Prompt
 from geenii.datamodels import MCPServerConfig, MCPToolCallRequest, MCPServerInfo, MCPToolCallResponse
 from geenii.mcp.client import get_mcp_config, read_mcp_config_json, write_mcp_config_json, \
     get_mcp_client_for_server, get_mcp_config_for_server
+from geenii.utils.cached import cached
 
 router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
-
-
 ### MCP
-@router.get("/servers", response_model=List[MCPServerConfig])
-async def get_mcp_servers() -> List[MCPServerConfig]:
+@router.get("/servers")
+async def get_mcp_servers() -> list[MCPServerConfig]:
     """
     List all available MCP servers.
     """
     config = get_mcp_config()
     print("get_mcp_servers config:", config)
-    if "mcpServers" not in config:
-        return []
-    return [MCPServerConfig(**server) for server in config["mcpServers"]]
+
+    mcp_configs = []
+    if "mcpServers" in config:
+        for server_name in config["mcpServers"]:
+            try:
+                server = config["mcpServers"][server_name]
+                server["name"] = server_name
+                mcp_configs.append(MCPServerConfig(**server))
+            except Exception as e:
+                print(f"Error parsing MCP server config: {e}")
+                continue
+    #return [MCPServerConfig(**server) for server in config["mcpServers"]]
+    return mcp_configs
 
 # @router.get("/servers/{server_name}")
 # async def mcp_server_details(server_name: str):
@@ -60,7 +68,8 @@ async def add_mcp_server(request: MCPServerConfig) -> MCPServerConfig:
             "name": server_name,
             "url": request.url,
             "command": request.command,
-            "args": request.args or []
+            "args": request.args or None,
+            "env": request.env or None
         }
         server_config = MCPServerConfig(**server_config_dict)
         config["mcpServers"].append(server_config_dict)
@@ -80,7 +89,7 @@ async def get_mcp_server_info(server_name: str) -> MCPServerInfo:
     """
     Connect to a specific MCP server.
     """
-    config = read_mcp_config_json()
+    #config = read_mcp_config_json()
     server_config = get_mcp_config_for_server(server_name=server_name)
     if not server_config:
         raise HTTPException(status_code=404, detail="Server not found.")
@@ -88,31 +97,49 @@ async def get_mcp_server_info(server_name: str) -> MCPServerInfo:
     if "url" not in server_config and ("command" not in server_config or "args" not in server_config):
         raise HTTPException(status_code=400, detail="Either 'url' or 'command' must be provided.")
 
-    # Create a client that connects to the specified server
-    #_config = {"mcpServers": {server_name: server_config}}
-    #client = Client(_config)
-    client = get_mcp_client_for_server(server_name=server_name).client
+    def build_cache_key(func, args, kwargs):
+        return f"mcp_server_info_{server_name}"
 
-    async with client:
+    @cached(ttl=300, cachekey=build_cache_key)
+    async def fetch_mcp_server_info() -> MCPServerInfo:
         try:
-            #initialize_result = await client.initialize_result
-            tools = await client.list_tools()
-            resources = await client.list_resources()
-            prompts: list[Prompt] = await client.list_prompts()
-
-            info_dict = {
-                "name": server_name,
-                "status": "connected",
-                #"message": f"Connected to MCP server '{server_name}' successfully.",
-                #"initialize_result": initialize_result.model_dump(),
-                "tools": [tool.model_dump() for tool in tools],
-                "resources": [res.model_dump() for res in resources],
-                "prompts": [prompt.model_dump() for prompt in prompts],
-            }
-            print(info_dict)
-            return MCPServerInfo(**info_dict)
+            client = get_mcp_client_for_server(server_name=server_name).client
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+        async with client:
+            try:
+                #initialize_result = await client.initialize_result
+                tools = await client.list_tools()
+                resources = await client.list_resources()
+                prompts: list[Prompt] = await client.list_prompts()
+
+                info_dict = {
+                    "name": server_name,
+                    "status": "connected",
+                    #"message": f"Connected to MCP server '{server_name}' successfully.",
+                    #"initialize_result": initialize_result.model_dump(),
+                    "tools": [tool.model_dump() for tool in tools],
+                    "resources": [res.model_dump() for res in resources],
+                    "prompts": [prompt.model_dump() for prompt in prompts],
+                }
+                print(info_dict)
+                return MCPServerInfo(**info_dict)
+            except Exception as e:
+                #raise HTTPException(status_code=500, detail=str(e))
+                info_dict = {
+                    "name": server_name,
+                    "status": "error",
+                    "description": f"Connection Error: {e}",
+                    "tools": [],
+                    "resources": [],
+                    "prompts": [],
+                }
+                print(info_dict)
+                return MCPServerInfo(**info_dict)
+
+    info = await fetch_mcp_server_info()
+    return info
 
 @router.delete("/servers/{server_name}")
 def delete_mcp_server(server_name: str) -> MCPServerConfig:

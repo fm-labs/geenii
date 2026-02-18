@@ -19,7 +19,7 @@ const Layout = (props: PropsWithChildren) => {
 
   return (
     <div>
-      <header className={"fixed top-0 left-0 w-full border-b shadow-md z-10000 p-2"}>
+      <header className={"fixed top-0 left-0 w-full border-b shadow-md z-10000 p-2 bg-accent"}>
         <div className={"flex flex-row w-full justify-between items-center max-w-7xl px-4 mx-auto"}>
           <div className={"flex flex-row"}>
             <BotIcon />

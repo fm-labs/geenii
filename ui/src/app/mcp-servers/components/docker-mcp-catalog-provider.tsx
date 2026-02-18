@@ -7,7 +7,8 @@ type DockerMcpCatalog = {
     registry: { [key: string]: any };
 }
 
-type DockerMcpCatalogContextType = DockerMcpCatalog & {
+type DockerMcpCatalogContextType = {
+    catalog: DockerMcpCatalog;
     getServerDef: (name: string) => any;
 }
 
@@ -20,11 +21,15 @@ export const DockerMcpCatalogProvider = ({children}: PropsWithChildren) => {
     const [mcpCatalog, setMcpCatalog] = useState<DockerMcpCatalog>()
 
     const getServerDef = (name: string): any => {
+        if (!mcpCatalog) {
+            console.warn('MCP Catalog not loaded yet')
+            return null
+        }
         return mcpCatalog.registry[name] || null
     }
 
     const contextValue = {
-        ...mcpCatalog,
+        catalog: mcpCatalog,
         getServerDef
     }
 

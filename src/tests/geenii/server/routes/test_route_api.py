@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from geenii.settings import APP_VERSION
+from geenii.config import APP_VERSION
 from server import app
 
 client = TestClient(app)

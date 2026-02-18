@@ -3,7 +3,7 @@ import os
 from os.path import realpath
 import json
 
-from geenii.settings import WHISPERCPP_IMAGE
+from geenii.config import WHISPERCPP_IMAGE
 
 
 def run_whisper_cli_transcribe(input_file: str, input_dir: str = "audios",
