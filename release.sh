@@ -74,6 +74,9 @@ if [[ "$1" == "--help" ]]; then
     exit 0
 fi
 
+# Create remote directories (use multiline SSH command)
+ssh -i "$SSH_KEY_PATH" -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "mkdir -p ${SSH_REMOTE_DIR}/dmg ${SSH_REMOTE_DIR}/app ${SSH_REMOTE_DIR}/deb ${SSH_REMOTE_DIR}/rpm ${SSH_REMOTE_DIR}/appimage"
+
 
 # MacOS ARM bundles
 if [[ "$TARGET_TRIPLE" == *"aarch64-apple-darwin"* ]]; then
@@ -116,11 +119,11 @@ elif [[ "$TARGET_TRIPLE" == *"aarch64-unknown-linux"* ]]; then
       submit_release_info $TARGET_TRIPLE "rpm" "${APP_NAME}-${APP_VERSION}-1.aarch64.rpm"
     fi
     # appimage
-    if [[ -d "./ui/src-tauri/target/release/bundle/appimage/" ]]; then
-      upload_ssh "./ui/src-tauri/target/release/bundle/appimage/${APP_NAME}_${APP_VERSION}_arm64.AppImage" "/appimage/${APP_NAME}_${APP_VERSION}_arm64.AppImage" && \
-      upload_ssh "./ui/src-tauri/target/release/bundle/appimage/${APP_NAME}_${APP_VERSION}_arm64.AppImage.sig" "/appimage/${APP_NAME}_${APP_VERSION}_arm64.AppImage.sig" && \
-      submit_release_info $TARGET_TRIPLE "appimage" "${APP_NAME}_${APP_VERSION}_arm64.AppImage"
-    fi
+    #if [[ -d "./ui/src-tauri/target/release/bundle/appimage/" ]]; then
+    #  upload_ssh "./ui/src-tauri/target/release/bundle/appimage/${APP_NAME}_${APP_VERSION}_arm64.AppImage" "/appimage/${APP_NAME}_${APP_VERSION}_arm64.AppImage" && \
+    #  upload_ssh "./ui/src-tauri/target/release/bundle/appimage/${APP_NAME}_${APP_VERSION}_arm64.AppImage.sig" "/appimage/${APP_NAME}_${APP_VERSION}_arm64.AppImage.sig" && \
+    #  submit_release_info $TARGET_TRIPLE "appimage" "${APP_NAME}_${APP_VERSION}_arm64.AppImage"
+    #fi
 # Linux AMD64
 elif [[ "$TARGET_TRIPLE" == *"x86_64-unknown-linux"* ]]; then
     # deb
