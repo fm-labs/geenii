@@ -27,11 +27,18 @@ while true; do
 
       if ! git pull --quiet; then
           echo "Failed to pull latest changes. Please check your network connection and repository status."
+
+          # check if there are any outstanding changes locally after failed pull
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+              echo "You have uncommitted changes after failed pull. Please commit or stash them before running this script again."
+              exit 2
+              # WARNING: destroys local changes
+              #git reset --hard @{u}
+              #git clean -fd
+          fi
+
           exit 1
       fi
-      # WARNING: destroys local changes
-      #git reset --hard @{u}
-      #git clean -fd
 
       if ! bash build_desktop.sh $@ ; then
           echo "Build failed !!!"
