@@ -73,6 +73,9 @@ async def init_mcp_server_tools(registry: ToolRegistry):
     #     }
     # }
     mcp_config = get_mcp_config()
+    if not mcp_config or "mcpServers" not in mcp_config:
+        print("No MCP servers configured")
+        return
 
     @cached(ttl=3600)
     async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
