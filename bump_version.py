@@ -79,7 +79,7 @@ if __name__ == "__main__":
         ("ui/src-tauri/Cargo.toml", "package.version", bump_version_toml, None),
         ("ui/src-tauri/tauri.conf.json", "version", bump_version_json, None),
         ("ui/package.json", "version", bump_version_json, None),
-        ("src/geenii/settings.py", "APP_VERSION =", bump_version_in_file, {"escape": "true"}),
+        ("src/geenii/config.py", "APP_VERSION =", bump_version_in_file, {"escape": "true"}),
         ("VERSION", "", write_version_to_file, None),
     ]
     for file_path, key, bump_func, extra in files:
