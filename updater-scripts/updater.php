@@ -51,9 +51,10 @@ $user_target = $_GET['target'] ?? null;
 $user_arch = $_GET['arch'] ?? null;
 $user_version = $_GET['current_version'] ?? null;
 $dump = $_GET['dump'] ?? null;
+$version = $_GET['version'] ?? null;
 
 // get the latest version from the VERSION file
-$latest_version = get_latest_version();
+$latest_version = $version ?? get_latest_version();
 if (!$latest_version) {
     http_response_code(500);
     echo json_encode(["error" => "Current version not found"]);
