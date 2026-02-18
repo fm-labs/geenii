@@ -33,7 +33,7 @@ while true; do
       #git reset --hard @{u}
       #git clean -fd
 
-      if ! bash build_desktop.sh ; then
+      if ! bash build_desktop.sh $@ ; then
           echo "Build failed !!!"
       fi
   else
