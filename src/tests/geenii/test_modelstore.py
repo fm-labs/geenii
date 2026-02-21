@@ -4,7 +4,7 @@ import uuid
 import pytest
 import pydantic
 
-from geenii.modelstore import InMemoryModelStore, SerializedInMemoryModelStore, ModelStore
+from geenii.utils.modelstore import InMemoryModelStore, SerializedInMemoryModelStore, ModelStore
 
 
 class MyModel(pydantic.BaseModel):

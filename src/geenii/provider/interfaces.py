@@ -47,7 +47,7 @@ class AIChatCompletionProvider(abc.ABC):
     """
 
     @abc.abstractmethod
-    def generate_chat_completion(self, request: ChatCompletionRequest) -> ChatCompletionResponse:
+    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry = None) -> ChatCompletionResponse:
         """Get an AI chat completion with tooling support for the given prompt and tools"""
         pass
 

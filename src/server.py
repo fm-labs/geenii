@@ -12,7 +12,8 @@ from geenii.config import APP_VERSION
 # from geenii.server.middleware.proxy_middleware import ProxyMiddleware
 # from geenii.server.middleware.request_logger_middleware import RequestLoggerMiddleware
 from geenii.server.router import app_router
-from geenii.tools import ToolRegistry, init_builtin_tools, init_mcp_server_tools
+from geenii.rt import init_builtin_tools, init_mcp_server_tools
+from geenii.tools import ToolRegistry
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 

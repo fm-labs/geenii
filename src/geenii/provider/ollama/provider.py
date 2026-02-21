@@ -7,7 +7,7 @@ import ollama
 from geenii.chat.chat_models import TextContent, ToolCallContent, ContentPart
 from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider
-from geenii.tools import get_tool_registry
+from geenii.rt import get_tool_registry
 
 
 class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
@@ -161,7 +161,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             print("OLLAMA: Error generating completion:", str(e))
             raise e
 
-    def generate_chat_completion(self, request: ChatCompletionRequest):
+    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry = None) -> ChatCompletionResponse:
         """
         Get ollama completion for the given prompt via Ollama Chat API.
 
@@ -242,50 +242,28 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         top_k = model_params.get('top_k', None)
         top_p = model_params.get('top_p', None)
 
-        print("REQUESTED TOOLS:", tools)
+        # TOOLS
+        ollama_tools = []
+        print(f"Tool registry provided {tool_registry is not None}, tools requested: {tools}")
+        if tool_registry is not None and len(tools) > 0:
+            # tool_registry = get_tool_registry()
+            # filter the registry to get the tool definitions for the requested tools
+            tool_defs = tool_registry.list_definitions()
+            openai_tools = [tool_def for tool_def in tool_defs if tool_def['name'] in tools]
+            #print("Mapped OpenAI tools:", openai_tools)
+            ollama_tools = map_openai_tools_to_ollama(openai_tools)
+            print(f"Mapped {len(openai_tools)} OpenAI tools to Ollama format for tools: {tools}")
+            print("Mapped tools:", ollama_tools)
 
-        registry = get_tool_registry()
-        # filter the registry to get the tool definitions for the requested tools
-        tool_defs = registry.list_definitions()
-        openai_tools = [tool_def for tool_def in tool_defs if tool_def['name'] in tools]
-
-        #print("Mapped OpenAI tools:", openai_tools)
-        ollama_tools = map_openai_tools_to_ollama(openai_tools)
-        print("Mapped tools:", ollama_tools)
-        print(f"Mapped {len(openai_tools)} OpenAI tools to Ollama format for tools: {tools}")
-
-        # messages in ollama chat api should be in the format:
-        # [
-        #     {
-        #         "role": "user",
-        #         "content": "What is the weather in Tokyo?"
-        #     },
-        #     {
-        #         "role": "assistant",
-        #         "content": "The weather in Tokyo is sunny."
-        #     },
-        #     {
-        #         "role": "tool",
-        #         "tool_calls": [
-        #             {
-        #                 "function": {
-        #                     "name": "get_weather",
-        #                     "arguments": {
-        #                         "city": "Tokyo"
-        #                     }
-        #                 },
-        #             }
-        #         ],
-        #         "content": "The weather in Tokyo is sunny."
-        #     }
-        # ]
-        _messages = []
+        # messages that will be sent to the Ollama API, starting with the system prompt, then developer prompt (if any),
+        # then the conversation history messages (if any), and finally the user prompt
+        input_messages = []
 
         # system prompt goes first in the messages list
         system_prompt = request.system
         if system_prompt is None:
-            system_prompt = "You are a helpful assistant that can call tools to answer questions. Preferably call a tool to get the information."
-        _messages.append({
+            system_prompt = "You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer."
+        input_messages.append({
             'role': 'system',
             'content': system_prompt,
         })
@@ -343,19 +321,19 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                         print(f"Skipping message with role {role} and non-text content: {content_item}")
 
                     if _message is not None:
-                        _messages.append(_message)
+                        input_messages.append(_message)
 
 
         # Add the user prompt to the messages list
-        _messages.append({
+        input_messages.append({
             'role': 'user',
             'content': prompt,
         })
         try:
-            print("OLLAMA: Generating chat completion with model:", model, _messages)
+            print("OLLAMA: Generating chat completion with model:", model, input_messages)
             model_result = ollama.chat(
                 model=model,
-                messages=_messages,
+                messages=input_messages,
                 tools=ollama_tools,
                 stream=stream,
                 #format="json",
@@ -377,20 +355,20 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 print("No message found in the model response.")
                 raise Exception("No message found in the model response.")
 
-            output: List[ContentPart] = []
+            output_parts: List[ContentPart] = []
 
             # TEXT content
             content = message.get('content')
             if content:
                 print("Content found in the message:", content)
-                output.append(TextContent(text=content))
+                output_parts.append(TextContent(text=content))
 
             # IMAGE content
             images = message.get('images', [])
             if images:
                 print(f"{len(images)} image(s) found in the message.")
                 for image in images:
-                    output.append(TextContent(text="[Image content not supported yet]"))
+                    output_parts.append(TextContent(text="[Image content not supported yet]"))
 
             # TOOL CALLS
             tool_calls = message.get('tool_calls', default=[])
@@ -407,7 +385,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
 
                     # Reference ID for this function call
                     call_id = 'xcall_' + uuid.uuid4().hex
-                    output.append(ToolCallContent(name=name, arguments=arguments, call_id=call_id))
+                    output_parts.append(ToolCallContent(name=name, arguments=arguments, call_id=call_id))
 
 
             response = ChatCompletionResponse(
@@ -416,7 +394,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 prompt=prompt,
                 model=model,
                 #provider=self.name,
-                output=output, # Parsed output from the model response
+                output=output_parts, # Parsed output from the model response
                 model_result=model_result.model_dump(),
                 #todo tools_used=[]
             )

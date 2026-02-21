@@ -5,7 +5,7 @@ import click
 from geenii.ai import generate_completion, generate_chat_completion
 from geenii.chat.chat_models import TextContent
 from geenii.datamodels import ModelMessage
-from geenii.tools import get_tool_registry
+from geenii.rt import get_tool_registry
 from geenii.config import DEFAULT_COMPLETION_MODEL, APP_VERSION
 
 
@@ -49,7 +49,7 @@ def chat(model, temperature, output_format, prompt):
         if not prompt:
             click.echo("No input provided. Ending chat session.")
             break
-        
+
         # write the user message to the chat history
         chat_history.append(ModelMessage(role="user", content=[TextContent(text=prompt),]))
 

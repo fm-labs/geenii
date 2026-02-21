@@ -3,7 +3,7 @@ import redis
 from testcontainers.redis import RedisContainer
 
 from geenii.db.redis import get_redis_client
-from geenii.modelstore import RedisModelStore, ModelStore
+from geenii.utils.modelstore import RedisModelStore, ModelStore
 from tests.geenii.test_modelstore import TestModelStore, MyModel
 
 

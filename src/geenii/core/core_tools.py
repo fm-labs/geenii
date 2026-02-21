@@ -1,3 +1,5 @@
+import subprocess
+
 from geenii.tools import ToolRegistry
 
 geenii_tools = ToolRegistry()
@@ -72,48 +74,18 @@ def file_write(file_path: str, contents: str) -> None:
 
 
 @geenii_tools.tool()
-def file_read_bytes(file_path: str) -> bytes:
-    """
-    Read and return the contents of a file as bytes.
-
-    :param file_path: The path to the file to read.
-    :return: The contents of the file as bytes.
-    """
-    with open(file_path, "rb") as f:
-        return f.read()
-
-
-@geenii_tools.tool()
-def file_write_bytes(file_path: str, contents: bytes) -> None:
-    """
-    Write the specified bytes contents to a file.
-
-    :param file_path: The path to the file to write to.
-    :param contents: The bytes contents to write to the file.
-    """
-    with open(file_path, "wb") as f:
-        f.write(contents)
-
-
-@geenii_tools.tool()
 def execute_command(command: str) -> str:
     """
     Execute a shell command and return its output.
+    Especially useful for executing AppleScript commands on MacOSX using the "osascript" command.
 
     :param command: The shell command to execute.
     :return: The output of the command as a string.
     """
-    import subprocess
+    # todo: implement tool usage policy
+    allowed_commands = ["ls", "pwd", "whoami", "date", "osascript", "echo", "cat", "head", "tail"]
+    if not any(command.startswith(allowed) for allowed in allowed_commands):
+        return f"Error: Command '{command}' is not allowed."
+
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
-
-
-@geenii_tools.tool()
-def bash(command: str) -> str:
-    """
-    Alias for execute_command to run a bash command.
-
-    :param command: The bash command to execute.
-    :return: The output of the command as a string.
-    """
-    return execute_command(command)

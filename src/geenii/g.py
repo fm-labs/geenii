@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 from geenii.ai import generate_chat_completion
 from geenii.chat.chat_bots import BotInterface
 from geenii.chat.chat_models import ContentPart, TextContent
+from geenii.wizards import Wizard, load_wizard_from_json
 
 
 class EchoBot(BotInterface):
@@ -42,7 +43,9 @@ class SimpleBot(BotInterface):
     async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ContentPart, None]:
         try:
             model_id = "ollama:mistral:latest"
-            system_prompt = "You are a helpful assistant, that gives short and concise answers."
+            system_prompt = "You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer."
+            tools = ["get_weather", "execute_command", "file_read"]
+
             if isinstance(message, str):
                 prompt = message
             elif isinstance(message, list):
@@ -53,7 +56,10 @@ class SimpleBot(BotInterface):
             response = generate_chat_completion(
                 model=model_id,
                 prompt=prompt,
-                system=system_prompt)
+                system=system_prompt,
+                messages=[],
+                tools=tools,
+            )
 
             for content_part in response.output:
                 yield content_part
@@ -66,3 +72,12 @@ class SimpleBot(BotInterface):
 def get_bot(botname: str, room_id: str = None) -> BotInterface:
     #return EchoBot(botname=botname)
     return SimpleBot(botname=botname)
+
+    # if not botname.startswith("geenii_bot:"):
+    #     raise ValueError(f"Invalid bot name: {botname}. Bot names must start with 'geenii_bot:'")
+    #
+    # return Wizard(name=botname,
+    #               model="ollama:mistral:latest",
+    #               system="You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer.",
+    #               tools=["get_weather", "execute_command", "file_read"],
+    #               )

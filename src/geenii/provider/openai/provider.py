@@ -4,8 +4,7 @@ import uuid
 
 from geenii.chat.chat_models import TextContent, ToolCallContent
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, ChatCompletionRequest, \
-    ChatCompletionResponse, ModelMessage
-from geenii.tools import get_tool_registry
+    ChatCompletionResponse
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider, \
     AIImageGeneratorProvider
 from geenii.provider.openai.client import get_openai_client
@@ -16,6 +15,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
     A class to represent the OpenAI provider for XAI.
     """
     DEFAULT_MODEL = "gpt-3.5-turbo"
+    DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer."
 
     DALLE_MODELS = {
         "gpt-image-1": {"sizes": ["1024x1024", "auto"]},
@@ -106,9 +106,9 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         return response
 
 
-    def generate_chat_completion(self, request: ChatCompletionRequest) -> ChatCompletionResponse:
+    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry = None) -> ChatCompletionResponse:
         model = request.model or self.DEFAULT_MODEL
-        system_instructions = request.system
+        system_prompt = request.system or self.DEFAULT_SYSTEM_PROMPT
         prompt = request.prompt
         messages = request.messages or []
         tools = request.tools or []
@@ -117,10 +117,11 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
 
         # map tool names to tool definitions in openai format
         tool_defs_openai = []
-        if tools:
-            registry = get_tool_registry()
+        print(f"Tool registry provided {tool_registry is not None}, tools requested: {tools}")
+        if tool_registry is not None and len(tools) > 0:
+            # tool_registry = get_tool_registry()
             # filter the registry to get the (openai) tool definitions for the requested tools
-            tool_defs = registry.list_definitions()
+            tool_defs = tool_registry.list_definitions()
             tool_defs_openai = [tool_def for tool_def in tool_defs if tool_def['name'] in tools]
             print(f"OpenAI tools: {tool_defs_openai}")
 
@@ -155,7 +156,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         print(f"Requesting response with input messages:", input_messages)
         model_result = self.client.responses.create(
             model=model,
-            instructions=system_instructions,
+            instructions=system_prompt,
             input=input_messages,
             tools=tool_defs_openai or [],
             stream=False

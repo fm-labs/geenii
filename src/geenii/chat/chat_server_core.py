@@ -4,10 +4,10 @@ from abc import ABC, abstractmethod
 
 from starlette.websockets import WebSocket, WebSocketState
 
-from geenii import g
 from geenii.chat.chat_bots import BotRunner
 from geenii.chat.chat_manager import ChatManager
 from geenii.chat.chat_models import WireMessage, ChatMessage, ContentPart, SystemMessage, TextContent
+from geenii.g import get_bot
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class BotConnection(Connection):
         print(f"Accessing bot runner for bot {self._botname} in room {self._room_id}")
         if self._botrunner is None:
             print("Initializing bot runner for bot %s in room %s", self._botname, self._room_id)
-            g_bot = g.get_bot(self._botname, self._room_id)
+            g_bot = get_bot(self._botname, self._room_id)
             self._botrunner = BotRunner(botname=self._botname, room_id=self._room_id, bot=g_bot)
             print("Bot runner initialized for bot %s in room %s: %s", self._botname, self._room_id, self._botrunner)
         return self._botrunner
@@ -297,6 +297,9 @@ class MessageHandler:
             for member in members:
                 if member.member_type == "bot":
                     self.get_or_create_bot_conn(room_id, member.username)
+                    # notify the room that the bot has joined
+                    await self.conns.broadcast(room_id, SystemMessage(room_id=room_id,
+                                                                      content=f"Bot {member.username} has joined the room."))
 
             # add active room to the set to avoid repeating this logic for every message
             self._active_rooms.add(room_id)
@@ -306,14 +309,16 @@ class MessageHandler:
             self.chat_mgr.add_message(room_id, sender, message.content)
 
         # inspect the first content part to check for commands (e.g. to trigger bot actions or other system events)
-        if content and isinstance(content[0], TextContent):
+        if content and len(content) > 0 and content[0].type == "text":
             text = content[0].text.strip()
+            print(f"MH: Inspecting message content for commands: '{text}'")
             if text.startswith("$"):
                 command = text[1:].split()[0]  # get the command word after the "/"
                 logger.info("MH: Detected command '%s' in message: %s", command, message)
                 # handle_user_command(command)
                 await self.conns.broadcast(room_id, SystemMessage(room_id=room_id,
                                                                   content=f"User {sender} issued command: {command}"))
+                return
 
         # broadcast the original message to all members in the room (including bots)
         await self.conns.broadcast(room_id, message)

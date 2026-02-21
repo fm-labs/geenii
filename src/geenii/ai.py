@@ -168,6 +168,7 @@ def generate_chat_completion(model: str,
                              system: str = None,
                              messages: list[ModelMessage] = None,
                              tools: list[str] = None,
+                             tool_registry = None,
                              output_format: str = None,
                              output_schema: dict = None,
                              stream: bool = False,
@@ -192,7 +193,7 @@ def generate_chat_completion(model: str,
             #model_parameters=kwargs
         )
 
-        response = ai.generate_chat_completion(request)
+        response = ai.generate_chat_completion(request, tool_registry=tool_registry)
         return response
     except Exception as e:
         print(f"Error in {model} assistant API: {str(e)}")

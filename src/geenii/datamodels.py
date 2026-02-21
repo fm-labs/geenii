@@ -1,67 +1,16 @@
-import abc
-from typing import List, Any, ClassVar, Union
+from typing import List, Any
 
 import pydantic
-from fastapi import UploadFile, File
+from fastapi import UploadFile
 
 from geenii import config
 from geenii.chat.chat_models import ContentPart
-
-
-# class ModelParameters(pydantic.BaseModel):
-#     model_config = { "extra": "allow" }
-#
-#     temperature: float | None = None
-#     top_p: float | None = None
-#     max_tokens: int | None = None
-
-
-# class BaseContent(pydantic.BaseModel):
-#     type: str
-#
-#
-# class TextContent(BaseContent):
-#     type: str = "text"
-#     text: str
-#
-#
-# class AudioContent(BaseContent):
-#     type: str = "audio"
-#     url: str | None = None
-#
-#
-# class ImageContent(BaseContent):
-#     type: str = "image"
-#     url: str | None = None
-#
-#
-# class ToolCallContent(BaseContent):
-#     type: str = "tool_call"
-#     name: str
-#     arguments: dict | None = None
-#     call_id: str | None = None  # Unique identifier for this tool call, useful for matching with results
-#
-#
-# class ToolCallResultContent(BaseContent):
-#     type: str = "tool_call_result"
-#     call_id: str | None = None
-#     result: dict | list | str | Any | None = None
-#
-#
-# ContentPart = Union[TextContent | AudioContent | ImageContent | ToolCallContent | ToolCallResultContent]
 
 
 class ModelMessage(pydantic.BaseModel):
     type: str = "message"
     role: str  # e.g., "user", "assistant", "system"
     content: list[ContentPart] = pydantic.Field(default_factory=list)
-
-
-# class ChatMessage(pydantic.BaseModel):
-#     sender: str
-#     room_id: str
-#     thread_id: str
-#     content: CanonicalContent
 
 
 # Completion
