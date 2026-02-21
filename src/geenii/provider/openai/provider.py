@@ -163,16 +163,16 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         print(f"Response received: {model_result}")
 
         # mapping OpenAI Responses API output format to generic model messages
-        output_content = []
+        output_parts = []
         for output_item in model_result.output:
             if output_item.type == "message":
                 for content_item in output_item.content:
                     if content_item.type == "output_text":
                         print(f"Model output text: {content_item.text}")
-                        output_content.append(TextContent(text=content_item.text))
+                        output_parts.append(TextContent(text=content_item.text))
                     elif content_item.type == "refusal":
                         print(f"Model refusal: {content_item.refusal}")
-                        output_content.append(TextContent(text=f"Model refusal: {content_item.refusal}"))
+                        output_parts.append(TextContent(text=f"Model refusal: {content_item.refusal}"))
 
             elif output_item.type == "function_call":
                 # https://platform.openai.com/docs/guides/function-calling?api-mode=responses#handling-function-calls
@@ -181,7 +181,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                 fn_args = json.loads(output_item.arguments)
                 print(f"Tool call detected: Function {fn_name} with args: {fn_args} ({fn_call_id})")
 
-                output_content.append(ToolCallContent(name=fn_name, arguments=fn_args, call_id=fn_call_id))
+                output_parts.append(ToolCallContent(name=fn_name, arguments=fn_args, call_id=fn_call_id))
             else:
                 print(f"Unsupported OpenAI response output item type: {output_item.type}")
 
@@ -191,7 +191,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             model=model,
             prompt=prompt,
             #provider=self.name,
-            output=[ModelMessage(role="assistant", content=output_content)],
+            output=output_parts,
             output_text=model_result.output_text,
             model_result=model_result.model_dump()
         )

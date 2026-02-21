@@ -3,6 +3,7 @@ from typing import List
 import click
 
 from geenii.ai import generate_completion, generate_chat_completion
+from geenii.chat.chat_models import TextContent
 from geenii.datamodels import ModelMessage
 from geenii.tools import get_tool_registry
 from geenii.config import DEFAULT_COMPLETION_MODEL, APP_VERSION
@@ -40,30 +41,33 @@ def completion(model, temperature, output_format, prompt):
 @click.argument("prompt")
 def chat(model, temperature, output_format, prompt):
     """Start an interactive chat session with an initial prompt."""
-    click.echo(f"Starting chat with: {prompt}")
-    # TODO: implement interactive chat loop
-    
+    click.echo(f"You asked: {prompt}")
+
     chat_history: List[ModelMessage] = []
-    
     continue_chat = True
     while continue_chat:
+        if not prompt:
+            click.echo("No input provided. Ending chat session.")
+            break
+        
+        # write the user message to the chat history
+        chat_history.append(ModelMessage(role="user", content=[TextContent(text=prompt),]))
+
+        # generate a response based on the chat history
         response = generate_chat_completion(prompt=prompt,
                                             model=model,
                                             messages=chat_history,
                                             temperature=temperature, 
                                             output_format=output_format)
-        # click.echo(f"Response: {response}")
-        # if response.output and len(response.output) > 0 and response.output[0].get("content", []):
-        #     click.echo(f"Content: {response.output[0].get('content')[0].get('text', '')}")
-        # else:
-        #     click.echo("No content provided.")
+
+        # print the assistant response
         print(response)
-        for msg in response.output:
-            chat_history.append(msg)
 
-        # todo check if the response contains tool calls and handle them
+        # add the assistant response to the chat history
+        chat_history.append(ModelMessage(role="assistant", content=response.output))
 
-        prompt = click.prompt("You")
+        # prompt the user for the next message
+        prompt = click.prompt("> ", default="", show_default=False)
 
 
 @cli.command()

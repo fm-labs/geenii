@@ -55,12 +55,12 @@ class SmartBot(BotInterface):
                 prompt=prompt,
                 system=system_prompt)
 
-            for msg in response.output:
-                for content_part in msg.content:
-                    yield content_part
+            for content_part in response.output:
+                yield content_part
 
         except Exception:
             yield TextContent(text=f"Uuups, something went wrong :/")
+
 
 
 def get_bot(botname: str, room_id: str = None) -> BotInterface:

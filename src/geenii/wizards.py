@@ -1,7 +1,9 @@
-from typing import List
+from typing import List, AsyncGenerator
 
 from geenii.ai import generate_chat_completion
-from geenii.datamodels import ModelMessage, ToolCallResultContent
+from geenii.chat.chat_bots import BotInterface
+from geenii.chat.chat_models import ToolCallResultContent, ContentPart, TextContent
+from geenii.datamodels import ModelMessage
 from geenii.config import DEFAULT_COMPLETION_MODEL
 from geenii.tools import ToolRegistry, get_tool_registry, init_tool_registry, execute_tool_call
 
@@ -25,13 +27,13 @@ Step 4 — If no tools are relevant, answer the user's question directly.
 """
 
 
-class Wizard:
-    def __init__(self, name, model: str = None, system: str = None, description: str = None,
+class Wizard(BotInterface):
+    def __init__(self, name, model: str = None, system_prompt: str = None, description: str = None,
                  tools: list[str] = None, tool_registry: ToolRegistry = None, mcp_servers: dict[str, str] = None):
         self.name = name
         self.description = description
         self.model = model or DEFAULT_COMPLETION_MODEL
-        self.system = system or DEFAULT_WIZARD_SYSTEM_PROMPT
+        self.system_prompt = system_prompt or DEFAULT_WIZARD_SYSTEM_PROMPT
         self.tools = tools or []
         self.mcp_servers = {}
 
@@ -44,12 +46,12 @@ class Wizard:
         else:
             self._tool_registry = get_tool_registry()
 
-    def prompt(self, input_text=None):
-        if not input_text:
+    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ContentPart, None]:
+        if not message:
             print("No input provided.")
-            return
+            yield TextContent(text=f"How can I assist you today?")
 
-        print(f"You said: {input_text}")
+        print(f"User said: {message}")
         #print("System Instructions:", self.system)
 
         allowed_tools = self.tools
@@ -62,9 +64,12 @@ class Wizard:
             i += 1
             print(f"Wizard: Run #{i}")
             print("Using tools:", allowed_tools)
-            response = generate_chat_completion(prompt=input_text,
+
+            # todo - run sync task in thread pool to avoid blocking the event loop while waiting for the response
+            #  and yield intermediate content parts as they come in instead of waiting for the full response
+            response = generate_chat_completion(prompt=message,
                                                 model=self.model,
-                                                system=self.system,
+                                                system=self.system_prompt,
                                                 messages=message_history,
                                                 tools=allowed_tools
                                                 #temperature=temperature,
@@ -72,34 +77,37 @@ class Wizard:
                                                 )
             print(response)
             tool_calls = 0
-            for msg in response.output:
-                message_history.append(msg)
-                for content in msg.content:
-                    if content.type == "text":
-                        print(content.text)
-                    elif content.type == "tool_call":
-                        try:
-                            # execute the tool call and get the result
-                            print(f"[$>] Tool call: {content.name} with args {content.arguments}")
-                            tool_call_id = content.call_id
-                            tool_result = execute_tool_call(self._tool_registry, content.name, **content.arguments)
-                            print(f"Tool result: {len(tool_result)}")
-                            # add the tool result to the message history as a new assistant message
-                            tool_result_content = tool_result.content[0].text if isinstance(tool_result, list) and len(tool_result) > 0 and tool_result[0].get("content") else str(tool_result)
-                            message_history.append(ModelMessage(role="tool", content=[ToolCallResultContent(
-                                call_id=tool_call_id,
-                                result=tool_result_content)]))
+            output_parts: List[ContentPart] = []
+            for item in response.output:
+                if item.type == "text":
+                    print(item.text)
+                    output_parts.append(TextContent(text=item.text))
+                elif item.type == "tool_call":
+                    try:
+                        # execute the tool call and get the result
+                        print(f"[$>] Tool call: {item.name} with args {item.arguments}")
+                        tool_call_id = item.call_id
+                        tool_result = execute_tool_call(self._tool_registry, item.name, **item.arguments)
+                        print(f"Tool result: {len(tool_result)}")
+                        # add the tool result to the message history as a new assistant message
+                        tool_result_content = tool_result.content[0].text if isinstance(tool_result, list) and len(tool_result) > 0 and tool_result[0].get("content") else str(tool_result)
+                        output_parts.append(ToolCallResultContent(call_id=tool_call_id, result=tool_result_content))
 
-                            tool_calls += 1
+                        tool_calls += 1
 
-                            # remove the tool from the list of available tools for the next iteration to prevent infinite loops
-                            if content.name in allowed_tools:
-                                allowed_tools.remove(content.name)
+                        # remove the tool from the list of available tools for the next iteration to prevent infinite loops
+                        if item.name in allowed_tools:
+                            allowed_tools.remove(item.name)
 
-                        except Exception as e:
-                            print(f"Error executing tool {content.name}: {str(e)}")
-                            message_history.append(ModelMessage(role="tool", content=[ToolCallResultContent(
-                                result={"error": str(e)})]))
+                    except Exception as e:
+                        print(f"Error executing tool {item.name}: {str(e)}")
+                        output_parts.append(ToolCallResultContent(result={"error": str(e)}))
+                else:
+                    print(f"Unknown content part type: {item.type}")
+                    output_parts.append(TextContent(text=f"[Unknown content type: {item.type}]"))
+
+            output_message = ModelMessage(role="assistant", content=output_parts)
+            message_history.append(output_message)
 
             total_tool_calls += tool_calls
             # end the chat if no tools were called or after 3 iterations to prevent infinite loops
@@ -107,6 +115,7 @@ class Wizard:
                 continue_chat = False
 
         print(f"Wizard Chat ended. Total iterations: {i}, total tool calls: {total_tool_calls}")
+        yield TextContent(text=f"Wizard Chat ended. Total iterations: {i}, total tool calls: {total_tool_calls}")
 
 
 
@@ -136,8 +145,9 @@ def load_wizard_from_json(file_path: str) -> Wizard:
     if not name:
         raise ValueError("Wizard configuration must include a 'name' field.")
 
-    wizard = Wizard(name=name, model=model, system=system, description=description, tools=tools, mcp_servers=mcp_servers)
+    wizard = Wizard(name=name, model=model, system_prompt=system, description=description, tools=tools, mcp_servers=mcp_servers)
     return wizard
+
 
 def load_wizards_from_directory(directory_path: str) -> List[Wizard]:
     """

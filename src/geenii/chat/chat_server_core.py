@@ -287,8 +287,9 @@ class MessageHandler:
             # add active room to the set to avoid repeating this logic for every message
             self._active_rooms.add(room_id)
 
-        # store in chat history
-        self.chat_mgr.add_message(room_id, sender, message.content)
+        # store inbound messages chat history
+        if isinstance(message, ChatMessage):
+            self.chat_mgr.add_message(room_id, sender, message.content)
 
         # broadcast the original message to all members in the room (including bots)
         await self.conns.broadcast(room_id, message)
@@ -300,6 +301,10 @@ class MessageHandler:
             message: ChatMessage | SystemMessage = await self.outbound.get()
             logger.info("Messagehandler got outbound message %s", message)
             try:
+                # store outbound messages in chat history
+                if isinstance(message, ChatMessage):
+                    self.chat_mgr.add_message(message.room_id, message.sender_id, message.content)
+
                 await self.conns.broadcast(message.room_id, message)
             finally:
                 self.outbound.task_done()

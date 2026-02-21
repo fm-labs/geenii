@@ -87,7 +87,7 @@ app.add_middleware(
 #     timeout=30.0
 # )
 
-#app.include_router(app_router, prefix="")
+app.include_router(app_router, prefix="")
 app.include_router(chat_router, prefix="")
 
 

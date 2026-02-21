@@ -4,7 +4,6 @@ import os
 from typing import List
 
 import pydantic
-from anthropic.types import ErrorResponse
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import ConfigDict
 from starlette import status
@@ -14,7 +13,6 @@ from geenii.assistants.models import ChatConversation, ChatMessageContent, ChatM
 from geenii.datamodels import CompletionResponse, CompletionErrorResponse
 from geenii.server.deps import dep_current_user
 from geenii.config import DATA_DIR
-from geenii.wizard.default import DefaultWizard
 
 router = APIRouter(prefix="/ai/v1/assistants", tags=["assistants"])
 
@@ -69,14 +67,15 @@ def update_assistant_config_for_user(username: str, assistant_config: dict) -> N
         json.dump(assistants, f, indent=4)
 
 
-def init_assistant_for_user(username: str, assistant_id: str, conversation_id: str, create=False) -> DefaultWizard:
+def init_assistant_for_user(username: str, assistant_id: str, conversation_id: str, create=False) -> "DefaultWizard":
     memory = get_chat_memory(username, assistant_id, conversation_id, create=create)
     assistant_config = fetch_assistant_config_by_id_for_user(username, assistant_id)
     if assistant_config is None:
         raise FileNotFoundError("Assistant configuration not found")
     print(f"Initializing assistant {assistant_id}", assistant_config)
-    assistant = DefaultWizard(memory=memory, context_id=conversation_id, **(assistant_config or {}))
-    return assistant
+    #assistant = DefaultWizard(memory=memory, context_id=conversation_id, **(assistant_config or {}))
+    #return assistant
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assistant not found")
 
 
 

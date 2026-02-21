@@ -180,17 +180,14 @@ def generate_chat_completion(model: str,
         if not isinstance(ai, AIChatCompletionProvider):
             raise RuntimeError(f"Invalid AI provider: {provider_name} does not support assistant completions.")
 
-        stream = False # Stream is not supported yet, so we force it to False.
-        messages = messages or []
-        approved_tools = tools or []
-
         request = ChatCompletionRequest(
             model=model_name,
             system=system,
             prompt=prompt,
-            messages=messages,
-            tools=approved_tools,
+            messages=messages or [],
+            tools= tools or [],
             output_format=output_format,
+            #output_schema=output_schema,
             stream=stream,
             #model_parameters=kwargs
         )

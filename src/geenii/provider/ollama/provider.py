@@ -4,10 +4,10 @@ from typing import List
 
 import ollama
 
-from geenii.chat.chat_models import TextContent, ToolCallContent
-from geenii.tools import get_tool_registry, execute_tool_call
+from geenii.chat.chat_models import TextContent, ToolCallContent, ContentPart
+from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider
-from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest, ModelMessage
+from geenii.tools import get_tool_registry
 
 
 class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
@@ -142,22 +142,8 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 }
             )
 
-            # or via chat API
-            # model_result = ollama.chat(
-            #     model=model,
-            #     messages=[
-            #         {
-            #             'role': 'user',
-            #             'content': prompt,
-            #         },
-            #     ],
-            #     #format="json",
-            #     stream=False,
-            # )
-
             content = model_result.get('response', '')
-
-            output_message = ModelMessage(role='assistant', content=[TextContent(text=content)])
+            output_parts = [TextContent(text=model_result.get('response', ''))]
 
             response = CompletionResponse(
                 id=uuid.uuid4().hex,
@@ -165,9 +151,8 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 #prompt=prompt,
                 model=model,
                 #provider=self.name,
-                output=[output_message],
+                output=output_parts,
                 output_text=str(content).strip(),
-                # original model result for debugging
                 model_result=model_result.model_dump()
             )
             return response
@@ -392,41 +377,24 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 print("No message found in the model response.")
                 raise Exception("No message found in the model response.")
 
-            role = message.get('role', 'assistant')
-            output: List[ModelMessage] = []
+            output: List[ContentPart] = []
 
             # TEXT content
             content = message.get('content')
             if content:
                 print("Content found in the message:", content)
-                output.append(ModelMessage(role=role, content=[TextContent(text=content)]))
-            else:
-                print("No content found in the message.")
-
+                output.append(TextContent(text=content))
 
             # IMAGE content
             images = message.get('images', [])
             if images:
                 print(f"{len(images)} image(s) found in the message.")
                 for image in images:
-                    output.append(ModelMessage(role=role, content=[TextContent(text="[Image content not supported yet]")]))
-
+                    output.append(TextContent(text="[Image content not supported yet]"))
 
             # TOOL CALLS
-            # "tool_calls": [
-            #             {
-            #                 "function": {
-            #                     "name": "get_weather",
-            #                     "arguments": {
-            #                         "city": "Tokyo"
-            #                     }
-            #                 },
-            #             }
-            #         ]
             tool_calls = message.get('tool_calls', default=[])
-            if not tool_calls:
-                print("No tool calls found in the response.")
-            else:
+            if tool_calls:
                 print (f"Tool calls found in the response: {len(tool_calls)}", tool_calls)
                 for tool_call in tool_calls:
                     function = tool_call.get('function', {})
@@ -437,51 +405,10 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                     name = function.get('name', '')
                     arguments = function.get('arguments', {})
 
-                    call_id = 'xcall_' + uuid.uuid4().hex  # Generate a reference ID for this function call, which can be used to link the function call message and the tool result message
-                    # output.append({
-                    #     #'id': 'xfc_' + uuid.uuid4().hex,  # Generate a unique ID for the function call message
-                    #     'call_id': call_id,
-                    #     'type': 'function_call',
-                    #     'name': name,
-                    #     'arguments': arguments,
-                    # })
-                    output.append(ModelMessage(role='tool', content=[ToolCallContent(name=name, arguments=arguments, call_id=call_id)]))
+                    # Reference ID for this function call
+                    call_id = 'xcall_' + uuid.uuid4().hex
+                    output.append(ToolCallContent(name=name, arguments=arguments, call_id=call_id))
 
-                    # invoke the tool and get the result, then append to output
-                    # try:
-                    #     tool_result = call_tool(registry, name, **arguments)
-                    #     print("> Tool result for", name, "with arguments", arguments, "is", tool_result)
-                    #     output.append({
-                    #         'id': call_id,
-                    #         'type': 'function_call_result',
-                    #         'name': name,
-                    #         'data': tool_result,
-                    #         'status': 'completed'
-                    #     })
-                    #     _messages.append({
-                    #         'role': 'tool',
-                    #         'tool_calls': [{
-                    #             'function': {
-                    #                 'name': name,
-                    #                 'arguments': arguments,
-                    #             },
-                    #         }],
-                    #         'content': str(tool_result),
-                    #     })
-                    # except Exception as e:
-                    #     print(f"Error invoking tool {name} with arguments {arguments}: {e}")
-                    #     continue
-
-
-                # now call the model again with the updated messages to get a final response after tool calls
-                # model_result = ollama.chat(
-                #     model=model,
-                #     messages=_messages,
-                #     tools=[], # we don't need to pass tools again
-                #     stream=False,
-                #     #format="json",
-                # )
-                # print("Final Model Response after tool calls:", model_result)
 
             response = ChatCompletionResponse(
                 id=uuid.uuid4().hex,

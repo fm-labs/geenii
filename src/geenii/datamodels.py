@@ -97,7 +97,7 @@ class BaseCompletionResponse(pydantic.BaseModel):
 
 class CompletionResponse(BaseCompletionResponse):
     # prompt: str
-    output: List[ModelMessage] | None = None
+    output: List[ContentPart] | None = None
     output_text: str | None = None
 
 
