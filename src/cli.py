@@ -4,7 +4,7 @@ import click
 
 from geenii.ai import generate_completion, generate_chat_completion
 from geenii.datamodels import ModelMessage
-from geenii.g import get_tool_registry
+from geenii.tools import get_tool_registry
 from geenii.config import DEFAULT_COMPLETION_MODEL, APP_VERSION
 
 

@@ -23,12 +23,12 @@ class HuggingFaceAIProvider(AIAudioGeneratorProvider):
         pass
 
     def generate_speech(self, text: str, **kwargs):
-        model = kwargs.get("model", settings.DEFAULT_AUDIO_GENERATION_MODEL)
+        model = kwargs.get("model", config.DEFAULT_AUDIO_GENERATION_MODEL)
         request_id = str(uuid.uuid4())
         try:
             #tmp_output_file = tempfile.NamedTemporaryFile(delete=True)
             #tmp_file_handle, tmp_output_file = tempfile.mkstemp(suffix='.wav', prefix='xai_audio_')
-            output_file = os.path.realpath(os.path.join(settings.DATA_DIR, "tts", f"output_{time.time()}_{request_id}.wav"))
+            output_file = os.path.realpath(os.path.join(config.DATA_DIR, "tts", f"output_{time.time()}_{request_id}.wav"))
             #run_tts_pipeline(text, output_file, 'a')
             raise NotImplementedError("HuggingFaceAIProvider.generate_speech is not yet implemented.")
 

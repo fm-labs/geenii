@@ -1,9 +1,7 @@
 import abc
-import asyncio
-from typing import AsyncGenerator
 import logging
+from typing import AsyncGenerator
 
-from geenii.ai import generate_chat_completion
 from geenii.chat.chat_models import TextContent, ContentPart, ChatMessage
 
 logger = logging.getLogger(__name__)
@@ -26,51 +24,6 @@ class BotInterface(abc.ABC):
             An asynchronous generator that yields ContentPart objects representing the response.
         """
         yield TextContent(text="Not implemented")
-
-
-class DummyBot(BotInterface):
-    """
-    A simple dummy bot implementation that echoes the incoming message.
-    """
-
-    def __init__(self, botname: str):
-        self.botname = botname
-
-    # spawn task that sends messages to the room every few seconds for a while to simulate a bot that keeps sending messages over time
-    async def send_periodic_messages(self) -> AsyncGenerator[ContentPart, None]:
-        for i in range(5):
-            await asyncio.sleep(5)
-            yield TextContent(text=f"Periodic message {i + 1} from bot {self.botname}")
-
-    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ContentPart, None]:
-        if isinstance(message, str):
-            response_text = f"You said: {message}"
-        else:
-            response_text = "You sent structured content"
-        yield TextContent(type="text", text=f">{self.botname}< {response_text}")
-
-
-class BasicBot(BotInterface):
-    """
-    A basic bot implementation.
-    """
-
-    def __init__(self, botname: str):
-        self.botname = botname
-
-    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ContentPart, None]:
-        try:
-            response = generate_chat_completion(
-                model="ollama:mistral:latest",
-                prompt=message,
-                system="You are a helpful assistant.")
-
-            for response_content in response.output:
-                for content_part in response_content.content:
-                    yield content_part
-
-        except Exception:
-            yield TextContent(text=f"Uuups, something went wrong :/")
 
 
 class BotRunner:

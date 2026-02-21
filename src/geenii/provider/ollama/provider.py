@@ -4,10 +4,10 @@ from typing import List
 
 import ollama
 
-from geenii.g import get_tool_registry, execute_tool_call
+from geenii.chat.chat_models import TextContent, ToolCallContent
+from geenii.tools import get_tool_registry, execute_tool_call
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider
-from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest, TextContent, \
-    ModelMessage, CanonicalContent, ToolCallContent
+from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest, ModelMessage
 
 
 class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):

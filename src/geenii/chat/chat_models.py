@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Any
 
 from pydantic import BaseModel, Field
 
@@ -38,6 +38,18 @@ class FunctionCallContent(BaseContent):
     arguments: dict | None = None
     result: str | None = None
 
+class ToolCallContent(BaseContent):
+    type: Literal["tool_call"] = "tool_call"
+    name: str
+    arguments: dict | None = None
+    call_id: str | None = None  # Unique identifier for this tool call, useful for matching with results
+
+
+class ToolCallResultContent(BaseContent):
+    type: Literal["tool_call_result"] = "tool_call_result"
+    call_id: str | None = None
+    result: dict | list | str | Any | None = None
+
 
 class FileContent(BaseContent):
     type: Literal["file"] = "file"
@@ -56,8 +68,10 @@ class EmbedContent(BaseContent):
     video_url: str | None = None
 
 
+
 ContentPart = Annotated[
-    TextContent | ImageContent | AudioContent | FileContent | FunctionCallContent | EmbedContent,
+    TextContent | ImageContent | AudioContent | FileContent | EmbedContent |
+    FunctionCallContent | ToolCallContent | ToolCallResultContent,
     Field(discriminator="type"),
 ]
 

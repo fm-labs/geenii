@@ -2,10 +2,8 @@ from typing import List
 
 from geenii.ai import generate_chat_completion
 from geenii.datamodels import ModelMessage, ToolCallResultContent
-from geenii.g import execute_tool_call, init_tool_registry
 from geenii.config import DEFAULT_COMPLETION_MODEL
-from geenii.tools import ToolRegistry
-
+from geenii.tools import ToolRegistry, get_tool_registry, init_tool_registry, execute_tool_call
 
 DEFAULT_WIZARD_SYSTEM_PROMPT = """
 You are an AI assistant that MUST use available tools when they are relevant.
@@ -44,7 +42,6 @@ class Wizard:
         if tool_registry:
             self._tool_registry = tool_registry
         else:
-            from geenii.g import get_tool_registry
             self._tool_registry = get_tool_registry()
 
     def prompt(self, input_text=None):

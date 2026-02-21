@@ -5,6 +5,7 @@ import pydantic
 from fastapi import UploadFile, File
 
 from geenii import config
+from geenii.chat.chat_models import ContentPart
 
 
 # class ModelParameters(pydantic.BaseModel):
@@ -15,45 +16,45 @@ from geenii import config
 #     max_tokens: int | None = None
 
 
-class Content(pydantic.BaseModel):
-    type: str
-
-
-class TextContent(Content):
-    type: str = "text"
-    text: str
-
-
-class AudioContent(Content):
-    type: str = "audio"
-    url: str | None = None
-
-
-class ImageContent(Content):
-    type: str = "image"
-    url: str | None = None
-
-
-class ToolCallContent(Content):
-    type: str = "tool_call"
-    name: str
-    arguments: dict | None = None
-    call_id: str | None = None  # Unique identifier for this tool call, useful for matching with results
-
-
-class ToolCallResultContent(Content):
-    type: str = "tool_call_result"
-    call_id: str | None = None
-    result: dict | list | str | Any | None = None
-
-
-CanonicalContent = Union[TextContent | AudioContent | ImageContent | ToolCallContent | ToolCallResultContent]
+# class BaseContent(pydantic.BaseModel):
+#     type: str
+#
+#
+# class TextContent(BaseContent):
+#     type: str = "text"
+#     text: str
+#
+#
+# class AudioContent(BaseContent):
+#     type: str = "audio"
+#     url: str | None = None
+#
+#
+# class ImageContent(BaseContent):
+#     type: str = "image"
+#     url: str | None = None
+#
+#
+# class ToolCallContent(BaseContent):
+#     type: str = "tool_call"
+#     name: str
+#     arguments: dict | None = None
+#     call_id: str | None = None  # Unique identifier for this tool call, useful for matching with results
+#
+#
+# class ToolCallResultContent(BaseContent):
+#     type: str = "tool_call_result"
+#     call_id: str | None = None
+#     result: dict | list | str | Any | None = None
+#
+#
+# ContentPart = Union[TextContent | AudioContent | ImageContent | ToolCallContent | ToolCallResultContent]
 
 
 class ModelMessage(pydantic.BaseModel):
     type: str = "message"
     role: str  # e.g., "user", "assistant", "system"
-    content: list[CanonicalContent] = pydantic.Field(default_factory=list)
+    content: list[ContentPart] = pydantic.Field(default_factory=list)
 
 
 # class ChatMessage(pydantic.BaseModel):

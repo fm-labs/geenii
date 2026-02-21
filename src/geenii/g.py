@@ -1,115 +1,68 @@
-from geenii.chat.chat_bots import BotInterface, DummyBot
-from geenii.mcp.client import McpClient, get_mcp_config
-from geenii.tools import ToolRegistry
-from geenii.utils.cached import cached
+import asyncio
+from typing import AsyncGenerator
 
-TOOLS: ToolRegistry | None = None
-
-def get_tool_registry() -> ToolRegistry:
-    global TOOLS
-    if TOOLS is None:
-        TOOLS = init_tool_registry()
-    return TOOLS
+from geenii.ai import generate_chat_completion
+from geenii.chat.chat_bots import BotInterface
+from geenii.chat.chat_models import ContentPart, TextContent
 
 
-def init_tool_registry():
-    # todo: load built-in tools and register them in the registry
-    # todo: load tools from config file or database
-    # todo: support dynamic loading of tools from plugins or external sources
-    # todo: implement caching and efficient lookup of tools in the registry
-    # todo: implement tool policies and access control in the registry
-    registry = ToolRegistry()
-    init_builtin_tools(registry)
-    init_mcp_server_tools(registry)
+class EchoBot(BotInterface):
+    """
+    A simple dummy bot implementation that echoes the incoming message.
+    """
 
-    return registry
+    def __init__(self, botname: str):
+        self.botname = botname
+
+    # spawn task that sends messages to the room every few seconds for a while to simulate a bot that keeps sending messages over time
+    async def send_periodic_messages(self) -> AsyncGenerator[ContentPart, None]:
+        for i in range(5):
+            await asyncio.sleep(5)
+            yield TextContent(text=f"Periodic message {i + 1} from bot {self.botname}")
+
+    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ContentPart, None]:
+        if isinstance(message, str):
+            response_text = f"You said: {message}"
+        else:
+            response_text = "You sent structured content"
+        yield TextContent(type="text", text=f">{self.botname}< {response_text}")
 
 
-async def init_builtin_tools(registry: ToolRegistry):
-    # registry.register(PythonTool(
-    #     name="file_exists",
-    #     description="Check if a file exists at the specified path.",
-    #     parameters={
-    #         "type": "object",
-    #         "properties": {
-    #             "file_path": {"type": "string", "description": "The path to the file to check."}
-    #         },
-    #         "required": ["file_path"]
-    #     },
-    #     handler=file_exists
-    # ))
-    # registry.register(PythonTool(
-    #     name="file_read",
-    #     description="Read and return the contents of a file.",
-    #     parameters={
-    #         "type": "object",
-    #         "properties": {
-    #             "file_path": {"type": "string", "description": "The path to the file to read."}
-    #         },
-    #         "required": ["file_path"]
-    #     },
-    #     handler=file_read
-    # ))
-    # registry.register_function(fn=file_exists, )
-    # registry.register_function(fn=file_read, )
-    # registry.register_function(fn=file_write, )
-    # registry.register_function(fn=echo, )
-    # registry.register_function(fn=reverse_string, )
-    # registry.register_function(fn=greet, )
+class SmartBot(BotInterface):
+    """
+    A bot implementation with basic intelligence that uses the generate_chat_completion function
+    to generate responses based on the incoming message.
 
-    from geenii.core.core_tools import geenii_tools
-    for name, tool in geenii_tools._tools.items():
-        registry.register(tool)
+    It can handle both plain text and structured content messages.
+    """
 
-async def init_mcp_server_tools(registry: ToolRegistry):
-    # mcp_servers = {
-    #     "duckduckgo": {
-    #         "command": "docker",
-    #         "args": [
-    #             "run",
-    #             "-i",
-    #             "--rm",
-    #             "mcp/duckduckgo"
-    #         ]
-    #     }
-    # }
-    mcp_config = get_mcp_config()
-    if not mcp_config or "mcpServers" not in mcp_config:
-        print("No MCP servers configured")
-        return
+    def __init__(self, botname: str):
+        self.botname = botname
 
-    @cached(ttl=3600)
-    async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
+    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ContentPart, None]:
         try:
-            mcp_client = McpClient(server_name, server_conf)
-            tools = await mcp_client.list_tools()
-            return tools
-        except Exception as e:
-            print(f"Error retrieving tools from MCP server {server_name}: {e}")
-            return []
+            model_id = "ollama:mistral:latest"
+            system_prompt = "You are a helpful assistant, that gives short and concise answers."
+            if isinstance(message, str):
+                prompt = message
+            elif isinstance(message, list):
+                prompt = " ".join([content.to_text() for content in message])
+            else:
+                raise ValueError("Unsupported message format")
 
-    for server_name, server_conf in mcp_config["mcpServers"].items():
-        try:
-            mcp_tools = await read_mcp_server_tools(server_name, server_conf)
+            response = generate_chat_completion(
+                model=model_id,
+                prompt=prompt,
+                system=system_prompt)
 
-            # map the MCP tool definitions to the internal tool representation and register them in the registry
-            registry.register_mcp_tools(
-                mcp_server_id=server_name,
-                tool_definitions=mcp_tools
-            )
-        except Exception as e:
-            print(f"Error connecting to MCP server {server_name}: {e}")
-            continue
+            for msg in response.output:
+                for content_part in msg.content:
+                    yield content_part
 
-
-def execute_tool_call(registry: ToolRegistry, tool_name: str, **kwargs) -> any:
-    tool = registry.get(tool_name)
-    if tool is None:
-        raise ValueError(f"Tool {tool_name!r} is not registered")
-    print(f'$> Calling tool "{tool_name}" with args {kwargs}')
-    return tool.invoke(**kwargs)
-
+        except Exception:
+            yield TextContent(text=f"Uuups, something went wrong :/")
 
 
 def get_bot(botname: str, room_id: str = None) -> BotInterface:
-    return DummyBot(botname=botname)
+    #return EchoBot(botname=botname)
+    return SmartBot(botname=botname)

@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from fastmcp.client.client import CallToolResult
 from mcp.types import Prompt
 
+from geenii import tools
 from geenii.datamodels import MCPServerConfig, MCPToolCallRequest, MCPServerInfo, MCPToolCallResponse
 from geenii.mcp.client import get_mcp_config, read_mcp_config_json, write_mcp_config_json, \
     get_mcp_client_for_server, get_mcp_config_for_server
@@ -185,7 +186,7 @@ async def call_mcp_server_tool(server_name: str, request: MCPToolCallRequest) ->
     async with client:
         try:
             print("Calling MCP tool:", tool_name, "with arguments):", arguments)
-            result: CallToolResult = await client.execute_tool_call(tool_name, arguments=arguments)
+            result: CallToolResult = await tools.execute_tool_call(tool_name, arguments=arguments)
             return MCPToolCallResponse(**{"tool_name": tool_name, "arguments": arguments, "result": dataclasses.asdict(result)})
         except Exception as e:
             return MCPToolCallResponse(**{"tool_name": tool_name, "arguments": arguments, "error": str(e)})

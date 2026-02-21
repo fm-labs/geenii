@@ -9,11 +9,10 @@ from geenii.chat.chat_server_ctx import ChatServerState
 from geenii.chat.chat_server_routes import router as chat_router
 
 from geenii.config import APP_VERSION
-from geenii.g import init_builtin_tools, init_mcp_server_tools
 # from geenii.server.middleware.proxy_middleware import ProxyMiddleware
 # from geenii.server.middleware.request_logger_middleware import RequestLoggerMiddleware
 from geenii.server.router import app_router
-from geenii.tools import ToolRegistry
+from geenii.tools import ToolRegistry, init_builtin_tools, init_mcp_server_tools
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 

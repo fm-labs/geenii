@@ -2,9 +2,10 @@ import json
 import time
 import uuid
 
+from geenii.chat.chat_models import TextContent, ToolCallContent
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, ChatCompletionRequest, \
-    ChatCompletionResponse, ModelMessage, TextContent, ToolCallContent
-from geenii.g import get_tool_registry
+    ChatCompletionResponse, ModelMessage
+from geenii.tools import get_tool_registry
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider, \
     AIImageGeneratorProvider
 from geenii.provider.openai.client import get_openai_client
