@@ -1,8 +1,8 @@
 import json
 import pytest
 
-from geenii.chat.memory import FileChatMemory
-from geenii.chat.models import ChatMessage, ChatMessageContent
+from geenii.assistants.memory import FileChatMemory
+from geenii.assistants.models import ChatMessage, ChatMessageContent
 
 
 # Adjust these imports to match your project structure:

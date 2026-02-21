@@ -9,8 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import ConfigDict
 from starlette import status
 
-from geenii.chat.memory import ChatMemory, FileChatMemory
-from geenii.chat.models import ChatConversation, ChatMessageContent, ChatMessage
+from geenii.assistants.memory import ChatMemory, FileChatMemory
+from geenii.assistants.models import ChatConversation, ChatMessageContent, ChatMessage
 from geenii.datamodels import CompletionResponse, CompletionErrorResponse
 from geenii.server.deps import dep_current_user
 from geenii.config import DATA_DIR

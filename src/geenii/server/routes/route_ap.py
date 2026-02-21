@@ -6,7 +6,7 @@ from typing import Optional
 
 from fastapi import APIRouter, UploadFile, File, Form, Query
 
-from geenii.ap.models import StepStatus, Pagination, Artifact, TaskRequestBody, Task, StepRequestBody, Step, \
+from geenii.ext.ap import StepStatus, Pagination, Artifact, TaskRequestBody, Task, StepRequestBody, Step, \
     TaskListResponse, TaskStepsListResponse, TaskArtifactsListResponse, StepInput
 
 # Create APIRouter

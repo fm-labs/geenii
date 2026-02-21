@@ -1,27 +1,21 @@
-import asyncio
-import contextlib
-import signal
 from contextlib import asynccontextmanager
+import logging
 
 import uvicorn
-
-from fastapi import FastAPI, Security
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from fastmcp import Client
+from geenii.chat.chat_server_ctx import ChatServerState
+from geenii.chat.chat_server_routes import router as chat_router
 
-from starlette.testclient import TestClient
-from starlette.websockets import WebSocket, WebSocketDisconnect
-
+from geenii.config import APP_VERSION
 from geenii.g import init_builtin_tools, init_mcp_server_tools
-from geenii.server.deps import dep_current_token_user
 # from geenii.server.middleware.proxy_middleware import ProxyMiddleware
 # from geenii.server.middleware.request_logger_middleware import RequestLoggerMiddleware
 from geenii.server.router import app_router
-from geenii.server.routes.route_ws import manager, process_message, subs_lock, subscriptions, redis_pubsub_listener
-from geenii.config import APP_VERSION
 from geenii.tools import ToolRegistry
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
 #redis_listener_stop_event = asyncio.Event()
 
@@ -36,12 +30,18 @@ async def initialize_tool_registry():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    chat_server_state = ChatServerState(app)
+    await chat_server_state.startup()
+    app.state.chat_server_state = chat_server_state
+
     #task = asyncio.create_task(redis_pubsub_listener(redis_listener_stop_event))
     # store the tool registry in the app state for access in routes
     app.state.tool_registry = await initialize_tool_registry()
     try:
         yield
     finally:
+        await chat_server_state.stop()
+
         # cleanup tool registry if needed
         if app.state.tool_registry:
             del app.state.tool_registry
@@ -88,7 +88,8 @@ app.add_middleware(
 #     timeout=30.0
 # )
 
-app.include_router(app_router, prefix="")
+#app.include_router(app_router, prefix="")
+app.include_router(chat_router, prefix="")
 
 
 # # WebSocket endpoint

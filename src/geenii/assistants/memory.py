@@ -3,7 +3,7 @@ import json
 import time
 from pathlib import Path
 
-from geenii.chat.models import ChatMessage
+from geenii.assistants.models import ChatMessage
 
 
 class ChatMemory(abc.ABC):

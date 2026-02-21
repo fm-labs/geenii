@@ -4,11 +4,11 @@ from geenii.server.routes.route_api import router as api_router
 from geenii.server.routes.route_settings import router as settings_router
 from geenii.server.routes.route_tools import router as tools_router
 from geenii.server.routes.route_ai import router as ai_router
-from geenii.server.routes.route_ap import router as ap_router
+#from geenii.server.routes.route_ap import router as ap_router
 from geenii.server.routes.route_assistants import router as assistants_router
 from geenii.server.routes.route_mcp_admin import router as mcp_router
-from geenii.server.routes.route_pubsub import router as pubsub_router
-from geenii.server.routes.route_ws import router as ws_router
+#from geenii.server.routes.route_pubsub import router as pubsub_router
+#from geenii.server.routes.route_ws import router as ws_router
 
 
 app_router = APIRouter()

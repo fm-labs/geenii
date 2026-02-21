@@ -1,5 +1,5 @@
-from geenii.chat.memory import ChatMemory
-from geenii.chat.models import ChatMessage, ChatMessageContent
+from geenii.assistants.memory import ChatMemory
+from geenii.assistants.models import ChatMessage, ChatMessageContent
 from geenii.datamodels import CompletionResponse
 from geenii.wizard.completion import CompletionWizard
 

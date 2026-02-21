@@ -1,11 +1,13 @@
 .cache/
 .idea/
 .venv/
+.geenii/
 bak/
 data/
 build/
 dist/
 volumes/
+/lib/
 .env.local
 .env
 *.local

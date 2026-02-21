@@ -37,3 +37,12 @@ MONGODB_DB_NAME = os.environ.get("MONGODB_DB_NAME", "geenii_brain0")
 
 # Redis settings
 REDIS_URI = os.environ.get("REDIS_URI", "")
+
+
+### Chat settings ###
+# Path to the SQLite database file for storing chat history and related data
+CHAT_DB_PATH = "./data/chat.db"
+
+# A unique namespace UUID for generating deterministic UUIDs for DM room IDs.
+CHAT_DM_NAMESPACE = "a7f3c2e1-4b8d-5a9f-8c3e-2d1b6f0e4a7c"
+

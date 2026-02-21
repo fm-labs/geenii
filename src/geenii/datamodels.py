@@ -56,11 +56,11 @@ class ModelMessage(pydantic.BaseModel):
     content: list[CanonicalContent] = pydantic.Field(default_factory=list)
 
 
-class ChatMessage(pydantic.BaseModel):
-    sender: str
-    room_id: str
-    thread_id: str
-    content: CanonicalContent
+# class ChatMessage(pydantic.BaseModel):
+#     sender: str
+#     room_id: str
+#     thread_id: str
+#     content: CanonicalContent
 
 
 # Completion

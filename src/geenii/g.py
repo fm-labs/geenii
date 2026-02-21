@@ -1,6 +1,7 @@
-from geenii.utils.cached import cached
+from geenii.chat.chat_bots import BotInterface, DummyBot
 from geenii.mcp.client import McpClient, get_mcp_config
 from geenii.tools import ToolRegistry
+from geenii.utils.cached import cached
 
 TOOLS: ToolRegistry | None = None
 
@@ -56,7 +57,7 @@ async def init_builtin_tools(registry: ToolRegistry):
     # registry.register_function(fn=reverse_string, )
     # registry.register_function(fn=greet, )
 
-    from geenii.builtin.builtin_tools import geenii_tools
+    from geenii.core.core_tools import geenii_tools
     for name, tool in geenii_tools._tools.items():
         registry.register(tool)
 
@@ -107,3 +108,8 @@ def execute_tool_call(registry: ToolRegistry, tool_name: str, **kwargs) -> any:
         raise ValueError(f"Tool {tool_name!r} is not registered")
     print(f'$> Calling tool "{tool_name}" with args {kwargs}')
     return tool.invoke(**kwargs)
+
+
+
+def get_bot(botname: str, room_id: str = None) -> BotInterface:
+    return DummyBot(botname=botname)

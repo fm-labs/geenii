@@ -91,7 +91,7 @@ pnpm install
 ### Run server in development mode from sources
 
 ```bash
-uv run uvicorn --app-dir ./src --port 13030 server:app --reload
+uv run uvicorn --app-dir ./src --port 13030 server:app --reload --log-level debug
 ```
 
 ### Run server in production mode from sources
