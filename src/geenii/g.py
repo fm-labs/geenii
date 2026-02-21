@@ -28,7 +28,7 @@ class EchoBot(BotInterface):
         yield TextContent(type="text", text=f">{self.botname}< {response_text}")
 
 
-class SmartBot(BotInterface):
+class SimpleBot(BotInterface):
     """
     A bot implementation with basic intelligence that uses the generate_chat_completion function
     to generate responses based on the incoming message.
@@ -65,4 +65,4 @@ class SmartBot(BotInterface):
 
 def get_bot(botname: str, room_id: str = None) -> BotInterface:
     #return EchoBot(botname=botname)
-    return SmartBot(botname=botname)
+    return SimpleBot(botname=botname)

@@ -7,7 +7,7 @@ from starlette.websockets import WebSocket, WebSocketState
 from geenii import g
 from geenii.chat.chat_bots import BotRunner
 from geenii.chat.chat_manager import ChatManager
-from geenii.chat.chat_models import WireMessage, ChatMessage, ContentPart, SystemMessage
+from geenii.chat.chat_models import WireMessage, ChatMessage, ContentPart, SystemMessage, TextContent
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +195,7 @@ class ConnectionManager:
         for conn in dead:
             self.rooms.get(room_id, []).remove(conn)
 
-    async def close(self) -> None:
+    async def shutdown(self) -> None:
         """Close all connections in all rooms, e.g. on server shutdown."""
         for connections in self.rooms.values():
             for conn in connections:
@@ -221,20 +221,29 @@ class MessageHandler:
         self.conns = conns
         self.chat_mgr = chat_manager
 
+        self._tasks: list[asyncio.Task] = []
         # active rooms are tracked to manage bot connections and avoid repeating the same logic for every message
         self._active_rooms: set[str] = set()  # track active rooms to manage bot connections
 
-    async def run(self) -> None:
+    async def start(self) -> None:
         """Start the connection manager's main loop to process inbound messages."""
         _in_task = asyncio.create_task(self._process_inbound_messages())
         _out_task = asyncio.create_task(self._process_outbound_messages())
-        tasks = [_in_task, _out_task]
-        #await asyncio.gather(*tasks, return_exceptions=True)
-        await self.shutdown_event.wait()
-        logger.info("MH: Shutdown event received, cancelling message handler tasks ...")
-        for task in tasks:
-            task.cancel()
 
+        def handle_exception(task):
+            if not task.cancelled():
+                exc = task.exception()
+                if exc:
+                    logger.error("msg_handler failed", exc_info=exc)
+        _in_task.add_done_callback(handle_exception)
+        _out_task.add_done_callback(handle_exception)
+
+        self._tasks = [_in_task, _out_task]
+
+    async def shutdown(self) -> None:
+        """Signal the message handler to stop processing messages and clean up resources."""
+        for task in self._tasks:
+            task.cancel()
 
     # --- Bot helpers ---
 
@@ -255,6 +264,10 @@ class MessageHandler:
         """Continuously process messages from the inbound queue."""
         logger.info("Messagehandler listening for inbound messages ...")
         while True:
+            if self.shutdown_event.is_set():
+                logger.info("MH: Shutdown event set, stopping inbound message processing loop ...")
+                break
+
             message = await self.inbound.get()
             logger.info("MH: Messagehandler got message %s", message)
             try:
@@ -267,6 +280,7 @@ class MessageHandler:
         logger.info("MH: Processing message: %s", message)
         room_id = message.room_id
         sender = message.sender_id
+        content = message.content
 
         # route the message to the appropriate room
         if room_id not in self._active_rooms:
@@ -291,6 +305,16 @@ class MessageHandler:
         if isinstance(message, ChatMessage):
             self.chat_mgr.add_message(room_id, sender, message.content)
 
+        # inspect the first content part to check for commands (e.g. to trigger bot actions or other system events)
+        if content and isinstance(content[0], TextContent):
+            text = content[0].text.strip()
+            if text.startswith("$"):
+                command = text[1:].split()[0]  # get the command word after the "/"
+                logger.info("MH: Detected command '%s' in message: %s", command, message)
+                # handle_user_command(command)
+                await self.conns.broadcast(room_id, SystemMessage(room_id=room_id,
+                                                                  content=f"User {sender} issued command: {command}"))
+
         # broadcast the original message to all members in the room (including bots)
         await self.conns.broadcast(room_id, message)
 
@@ -298,6 +322,10 @@ class MessageHandler:
         """Continuously process messages from the outbound queue and broadcast to rooms."""
         logger.info("Messagehandler listening for outbound messages ...")
         while True:
+            if self.shutdown_event.is_set():
+                logger.info("MH: Shutdown event set, stopping outbound message processing loop ...")
+                break
+
             message: ChatMessage | SystemMessage = await self.outbound.get()
             logger.info("Messagehandler got outbound message %s", message)
             try:

@@ -61,9 +61,7 @@ class ChatManager:
         logger.info(f"Connecting to {db_path}")
         try:
             self._conn = sqlite3.connect(db_path, check_same_thread=False)
-            self._conn.row_factory = sqlite3.Row
-            self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("PRAGMA foreign_keys=ON")
+            self._init_db()
         except sqlite3.OperationalError:
             logger.error(f"Failed to connect to database at {db_path}. Check if the path is correct and writable.")
             raise
@@ -74,7 +72,10 @@ class ChatManager:
             raise RuntimeError("Database connection is not initialized.")
         return self._conn
 
-    def init_db(self) -> None:
+    def _init_db(self) -> None:
+        self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA foreign_keys=ON")
         self.conn.executescript("""
             CREATE TABLE IF NOT EXISTS rooms (
                 id TEXT PRIMARY KEY,

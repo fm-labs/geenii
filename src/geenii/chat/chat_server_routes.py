@@ -14,7 +14,7 @@ from starlette.requests import HTTPConnection, Request
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from geenii.chat.chat_models import Room, RoomCreate, Member, JoinRoom, LeaveRoom, InviteUser, Message, MessageCreate, \
-    SystemMessage, ChatMessage
+    SystemMessage, ChatMessage, TextContent
 
 from geenii.chat.chat_server_core import SseConnection, WebSocketConnection, MessageHandler, ConnectionManager
 from geenii.chat.chat_manager import ChatManager
@@ -284,6 +284,7 @@ async def websocket_endpoint(websocket: WebSocket,
 
     # notify room of join/leave via system messages
     await msg_handler.outbound.put(SystemMessage(room_id=room_id, content=f"{username} joined the room!"))
+    #await msg_handler.outbound.put(ChatMessage(room_id=room_id, sender_id="system", content=[TextContent(text="Welcome back!")]))
 
     try:
         while True:
@@ -292,14 +293,19 @@ async def websocket_endpoint(websocket: WebSocket,
 
             content = data.get("content", [])
             if not content:
+                logger.info("Skipping empty message from user=%s in room=%s", username, room_id)
                 continue
 
             try:
+                if not msg_handler or not msg_handler.inbound or msg_handler.inbound.full():
+                    logger.warning("Message handler inbound queue is not available or full, skipping message from user=%s in room=%s", username, room_id)
+                    continue
+
                 msg = ChatMessage(room_id=room_id, sender_id=username, content=content)
+                await msg_handler.inbound.put(msg)
             except Exception:
                 logger.warning("WS: Invalid message content from user=%s, skipping: %s", username, content)
                 continue
-            await msg_handler.inbound.put(msg)
     except WebSocketDisconnect:
         pass
     finally:
