@@ -6,13 +6,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from geenii.chat.chat_server_ctx import ChatServerState
-from geenii.chat.chat_server_routes import router as chat_router
 
 from geenii.config import APP_VERSION
 # from geenii.server.middleware.proxy_middleware import ProxyMiddleware
 # from geenii.server.middleware.request_logger_middleware import RequestLoggerMiddleware
 from geenii.server.router import app_router
 from geenii.rt import init_builtin_tools, init_mcp_server_tools
+from geenii.supervisor import Supervisor, ProcConfig
 from geenii.tools import ToolRegistry
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -27,21 +27,30 @@ async def initialize_tool_registry():
     await init_mcp_server_tools(registry)
     return registry
 
+async def initialize_supervisor():
+    print("Initializing supervisor...")
+    supervisor = Supervisor()
+    await supervisor.ensure("geenii_startup", ProcConfig(name="geenii_startup", cmd=["/bin/bash", "-c", "echo 'Geenii API Server Started'; echo `date` >> data/startup.log"], restart=False))
+    await supervisor.ensure("geenii_beat", ProcConfig(name="geenii_beat", cmd=["/bin/bash", "-c", "while true; do echo `date`; sleep 3; done"]))
+    return supervisor
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    chat_server_state = ChatServerState(app)
-    await chat_server_state.startup()
-    app.state.chat_server_state = chat_server_state
-
-    #task = asyncio.create_task(redis_pubsub_listener(redis_listener_stop_event))
-    # store the tool registry in the app state for access in routes
+    # Chat Server
+    app.state.chat_server = ChatServerState(app)
+    await app.state.chat_server.startup()
+    # Tool Registry
     app.state.tool_registry = await initialize_tool_registry()
+    # Supervisor
+    app.state.supervisor = await initialize_supervisor()
+    # Redis
+    #task = asyncio.create_task(redis_pubsub_listener(redis_listener_stop_event))
     try:
         yield
     finally:
-        await chat_server_state.stop()
-
+        await app.state.chat_server.stop()
+        await app.state.supervisor.stop()
         # cleanup tool registry if needed
         if app.state.tool_registry:
             del app.state.tool_registry
@@ -89,7 +98,6 @@ app.add_middleware(
 # )
 
 app.include_router(app_router, prefix="")
-app.include_router(chat_router, prefix="")
 
 
 # # WebSocket endpoint

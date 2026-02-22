@@ -4,34 +4,32 @@ import json
 import logging
 import sqlite3
 
-from fastapi.params import Depends
-
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.params import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse
 from starlette.requests import HTTPConnection, Request
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from geenii.chat.chat_models import Room, RoomCreate, Member, JoinRoom, LeaveRoom, InviteUser, Message, MessageCreate, \
-    SystemMessage, ChatMessage, TextContent
-
-from geenii.chat.chat_server_core import SseConnection, WebSocketConnection, MessageHandler, ConnectionManager
 from geenii.chat.chat_manager import ChatManager
+from geenii.chat.chat_models import Room, RoomCreate, Member, JoinRoom, LeaveRoom, InviteUser, Message, MessageCreate, \
+    SystemMessage, ChatMessage
+from geenii.chat.chat_server_core import SseConnection, WebSocketConnection, MessageHandler, ConnectionManager
 
 logger = logging.getLogger(__name__)
 
 async def dep_chat_mgr(request: HTTPConnection) -> "ChatManager":
     """Get the ChatManager instance from the app state."""
-    return request.app.state.chat_server_state.chat_manager
+    return request.app.state.chat_server.chat_manager
 
 async def dep_conn_mgr(request: HTTPConnection) -> "ConnectionManager":
     """Get the ConnectionManager instance from the app state."""
-    return request.app.state.chat_server_state.conn_manager
+    return request.app.state.chat_server.conn_manager
 
 async def dep_msg_handler(request: HTTPConnection) -> "MessageHandler":
     """Get the main message handler function from the app state."""
-    return request.app.state.chat_server_state.message_handler
+    return request.app.state.chat_server.message_handler
 
 
 
