@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, Set
 
 import pydantic
 from fastapi import UploadFile
@@ -55,7 +55,7 @@ class ChatCompletionRequest(CompletionRequest):
     # Conversation history (for chat completions)
     messages: List[ModelMessage] | None = None
     # Tooling support
-    tools: List[str] | None = None
+    tools: Set[str] | None = None
     # Context ID for the completion request
     context_id: str | None = None
 

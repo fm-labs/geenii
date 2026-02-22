@@ -78,7 +78,9 @@ class PythonTool(Tool):
     def invoke(self, **kwargs: Any) -> Any:
         if self.handler is None:
             raise RuntimeError(f"No handler registered for tool {self.name!r}")
-        return self.handler(**kwargs)
+        result = self.handler(**kwargs)
+        print(f"Tool {self.name!r} returned:", result)
+        return result
 
 
 # ---------------------------------------------------------------------------

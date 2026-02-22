@@ -42,7 +42,7 @@ class SimpleBot(BotInterface):
 
     async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ContentPart, None]:
         try:
-            model_id = "ollama:mistral:latest"
+            model_id = "ollama:qwen3:8b"
             system_prompt = "You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer."
             tools = ["get_weather", "execute_command", "file_read"]
 
@@ -77,7 +77,7 @@ def get_bot(botname: str, room_id: str = None) -> BotInterface:
     #     raise ValueError(f"Invalid bot name: {botname}. Bot names must start with 'geenii_bot:'")
     #
     # return Wizard(name=botname,
-    #               model="ollama:mistral:latest",
+    #               model="ollama:qwen3:8b",
     #               system="You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer.",
     #               tools=["get_weather", "execute_command", "file_read"],
     #               )

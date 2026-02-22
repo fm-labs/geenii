@@ -12,6 +12,8 @@ from typing import Any, Optional
 
 import sqlite3
 
+from geenii import config
+
 
 class SqliteCacheStore:
     """
@@ -209,7 +211,7 @@ def default_cache_key(func, args, kwargs):
 
 def default_cache_store():
     # return FileCacheStore(".cache")
-    return SqliteCacheStore(".cache/cache.sqlite")
+    return SqliteCacheStore(f"{config.CACHE_DIR}/cache.sqlite")
 
 def cached(ttl=None, cachekey=None, store=None):
     """

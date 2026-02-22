@@ -228,7 +228,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         :return:
         """
         model = request.model or self.DEFAULT_MODEL
-        tools = request.tools or []
+        tools = request.tools or set()
         prompt = request.prompt
         #stream = request.stream
         stream = False # for now we will not support streaming in chat completions.

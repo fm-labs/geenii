@@ -88,4 +88,10 @@ def execute_command(command: str) -> str:
         return f"Error: Command '{command}' is not allowed."
 
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    # debug print the command, return code, stdout and stderr
+    print(f">Executed command: {command}")
+    print(f">Return code: {result.returncode}")
+    print(f">Standard output: {result.stdout}")
+    print(f">Standard error: {result.stderr}")
+
     return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()

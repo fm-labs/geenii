@@ -111,25 +111,19 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         system_prompt = request.system or self.DEFAULT_SYSTEM_PROMPT
         prompt = request.prompt
         messages = request.messages or []
-        tools = request.tools or []
-        #if model not in self.get_models():
-        #    raise ValueError(f"Model {model} is not supported by {repr(self)}.")
+        tools = request.tools or set()
 
         # map tool names to tool definitions in openai format
         tool_defs_openai = []
         print(f"Tool registry provided {tool_registry is not None}, tools requested: {tools}")
         if tool_registry is not None and len(tools) > 0:
-            # tool_registry = get_tool_registry()
-            # filter the registry to get the (openai) tool definitions for the requested tools
             tool_defs = tool_registry.list_definitions()
             tool_defs_openai = [tool_def for tool_def in tool_defs if tool_def['name'] in tools]
-            print(f"OpenAI tools: {tool_defs_openai}")
+            print(f"OpenAI tools mapped: {len(tool_defs_openai)}")
 
 
-        # mapping generic model messages to OpenAI Responses API input format
+        # mapping history/seed model messages to OpenAI Responses API input format
         input_messages = []
-        input_messages.append({"role": "user", "content": prompt})
-
         for message in messages:
             if message.content and len(message.content) > 0:
                 for content_item in message.content:
@@ -151,6 +145,8 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                     else:
                         print(f"Unsupported model message content type for openai chat completion input: {content_item.type}")
 
+        # finally add the user prompt
+        input_messages.append({"role": "user", "content": prompt})
 
         # perform the API call to OpenAI Responses API
         print(f"Requesting response with input messages:", input_messages)
