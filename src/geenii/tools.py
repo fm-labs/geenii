@@ -79,7 +79,7 @@ class PythonTool(Tool):
         if self.handler is None:
             raise RuntimeError(f"No handler registered for tool {self.name!r}")
         result = self.handler(**kwargs)
-        print(f"Tool {self.name!r} returned:", result)
+        #print(f"Tool {self.name!r} returned:", result)
         return result
 
 
@@ -191,7 +191,7 @@ class ToolRegistry:
         """
 
         def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
-            print(f"Registering tool {name or fn.__name__!r} from function {fn.__module__}.{fn.__qualname__}")
+            logger.info(f"Registering tool {name or fn.__name__!r} from function {fn.__module__}.{fn.__qualname__}")
             self.register_function(fn, name=name, description=description, parameters=parameters)
             return fn
 
@@ -291,5 +291,5 @@ def execute_tool_call(registry: ToolRegistry, tool_name: str, **kwargs) -> any:
     tool = registry.get(tool_name)
     if tool is None:
         raise ValueError(f"Tool {tool_name!r} is not registered")
-    print(f'$> Calling tool "{tool_name}" with args {kwargs}')
+    logger.info(f'EXECUTING TOOL "{tool_name}" with args {kwargs}')
     return tool.invoke(**kwargs)

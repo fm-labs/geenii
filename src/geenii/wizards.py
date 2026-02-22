@@ -104,7 +104,7 @@ class Wizard(BotInterface):
                     async for msg in self._ask_llm(**task["arguments"]):
                         yield msg
                 else:
-                    print(f"Unknown task type: {task['task']}")
+                    logger.critical(f"Unknown task type: {task['task']}")
             except Exception as e:
                 logger.exception(f"Error processing task {task['task']}: {str(e)}", exc_info=e)
                 # todo handle exceptions properly, e.g. by yielding an error message
@@ -151,7 +151,7 @@ class Wizard(BotInterface):
                         output_parts.append(ToolCallResultContent(name=item.name, argument=item.arguments, call_id=tool_call_id, result=tool_result))
                         tool_calls += 1
                     else:
-                        print(f"Tool execution for {item.name} was rejected by the request_tool_execution method.")
+                        logger.critical(f"Tool execution for {item.name} was rejected by the request_tool_execution method.")
                         output_parts.append(ToolCallResultContent(name=item.name, argument=item.arguments, call_id=tool_call_id,
                                                                   result={"error": "Tool execution rejected."}))
 
@@ -160,7 +160,7 @@ class Wizard(BotInterface):
                         tool_names.remove(item.name)
 
                 except Exception as e:
-                    logger.error(f"Error executing tool {item.name}", exc_info=e)
+                    logger.exception(f"Error executing tool {item.name}", exc_info=e)
                     # print stack trace
                     #import traceback
                     #traceback.print_exc()
@@ -168,7 +168,7 @@ class Wizard(BotInterface):
                     output_parts.append(ToolCallResultContent(name=item.name, argument=item.arguments, call_id=tool_call_id, result={"error": str(e)}))
                     raise e
             else:
-                print(f"Unknown content part type: {item.type}")
+                logger.warning(f"Unknown content part type: {item.type}")
                 output_parts.append(TextContent(text=f"[Unknown content type: {item.type}]"))
 
         # add user request to message history
@@ -269,21 +269,21 @@ def load_wizard_from_json(file_path: str) -> Wizard:
     return wizard
 
 
-def load_wizards_from_directory(directory_path: str) -> List[Wizard]:
-    """
-    Load all wizard configurations from JSON files in the specified directory and create a list of Wizard instances.
-    """
-    import os
-
-    wizards = []
-    for filename in os.listdir(directory_path):
-        if filename.endswith(".wizard.json"):
-            file_path = os.path.join(directory_path, filename)
-            try:
-                wizard = load_wizard_from_json(file_path)
-                wizards.append(wizard)
-                print(f"Loaded wizard: {wizard.name}")
-            except Exception as e:
-                print(f"Error loading wizard from {file_path}: {e}")
-
-    return wizards
+# def load_wizards_from_directory(directory_path: str) -> List[Wizard]:
+#     """
+#     Load all wizard configurations from JSON files in the specified directory and create a list of Wizard instances.
+#     """
+#     import os
+#
+#     wizards = []
+#     for filename in os.listdir(directory_path):
+#         if filename.endswith(".wizard.json"):
+#             file_path = os.path.join(directory_path, filename)
+#             try:
+#                 wizard = load_wizard_from_json(file_path)
+#                 wizards.append(wizard)
+#                 print(f"Loaded wizard: {wizard.name}")
+#             except Exception as e:
+#                 print(f"Error loading wizard from {file_path}: {e}")
+#
+#     return wizards

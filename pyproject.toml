@@ -19,6 +19,7 @@ dependencies = [
     "py-key-value-aio>=0.3.0",
     "pydantic>=2.12.5",
     "pymongo>=4.15.5",
+    "rich>=14.3.3",
     "sse-starlette>=2.0.0",
     "tomli-w>=1.2.0",
     "uvicorn>=0.40.0",

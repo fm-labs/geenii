@@ -62,12 +62,13 @@ def skill_locate_path(skill_name: str) -> Path | None:
         os.path.join(DATA_DIR, "skills", skill_name)
     ]
     for path in base_paths:
-        print(f"Checking for skill '{skill_name}' in path: {path}")
+        logger.debug(f"Searching for skill '{skill_name}' in path: {path}")
         _path = Path(path).absolute()
         if _path.is_dir():
             #skill_md_path = _path / "SKILL.md"
             #if skill_md_path.is_file():
             #    return _path
+            logger.info(f"Found skill '{skill_name}' in path: {_path}")
             return _path
     return None
 
