@@ -6,7 +6,7 @@ from starlette.websockets import WebSocket, WebSocketState
 
 from geenii.chat.chat_bots import BotRunner
 from geenii.chat.chat_manager import ChatManager
-from geenii.chat.chat_models import WireMessage, ChatMessage, ContentPart, SystemMessage, TextContent
+from geenii.chat.chat_models import WireMessage, ChatMessage, ContentPart, SystemMessage
 from geenii.g import get_bot
 
 logger = logging.getLogger(__name__)
@@ -67,11 +67,11 @@ class SseConnection(Connection):
 class BotConnection(Connection):
     """Virtual connection for a bot participant. Instead of sending messages to an external client, we loop back"""
 
-    def __init__(self, botname: str, room_id: str, outbox: asyncio.Queue = None) -> None:
+    def __init__(self, botname: str, room_id: str, bot: BotRunner, outbox: asyncio.Queue = None) -> None:
         self._botname = botname
         self._room_id = room_id
+        self._botrunner: BotRunner = bot
         self._task: asyncio.Task | None = None
-        self._botrunner: BotRunner | None = None
 
         self.inbox: asyncio.Queue = asyncio.Queue()  # internal queue for incoming messages to the bot, consumed by the bot's internal reader task
         self.outbox: asyncio.Queue = outbox  # optional queue for outgoing messages from the bot, can be consumed by an external sender task if needed
@@ -82,12 +82,8 @@ class BotConnection(Connection):
 
     @property
     def bot(self) -> BotRunner | None:
-        print(f"Accessing bot runner for bot {self._botname} in room {self._room_id}")
         if self._botrunner is None:
-            print("Initializing bot runner for bot %s in room %s", self._botname, self._room_id)
-            g_bot = get_bot(self._botname, self._room_id)
-            self._botrunner = BotRunner(botname=self._botname, room_id=self._room_id, bot=g_bot)
-            print("Bot runner initialized for bot %s in room %s: %s", self._botname, self._room_id, self._botrunner)
+            raise RuntimeError("Bot runner not initialized")
         return self._botrunner
 
     async def send(self, message: WireMessage) -> None:
@@ -118,7 +114,7 @@ class BotConnection(Connection):
                 continue
 
             logger.info("Processing message with bot runner")
-            async for content_part in self.bot.process(message):
+            async for content_part in self.bot.prompt(message):
                 print(f"Bot {self._botname} generated content part: {content_part}")
                 await self._send_to_room([content_part])
 
@@ -247,16 +243,22 @@ class MessageHandler:
 
     # --- Bot helpers ---
 
-    def get_or_create_bot_conn(self, room_id: str, bot_name: str) -> BotConnection:
-        existing = self.conns.get(room_id, bot_name)
+    def get_or_create_bot_conn(self, room_id: str, botname: str) -> BotConnection:
+        existing = self.conns.get(room_id, botname)
         if isinstance(existing, BotConnection):
-            logger.info("Found existing bot connection for bot=%s in room=%s", bot_name, room_id)
+            logger.info("Found existing bot connection for bot=%s in room=%s", botname, room_id)
             return existing
-        logger.info("Creating new bot connection for bot=%s in room=%s", bot_name, room_id)
-        bot = BotConnection(bot_name, room_id, outbox=self.outbound)
-        bot.start()
-        self.conns.add(room_id, bot)
-        return bot
+        logger.info("Creating new bot connection for bot=%s in room=%s", botname, room_id)
+
+        print("Initializing bot runner for bot %s in room %s", botname, room_id)
+        g_bot = get_bot(botname, room_id)
+        botrunner = BotRunner(botname=botname, room_id=room_id, bot=g_bot)
+        print("Bot runner initialized for bot %s in room %s: %s", botname, room_id, botrunner)
+        
+        bot_conn = BotConnection(botname, room_id, bot=botrunner, outbox=self.outbound)
+        bot_conn.start()
+        self.conns.add(room_id, bot_conn)
+        return bot_conn
 
     # --- Queue Processing ---
 
@@ -272,6 +274,8 @@ class MessageHandler:
             logger.info("MH: Messagehandler got message %s", message)
             try:
                 await self._process_message(message)
+            except Exception as e:
+                logger.error("Error processing message: %s. Message: %s", e, message, exc_info=e)
             finally:
                 self.inbound.task_done()
 

@@ -1,10 +1,9 @@
-import asyncio
 from typing import AsyncGenerator
 
 from geenii.ai import generate_chat_completion
 from geenii.chat.chat_bots import BotInterface
 from geenii.chat.chat_models import ContentPart, TextContent
-from geenii.wizards import Wizard, load_wizard_from_json
+from geenii.datamodels import ModelMessage
 
 
 class EchoBot(BotInterface):
@@ -16,17 +15,17 @@ class EchoBot(BotInterface):
         self.botname = botname
 
     # spawn task that sends messages to the room every few seconds for a while to simulate a bot that keeps sending messages over time
-    async def send_periodic_messages(self) -> AsyncGenerator[ContentPart, None]:
-        for i in range(5):
-            await asyncio.sleep(5)
-            yield TextContent(text=f"Periodic message {i + 1} from bot {self.botname}")
+    # async def send_periodic_messages(self) -> AsyncGenerator[ContentPart, None]:
+    #     for i in range(5):
+    #         await asyncio.sleep(5)
+    #         yield TextContent(text=f"Periodic message {i + 1} from bot {self.botname}")
 
-    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ContentPart, None]:
+    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ModelMessage, None]:
         if isinstance(message, str):
             response_text = f"You said: {message}"
         else:
             response_text = "You sent structured content"
-        yield TextContent(type="text", text=f">{self.botname}< {response_text}")
+        yield ModelMessage(role="assistant", content=[TextContent(type="text", text=f">{self.botname}< {response_text}")])
 
 
 class SimpleBot(BotInterface):
@@ -44,7 +43,7 @@ class SimpleBot(BotInterface):
         try:
             model_id = "ollama:qwen3:8b"
             system_prompt = "You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer."
-            tools = ["get_weather", "execute_command", "file_read"]
+            tools = {"get_weather", "execute_command", "file_read"}
 
             if isinstance(message, str):
                 prompt = message

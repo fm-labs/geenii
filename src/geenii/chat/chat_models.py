@@ -48,7 +48,10 @@ class ToolCallContent(BaseContent):
 class ToolCallResultContent(BaseContent):
     type: Literal["tool_call_result"] = "tool_call_result"
     call_id: str | None = None
+    name: str
+    arguments: dict | None = None
     result: dict | list | str | Any | None = None
+    error: str | None = None  # Optional error message if the tool call failed
 
 
 class FileContent(BaseContent):

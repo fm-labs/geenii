@@ -3,6 +3,7 @@ import logging
 from typing import AsyncGenerator
 
 from geenii.chat.chat_models import TextContent, ContentPart, ChatMessage
+from geenii.datamodels import ModelMessage
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ class BotInterface(abc.ABC):
     """
 
     @abc.abstractmethod
-    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ContentPart, None]:
+    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ModelMessage, None]:
         """
         Process an incoming message and generate a response.
 
@@ -23,7 +24,7 @@ class BotInterface(abc.ABC):
         Returns:
             An asynchronous generator that yields ContentPart objects representing the response.
         """
-        yield TextContent(text="Not implemented")
+        yield ModelMessage(role="admin", content=[TextContent(text="Not implemented")])
 
 
 class BotRunner:
@@ -36,15 +37,13 @@ class BotRunner:
         self.room_id = room_id
         self.bot = bot
 
-    async def process(self, message: ChatMessage) -> AsyncGenerator[ContentPart, None]:
-        print("BotRunner processing message in room %s: %s", self.room_id, message)
+    async def prompt(self, message: ChatMessage) -> AsyncGenerator[ModelMessage, None]:
         logger.info("Bot %s processing message in room %s: %s", self.botname, self.room_id, message)
-        yield TextContent(text="w00000t")
-
         try:
-            async for content_part in self.bot.prompt(message.content):
-                logger.info("Bot %s generated content part in room %s: %s", self.botname, self.room_id, content_part)
-                yield content_part
+            async for msg in self.bot.prompt(message.content):
+                logger.info("Bot '%s' generated content part in room '%s': %s", self.botname, self.room_id, msg)
+                yield msg
         except Exception as e:
             logger.error("Error in bot %s prompt: %s", self.botname, e)
-            yield TextContent(text=f"Error in bot response: {e}")
+            #yield TextContent(text=f"Error in bot response: {e}")
+            #raise e
