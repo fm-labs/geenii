@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 
 from starlette.websockets import WebSocket, WebSocketState
 
@@ -199,6 +200,32 @@ class ConnectionManager:
         self.rooms.clear()
 
 
+# ---------- Command Handler ----------
+class CommandHandler:
+
+    def __init__(self, commands: dict[str, Callable]) -> None:
+        self.commands = commands
+
+
+    def handle_slash_command(self, command: str):
+        if command.startswith("help"):
+            return "Available commands: " + ", ".join(self.commands.keys())
+        elif command.startswith("info"):
+            return "This is a chat server that supports user and bot connections. Bots can respond to messages and execute commands."
+        elif command.startswith("version"):
+            return "Chat Server version 1.0.0"
+        elif command.startswith("call-tool"):
+            return "Unknown tool. Available tools: get_weather, execute_command, file_read"
+
+        if command in self.commands:
+            try:
+                result = self.commands[command]()
+                return f"Command '{command}' executed successfully: {result}"
+            except Exception as e:
+                logger.error(f"Error executing command '{command}': {e}", exc_info=e)
+                return f"Error executing command '{command}': {str(e)}"
+        else:
+            return "Unknown command"
 
 # ---------- Message Handler ----------
 
@@ -216,6 +243,7 @@ class MessageHandler:
         self.shutdown_event = shutdown_event # asyncio.Event()
         self.conns = conns
         self.chat_mgr = chat_manager
+        self.commands = CommandHandler(commands={})
 
         self._tasks: list[asyncio.Task] = []
         # active rooms are tracked to manage bot connections and avoid repeating the same logic for every message
@@ -316,12 +344,16 @@ class MessageHandler:
         if content and len(content) > 0 and content[0].type == "text":
             text = content[0].text.strip()
             print(f"MH: Inspecting message content for commands: '{text}'")
-            if text.startswith("$"):
-                command = text[1:].split()[0]  # get the command word after the "/"
+            if text.startswith("$$") or text.startswith("/"):
+                command = text[1:].strip()
                 logger.info("MH: Detected command '%s' in message: %s", command, message)
-                # handle_user_command(command)
                 await self.conns.broadcast(room_id, SystemMessage(room_id=room_id,
                                                                   content=f"User {sender} issued command: {command}"))
+
+                command_response = self.commands.handle_slash_command(command)
+                await self.conns.broadcast(room_id, SystemMessage(room_id=room_id,
+                                                                  content=f"Command response: {command_response}"))
+
                 return
 
         # broadcast the original message to all members in the room (including bots)

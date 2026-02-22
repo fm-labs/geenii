@@ -83,6 +83,7 @@ class DiscordBotConnector:
         self._queue = queue  # shared queue to enqueue incoming messages for processing by the main message handler loop
         self._shutdown_event = shutdown_event
 
+        # Configure Discord client
         intents = discord.Intents.default()
         intents.message_content = True  # needed if you want message content in some contexts
         intents.dm_messages = True  # receive DMs
@@ -94,11 +95,29 @@ class DiscordBotConnector:
         self.client.event(self.on_ready)
         self.client.event(self.on_message)
 
-        self._task: asyncio.Task | None = None
+        # Register slash commands
+        self.tree = discord.app_commands.CommandTree(self.client)
+        self._register_commands()
+
+        self._task: asyncio.Task | None = None # asyncio task running the bot client
+
+    def _register_commands(self):
+        @self.tree.command(name="hello", description="Says hello")
+        @discord.app_commands.allowed_installs(guilds=True, users=True)
+        @discord.app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+        async def hello(interaction: discord.Interaction):
+            await interaction.response.send_message("Hello!")
+
+        @self.tree.command(name="ping", description="Replies with pong")
+        @discord.app_commands.allowed_installs(guilds=True, users=True)
+        @discord.app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+        async def ping(interaction: discord.Interaction):
+            await interaction.response.send_message("Pong!")
 
     async def on_ready(self):
         """Called when the bot has successfully connected to Discord and is ready to receive events."""
         print(f"Logged in as {self.client.user} (id={self.client.user.id})")
+        print("Slash commands registered:", [cmd.name for cmd in self.tree.get_commands()])
 
     async def on_message(self, message: discord.Message):
         """Called when a new message arrives (DM or guild). Routes to the appropriate chat room and enqueues them for processing."""
