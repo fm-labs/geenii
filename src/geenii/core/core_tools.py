@@ -95,3 +95,38 @@ def execute_command(command: str) -> str:
     print(f">Standard error: {result.stderr}")
 
     return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+
+
+@geenii_tools.tool()
+def schedule_command(command: str, delay_seconds: int) -> str:
+    """
+    Schedule a shell command to be executed after a specified delay.
+
+    :param command: The shell command to execute.
+    :param delay_seconds: The delay in seconds before executing the command.
+    :return: A message indicating that the command has been scheduled.
+    """
+    import threading
+    def delayed_execution():
+        print(f">Executing scheduled command after {delay_seconds} seconds: {command}")
+        execute_command(command)
+
+    timer = threading.Timer(delay_seconds, delayed_execution)
+    timer.start()
+
+    return f"Command '{command}' scheduled to run in {delay_seconds} seconds."
+
+
+@geenii_tools.tool()
+def notify(title: str, message: str) -> str:
+    """
+    Show a desktop notification with the given title and message.
+
+    :param title: The title of the notification.
+    :param message: The message body of the notification.
+    :return: A message indicating that the notification has been sent.
+    """
+    command = f"""osascript -e 'display notification "{message}" with title "{title}"'"""
+    subprocess.run(command, shell=True)
+
+    return "Notification sent."
