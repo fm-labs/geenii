@@ -247,8 +247,8 @@ async def websocket_endpoint(websocket: WebSocket,
 
     # validate room exists, or auto-create DM room if not found
     if not chat_mgr.get_room(room_id):
-        _default_bot_id = "geenii_bot:default"
-        _dm_room = chat_mgr.get_dm_room(owner=username, peer=_default_bot_id, auto_create=True)
+        _default_bot_id = "geenii:bot:default"
+        _dm_room = chat_mgr.get_dm_room(owner=username, peer=_default_bot_id, auto_create=True, auto_join=True)
         if _dm_room is None:
             logger.info("DM room for user %s and bot %s does not exist", username, _default_bot_id)
             await websocket.close(code=4004, reason="Room not found")

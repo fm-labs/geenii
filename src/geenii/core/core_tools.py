@@ -118,15 +118,17 @@ def schedule_command(command: str, delay_seconds: int) -> str:
 
 
 @geenii_tools.tool()
-def notify(title: str, message: str) -> str:
+def display_desktop_notification(message: str, title: str = "Message from Geenii") -> str:
     """
     Show a desktop notification with the given title and message.
 
-    :param title: The title of the notification.
     :param message: The message body of the notification.
+    :param title: The title of the notification.
     :return: A message indicating that the notification has been sent.
     """
-    command = f"""osascript -e 'display notification "{message}" with title "{title}"'"""
+    #command = f"""osascript -e 'display notification "{message}" with title "{title}"'"""
+    command = f"""osascript -e 'display dialog "{message}" with title "{title}"'"""
+    print(">Displaying desktop notification with command:", command)
     subprocess.run(command, shell=True)
 
     return "Notification sent."

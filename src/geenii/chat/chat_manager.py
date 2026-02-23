@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Stable namespace for DM room IDs — generated once, fixed forever.
 _DM_NAMESPACE = uuid.UUID(config.CHAT_DM_NAMESPACE)
+_GROUP_NAMESPACE = uuid.UUID(config.CHAT_GROUP_NAMESPACE)
 _DB_PATH = config.CHAT_DB_PATH
 
 def dm_room_id(user_a: str, user_b: str) -> str:
@@ -19,6 +20,9 @@ def dm_room_id(user_a: str, user_b: str) -> str:
     key = ":".join(sorted([user_a, user_b]))
     return str(uuid.uuid5(_DM_NAMESPACE, key))
 
+def group_room_id(room_key: str) -> str:
+    """Return a stable UUID for a group room based on a unique room key."""
+    return str(uuid.uuid5(_GROUP_NAMESPACE, room_key))
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -125,13 +129,25 @@ class ChatManager:
         password: str | None = None,
         room_type: RoomType = "group",
         dm_peer: str | None = None,  # required when room_type == "dm"
+        room_id: str | None = None,  # optional explicit ID (for testing or special cases)
     ) -> Room:
-        if room_type == "dm":
-            if not dm_peer:
-                raise ValueError("dm_peer is required for DM rooms")
-            room_id = dm_room_id(owner, dm_peer)
-        else:
-            room_id = str(uuid.uuid4())
+        if not room_id:
+            if room_type == "dm":
+                if not dm_peer:
+                    raise ValueError("dm_peer is required for DM rooms")
+                room_id = dm_room_id(owner, dm_peer)
+            elif room_type == "group":
+                if not dm_peer:
+                    raise ValueError("dm_peer (room_key) is required for group rooms")
+                room_key = dm_peer
+                room_id = group_room_id(room_key)
+            else:
+                raise ValueError(f"Invalid room type {room_type}")
+
+        if not room_id or not name or not owner:
+            raise ValueError("id, name, and owner are required to create a room")
+        if room_type not in ("group", "dm"):
+            raise ValueError("room_type must be 'group' or 'dm'")
 
         password_hash = _hash_password(password) if password else None
         self.conn.execute(
@@ -150,26 +166,79 @@ class ChatManager:
         row = self.conn.execute("SELECT * FROM rooms WHERE id = ?", (room_id,)).fetchone()
         return _row_to_room(row) if row else None
     
-    def get_dm_room(self, owner: str, peer: str, auto_create: bool = True) -> Room | None:
+    def get_dm_room(self, owner: str, peer: str, auto_create: bool = True, auto_join: bool = True) -> Room | None:
         room_id = dm_room_id(owner, peer)
 
         _room = self.get_room(room_id)
         if _room or not auto_create:
+            # todo validate owner/is_public/room_type if room already exists?
             return _room
 
         # auto-create DM room
         logger.info("Auto-creating DM room %s for user %s with peer %s", room_id, owner, peer)
         _room = self.create_room(
+            room_id=room_id, # pre-computed ID to ensure stability
             name=f"DM between {owner} and {peer}",
             owner=owner,
             is_public=False,
             room_type="dm",
-            dm_peer=peer,
+            #dm_peer=peer
         )
         # auto-invite/join the peer to the DM room
-        self.join_room(room_id, owner, member_type="bot" if owner.startswith("geenii_bot:") else "user")
-        self.join_room(room_id, peer, member_type="bot" if peer.startswith("geenii_bot:") else "user")
+        if auto_join:
+            self.join_room(room_id, owner, member_type="bot" if owner.startswith("geenii:bot:") else "user")
+            self.join_room(room_id, peer, member_type="bot" if peer.startswith("geenii:bot:") else "user")
         return _room
+
+    def get_group_room(self, room_key: str, username: str = None, is_public: bool = False, auto_create: bool = False, auto_join: bool = True, members: set[str] = None) -> Room | None:
+        """
+        Get a group room by its unique room key. Optionally auto-create the room if it doesn't exist, and auto-join the user to the room.
+
+        :param room_key: A unique key that identifies the group room (e.g. "project-123", "team-alpha", etc.)
+        :param username: The username requesting the room. Required if auto_create or auto_join is True to set the owner and join the room.
+        :param is_public: Whether the room should be publicly visible (default: False). Only applicable if auto_create is True.
+        :param auto_create: Whether to auto-create the room if it doesn't exist (default: False). If True, username is required to set the owner and initial member of the room.
+        :param auto_join: Whether to auto-join the user to the room if it already exists (default: True). If True, username is required to join the room.
+        :param members: Optional list of additional usernames to auto-join to the room if auto_create is True. Ignored if auto_create is False.
+        :return: The Room object if found or created, or None if not found and not auto-created.
+        """
+        members = members or set()
+        room_id = group_room_id(room_key)
+        _room = self.get_room(room_id)
+
+        # auto-create group room
+        if not _room and auto_create:
+            if not username:
+                raise ValueError("Username is required to auto-create a group room")
+            logger.info("Auto-creating group room %s for user %s with room key %s", room_id, username, room_key)
+            _room = self.create_room(
+                room_id=room_id, # pre-computed ID to ensure stability
+                name=f"Group Room {room_key}",
+                owner="system", # todo implement group room ownership
+                is_public=is_public, # todo implement public group rooms
+                room_type="group",
+                #dm_peer=room_key
+            )
+            # auto-join the creator to the group room
+            self.join_room(room_id, username, member_type="bot" if username.startswith("geenii:bot:") else "user")
+            return _room
+
+        # not found and not auto-create, return None
+        if not _room:
+            return None
+
+        # todo validate owner/is_public/room_type if room already exists?
+
+        # auto-join the user to the group room
+        if auto_join:
+            if username:
+                members.add(username)
+            for peer in members:
+                if peer and not self.is_member(room_id, peer):
+                    self.join_room(room_id, peer, member_type="bot" if peer.startswith("geenii:bot:") else "user")
+
+        return _room
+
 
     def get_room_password_hash(self, room_id: str) -> str | None:
         row = self.conn.execute("SELECT password_hash FROM rooms WHERE id = ?", (room_id,)).fetchone()
@@ -191,13 +260,15 @@ class ChatManager:
         ).fetchone()
 
         if existing:
-            if existing["status"] == "joined":
-                raise sqlite3.IntegrityError("Already joined")
-            self.conn.execute(
-                "UPDATE members SET status = 'joined', member_type = ?, joined_at = ? WHERE id = ?",
-                (member_type, _now(), existing["id"]),
-            )
-            self.conn.commit()
+            if existing["status"] == "banned":
+                raise sqlite3.IntegrityError("Banned from room")
+            if existing["status"] != "joined":
+                #raise sqlite3.IntegrityError("Already joined")
+                self.conn.execute(
+                    "UPDATE members SET status = 'joined', member_type = ?, joined_at = ? WHERE id = ?",
+                    (member_type, _now(), existing["id"]),
+                )
+                self.conn.commit()
             row = self.conn.execute("SELECT * FROM members WHERE id = ?", (existing["id"],)).fetchone()
         else:
             cur = self.conn.execute(

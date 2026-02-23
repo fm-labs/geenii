@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import shlex
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
@@ -8,6 +9,7 @@ from starlette.websockets import WebSocket, WebSocketState
 from geenii.chat.chat_bots import BotRunner
 from geenii.chat.chat_manager import ChatManager
 from geenii.chat.chat_models import WireMessage, ChatMessage, ContentPart, SystemMessage
+from geenii.core.core_tools import display_desktop_notification
 from geenii.g import get_bot
 
 logger = logging.getLogger(__name__)
@@ -206,16 +208,28 @@ class CommandHandler:
     def __init__(self, commands: dict[str, Callable]) -> None:
         self.commands = commands
 
-
     def handle_slash_command(self, command: str):
-        if command.startswith("help"):
+        if command == "help":
             return "Available commands: " + ", ".join(self.commands.keys())
-        elif command.startswith("info"):
+        elif command == "ping":
+            return "pong"
+        elif command == "info":
             return "This is a chat server that supports user and bot connections. Bots can respond to messages and execute commands."
-        elif command.startswith("version"):
+        elif command == "version":
             return "Chat Server version 1.0.0"
-        elif command.startswith("call-tool"):
-            return "Unknown tool. Available tools: get_weather, execute_command, file_read"
+        elif command.startswith("tool"):
+            args = command.split(" ", 1)
+            if len(args) < 2:
+                return "Usage: tool <tool_name> [--arg=value ...]"
+            args = self.parse_args_to_dict(shlex.split(args[1]))
+            return f"Tool call with arguments: {args}"
+        elif command.startswith("notify"):
+            args = command.split(" ", 1)
+            if len(args) < 2:
+                return "Usage: notify <message>"
+            message = args[1]
+            display_desktop_notification(message)
+            return f"Notification sent: {message}"
 
         if command in self.commands:
             try:
@@ -226,6 +240,18 @@ class CommandHandler:
                 return f"Error executing command '{command}': {str(e)}"
         else:
             return "Unknown command"
+
+    @staticmethod
+    def parse_args_to_dict(args: list[str] = None) -> dict:
+        result = {}
+        for arg in args:
+            if arg.startswith("--"):
+                key, _, value = arg[2:].partition("=")
+                result[key] = value if value else True
+            elif arg.startswith("-"):
+                result[arg[1:]] = True
+        return result
+
 
 # ---------- Message Handler ----------
 
@@ -344,7 +370,7 @@ class MessageHandler:
         if content and len(content) > 0 and content[0].type == "text":
             text = content[0].text.strip()
             print(f"MH: Inspecting message content for commands: '{text}'")
-            if text.startswith("$$") or text.startswith("/"):
+            if text.startswith("$") or text.startswith("/"):
                 command = text[1:].strip()
                 logger.info("MH: Detected command '%s' in message: %s", command, message)
                 await self.conns.broadcast(room_id, SystemMessage(room_id=room_id,
@@ -358,6 +384,7 @@ class MessageHandler:
 
         # broadcast the original message to all members in the room (including bots)
         await self.conns.broadcast(room_id, message)
+
 
     async def _process_outbound_messages(self):
         """Continuously process messages from the outbound queue and broadcast to rooms."""

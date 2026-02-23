@@ -102,11 +102,12 @@ class DiscordBotConnector:
         self._task: asyncio.Task | None = None # asyncio task running the bot client
 
     def _register_commands(self):
-        @self.tree.command(name="hello", description="Says hello")
+        """Register slash commands for the bot."""
+        @self.tree.command(name="whoareyou", description="Gives a brief description of the bot and its capabilities")
         @discord.app_commands.allowed_installs(guilds=True, users=True)
         @discord.app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
         async def hello(interaction: discord.Interaction):
-            await interaction.response.send_message("Hello!")
+            await interaction.response.send_message("Hi, I am not self-aware yet. Ask me again later!")
 
         @self.tree.command(name="ping", description="Replies with pong")
         @discord.app_commands.allowed_installs(guilds=True, users=True)
@@ -116,8 +117,9 @@ class DiscordBotConnector:
 
     async def on_ready(self):
         """Called when the bot has successfully connected to Discord and is ready to receive events."""
-        print(f"Logged in as {self.client.user} (id={self.client.user.id})")
-        print("Slash commands registered:", [cmd.name for cmd in self.tree.get_commands()])
+        logger.info(f"Logged in as {self.client.user} (id={self.client.user.id})")
+        #logger.info("Slash commands registered:", [cmd.name for cmd in self.tree.get_commands()])
+        logger.info(repr(self.client.user))
 
     async def on_message(self, message: discord.Message):
         """Called when a new message arrives (DM or guild). Routes to the appropriate chat room and enqueues them for processing."""
@@ -125,15 +127,14 @@ class DiscordBotConnector:
             return
 
         if isinstance(message.channel, discord.DMChannel):
-            print(f"DM from {message.author} ({message.author.id}): {message.content}")
-            print("ChannelID:", message.channel.id)
+            logger.info(f"DM in Channel {message.channel.id} from {message.author} ({message.author.id}): {message.content}")
             await message.channel.send("[ext] Got your message 👍")
 
             # todo mapping of discord user ID to chat server username. discord:{user_id} -> {username}
             # todo mapping of user bots. username -> bot_id
 
-            username = f"discord:{message.author.id}"
-            bot_id = f"geenii_bot:default"
+            username = f"discord:user:{message.author.id}"
+            bot_id = f"geenii:bot:default"
 
             # ensure DM room exists in chat manager, if not create it
             dm_room = self._chat_mgr.get_dm_room(owner=username, peer=bot_id, auto_create=True)
@@ -142,9 +143,8 @@ class DiscordBotConnector:
             # ensure connection exists for this DM channel and user
             self.get_or_create_dm_connection(room_id, username, message.channel)
 
-            content = self.map_discord_message_content(message)
-
             # enqueue the message for processing by the main message handler loop
+            content = self.map_discord_message_content(message)
             await self._queue.put(ChatMessage(
                 room_id=room_id,
                 sender_id=username,
@@ -158,8 +158,44 @@ class DiscordBotConnector:
             #     "content": content,
             # }, exclude=username)
         else:
-            print(f"Message in guild {message.guild.name} from {message.author}: {message.content}")
+            logger.info(f"Message in guild {message.guild.name} from {message.author}: {message.content}")
+            logger.info(f"GUILD: {repr(message.guild)}")
             await message.channel.send("Got your message in the guild 👍")
+
+            username = f"discord:user:{message.author.id}"
+            bot_id = f"geenii:bot:default"
+            room_key = f"discord:guild:{message.guild.id}"
+            
+            # check for explicit mentions of the bot user and only process those messages
+            mentioned = False
+            for members in message.mentions:
+                if members.id == self.client.user.id:
+                    mentioned = True
+                    logger.info(f"Bot was mentioned in guild {message.guild.name} by {message.author}: {message.content}")
+                    logger.info(f"Mentioned: {repr(members)}")
+                    await message.channel.send("You mentioned me :)")
+
+                    # ensure DM room exists in chat manager, if not create it
+                    # todo refactor! here the (discord) user automatically owns the room, but that assumes that
+                    #  the real bot owner is the first to mention the bot in the guild, which may not always be the case.
+                    guild_room = self._chat_mgr.get_group_room(room_key=room_key, username=username, auto_create=True, auto_join=True, members={username, bot_id})
+                    room_id = guild_room.id
+
+                    # ensure connection exists for this group channel and user
+                    self.get_or_create_guild_connection(room_id, username, message.channel)
+
+                    # enqueue the message for processing by the main message handler loop
+                    content = self.map_discord_message_content(message)
+                    await self._queue.put(ChatMessage(
+                        room_id=room_id,
+                        sender_id=username,
+                        content=content,
+                    ))
+                    break
+
+            if not mentioned:
+                logger.info(f"Bot was not mentioned in guild {message.guild.name} by {message.author}. Ignoring message.")
+
 
     @staticmethod
     def map_discord_message_content(message: discord.Message) -> list[ContentPart]:
@@ -197,15 +233,51 @@ class DiscordBotConnector:
 
         return content_parts
 
+    def get_or_create_guild_connection(self,
+                                       room_id: str,
+                                       username: str,
+                                       channel: discord.GroupChannel) -> DiscordConnection:
+        """
+        Ensures there is a DiscordConnection for the given group DM channel and user, creating one if necessary.
+        Raises an error if there is a conflicting non-Discord connection.
+        """
+        # make sure the channel is a GroupChannel
+        logger.info(repr(channel))
+        if not isinstance(channel, discord.GroupChannel):
+            raise ValueError(f"Channel {channel.id} is not a GroupChannel")
+
+        conn = self._conns.get(room_id, username)
+        if isinstance(conn, DiscordConnection):
+            logger.info("Found existing Discord connection for user=%s in group channel=%s", username, channel.id)
+            return conn
+
+        if conn is not None:
+            logger.error(
+                "Found existing connection for user=%s in group channel=%s, but is not a discord connection. This is fatal.",
+                username, channel.id)
+            raise RuntimeError(f"Connection conflict for user={username} in group channel={channel.id}")
+
+        conn = DiscordConnection(username, channel)
+        self._conns.add(room_id, conn)
+        logger.info("Created new Discord connection for user=%s in group channel=%s", username, channel.id)
+        return conn
+
 
     def get_or_create_dm_connection(self,
                                     room_id: str,
                                     username: str,
-                                    channel: discord.DMChannel | discord.GroupChannel) -> DiscordConnection:
+                                    channel: discord.DMChannel) -> DiscordConnection:
         """
         Ensures there is a DiscordConnection for the given DM channel and user, creating one if necessary.
         Raises an error if there is a conflicting non-Discord connection.
         """
+
+        # make sure it's a DM channel
+        logger.info(repr(channel))
+        if not isinstance(channel, discord.DMChannel):
+            logger.error("Channel %s is not a DM channel. Cannot create DM connection.", channel.id)
+            raise ValueError(f"Channel {channel.id} is not a DM channel")
+
         conn = self._conns.get(room_id, username)
         if isinstance(conn, DiscordConnection):
             logger.info("Found existing Discord connection for user=%s in channel=%s", username, channel.id)

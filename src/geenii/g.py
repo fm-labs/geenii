@@ -72,8 +72,8 @@ def get_bot(botname: str, room_id: str = None) -> BotInterface:
     #return EchoBot(botname=botname)
     return SimpleBot(botname=botname)
 
-    # if not botname.startswith("geenii_bot:"):
-    #     raise ValueError(f"Invalid bot name: {botname}. Bot names must start with 'geenii_bot:'")
+    # if not botname.startswith("geenii:bot:"):
+    #     raise ValueError(f"Invalid bot name: {botname}. Bot names must start with 'geenii:bot:'")
     #
     # return Wizard(name=botname,
     #               model="ollama:qwen3:8b",

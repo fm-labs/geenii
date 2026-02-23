@@ -30,8 +30,8 @@ async def initialize_tool_registry():
 async def initialize_supervisor():
     print("Initializing supervisor...")
     supervisor = Supervisor()
-    await supervisor.ensure("geenii_startup", ProcConfig(name="geenii_startup", cmd=["/bin/bash", "-c", "echo 'Geenii API Server Started'; echo `date` >> data/startup.log"], restart=False))
-    await supervisor.ensure("geenii_beat", ProcConfig(name="geenii_beat", cmd=["/bin/bash", "-c", "while true; do echo `date`; sleep 3; done"]))
+    #await supervisor.ensure("geenii_startup", ProcConfig(name="geenii_startup", cmd=["/bin/bash", "-c", "echo 'Geenii API Server Started'; echo `date` >> data/startup.log"], restart=False))
+    #await supervisor.ensure("geenii_beat", ProcConfig(name="geenii_beat", cmd=["/bin/bash", "-c", "while true; do echo `date`; sleep 3; done"]))
     return supervisor
 
 

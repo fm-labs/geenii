@@ -68,4 +68,6 @@ CHAT_DB_PATH = "./data/chat.db"
 
 # A unique namespace UUID for generating deterministic UUIDs for DM room IDs.
 CHAT_DM_NAMESPACE = "a7f3c2e1-4b8d-5a9f-8c3e-2d1b6f0e4a7c"
+CHAT_GROUP_NAMESPACE = "b7f3c2e1-8b4d-5a9f-8c3e-2d1b6f0e4a7a"
+
 
