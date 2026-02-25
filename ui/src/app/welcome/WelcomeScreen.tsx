@@ -1,14 +1,7 @@
 import React from 'react'
-import Layout from '../../components/layout/layout.tsx'
 import TypewriterText from '../../ui/TypewriterText.tsx'
-import { Button } from '../../ui'
 import { useNavigate } from '../../app-router.tsx'
-import Header from '@/components/header.tsx'
-import QuickTextGenerationPopupButton from '@/app/completion/components/QuickTextGenerationPopupButton.tsx'
-import QuickImageGenerationPopupButton from '@/app/completion/components/QuickImageGenerationPopupButton.tsx'
-import QuickAudioGenerationPopupButton from '@/app/completion/components/QuickAudioGenerationPopupButton.tsx'
 import { AppContext } from '@/context/AppContext.tsx'
-import TauriUpdaterPanelItem from '@/components/tauri/TauriUpdaterPanelItem.tsx'
 import "@/Animate.scss"
 
 const greetings = [
@@ -77,7 +70,7 @@ const WelcomeScreen = () => {
 
           <div className={"text-center"}>
             <div className={"relative my-6"}>
-              <span onClick={() => navigate('/chat')}>
+              <span onClick={() => navigate('/apps')}>
                 <img src={'/bot_white.svg'}
                      alt="geenii logo"
                      className={"inline-block w-1/4 max-w-2xl pulse rotate-burst hover:cursor-pointer"} />

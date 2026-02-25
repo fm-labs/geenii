@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { TauriCommandResponse } from "./tauri.types.ts";
 import { useTauri } from "./useTauri.ts";
-import { Button } from '../../ui'
+import { Button } from '@/components/ui/button.tsx';
 
 interface TauriCommandButtonProps {
     command: string,

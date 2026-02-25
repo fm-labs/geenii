@@ -46,7 +46,7 @@ const Layout = (props: PropsWithChildren) => {
         </div>
       </header>
 
-      <div className="content max-w-7xl mx-auto pt-12">
+      {/*<div className="content max-w-7xl mx-auto pt-12">
         <div className="flex flex-col justify-center min-h-screen">
           <div className="flex flex-col justify-center mb-4">
             <div className={'grow'}>
@@ -54,7 +54,11 @@ const Layout = (props: PropsWithChildren) => {
             </div>
           </div>
         </div>
-      </div>
+      </div>*/}
+
+      <main className={"pt-10"}>
+        {props.children}
+      </main>
 
     </div>
   )

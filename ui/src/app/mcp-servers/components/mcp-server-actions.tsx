@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import Button from '@/ui/Button.tsx'
+import { Button } from '@/components/ui/button.tsx'
 import McpServerToolForm from '@/app/mcp-servers/components/mcp-server-tool-form.tsx'
 import JsonView from "@/components/json-view.tsx";
 import { useMcpServer } from '@/app/mcp-servers/components/mcp-server-provider.tsx'

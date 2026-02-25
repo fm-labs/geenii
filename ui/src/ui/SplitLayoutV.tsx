@@ -1,4 +1,4 @@
-const VSplitLayout = ({
+const SplitLayoutV = ({
                                  top,
                                  bottom,
                                  topHeight = 50, // Default to 50% height for the top section
@@ -22,4 +22,4 @@ const VSplitLayout = ({
     );
 };
 
-export default VSplitLayout;
+export default SplitLayoutV;

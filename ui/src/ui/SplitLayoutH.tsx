@@ -1,4 +1,4 @@
-const HSplitLayout = ({
+const SplitLayoutH = ({
                           left,
                           right,
                           leftWidth = 50,
@@ -24,4 +24,4 @@ const HSplitLayout = ({
     );
 };
 
-export default HSplitLayout;
+export default SplitLayoutH;
