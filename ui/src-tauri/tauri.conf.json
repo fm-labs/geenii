@@ -50,6 +50,8 @@
   "plugins": {
     "updater": {
       "endpoints": [
+        "https://updates.geenii.app/latest.json",
+        "https://updates.geenii.app/updater.php?target={{target}}&arch={{arch}}&current_version={{current_version}}",
         "https://geenii.flowmotion-labs.com/updates.latest.json",
         "https://geenii.flowmotion-labs.com/updater.php?target={{target}}&arch={{arch}}&current_version={{current_version}}"
       ],
