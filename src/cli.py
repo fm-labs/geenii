@@ -1,3 +1,4 @@
+import asyncio
 from typing import List
 
 import click
@@ -5,8 +6,10 @@ import click
 from geenii.ai import generate_completion, generate_chat_completion
 from geenii.chat.chat_models import TextContent
 from geenii.datamodels import ModelMessage
-from geenii.rt import get_tool_registry
+from geenii.rt import get_tool_registry, init_builtin_tools
 from geenii.config import DEFAULT_COMPLETION_MODEL, APP_VERSION
+from geenii.tools import ToolRegistry
+from geenii.wizards import CliWizard
 
 
 @click.group()
@@ -14,6 +17,38 @@ from geenii.config import DEFAULT_COMPLETION_MODEL, APP_VERSION
 def cli():
     """Geenii CLI tool."""
     pass
+
+
+@cli.command()
+@click.argument("name")
+@click.argument("prompt")
+def wizard(name: str, prompt: str):
+    """Run a named wizard with the provided prompt."""
+    click.echo(f"Running wizard '{name}' with prompt: {prompt}")
+
+    async def load_wizard_and_run(name, prompt):
+        tool_registry = ToolRegistry()
+        await init_builtin_tools(tool_registry)
+
+        g_bot = CliWizard(name=name,
+                          model="ollama:qwen3:8b",
+                          #system_prompt="You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer.",
+                          system_prompt="You are a helpful Apple MacOSX assistant, that can perform tasks on the user's computer using command line tools. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer.",
+                          tools={"get_weather", "execute_command", "file_read", "calculate_square_root"},
+                          tool_registry=tool_registry,
+                          )
+        g_bot.load_skill("git-skills")
+
+        #def _say(message: str):
+        #    asyncio.create_task(asyncio.to_thread(tts_say_cli, message))
+
+        async for msg in g_bot.prompt([TextContent(text=prompt)]):
+            for part in msg.content:
+                print(f">>> [{part.type}] {part.to_text()}")
+
+    while len(prompt) > 0 and prompt != "exit":
+        asyncio.run(load_wizard_and_run(name, prompt))
+        prompt = click.prompt("> ", default="", show_default=False)
 
 
 @cli.command()

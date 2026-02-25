@@ -4,6 +4,8 @@ from geenii.ai import generate_chat_completion
 from geenii.chat.chat_bots import BotInterface
 from geenii.chat.chat_models import ContentPart, TextContent
 from geenii.datamodels import ModelMessage
+from geenii.tools import ToolRegistry
+from geenii.wizards import Wizard
 
 
 class EchoBot(BotInterface):
@@ -68,15 +70,16 @@ class SimpleBot(BotInterface):
 
 
 
-def get_bot(botname: str, room_id: str = None) -> BotInterface:
+def get_bot(botname: str) -> BotInterface:
     #return EchoBot(botname=botname)
-    return SimpleBot(botname=botname)
+    #return SimpleBot(botname=botname)
 
-    # if not botname.startswith("geenii:bot:"):
-    #     raise ValueError(f"Invalid bot name: {botname}. Bot names must start with 'geenii:bot:'")
-    #
-    # return Wizard(name=botname,
-    #               model="ollama:qwen3:8b",
-    #               system="You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer.",
-    #               tools=["get_weather", "execute_command", "file_read"],
-    #               )
+    if not botname.startswith("geenii:bot:"):
+        raise ValueError(f"Invalid bot name: {botname}. Bot names must start with 'geenii:bot:'")
+
+
+    return Wizard(name=botname,
+                  model="ollama:qwen3:8b",
+                  system_prompt="You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer.",
+                  tools={"get_weather", "execute_command", "file_read", "calculate_square_root"},
+                  )

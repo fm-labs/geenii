@@ -81,8 +81,12 @@ class Wizard(BotInterface):
 
         self._tool_registry = tool_registry or ToolRegistry()
         self._skill_registry = skill_registry or SkillRegistry()
+        #self._skill_registry.load_skill("mac-skills")  # load default skills
 
         self._queue: asyncio.Queue[dict] = asyncio.Queue()
+
+    def __repr__(self):
+        return f"Wizard(name={self.name}, model={self.model}, tools={self.tools}, mcp_servers={list(self.mcp_servers.keys())})"
 
     async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ModelMessage, None]:
         """Process an incoming message and generate a response by enqueuing tasks to the internal queue and processing them sequentially."""
@@ -117,6 +121,7 @@ class Wizard(BotInterface):
         tool_names = self.tools
         prompt = message_to_prompt(message)
 
+        print(full_system_prompt)
         # run sync task in thread pool to avoid blocking the event loop while waiting for the response
         def generate_response():
             return generate_chat_completion(prompt=prompt,
@@ -260,12 +265,14 @@ def load_wizard_from_json(file_path: str) -> Wizard:
     description = config.get("description")
     tools = config.get("tools", [])
     mcp_servers = config.get("mcp_servers", {})
+    skills = config.get("skills", [])
 
     if not name:
         raise ValueError("Wizard configuration must include a 'name' field.")
 
     wizard = Wizard(name=name, model=model, system_prompt=system, description=description,
-                    tools=tools, mcp_servers=mcp_servers)
+                    tools=set(tools), mcp_servers=mcp_servers, skills=set(skills),
+                    tool_registry=ToolRegistry(), skill_registry=SkillRegistry())
     return wizard
 
 

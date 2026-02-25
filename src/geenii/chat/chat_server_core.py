@@ -10,6 +10,7 @@ from geenii.chat.chat_bots import BotRunner
 from geenii.chat.chat_manager import ChatManager
 from geenii.chat.chat_models import WireMessage, ChatMessage, ContentPart, SystemMessage
 from geenii.core.core_tools import display_desktop_notification
+from geenii.datamodels import ModelMessage
 from geenii.g import get_bot
 
 logger = logging.getLogger(__name__)
@@ -76,8 +77,8 @@ class BotConnection(Connection):
         self._botrunner: BotRunner = bot
         self._task: asyncio.Task | None = None
 
-        self.inbox: asyncio.Queue = asyncio.Queue()  # internal queue for incoming messages to the bot, consumed by the bot's internal reader task
-        self.outbox: asyncio.Queue = outbox  # optional queue for outgoing messages from the bot, can be consumed by an external sender task if needed
+        self.inbox: asyncio.Queue = asyncio.Queue()  # internal queue for incoming chat messages to the bot, consumed by the botrunner's internal reader task
+        self.outbox: asyncio.Queue = outbox  # optional queue for outgoing chat messages from the bot, can be consumed by an external sender task if needed
 
     @property
     def username(self) -> str:
@@ -104,9 +105,9 @@ class BotConnection(Connection):
             self._task.cancel()
 
     def start(self) -> None:
-        self._task = asyncio.create_task(self._process_message_queue())
+        self._task = asyncio.create_task(self._read_inbox_queue())
 
-    async def _process_message_queue(self) -> None:
+    async def _read_inbox_queue(self) -> None:
         while True:
             message: ChatMessage = await self.inbox.get()
 
@@ -117,24 +118,31 @@ class BotConnection(Connection):
                 continue
 
             logger.info("Processing message with bot runner")
-            async for content_part in self.bot.prompt(message):
-                print(f"Bot {self._botname} generated content part: {content_part}")
-                await self._send_to_room([content_part])
+            async for msg in self.bot.prompt(message):
+                print(f"Bot {self._botname} generated message: {msg}")
+                await self._send_model_message_to_room(msg)
 
             # add some delay to simulate processing time
-            logger.info("Bot %s processed message in room %s. Waiting before processing next message ...", self._botname, self._room_id)
-            await asyncio.sleep(1)
+            #logger.info("Bot %s processed message in room %s. Waiting before processing next message ...", self._botname, self._room_id)
+            #await asyncio.sleep(1)
 
-    async def _send_to_room(self, content: list[ContentPart]) -> None:
+    async def _send_model_message_to_room(self, msg: ModelMessage) -> None:
         """Build a ChatMessage and put it into the outbox for broadcasting to the room."""
         message = ChatMessage(
             room_id=self._room_id,
             sender_id=self._botname,
-            content=content,
+            content=msg.content,
         )
         if self.outbox:
             logger.info("Bot %s sending message to room %s", self._botname, self._room_id)
-            await self.outbox.put(message)
+            try:
+                await self.outbox.put(message)
+            except asyncio.CancelledError:
+                logger.error("Bot %s could not send to room %s, outbox queue canceled", self._botname, self._room_id)
+                pass
+            except asyncio.QueueShutDown:
+                logger.error("Bot %s could not send to room %s, outbox queue is shutting down", self._botname, self._room_id)
+                pass
         else:
             logger.warning("No outbox defined for bot %s in room %s. Message not sent: %s",
                            self._botname, self._room_id, message)
@@ -305,7 +313,7 @@ class MessageHandler:
         logger.info("Creating new bot connection for bot=%s in room=%s", botname, room_id)
 
         print("Initializing bot runner for bot %s in room %s", botname, room_id)
-        g_bot = get_bot(botname, room_id)
+        g_bot = get_bot(botname)
         botrunner = BotRunner(botname=botname, room_id=room_id, bot=g_bot)
         print("Bot runner initialized for bot %s in room %s: %s", botname, room_id, botrunner)
         

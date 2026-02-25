@@ -6,6 +6,7 @@ from geenii.server.routes.route_tools import router as tools_router
 from geenii.server.routes.route_ai import router as ai_router
 #from geenii.server.routes.route_ap import router as ap_router
 from geenii.server.routes.route_assistants import router as assistants_router
+from geenii.server.routes.route_wizards import router as wizards_router
 from geenii.server.routes.route_mcp_admin import router as mcp_router
 #from geenii.server.routes.route_pubsub import router as pubsub_router
 #from geenii.server.routes.route_ws import router as ws_router
@@ -20,6 +21,7 @@ app_router.include_router(ai_router)
 app_router.include_router(tools_router)
 app_router.include_router(mcp_router)
 app_router.include_router(assistants_router)
+app_router.include_router(wizards_router)
 app_router.include_router(chat_router)
 app_router.include_router(supervisor_router)
 #app_router.include_router(ap_router)

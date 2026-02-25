@@ -16,9 +16,9 @@ def get_tools(registry: ToolRegistry = Depends(dep_tool_registry)):
     print(f"Found {len(definitions)} tools in registry.")
     return definitions
 
-# @router.post("/{tool_name}/execute")
-# def execute_tool(tool_name: str, args: dict, registry: ToolRegistry = Depends(dep_tool_registry)):
-#     tool = registry.get(tool_name)
-#     if not tool:
-#         raise ValueError(f"Tool '{tool_name}' not found.")
-#     return tool.invoke(**args)
+@router.post("/{tool_name}/execute")
+def execute_tool(tool_name: str, args: dict, registry: ToolRegistry = Depends(dep_tool_registry)):
+    tool = registry.get(tool_name)
+    if not tool:
+        raise ValueError(f"Tool '{tool_name}' not found.")
+    return tool.invoke(**args)

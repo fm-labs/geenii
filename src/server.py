@@ -4,6 +4,7 @@ import logging
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from rich.logging import RichHandler
 
 from geenii.chat.chat_server_ctx import ChatServerState
 
@@ -15,9 +16,23 @@ from geenii.rt import init_builtin_tools, init_mcp_server_tools
 from geenii.supervisor import Supervisor, ProcConfig
 from geenii.tools import ToolRegistry
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+# logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+logging.basicConfig(
+    level="INFO",
+    format="%(message)s",
+    handlers=[
+        RichHandler(
+            show_time=True,  # show timestamps
+            omit_repeated_times=False,  # show timestamp every line
+            show_level=True,
+            show_path=True,  # hide file path
+            rich_tracebacks=True,  # beautiful exception tracebacks
+        )
+    ]
+)
 
-#redis_listener_stop_event = asyncio.Event()
+
+# redis_listener_stop_event = asyncio.Event()
 
 
 async def initialize_tool_registry():
@@ -27,11 +42,12 @@ async def initialize_tool_registry():
     await init_mcp_server_tools(registry)
     return registry
 
+
 async def initialize_supervisor():
     print("Initializing supervisor...")
     supervisor = Supervisor()
-    #await supervisor.ensure("geenii_startup", ProcConfig(name="geenii_startup", cmd=["/bin/bash", "-c", "echo 'Geenii API Server Started'; echo `date` >> data/startup.log"], restart=False))
-    #await supervisor.ensure("geenii_beat", ProcConfig(name="geenii_beat", cmd=["/bin/bash", "-c", "while true; do echo `date`; sleep 3; done"]))
+    # await supervisor.ensure("geenii_startup", ProcConfig(name="geenii_startup", cmd=["/bin/bash", "-c", "echo 'Geenii API Server Started'; echo `date` >> data/startup.log"], restart=False))
+    # await supervisor.ensure("geenii_beat", ProcConfig(name="geenii_beat", cmd=["/bin/bash", "-c", "while true; do echo `date`; sleep 3; done"]))
     return supervisor
 
 
@@ -45,7 +61,7 @@ async def lifespan(app: FastAPI):
     # Supervisor
     app.state.supervisor = await initialize_supervisor()
     # Redis
-    #task = asyncio.create_task(redis_pubsub_listener(redis_listener_stop_event))
+    # task = asyncio.create_task(redis_pubsub_listener(redis_listener_stop_event))
     try:
         yield
     finally:
@@ -56,11 +72,12 @@ async def lifespan(app: FastAPI):
             del app.state.tool_registry
 
         # signal the Redis listener to stop
-        #redis_listener_stop_event.set()
-        #task.cancel()
-        #with contextlib.suppress(Exception):
+        # redis_listener_stop_event.set()
+        # task.cancel()
+        # with contextlib.suppress(Exception):
         #    await task
         pass
+
 
 app = FastAPI(lifespan=lifespan, title="Geenii API", version=APP_VERSION)
 
@@ -98,7 +115,6 @@ app.add_middleware(
 # )
 
 app.include_router(app_router, prefix="")
-
 
 # # WebSocket endpoint
 # @app.websocket("/ws")
@@ -169,7 +185,7 @@ app.include_router(app_router, prefix="")
 #     test_websocket()
 
 if __name__ == "__main__":
-   uvicorn.run(app, host="127.0.0.1", port=13030, workers=1, reload=False, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=13030, workers=1, reload=False, log_level="info")
 
 # async def serve():
 #     config = uvicorn.Config(app, host="127.0.0.1", port=13030, log_level="info")
