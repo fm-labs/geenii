@@ -10,6 +10,7 @@ import FlowsPage from '@/app/flows/flows-page.tsx'
 import AudioPage from '@/app/aiassist/audio-page.tsx'
 import WelcomeScreen from '@/app/welcome/WelcomeScreen.tsx'
 import ToolsPage from '@/app/tools/tools.page.tsx'
+import AppsPage from '@/app/apps/apps.page.tsx'
 
 
 type Route = {
@@ -96,6 +97,10 @@ const AppRouter = () => {
     {
       path: '/settings',
       element: <SettingsPage />,
+    },
+    {
+      path: '/apps',
+      element: <AppsPage />,
     },
   ]
 

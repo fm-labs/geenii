@@ -1,19 +1,29 @@
-mod docker;
-
+//mod docker;
 mod server;
-use server::ServerProcess;
 
-use serde::{Deserialize, Serialize};
-//use tauri::image::Image;
-//use tauri::menu::Menu;
-use tauri::path::BaseDirectory;
-//use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex,
 };
-use tauri::{App, AppHandle, Manager, RunEvent, State};
-use tauri_plugin_shell::{process::CommandChild, process::CommandEvent, ShellExt};
+
+use serde::{Deserialize, Serialize};
+use mime_guess::MimeGuess;
+use uuid::Uuid;
+
+//use tauri::image::Image;
+//use tauri::menu::Menu;
+use tauri::path::BaseDirectory;
+//use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{App, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::http::{Response, StatusCode};
+use tauri_plugin_shell::{process::CommandChild, ShellExt};
+
+use server::ServerProcess;
+
 
 pub struct ServerState {
     pub child: Mutex<Option<CommandChild>>,
@@ -233,6 +243,85 @@ pub fn setup_autostart(app: &mut App) -> Result<(), Box<dyn std::error::Error>> 
 //     start_server_internal(app).await
 // }
 
+
+// MICROSITES
+
+#[derive(Default)]
+struct Sites(Mutex<HashMap<String, PathBuf>>);
+
+fn normalize_request_path(p: &str) -> String {
+    // request.uri().path() starts with '/', keep it simple.
+    let p = p.trim_start_matches('/');
+
+    // Strip any query string-ish leftovers (usually none here, but safe).
+    p.split('?').next().unwrap_or("").to_string()
+}
+
+fn response_bytes(status: StatusCode, bytes: Vec<u8>, content_type: &str) -> Response<Vec<u8>> {
+    Response::builder()
+        .status(status)
+        .header("Content-Type", content_type)
+        .body(bytes)
+        .unwrap()
+}
+
+fn response_text(status: StatusCode, msg: &str) -> Response<Vec<u8>> {
+    response_bytes(status, msg.as_bytes().to_vec(), "text/plain; charset=utf-8")
+}
+
+fn is_probably_spa_route(request_path: &str) -> bool {
+    // Heuristic: no file extension => likely a client-side route.
+    Path::new(request_path).extension().is_none()
+}
+
+#[tauri::command]
+fn register_site_root(app: tauri::AppHandle, root_dir: String) -> Result<String, String> {
+    let root = PathBuf::from(root_dir);
+
+    // print the root path for debugging
+    println!("Registering site root: {:?}", root);
+    if !root.is_dir() {
+        println!("Provided path is not a directory: {:?}", root);
+        return Err("root_dir is not a directory".into());
+    }
+
+    // Canonicalize to make later "starts_with" checks reliable.
+    let root = root
+        .canonicalize()
+        .map_err(|e| format!("failed to canonicalize root_dir: {e}"))?;
+
+    let id = Uuid::new_v4().to_string();
+
+    let sites = app.state::<Sites>();
+    sites.0.lock().unwrap().insert(id.clone(), root);
+
+    Ok(id)
+}
+
+#[tauri::command]
+fn open_site_window(app: tauri::AppHandle, site_id: String) -> Result<(), String> {
+    let url = format!("site://localhost/{}/index.html", site_id);
+    let url = url.parse().map_err(|e| format!("bad url: {e}"))?;
+
+    WebviewWindowBuilder::new(&app, format!("site-{}", site_id), WebviewUrl::CustomProtocol(url))
+        .title("Site Preview")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn get_site_iframe_url(site_id: String) -> String {
+    // macOS/Linux.
+    // TODO: Handle ERR_UNKNOWN_URL_SCHEME on Windows, switch to the http mapping below.
+    format!("site://localhost/{}/index.html", site_id)
+
+    // TODO: Windows uses site.localhost
+    // format!("http://site.localhost/{}/index.html", site_id)
+}
+
+
 #[cfg(desktop)]
 pub fn run() {
     tauri::Builder::default()
@@ -325,6 +414,71 @@ pub fn run() {
                     server::stop_server(app);
                 }
             }
+        })
+        .manage(Sites::default())
+        .invoke_handler(tauri::generate_handler![register_site_root, open_site_window, get_site_iframe_url])
+        .register_uri_scheme_protocol("site", |ctx, request| {
+            let app = ctx.app_handle();
+            let sites = app.state::<Sites>();
+
+            let path = normalize_request_path(request.uri().path());
+            // Expect: "<siteId>/some/file/or/route"
+            let mut parts = path.splitn(2, '/');
+            let site_id = match parts.next() {
+                Some(s) if !s.is_empty() => s,
+                _ => return response_text(StatusCode::BAD_REQUEST, "Missing site id"),
+            };
+            // print path and site_id
+            println!("Path: {path} Site ID: {site_id}");
+            let rel = parts.next().unwrap_or("index.html");
+
+            let root = {
+                let guard = sites.0.lock().unwrap();
+                match guard.get(site_id) {
+                    Some(p) => p.clone(),
+                    None => return response_text(StatusCode::NOT_FOUND, "Unknown site id"),
+                }
+            };
+
+            // Build candidate path.
+            let candidate = root.join(rel);
+
+            // Canonicalize to prevent `..` traversal; if it doesn't exist, canonicalize will fail.
+            // For SPA routes that don't map to a file, we fall back to index.html below.
+            let mut to_serve = candidate.clone();
+
+            let mut canonical = match to_serve.canonicalize() {
+                Ok(c) => Some(c),
+                Err(_) => None,
+            };
+
+            // SPA fallback:
+            // - if file doesn't exist OR looks like a client-side route, serve index.html
+            if canonical.is_none() || is_probably_spa_route(rel) {
+                to_serve = root.join("index.html");
+                canonical = match to_serve.canonicalize() {
+                    Ok(c) => Some(c),
+                    Err(_) => None,
+                };
+            }
+
+            let canonical = match canonical {
+                Some(c) => c,
+                None => return response_text(StatusCode::NOT_FOUND, "Not found"),
+            };
+
+            // Ensure the resolved path is still inside root.
+            if !canonical.starts_with(&root) {
+                return response_text(StatusCode::FORBIDDEN, "Forbidden");
+            }
+
+            let bytes = match std::fs::read(&canonical) {
+                Ok(b) => b,
+                Err(_) => return response_text(StatusCode::NOT_FOUND, "Not found"),
+            };
+
+            let mime = MimeGuess::from_path(&canonical).first_or_octet_stream();
+            response_bytes(StatusCode::OK, bytes, mime.essence_str())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

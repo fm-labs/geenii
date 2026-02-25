@@ -1,13 +1,13 @@
-use serde::{Deserialize, Serialize};
-
-// Docker info response structure
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DockerInfo {
-    pub success: bool,
-    pub output: Option<String>,
-    pub error: Option<String>,
-    //pub parsed_info: Option<DockerSystemInfo>,
-}
+// use serde::{Deserialize, Serialize};
+// 
+// // Docker info response structure
+// #[derive(Serialize, Deserialize, Debug)]
+// pub struct DockerInfo {
+//     pub success: bool,
+//     pub output: Option<String>,
+//     pub error: Option<String>,
+//     //pub parsed_info: Option<DockerSystemInfo>,
+// }
 
 // pub async fn docker_check_availability() -> Result<bool, String> {
 //     tokio::task::spawn_blocking(|| {

@@ -19,7 +19,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; frame-src 'self' site: http://site.localhost; child-src 'self' site: http://site.localhost"
     },
     "withGlobalTauri": true
   },
