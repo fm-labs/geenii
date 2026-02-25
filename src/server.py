@@ -6,9 +6,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from rich.logging import RichHandler
 
+from geenii.apps import AppRegistry
 from geenii.chat.chat_server_ctx import ChatServerState
 
-from geenii.config import APP_VERSION
+from geenii.config import APP_VERSION, DATA_DIR
 # from geenii.server.middleware.proxy_middleware import ProxyMiddleware
 # from geenii.server.middleware.request_logger_middleware import RequestLoggerMiddleware
 from geenii.server.router import app_router
@@ -50,6 +51,12 @@ async def initialize_supervisor():
     # await supervisor.ensure("geenii_beat", ProcConfig(name="geenii_beat", cmd=["/bin/bash", "-c", "while true; do echo `date`; sleep 3; done"]))
     return supervisor
 
+async def initialize_app_registry():
+    print("Initializing apps...")
+    apps = AppRegistry()
+    apps.load_apps_from_directory(f"{DATA_DIR}/apps")
+    print(f"Initialized {len(apps.apps)} apps: {list(apps.apps.keys())}")
+    return apps
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -60,6 +67,8 @@ async def lifespan(app: FastAPI):
     app.state.tool_registry = await initialize_tool_registry()
     # Supervisor
     app.state.supervisor = await initialize_supervisor()
+    # Apps
+    app.state.app_registry = await initialize_app_registry()
     # Redis
     # task = asyncio.create_task(redis_pubsub_listener(redis_listener_stop_event))
     try:
