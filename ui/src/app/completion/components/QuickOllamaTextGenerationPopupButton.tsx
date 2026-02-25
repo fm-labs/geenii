@@ -1,5 +1,5 @@
 import React from "react";
-import Popup from "../../../ui/Popup.tsx";
+import Popup from "../../../components/Popup.tsx";
 import QuickCompletion from "./QuickCompletion.tsx";
 import { AppContext } from '@/context/AppContext.tsx';
 import { ollamaGenerate } from '@/api/ollama-api.ts';

@@ -1,6 +1,6 @@
 import React, { PropsWithChildren, useState } from 'react'
 import { ChatContext } from './ChatContext.tsx'
-import { UploadedFile } from '../../../ui/file-list'
+import { UploadedFile } from '../../../components/file-list'
 import { AVAILABLE_MODELS } from '../../../constants.ts'
 import { useNavigate } from '../../../app-router.tsx'
 import { ChatMessage } from '@/app/chat/components/chat.types.ts'

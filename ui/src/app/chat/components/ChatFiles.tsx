@@ -1,5 +1,5 @@
 import React from "react";
-import FileList, { UploadedFile } from "../../../ui/file-list";
+import FileList, { UploadedFile } from "../../../components/file-list";
 import { ChatContext } from "./ChatContext.tsx";
 import ChatFilesUploaderPopup from '@/app/chat/components/ChatFilesUploaderPopup.tsx'
 import { FEATURE_CHAT_FILES_ENABLED } from '@/constants.ts'

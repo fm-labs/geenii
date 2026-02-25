@@ -1,7 +1,7 @@
 import React from 'react'
 import { ChatContext } from '@/app/chat/components/ChatContext.tsx'
 import { ModelThinkingIndicator } from '@/app/chat/components/ModelThinkingIndicator.tsx'
-import TypewriterText from '@/ui/TypewriterText.tsx'
+import TypewriterText from '@/components/TypewriterText.tsx'
 import {
   ApprovalChatMessageContent,
   ChatMessage,
@@ -10,7 +10,7 @@ import {
 } from '@/app/chat/components/chat.types.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { CHAT_TYPEWRITER_ENABLED } from '@/constants.ts'
-import { OutputDataMarkdown } from '@/ui/OutputDataMarkdown.tsx'
+import { OutputDataMarkdown } from '@/components/output-data-markdown.tsx'
 
 const ChatMessageOutputText = ({ text, isLast }: { text: string, isLast?: boolean }) => {
   if (CHAT_TYPEWRITER_ENABLED && isLast) {

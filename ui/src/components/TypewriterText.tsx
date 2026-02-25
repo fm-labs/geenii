@@ -1,5 +1,5 @@
 import React, { PropsWithChildren, useEffect, useState } from 'react'
-import { OutputDataMarkdown } from '@/ui/OutputDataMarkdown.tsx'
+import { OutputDataMarkdown } from '@/components/output-data-markdown.tsx'
 
 interface TypewriterTextProps extends PropsWithChildren<any> {
   text: string;

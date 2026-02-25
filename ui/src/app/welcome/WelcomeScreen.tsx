@@ -1,5 +1,5 @@
 import React from 'react'
-import TypewriterText from '../../ui/TypewriterText.tsx'
+import TypewriterText from '../../components/TypewriterText.tsx'
 import { useNavigate } from '../../app-router.tsx'
 import { AppContext } from '@/context/AppContext.tsx'
 import "@/Animate.scss"

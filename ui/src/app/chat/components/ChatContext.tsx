@@ -1,5 +1,5 @@
 import React from "react";
-import { UploadedFile } from "../../../ui/file-list";
+import { UploadedFile } from "../../../components/file-list";
 import { ChatMessage } from '@/app/chat/components/chat.types.ts'
 
 type ChatContextType = {

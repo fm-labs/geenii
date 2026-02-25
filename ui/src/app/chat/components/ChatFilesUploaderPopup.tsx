@@ -1,6 +1,6 @@
-import Popup, { PopupProps } from "../../../ui/Popup.tsx";
-import FileUploader from "../../../ui/uploader/FileUploader.tsx";
-import { UploadedFile } from "../../../ui/file-list";
+import Popup, { PopupProps } from "../../../components/Popup.tsx";
+import FileUploader from "@/components/uploader/FileUploader.tsx";
+import { UploadedFile } from "../../../components/file-list";
 import { useContext } from "react";
 import { ChatContext } from "./ChatContext.tsx";
 import { FEATURE_CHAT_FILES_ENABLED } from "../../../constants.ts";

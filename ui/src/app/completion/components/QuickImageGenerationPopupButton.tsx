@@ -1,9 +1,9 @@
 import React from 'react'
-import Popup from '../../../ui/Popup.tsx'
+import Popup from '../../../components/Popup.tsx'
 import QuickCompletion from './QuickCompletion.tsx'
 import { AppContext } from '@/context/AppContext.tsx'
 import useNotification from '../../../hooks/useNotification.ts'
-import Button from '@/ui/Button.tsx'
+import { Button } from '@/components/ui/button.tsx'
 
 const QuickImageGenerationPopupButton = ({ modelName }) => {
   const [isOpen, setIsOpen] = React.useState(false)

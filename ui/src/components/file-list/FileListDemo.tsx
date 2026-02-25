@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import FileList, { UploadedFile } from './FileList';
+import FileList, { UploadedFile } from './FileList.tsx';
 
 // Demo component to showcase the FileList functionality
 const FileListDemo: React.FC = () => {
