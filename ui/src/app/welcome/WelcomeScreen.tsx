@@ -70,7 +70,7 @@ const WelcomeScreen = () => {
 
           <div className={"text-center"}>
             <div className={"relative my-6"}>
-              <span onClick={() => navigate('/apps')}>
+              <span onClick={() => navigate('/chat')}>
                 <img src={'/bot_white.svg'}
                      alt="geenii logo"
                      className={"inline-block w-1/4 max-w-2xl pulse rotate-burst hover:cursor-pointer"} />

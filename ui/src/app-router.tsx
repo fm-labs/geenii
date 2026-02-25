@@ -10,20 +10,29 @@ import FlowsPage from '@/app/flows/flows-page.tsx'
 import AudioPage from '@/app/aiassist/audio-page.tsx'
 import WelcomeScreen from '@/app/welcome/WelcomeScreen.tsx'
 import ToolsPage from '@/app/tools/tools.page.tsx'
-import AppsPage from '@/app/apps/apps.page.tsx'
+import AppPage from '@/app/apps/app.page.tsx'
+
 
 
 type Route = {
   path: string;
+  element: React.ReactNode;
 }
 
-const RouteContext = React.createContext<Route | null>(null)
+type RouteMatch = {
+  location: string;
+  route: Route | null;
+  params?: Record<string, string>;
+}
+
+const RouteContext = React.createContext<RouteMatch | null>(null)
 
 const AppRouter = () => {
 
   //const queryParams = new URLSearchParams(window.location.search);
   //const routeQueryPath = queryParams.get('route');
   const [routePath, setRoutePath] = React.useState<string>(window.location.hash.replace('#', '') || '/')
+  //const [routeMatch, setRouteMatch] = React.useState<Route | null>(null)
 
   console.log('>> AppRouter: current URL', window.location.href)
   //const routePath = window.location.hash.replace('#', '')
@@ -45,7 +54,7 @@ const AppRouter = () => {
     }
   }, [])
 
-  const routes = [
+  const routes: Route[] = [
     {
       path: '/',
       element: <WelcomeScreen />,
@@ -99,18 +108,59 @@ const AppRouter = () => {
       element: <SettingsPage />,
     },
     {
-      path: '/apps',
-      element: <AppsPage />,
+      path: '/apps/:appId',
+      element: <AppPage />,
     },
   ]
 
-  const match = React.useMemo(() => {
-    return routes.find(v => v.path===routePath)
+  const parseUrl = (url: string) => {
+    const [path, queryString] = url.split('?')
+    const queryParams = new URLSearchParams(queryString || '')
+    return { path, queryParams }
+  }
+
+  const pathToRegex = (path: string) => {
+    // split path, replace dynamic segments with regex groups, and join back
+    const segments = path.split('/').map(segment => {
+      if (segment.startsWith(':')) {
+        return '([^/]+)' // capture group for dynamic segment
+      }
+      return segment
+    })
+    return new RegExp(`^${segments.join('/')}$`)
+  }
+
+  const match: RouteMatch = React.useMemo(() => {
+    // parse the routePath to handle query parameters if needed
+    const [basePath] = routePath.split('?')
+    const routePathToMatch = basePath || routePath
+    // Find the first route that matches the current path and map dynamic segments
+    for (const route of routes) {
+      const regex = pathToRegex(route.path)
+      const matchResult = regex.exec(routePathToMatch)
+      if (matchResult) {
+        const paramValues = matchResult.slice(1) // first element is the full match
+        const paramNames = (route.path.match(/:([^/]+)/g) || []).map(name => name.substring(1)) // extract param names
+        const params: Record<string, string> = {}
+        paramNames.forEach((name, index) => {
+          params[name] = paramValues[index]
+        })
+        console.log('>> Matched route:', route.path, 'with params:', params)
+
+        return {
+          location: routePath,
+          route: route,
+          params: params,
+        }
+      }
+    }
+    //return routes.find(v => v.path===routePathToMatch)
+    return null
   }, [routePath, routes])
 
-  const currentView = React.useMemo(() => {
+  const currentView: Route = React.useMemo(() => {
     if (match) {
-      return match
+      return match.route
     }
     // Fallback to the first route if no match is found
     //return routes[0];
@@ -120,17 +170,18 @@ const AppRouter = () => {
     }
   }, [match, routes])
 
-  const currentRoute = React.useMemo(() => {
-    return {
-      path: routePath,
-    }
-  }, [routePath])
+  // const currentRoute = React.useMemo(() => {
+  //   return {
+  //     location: routePath,
+  //     route: match
+  //   }
+  // }, [routePath, match])
 
   if (!currentView) {
     return <div className="text-center text-red-500">View not found: {routePath}</div>
   }
 
-  return <RouteContext.Provider value={currentRoute}>
+  return <RouteContext.Provider value={match}>
     {currentView.element}
   </RouteContext.Provider>
 }

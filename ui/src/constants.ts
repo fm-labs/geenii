@@ -7,24 +7,22 @@ export const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true' && import.meta.
 export const XAI_API_URL = import.meta.env.VITE_XAI_API_URL || 'http://localhost:13030' // `${window.location.protocol}//${window.location.hostname}:31030/`
 export const OLLAMA_API_URL = import.meta.env.VITE_OLLAMA_API_URL  || 'http://localhost:13030/ai/gateway/ollama/' // || `${window.location.protocol}//${window.location.hostname}:31030/ai/gateway/ollama/`;
 
+export const FEATURE_AI_ENABLED = import.meta.env.VITE_FEATURE_AI_ENABLED === 'true' || false;
 export const FEATURE_COMPLETION_ENABLED = import.meta.env.VITE_FEATURE_COMPLETION_ENABLED === 'true' || false;
 export const FEATURE_QUICKGEN_BUTTONS_ENABLED = import.meta.env.VITE_FEATURE_FEATURE_QUICKGEN_BUTTONS_ENABLED === 'true' || false;
-
 export const FEATURE_CHAT_ENABLED = import.meta.env.VITE_FEATURE_CHAT_ENABLED === 'true' || false;
 export const FEATURE_CHAT_FILES_ENABLED = import.meta.env.VITE_FEATURE_CHAT_FILES_ENABLED === 'true' || false;
 export const FEATURE_CHAT_TOOLS_ENABLED = import.meta.env.VITE_FEATURE_CHAT_TOOLS_ENABLED === 'true' || false;
 export const FEATURE_CHAT_MODEL_SELECTION_ENABLED = import.meta.env.VITE_FEATURE_CHAT_MODEL_SELECTION_ENABLED === 'true' || false;
 export const FEATURE_CHAT_PROMPT_SUGGESTIONS_ENABLED = import.meta.env.VITE_FEATURE_CHAT_PROMPT_SUGGESTIONS_ENABLED === 'true' || false;
-
 export const FEATURE_VOICE_RECORDING_ENABLED = import.meta.env.VITE_FEATURE_VOICE_RECORDING_ENABLED === 'true' || false;
 export const FEATURE_VOICE_TRANSCRIPTION_ENABLED = import.meta.env.VITE_FEATURE_VOICE_TRANSCRIPTION_ENABLED === 'true' || false;
-export const FEATURE_WIZARD_ENABLED = import.meta.env.VITE_FEATURE_WIZARD_ENABLED === 'true' || false;
-
+export const FEATURE_WIZARDS_ENABLED = import.meta.env.VITE_FEATURE_WIZARDS_ENABLED === 'true' || false;
 export const FEATURE_AGENTS_ENABLED = import.meta.env.VITE_FEATURE_AGENTS_ENABLED === 'true' || false;
 export const FEATURE_MCP_ENABLED = import.meta.env.VITE_FEATURE_MCP_ENABLED === 'true' || false;
 export const FEATURE_TOOLS_ENABLED = import.meta.env.VITE_FEATURE_TOOLS_ENABLED === 'true' || false;
+export const FEATURE_APPS_ENABLED = import.meta.env.VITE_FEATURE_APPS_ENABLED === 'true' || false;
 export const FEATURE_FLOWS_ENABLED = import.meta.env.VITE_FEATURE_FLOWS_ENABLED === 'true' || false;
-
 export const FEATURE_SETTINGS_ENABLED = import.meta.env.VITE_FEATURE_SETTINGS_ENABLED === 'true' || false;
 
 export const FEATURE_TAURI_ENABLED = import.meta.env.VITE_FEATURE_TAURI_ENABLED === 'true' || false;

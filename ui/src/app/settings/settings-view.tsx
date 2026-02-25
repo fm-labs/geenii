@@ -1,23 +1,20 @@
 import * as React from 'react'
 import {
   BotIcon,
-  BrainCircuitIcon,
   BrainIcon,
-  HammerIcon, PaletteIcon,
+  HammerIcon, PackageIcon, PaletteIcon,
   ServerIcon,
-  ToolboxIcon,
   UserIcon,
-  Video,
 } from 'lucide-react'
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
+// import {
+//   Breadcrumb,
+//   BreadcrumbItem,
+//   BreadcrumbLink,
+//   BreadcrumbList,
+//   BreadcrumbPage,
+//   BreadcrumbSeparator,
+// } from '@/components/ui/breadcrumb'
 
 import {
   Sidebar,
@@ -29,13 +26,23 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from '@/components/ui/sidebar'
-import { RJSFSchema } from '@rjsf/utils'
+
 import { SettingsFormView } from '@/app/settings/components/settings-form-view.tsx'
 import { McpServersSettingsView } from '@/app/settings/components/mcp-servers-settings-view.tsx'
 import { AiModelSettingsView } from '@/app/settings/components/ai-model-settings-view.tsx'
 import { settingsForms } from '@/app/settings/settings-forms.ts'
 import ToolsView from '@/app/tools/tools.view.tsx'
 import WizardsSettings from '@/app/settings/components/wizards-settings.tsx'
+import AppsSettings from '@/app/settings/components/apps-settings.tsx'
+import {
+  FEATURE_AI_ENABLED,
+  FEATURE_APPS_ENABLED,
+  FEATURE_MCP_ENABLED,
+  FEATURE_TOOLS_ENABLED,
+  FEATURE_WIZARDS_ENABLED,
+} from '@/constants.ts'
+import Header from '@/components/header.tsx'
+
 
 const data = {
   nav: [
@@ -46,6 +53,7 @@ const data = {
     { name: "Wizards", icon: BotIcon },
     { name: "Tools", icon: HammerIcon },
     { name: "MCP", icon: ServerIcon },
+    { name: "Apps", icon: PackageIcon },
     //{ name: "Notifications", icon: Bell },
     //{ name: "Navigation", icon: Menu },
     //{ name: "Home", icon: Home },
@@ -63,9 +71,13 @@ const data = {
 
 
 
-const DummySettingsView = () => {
+const DisabledFeatureSettingsView = () => {
   return <div>
-    {Array.from({ length: 10 }).map((_, i) => (
+    <div className={"bg-accent border rounded-lg p-4 mb-4 max-w-3xl"}>
+      <h2 className={"text-lg font-bold mb-2"}>Feature not available</h2>
+      <p className={"text-muted-foreground"}>This feature is not enabled in your current environment.</p>
+    </div>
+    {Array.from({ length: 2 }).map((_, i) => (
       <div
         key={i}
         className="bg-muted/50 aspect-video max-w-3xl rounded-xl my-4"
@@ -73,7 +85,6 @@ const DummySettingsView = () => {
     ))}
   </div>
 }
-
 
 const SettingsView = () => {
   const [activeTab, setActiveTab] = React.useState("Default Models");
@@ -85,44 +96,42 @@ const SettingsView = () => {
       case "Profile":
         return <SettingsFormView schema={settingsForms["profile"][0]} uiSchema={settingsForms["profile"][1]} />;
       case "Default Models":
+        if (!FEATURE_AI_ENABLED) {
+          return <DisabledFeatureSettingsView />;
+        }
         return <SettingsFormView schema={settingsForms["default_models"][0]} uiSchema={settingsForms["default_models"][1]} />;
       case "MCP":
+        if (!FEATURE_MCP_ENABLED) {
+          return <DisabledFeatureSettingsView />;
+        }
         return <McpServersSettingsView />;
       case "Models":
+        if (!FEATURE_AI_ENABLED) {
+          return <DisabledFeatureSettingsView />;
+        }
         return <AiModelSettingsView />;
       case "Tools":
+        if (!FEATURE_TOOLS_ENABLED) {
+          return <DisabledFeatureSettingsView />;
+        }
         return <ToolsView />
       case "Wizards":
+        if (!FEATURE_WIZARDS_ENABLED) {
+          return <DisabledFeatureSettingsView />;
+        }
         return <WizardsSettings />
+      case "Apps":
+        if (!FEATURE_APPS_ENABLED) {
+          return <DisabledFeatureSettingsView />;
+        }
+        return <AppsSettings />
       default:
-        return <DummySettingsView />;
+        return <DisabledFeatureSettingsView />;
     }
   }, [activeTab]);
 
     return (
         <div>
-            {/*<h1 className="text-2xl font-bold mb-4">Settings</h1>*/}
-            {/*<p className="text-gray-600 mb-4">*/}
-            {/*    App settings allow you to configure various aspects of the application, such as model preferences,*/}
-            {/*    API keys, and other options. Adjust these settings to tailor the app to your needs.*/}
-            {/*</p>*/}
-
-            {/*<section>*/}
-            {/*    <h2 className="text-xl font-semibold mb-2">Model Preferences</h2>*/}
-            {/*    <p className="text-gray-600 mb-4">*/}
-            {/*        Configure your preferred models for text generation, image generation, and other tasks.*/}
-            {/*    </p>*/}
-            {/*     Add model preference settings here */}
-            {/*</section>*/}
-
-            {/*<section>*/}
-            {/*    <h2 className="text-xl font-semibold mb-2">Integrations</h2>*/}
-            {/*    <p className="text-gray-600 mb-4">*/}
-            {/*        Manage integrations with external services, such as cloud storage or third-party APIs.*/}
-            {/*    </p>*/}
-            {/*     Add integrations settings here */}
-            {/*</section>*/}
-
           <SidebarProvider className="items-start">
             <Sidebar collapsible="none" className="hidden md:flex bg-transparent">
               <SidebarContent>
@@ -148,12 +157,12 @@ const SettingsView = () => {
               </SidebarContent>
             </Sidebar>
             <main className="flex flex-1 flex-col _overflow-hidden">
-              <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+              {/*<header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
                 <div className="flex items-center gap-2 px-4">
                   <Breadcrumb>
                     <BreadcrumbList>
                       <BreadcrumbItem className="hidden md:block">
-                        <BreadcrumbLink href="#">Settings</BreadcrumbLink>
+                        <BreadcrumbLink href="#/settings">Settings</BreadcrumbLink>
                       </BreadcrumbItem>
                       <BreadcrumbSeparator className="hidden md:block" />
                       <BreadcrumbItem>
@@ -162,8 +171,9 @@ const SettingsView = () => {
                     </BreadcrumbList>
                   </Breadcrumb>
                 </div>
-              </header>
+              </header>*/}
               <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 pt-0">
+                <Header title={activeTab} />
                 {activeTabElement}
               </div>
             </main>

@@ -3,15 +3,6 @@ import CompletionChat from './completion-chat.tsx'
 import React from 'react'
 import Layout from '../../components/layout/layout.tsx'
 
-
-// interface ChatAppProps {
-//     className?: string;
-//     enableSuggestions?: boolean;
-//     suggestions?: string[];
-//     enableFiles?: boolean;
-//     //files?: File[];
-// }
-
 const CompletionChatPage = () => {
 
   const contextProps = {
@@ -24,8 +15,16 @@ const CompletionChatPage = () => {
 
   return (<Layout>
       <ChatContextProvider {...contextProps}>
-        <div className="max-w-screen-md mx-auto p-4">
-          <CompletionChat />
+        <div className="content max-w-7xl mx-auto pt-12">
+          <div className="flex flex-col justify-center min-h-screen">
+            <div className="flex flex-col justify-center mb-4">
+              <div className={'grow'}>
+                <div className="max-w-3xl mx-auto p-4">
+                  <CompletionChat />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </ChatContextProvider>
     </Layout>

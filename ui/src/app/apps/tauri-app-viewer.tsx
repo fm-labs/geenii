@@ -50,7 +50,7 @@ const TauriAppViewer = ({appId}: {appId}) => {
   }, [appId])
 
   return (
-    <div className={"rounded-2xl border"}>
+    <div className={"border"}>
       {/*<div className={"p-2 space-x-1 flex"}>
         <Button variant={"default"} size={"sm"} onClick={handleOpenAppWindow}>Open in new window</Button>
         <Button variant={"default"} size={"sm"} onClick={handleOpenAppIframe}>Open in iframe</Button>
