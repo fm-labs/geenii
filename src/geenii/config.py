@@ -4,7 +4,7 @@ import dotenv
 dotenv.load_dotenv()
 dotenv.load_dotenv(".env.local", override=True)
 
-APP_VERSION = "0.1.4"
+APP_VERSION = "0.2.0"
 
 def get_os_name() -> str:
     platform = os.environ.get("PLATFORM", "").lower()
