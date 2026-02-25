@@ -16,6 +16,10 @@ export const SettingsFormView = ({ schema, uiSchema }: { schema: RJSFSchema, uiS
       uiSchema={uiSchema}
       validator={validator}
       onSubmit={handleSubmit}
-    ></Form>
+    >
+      <div className={"py-4 text-right"}>
+        <Button type={"submit"}>Save</Button>
+      </div>
+    </Form>
   )
 }

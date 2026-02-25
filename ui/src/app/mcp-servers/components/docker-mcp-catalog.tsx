@@ -1,12 +1,12 @@
 import React from "react";
 import { useDockerMcpCatalog } from "@/app/mcp-servers/components/docker-mcp-catalog-provider.tsx";
 import { Button } from "@/components/ui/button";
-import Form from "@rjsf/shadcn";
-import validator from "@rjsf/validator-ajv8";
-import JsonView from "@/components/json-view.tsx";
-import { Separator } from "@/components/ui/separator.tsx";
 import {RJSFSchema} from "@rjsf/utils";
 import { Input } from '@/components/ui/input.tsx'
+import { Dialog, DialogTitle } from '@radix-ui/react-dialog'
+import { DialogContent, DialogHeader } from '@/components/ui/dialog.tsx'
+import { Badge } from '@/components/ui/badge.tsx'
+import DockerMcpServerConfigBuilder from '@/app/mcp-servers/components/docker-mcp-server-config-builder.tsx'
 
 /**
  * Render the docker MCP toolkit catalog
@@ -119,7 +119,6 @@ const DockerMcpCatalog = () => {
     const { catalog } = useDockerMcpCatalog()
     const [selectedServerKey, setSelectedServerKey] = React.useState<string | null>(null);
     const [selectedServer, setSelectedServer] = React.useState<any | null>(null);
-    const [result, setResult] = React.useState<any | null>(null);
 
     const [searchTerm, setSearchTerm] = React.useState<string>("");
     const [searchFilter, setSearchFilter] = React.useState<any>({"hasTools": false, "hasConfig": false, "hasSecrets": false, "hasOauth": false, "hasNoConfig": false, "hasNoSecrets": false});
@@ -201,82 +200,7 @@ const DockerMcpCatalog = () => {
         return filtered;
     }, [registry, searchTerm, searchFilter]);
 
-    const buildConnectJsonSchemaForServer = (serverDef: any): RJSFSchema => {
 
-        const properties: any = {}
-
-        // env vars
-        // const envs = serverDef?.env || []
-        // envs.forEach((envVar: any) => {
-        //     properties[envVar.name] = {
-        //         type: "string",
-        //         title: envVar.name,
-        //         default: envVar.value || ""
-        //     }
-        // })
-        console.log("serverDev:", serverDef)
-        console.log("serverDef config:", serverDef?.config)
-        const config = serverDef?.config && Array.isArray(serverDef?.config)
-            ? serverDef?.config[0] || {} : {}
-
-        // add secrets
-        const secrets = serverDef?.secrets || []
-        secrets.forEach((secretVar: any) => {
-            properties['secret__' + secretVar.name] = {
-                type: "string",
-                title: '🔐 Secret: ' + secretVar.name,
-                default: "",
-                description: `Secret (in env var ${secretVar.env})`
-            }
-        })
-
-        if (config) {
-            config?.properties?.forEach((configVar: any) => {
-                const schema = configVar?.Schema || {};
-                properties[configVar.Name] = schema
-            })
-        }
-
-        return {
-            type: "object",
-            properties: properties,
-            required: [],
-        }
-    }
-
-    const handleSubmit = async ({ formData }: any) => {
-        console.log("Connecting to server with data:", formData);
-
-        if (!selectedServer || !selectedServerKey) {
-            console.error("No server selected");
-            return;
-        }
-
-        // create new mcp_server inventory item
-        let mcpType;
-        let properties: any = {}
-        if (selectedServer.type === "server") {
-            mcpType = "stdio"
-            properties["command"] = "docker"
-            properties["args"] = "run --rm -i " + selectedServer.image
-        } else if (selectedServer.type === "remote") {
-            mcpType = "http"
-            properties["url"] = selectedServer.remote.url
-        }
-        const serverName = selectedServerKey.toUpperCase()
-        const item = {
-            name: serverName,
-            properties: {
-                name: serverName,
-                type: mcpType,
-                ...properties
-            }
-        }
-
-        console.log("Creating MCP server inventory item:", item);
-        //const createdItem = await api.post("/api/inventory/mcp-server", item);
-        //console.log(createdItem);
-    }
 
     const typeEmojis: { [key: string]: string } = {
         "server": "🖥️",
@@ -338,8 +262,13 @@ const DockerMcpCatalog = () => {
                         <div className={"flex justify-between items-center"}>
                             <div className={"mb-1"}>
                                 <h3 className={"font-bold"} title={item?.description} onClick={() => {
-                                    setSelectedServerKey(key);
-                                    setSelectedServer(item);
+                                    if (selectedServerKey === key) {
+                                        setSelectedServerKey(null);
+                                        setSelectedServer(null);
+                                    } else {
+                                        setSelectedServerKey(key);
+                                        setSelectedServer(item);
+                                    }
                                 }}>
                                     {getTypeEmoji(item.type)} {item.title}</h3>
                                 <p className={"text-xs text-muted-foreground mb-1 max-h-8 overflow-hidden hover:max-h-16 hover:overflow-y-scroll"}>{item?.description}</p>
@@ -360,6 +289,11 @@ const DockerMcpCatalog = () => {
                                 {/*<div>
                                     <JsonView src={item} collapsed={true} />
                                 </div>*/}
+                                <div className={"flex flex-wrap space-x-1"}>
+                                    {item?.tools?.map((tool: any) => (
+                                      <div key={tool.name}><Badge>{tool.name}</Badge></div>
+                                    ))}
+                                </div>
                             </div>
                             <Button variant={"outline"}
                                     size={"sm"}
@@ -369,15 +303,16 @@ const DockerMcpCatalog = () => {
                                     }}>Add Server</Button>
                         </div>
                         {selectedServer?.title === item.title && <div>
-                            {item?.tools?.map((tool: any) => (
-                                <div key={tool.name}>{tool.name}</div>
-                            ))}
-                            <Separator className={"my-2"} />
-                            <Form schema={buildConnectJsonSchemaForServer(item)}
-                                  validator={validator}
-                                  onSubmit={handleSubmit}
-                            ><Button>Connect</Button></Form>
-                            {result && <JsonView src={result} />}
+                            <Dialog onOpenChange={() => setSelectedServerKey(null)}
+                                    open={selectedServerKey !== null}>
+                                <DialogContent className={"max-h-200 w-1/2 overflow-y-scroll"}>
+                                    <DialogHeader>
+                                        <DialogTitle>Connect {selectedServer?.title}</DialogTitle>
+                                    </DialogHeader>
+                                    <DockerMcpServerConfigBuilder serverName={selectedServerKey}
+                                                                  serverDef={selectedServer} />
+                                </DialogContent>
+                            </Dialog>
                         </div>}
                     </div>
                 )

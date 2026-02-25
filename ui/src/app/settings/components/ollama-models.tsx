@@ -1,6 +1,5 @@
 import React from 'react'
 
-//import modelData from '../data/ollama_models.json'
 import { Input } from '@/components/ui/input.tsx'
 import { DownloadIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
@@ -56,7 +55,25 @@ const OllamaModels = () => {
       model.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       model.tags.some((tag) => tag.name.toLowerCase().includes(searchTerm.toLowerCase()))
     )
-  }, [searchTerm])
+  }, [searchTerm, modelData])
+
+  const fetchModels = React.useCallback(async () => {
+    try {
+      const response = await fetch('/assets/ollama-model-catalog.json')
+      if (response.ok) {
+        const data = await response.json()
+        setModelData(data)
+      } else {
+        console.error('Failed to fetch models:', response.statusText)
+      }
+    } catch (error) {
+      console.error('Error fetching models:', error)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    fetchModels()
+  }, [fetchModels])
 
   return (
     <div>

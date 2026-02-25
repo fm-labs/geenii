@@ -58,8 +58,61 @@ const aiModelSettingsUiSchema = {
   // },
 };
 
+/** APPEARANCE SETTINGS **/
+const appearanceSettingsSchema: RJSFSchema = {
+  title: "Appearance Settings",
+  type: "object",
+  properties: {
+    theme: {
+      type: "string",
+      title: "Theme",
+      enum: ["light", "dark", "system"],
+      default: "system",
+    },
+    fontFamily: {
+      type: "string",
+      title: "Font Family",
+      enum: ["system", "sans-serif", "serif", "monospace"],
+      default: "system",
+    },
+    fontSize: {
+      type: "number",
+      title: "Font Size",
+      minimum: 10,
+      maximum: 24,
+      default: 14,
+    },
+  },
+};
+
+const appearanceSettingsUiSchema = {
+  theme: {
+    "ui:widget": "select",
+  },
+  fontFamily: {
+    "ui:widget": "select",
+    "ui:options": {
+      enumOptions: [
+        { value: "system", label: "System Default" },
+        { value: "sans-serif", label: "Sans Serif" },
+        { value: "serif", label: "Serif" },
+        { value: "monospace", label: "Monospace" },
+      ],
+    },
+  },
+  fontSize: {
+    "ui:widget": "range",
+    "ui:options": {
+      step: 1,
+      minimum: 10,
+      maximum: 24
+    },
+  },
+};
+
 
 export const settingsForms = {
+  "appearance": [appearanceSettingsSchema, appearanceSettingsUiSchema],
   "profile": [profileSettingsSchema, profileSettingsUiSchema],
   "default_models": [aiModelSettingsSchema, aiModelSettingsUiSchema],
 }

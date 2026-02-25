@@ -46,14 +46,14 @@ export function AssistantChatsPage() {
   const [chatMessages, setChatMessages] = useState<any[]>()
 
   const fetchAssistants = async () => {
-    const response = await fetch(XAI_API_URL + 'ai/v1/assistants/', {
+    const response = await fetch(XAI_API_URL + 'wizards/', {
       headers: {
         "Content-Type": "application/json",
       }
     })
     const data = await response.json()
     console.log("Fetched assistants", data)
-    return data
+    return data?.wizards || []
   }
 
   const fetchAssistantChats = async (assistantId: string) => {

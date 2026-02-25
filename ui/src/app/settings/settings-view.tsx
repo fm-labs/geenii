@@ -1,5 +1,14 @@
 import * as React from 'react'
-import { BotIcon, ServerIcon, Video } from 'lucide-react'
+import {
+  BotIcon,
+  BrainCircuitIcon,
+  BrainIcon,
+  HammerIcon, PaletteIcon,
+  ServerIcon,
+  ToolboxIcon,
+  UserIcon,
+  Video,
+} from 'lucide-react'
 
 import {
   Breadcrumb,
@@ -25,13 +34,18 @@ import { SettingsFormView } from '@/app/settings/components/settings-form-view.t
 import { McpServersSettingsView } from '@/app/settings/components/mcp-servers-settings-view.tsx'
 import { AiModelSettingsView } from '@/app/settings/components/ai-model-settings-view.tsx'
 import { settingsForms } from '@/app/settings/settings-forms.ts'
+import ToolsView from '@/app/tools/tools.view.tsx'
+import WizardsSettings from '@/app/settings/components/wizards-settings.tsx'
 
 const data = {
   nav: [
-    //{ name: "Profile", icon: UserIcon },
-    { name: "Default Assistant", icon: BotIcon },
-    { name: "AI Models", icon: BotIcon },
-    //{ name: "MCP Servers", icon: ServerIcon },
+    { name: "Profile", icon: UserIcon },
+    { name: "Appearance", icon: PaletteIcon },
+    //{ name: "Default Models", icon: BrainIcon },
+    { name: "Models", icon: BrainIcon },
+    { name: "Wizards", icon: BotIcon },
+    { name: "Tools", icon: HammerIcon },
+    { name: "MCP", icon: ServerIcon },
     //{ name: "Notifications", icon: Bell },
     //{ name: "Navigation", icon: Menu },
     //{ name: "Home", icon: Home },
@@ -66,16 +80,20 @@ const SettingsView = () => {
 
   const activeTabElement = React.useMemo(() => {
     switch (activeTab) {
+      case "Appearance":
+        return <SettingsFormView schema={settingsForms["appearance"][0]} uiSchema={settingsForms["appearance"][1]} />;
       case "Profile":
         return <SettingsFormView schema={settingsForms["profile"][0]} uiSchema={settingsForms["profile"][1]} />;
       case "Default Models":
         return <SettingsFormView schema={settingsForms["default_models"][0]} uiSchema={settingsForms["default_models"][1]} />;
-      case "Messages & media":
-        return <DummySettingsView />;
-      case "MCP Servers":
+      case "MCP":
         return <McpServersSettingsView />;
-      case "AI Models":
+      case "Models":
         return <AiModelSettingsView />;
+      case "Tools":
+        return <ToolsView />
+      case "Wizards":
+        return <WizardsSettings />
       default:
         return <DummySettingsView />;
     }
