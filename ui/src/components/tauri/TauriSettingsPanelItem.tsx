@@ -1,7 +1,7 @@
 import { SettingsIcon } from 'lucide-react'
 import React from 'react'
 import { useTauriPanel } from '@/components/tauri/TauriPanelContext.tsx'
-import TauriSystemInfo from '@/components/tauri/TauriSystemInfo.tsx'
+import TauriCommands from '@/components/tauri/TauriCommands.tsx'
 
 const TauriSettingsPanelItem = () => {
   const { setBody, setIsOpen, isOpen } = useTauriPanel()
@@ -13,11 +13,8 @@ const TauriSettingsPanelItem = () => {
       return
     }
 
-    // This function can be used to open a settings dialog or perform other actions
-    console.log('Settings clicked')
-    //notify.info("settings clicked")
     setBody(<div>
-      <TauriSystemInfo />
+      <TauriCommands />
     </div>)
     setIsOpen(true)
   }

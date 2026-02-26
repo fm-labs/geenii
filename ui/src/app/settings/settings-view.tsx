@@ -2,7 +2,7 @@ import * as React from 'react'
 import {
   BotIcon,
   BrainIcon,
-  HammerIcon, PackageIcon, PaletteIcon,
+  HammerIcon, InfoIcon, PackageIcon, PaletteIcon,
   ServerIcon,
   UserIcon,
 } from 'lucide-react'
@@ -42,6 +42,7 @@ import {
   FEATURE_WIZARDS_ENABLED,
 } from '@/constants.ts'
 import Header from '@/components/header.tsx'
+import SystemInfoView from '@/app/settings/components/system-info-view.tsx'
 
 
 const data = {
@@ -66,6 +67,7 @@ const data = {
     //{ name: "Connected accounts", icon: Link },
     //{ name: "Privacy & visibility", icon: Lock },
     //{ name: "Advanced", icon: Settings },
+    { name: "System Info", icon: InfoIcon },
   ],
 }
 
@@ -125,6 +127,8 @@ const SettingsView = () => {
           return <DisabledFeatureSettingsView />;
         }
         return <AppsSettings />
+      case "System Info":
+        return <SystemInfoView />
       default:
         return <DisabledFeatureSettingsView />;
     }

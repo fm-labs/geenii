@@ -11,7 +11,7 @@ const TAURI_COMMANDS: any[] = [
   { label: 'docker mcp catalog json', command: 'docker', args: ['mcp', 'catalog', 'show', 'docker-mcp', '--format', 'json'], outputFormat: 'json' }
 ]
 
-const TauriSystemInfo = () => {
+const TauriCommands = () => {
   return (
     <div>
       <ul>
@@ -25,4 +25,4 @@ const TauriSystemInfo = () => {
   )
 }
 
-export default TauriSystemInfo
+export default TauriCommands

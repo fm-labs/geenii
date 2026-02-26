@@ -144,7 +144,7 @@ const TauriUpdaterPanelItem = () => {
 
         {updateInfo && updateStatus === 'Finished' && (
           <div>
-            <span className={'cursor-pointer hover:bg-accent'} onClick={() => relaunch()}>[Restart App]</span>
+            <span className={'cursor-pointer hover:bg-accent'} onClick={() => relaunch()}>Restart App</span>
           </div>
         )}
       </div>
