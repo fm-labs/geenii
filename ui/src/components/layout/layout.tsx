@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import {
   APP_NAME,
-  FEATURE_AGENTS_ENABLED,
+  FEATURE_AGENTS_ENABLED, FEATURE_APPS_ENABLED,
   FEATURE_CHAT_ENABLED,
   FEATURE_COMPLETION_ENABLED,
   FEATURE_FLOWS_ENABLED,
@@ -38,6 +38,7 @@ const Layout = (props: PropsWithChildren) => {
               {/*FEATURE_AGENTS_ENABLED && <li className={navItemStyle}><a href="#/assistants">Assistants</a></li>*/}
               {/*FEATURE_TOOLS_ENABLED && <li className={navItemStyle}><a href="#/tools">Tools</a></li>*/}
               {/*FEATURE_MCP_ENABLED && <li className={navItemStyle}><a href="#/mcp">MCP</a></li>*/}
+              {FEATURE_APPS_ENABLED && <li className={navItemStyle}><a href="#/apps">Apps</a></li>}
               {FEATURE_FLOWS_ENABLED && <li className={navItemStyle}><a href="#/flows">Flows</a></li>}
             </ul>}
           </div>
