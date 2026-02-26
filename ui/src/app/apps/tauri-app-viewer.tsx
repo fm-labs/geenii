@@ -60,8 +60,10 @@ const TauriAppViewer = ({appId}: {appId}) => {
           id="siteFrame"
           src={iframeUrl}
           style={{ width: '100%', height: '80vh' }}
-         //className={"rounded-xl"}
+          //className={"rounded-xl"}
           //sandbox="allow-scripts allow-forms allow-modals allow-downloads"
+          allow="microphone"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
           referrerPolicy="no-referrer"
         />
       )}
