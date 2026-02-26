@@ -30,7 +30,7 @@ pub fn start_server(app: &tauri::AppHandle) -> Result<(), String> {
 
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
-            println!("sidecar: {:?}", event);
+            //println!("sidecar: {:?}", event);
             match event {
                 CommandEvent::Stdout(bytes) => {
                     print!("{}", String::from_utf8_lossy(&bytes));

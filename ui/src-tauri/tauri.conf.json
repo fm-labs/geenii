@@ -19,7 +19,11 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; frame-src 'self' site: http://site.localhost; child-src 'self' site: http://site.localhost"
+      "csp": {
+        "default-src": "'self' site: asset: http://site.localhost http://localhost:13030 http://127.0.0.1:13030",
+        "frame-src": "'self' site: http://site.localhost",
+        "child-src": "'self' site: http://site.localhost"
+      }
     },
     "withGlobalTauri": true
   },
@@ -40,8 +44,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "android": {
-      "minSdkVersion": 28
+    "macOS": {
+      "entitlements": "./Entitlements.plist",
+      "frameworks": [
+        "/System/Library/Frameworks/CoreAudio.framework"
+      ]
     },
     "externalBin": [
       "binaries/geeniid"
