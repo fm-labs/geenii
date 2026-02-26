@@ -1,7 +1,9 @@
 import os
+import logging
 
 import pydantic
 
+logger = logging.getLogger(__name__)
 
 class GeeAppManifest(pydantic.BaseModel):
     name: str
@@ -46,6 +48,9 @@ class AppRegistry:
 
     def load_apps_from_directory(self, directory: str):
         # check all directory entries for app_spec.json files and load them
+        if not os.path.isdir(directory):
+            logger.warning(f"Directory {directory} does not exist or is not a directory.")
+            return
         for entry in os.listdir(directory):
             entry_path = os.path.join(directory, entry)
             if os.path.isdir(entry_path):
@@ -55,8 +60,8 @@ class AppRegistry:
                         app_spec = read_app_spec_json(app_spec_path)
                         self.register_app(app_spec)
                     except Exception as e:
-                        print(f"Error loading app spec from {app_spec_path}: {e}")
+                        logger.warning(f"Error loading app spec from {app_spec_path}: {e}")
                 else:
-                    print(f"No app.manifest.json found in {entry_path}, auto-configure.")
+                    logger.warning(f"No app.manifest.json found in {entry_path}, auto-configure.")
                     app_spec = GeeAppSpec(name=entry, path=entry_path, manifest=None, trusted=False)
                     self.register_app(app_spec)
