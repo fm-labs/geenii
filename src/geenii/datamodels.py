@@ -1,10 +1,24 @@
-from typing import List, Any, Set
+from typing import List, Any, Set, Literal
 
 import pydantic
 from fastapi import UploadFile
 
 from geenii import config
 from geenii.chat.chat_models import ContentPart
+
+class AIProviderInfo(pydantic.BaseModel):
+    name: str
+    #description: str | None = None
+    #website: str | None = None
+    #models: List[str] | None = pydantic.Field(default_factory=list)
+
+class AIModelInfo(pydantic.BaseModel):
+    provider: str
+    name: str
+    locality: Literal["local","cloud"]  # "local" or "cloud"
+    description: str | None = None
+    capabilities: List[str] | None = pydantic.Field(default_factory=list)
+    metadata: dict | None = pydantic.Field(default_factory=dict)
 
 
 class ModelMessage(pydantic.BaseModel):

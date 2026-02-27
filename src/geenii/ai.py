@@ -1,15 +1,51 @@
-from geenii.datamodels import CompletionRequest, CompletionResponse, CompletionErrorResponse, \
-    ChatCompletionRequest, ChatCompletionResponse, ImageGenerationApiRequest, ImageGenerationApiResponse, \
+from geenii.datamodels import CompletionResponse, CompletionErrorResponse, \
+    ChatCompletionRequest, ImageGenerationApiRequest, ImageGenerationApiResponse, \
     AudioGenerationApiRequest, AudioGenerationApiResponse, AudioTranscriptionApiRequest, AudioTranscriptionApiResponse, \
-    ModelMessage
+    ModelMessage, AIModelInfo, AIProviderInfo
 from geenii.provider.interfaces import AICompletionProvider, AIProvider, AIImageGeneratorProvider, \
     AIAudioGeneratorProvider, AIAudioTranscriptionProvider, AIAudioTranslationProvider, AIChatCompletionProvider
 
 from geenii.provider.ollama.provider import OllamaAIProvider
 from geenii.provider.openai.provider import OpenAIProvider
+from geenii.utils.cached import cached
 
 type AIProviderType = AICompletionProvider | AIImageGeneratorProvider | AIAudioGeneratorProvider \
                       | AIAudioTranscriptionProvider | AIAudioTranslationProvider | AIProvider
+
+
+#@cached(ttl=3600)
+def enumerate_providers() -> list[AIProviderInfo]:
+    """
+    Enumerate all available AI providers by checking the provider modules.
+    This function can be extended to dynamically discover providers.
+    For now, it returns a hardcoded list of supported providers.
+
+    :return: A list of available provider names.
+    """
+    providers = []
+    providers.append(AIProviderInfo(name="ollama"))
+    providers.append(AIProviderInfo(name="openai"))
+    #providers.append(AIProviderInfo(name="anthropic"))
+    #providers.append(AIProviderInfo(name="openrouter"))
+    #providers.append(AIProviderInfo(name="whisper"))
+    #providers.append(AIProviderInfo(name="huggingface"))
+    return providers
+
+
+@cached(ttl=3600)
+def enumerate_models() -> list[AIModelInfo]:
+    """
+    Enumerate all available models from all providers.
+
+    :return: A list of available models
+    """
+    models = []
+    for provider_info in enumerate_providers():
+        ai_provider = get_ai_provider(provider_info.name)
+        provider_models = ai_provider.get_models()
+        for model in provider_models:
+            models.append(model)
+    return models
 
 
 def split_model(model_id: str) -> tuple[str, str]:

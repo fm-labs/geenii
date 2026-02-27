@@ -2,7 +2,7 @@ import abc
 from typing import List
 
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, AudioTranscriptionApiResponse, \
-    AudioGenerationApiResponse, AudioTranslationApiResponse, ChatCompletionResponse, ChatCompletionRequest
+    AudioGenerationApiResponse, AudioTranslationApiResponse, ChatCompletionResponse, ChatCompletionRequest, AIModelInfo
 
 
 class AIProvider(abc.ABC):
@@ -23,7 +23,7 @@ class AIProvider(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_models(self) -> list[str]:
+    def get_models(self) -> list[AIModelInfo]:
         """Return a list of models available in this AI provider"""
         pass
 

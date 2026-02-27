@@ -6,7 +6,7 @@ import logging
 import ollama
 
 from geenii.chat.chat_models import TextContent, ToolCallContent, ContentPart
-from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest
+from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest, AIModelInfo
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider
 
 logger = logging.getLogger(__name__)
@@ -30,18 +30,35 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         super().__init__(name="ollama")
         #self.client = get_ollama_client()
 
-    def get_capabilities(self) -> list[str]:
-        return ['completion', 'chat_completion', 'tools']
+    @property
+    def ollama(self):
+        client = ollama.Client()
+        return client
 
-    def get_models(self) -> list[str]:
-        return [
-            "mistral:latest",
-            "llama3.2:3b",
-            "llama3.2:latest",
-            "llama3.1:latest",
-            "llama3.0:latest",
-            "llama2:latest",
-        ]
+    def get_capabilities(self) -> list[str]:
+        return ['completion', 'chat_completion', 'tool_calling']
+
+    def get_models(self) -> list[AIModelInfo]:
+        models = []
+        # map the ollama models to our internal AIModelInfo format
+        ollama_models = self.ollama.list()
+        if ollama_models and ollama_models.models:
+            for model in ollama_models.models:
+                metadata = dict()
+                metadata["size"] = model.size if model.size else None
+                metadata["digest"] = model.digest if model.digest else None
+                metadata["modified_at"] = model.modified_at.isoformat() if model.modified_at else None
+                metadata.update(model.details.model_dump())
+                model_info = AIModelInfo(
+                    provider=self.name,
+                    name=model.model,
+                    locality="cloud" if model.model.endswith("-cloud") else "local",
+                    description=f"Ollama model {model.model}",
+                    capabilities=[],
+                    metadata=model.details.model_dump(),
+                )
+                models.append(model_info)
+        return models
 
     def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry = None) -> ChatCompletionResponse:
         """
@@ -213,7 +230,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         })
         try:
             logger.info(f"OLLAMA: Generating chat completion with model {model} and {len(input_messages)} input messages")
-            model_result = ollama.chat(
+            model_result = self.ollama.chat(
                 model=model,
                 messages=input_messages,
                 tools=ollama_tools,
@@ -369,7 +386,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         print(f"OLLAMA: Generating completion with model: {model}, system: {system}, prompt: {prompt}")
 
         try:
-            model_result = ollama.generate(
+            model_result = self.ollama.generate(
                 model=model,
                 system=system,
                 #todo template=template

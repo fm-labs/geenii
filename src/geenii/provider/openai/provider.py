@@ -1,10 +1,11 @@
 import json
 import time
 import uuid
+import datetime
 
 from geenii.chat.chat_models import TextContent, ToolCallContent
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, ChatCompletionRequest, \
-    ChatCompletionResponse
+    ChatCompletionResponse, AIModelInfo
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider, \
     AIImageGeneratorProvider
 from geenii.provider.openai.client import get_openai_client
@@ -28,14 +29,33 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         self.client = get_openai_client()
 
     def get_capabilities(self) -> list[str]:
-        return ['completion', 'chat_completion', 'function_calling', 'image_generation']
+        return ['completion', 'chat_completion', 'tool_calling', 'image_generation']
 
-    def get_models(self) -> list[str]:
-        return [
-            "gpt-3.5-turbo",
-            "gpt-4",
-            "gpt-4o-mini",
-            "gpt-4.1"]
+    def get_models(self) -> list[AIModelInfo]:
+        models = []
+
+        def datetime_from_timestamp(ts):
+            """Convert a Unix timestamp to a human-readable datetime isoformat."""
+            return datetime.datetime.fromtimestamp(ts).isoformat()
+
+        openai_models = self.client.models.list()
+        #print(openai_models)
+        # Example Entry: Model(id='gpt-4-0613', created=1686588896, object='model', owned_by='openai')
+        for model in openai_models.data:
+            models.append(AIModelInfo(
+                provider=self.name,
+                name=model.id,
+                locality="cloud",
+                description=f"OpenAI model {model.id}",
+                capabilities=[], #self.get_capabilities(),
+                metadata={
+                    "created_at": datetime_from_timestamp(model.created),
+                    "owned_by": model.owned_by,
+                    "object": model.object
+                }
+            ))
+
+        return models
 
 
     def generate_completion(self, prompt: str, model: str = DEFAULT_MODEL, **kwargs) -> CompletionResponse:
