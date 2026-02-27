@@ -133,12 +133,8 @@ def get_system_report():
             return str(e)
 
     data = {
-        "system": {
-            "memory": get_memory_usage(),
-            "info": get_system_summary(),
-            "disk_usage": get_all_disk_usage(),
-            # "pids": get_process_info()
-        },
+        "system": get_system_summary(),
+        "disk_usage": get_all_disk_usage(),
         "settings": {
             "DATA_DIR": config.DATA_DIR,
             # "TMP_DIR": config.TMP_DIR,
