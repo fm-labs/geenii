@@ -7,21 +7,34 @@ import { useNavigate } from '@/app-router.tsx'
 
 type AppSpecModel = {
   name: string;
-  description?: string;
+  path: string;
+  manifest?: AppManifest;
+  trusted?: boolean;
 }
 
-const AppCard = ({ app }: { app: AppSpecModel }) => {
+type AppManifest = {
+  name: string;
+  title?: string;
+  description?: string;
+  author?: string;
+  version?: string;
+  main?: string;
+  files?: string[];
+  permissions?: string[];
+}
+
+const AppsSettingCard = ({ app }: { app: AppSpecModel }) => {
   const navigate = useNavigate()
 
   return (
     <div className="app-card rounded-lg border p-4 flex flex-row justify-between items-center">
       <div>
-        <h3 className={"font-bold"}>{app.name}</h3>
-        <p>{app?.description}</p>
+        <h3 className={"font-bold"}>{app?.manifest?.title || app.name}</h3>
+        <p className={"text-muted-foreground"}>{app?.manifest?.description || "No description available"}</p>
       </div>
       <div className={"space-x-2"}>
-        <Button variant={"secondary"}>Configure</Button>
-        <Button variant={"default"} onClick={() => navigate(`/apps/${app.name}`)}>Open</Button>
+        <Button size={"sm"} variant={"secondary"}>Configure</Button>
+        <Button size={"sm"} variant={"default"} onClick={() => navigate(`/apps/${app.name}`)}>Open</Button>
       </div>
     </div>
   )
@@ -43,6 +56,11 @@ const AppsSettings = () => {
     return data?.apps || []
   }
 
+  const sortedApps = React.useMemo(() => {
+    if (!apps) return []
+    return [...apps].sort((a, b) => a.name.localeCompare(b.name))
+  }, [apps])
+
   React.useEffect(() => {
     fetchApps().then(setApps)
   }, [])
@@ -50,8 +68,8 @@ const AppsSettings = () => {
   return (
     <div>
       <div className={"flex flex-col gap-y-4"}>
-        {apps.map((app) => (
-          <AppCard key={app.name} app={app} />
+        {sortedApps.map((app) => (
+          <AppsSettingCard key={app.name} app={app} />
         ))}
       </div>
     </div>

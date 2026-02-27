@@ -290,21 +290,47 @@ fn register_site_root(app: tauri::AppHandle, root_dir: String) -> Result<String,
         .canonicalize()
         .map_err(|e| format!("failed to canonicalize root_dir: {e}"))?;
 
-    let id = Uuid::new_v4().to_string();
+    let site_id = Uuid::new_v4().to_string();
 
     let sites = app.state::<Sites>();
-    sites.0.lock().unwrap().insert(id.clone(), root);
+    sites.0.lock().unwrap().insert(site_id.clone(), root);
 
-    Ok(id)
+    Ok(site_id)
 }
 
 #[tauri::command]
+fn register_app(app: tauri::AppHandle, app_name: String) -> Result<String, String> {
+    // The root path is the Home directory + the id, e.g. ~/.geenii/apps/{id}
+    let home = app.path().home_dir().map_err(|e| format!("failed to get home dir: {e}"))?;
+    let root = home.join(".geenii").join("apps").join(&app_name);
+
+    println!("Registering site id: {} with root path: {:?}", app_name, root);
+    if !root.is_dir() {
+        println!("Expected site root directory does not exist: {:?}", root);
+        return Err("Expected site root directory does not exist".into());
+    }
+
+    // Canonicalize to make later "starts_with" checks reliable.
+    let root = root
+        .canonicalize()
+        .map_err(|e| format!("failed to canonicalize root_dir: {e}"))?;
+
+    let site_id = Uuid::new_v4().to_string();
+
+    let sites = app.state::<Sites>();
+    sites.0.lock().unwrap().insert(site_id.clone(), root);
+
+    Ok(site_id)
+}
+
+
+#[tauri::command]
 fn open_site_window(app: tauri::AppHandle, site_id: String) -> Result<(), String> {
-    let url = format!("site://localhost/{}/index.html", site_id);
+    let url = format!("geenii://localhost/{}/index.html", site_id);
     let url = url.parse().map_err(|e| format!("bad url: {e}"))?;
 
     WebviewWindowBuilder::new(&app, format!("site-{}", site_id), WebviewUrl::CustomProtocol(url))
-        .title("Site Preview")
+        .title("Geenii App")
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -315,7 +341,7 @@ fn open_site_window(app: tauri::AppHandle, site_id: String) -> Result<(), String
 fn get_site_iframe_url(site_id: String) -> String {
     // macOS/Linux.
     // TODO: Handle ERR_UNKNOWN_URL_SCHEME on Windows, switch to the http mapping below.
-    format!("site://localhost/{}/index.html", site_id)
+    format!("geenii://localhost/{}/index.html", site_id)
 
     // TODO: Windows uses site.localhost
     // format!("http://site.localhost/{}/index.html", site_id)
@@ -397,6 +423,8 @@ pub fn run() {
         // })
         .manage(ServerProcess(std::sync::Mutex::new(None)))
         .setup(|app| {
+            setup_path_checker(app)?;
+
             if tauri::is_dev() {
                 println!("Running in dev mode. Skipping server startup.");
             } else {
@@ -416,8 +444,8 @@ pub fn run() {
             }
         })
         .manage(Sites::default())
-        .invoke_handler(tauri::generate_handler![register_site_root, open_site_window, get_site_iframe_url])
-        .register_uri_scheme_protocol("site", |ctx, request| {
+        .invoke_handler(tauri::generate_handler![register_site_root, register_app, open_site_window, get_site_iframe_url])
+        .register_uri_scheme_protocol("geenii", |ctx, request| {
             let app = ctx.app_handle();
             let sites = app.state::<Sites>();
 

@@ -1,7 +1,7 @@
 .cache/
 .idea/
 .venv/
-.geenii/
+.geenii
 bak/
 data/
 build/

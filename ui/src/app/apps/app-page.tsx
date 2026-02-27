@@ -23,14 +23,14 @@ const AppPage = () => {
   return (
     <Layout>
       <div className={"p-4"}>
-        <Header title={appId}>
-          {/*<select value={appId} onChange={(e) => setAppId(e.target.value)}>
+        {/*<<Header title={appId}>
+          select value={appId} onChange={(e) => setAppId(e.target.value)}>
             <option value={''}>-- Select App --</option>
             {APP_IDS.map((id) => (
               <option key={id} value={id}>{id}</option>
             ))}
-          </select>*/}
-        </Header>
+          </select>
+        </Header>*/}
         {appId && <TauriAppViewer appId={appId} />}
       </div>
     </Layout>

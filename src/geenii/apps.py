@@ -6,8 +6,18 @@ import pydantic
 logger = logging.getLogger(__name__)
 
 class GeeAppManifest(pydantic.BaseModel):
+    model_config = {
+        "extra": "allow",  # allow extra fields in the manifest without validation errors
+    }
+
     name: str
-    required_permissions: list[str] = pydantic.Field(default_factory=list)
+    title: str | None = None
+    description: str | None = None
+    author: str | None = None
+    version: str | None = None
+    main: str | None = None
+    files: list[str] | None = pydantic.Field(default_factory=list)
+    permissions: list[str] = pydantic.Field(default_factory=list)
 
 
 class GeeAppSpec(pydantic.BaseModel):
@@ -17,10 +27,10 @@ class GeeAppSpec(pydantic.BaseModel):
     trusted: bool = False
 
 
-def read_app_spec_json(file_path: str) -> GeeAppSpec:
+def read_app_manifest_json(file_path: str) -> GeeAppManifest:
     with open(file_path, "r") as f:
         data = f.read()
-    return GeeAppSpec.model_validate_json(data)
+    return GeeAppManifest.model_validate_json(data)
 
 
 class AppRegistry:
@@ -54,13 +64,14 @@ class AppRegistry:
         for entry in os.listdir(directory):
             entry_path = os.path.join(directory, entry)
             if os.path.isdir(entry_path):
-                app_spec_path = os.path.join(entry_path, "app.manifest.json")
-                if os.path.isfile(app_spec_path):
+                app_manifest_path = os.path.join(entry_path, "manifest.json")
+                if os.path.isfile(app_manifest_path):
                     try:
-                        app_spec = read_app_spec_json(app_spec_path)
+                        app_manifest = read_app_manifest_json(app_manifest_path)
+                        app_spec = GeeAppSpec(name=entry, path=entry_path, manifest=app_manifest, trusted=False)
                         self.register_app(app_spec)
                     except Exception as e:
-                        logger.warning(f"Error loading app spec from {app_spec_path}: {e}")
+                        logger.warning(f"Error loading app spec from {app_manifest_path}: {e}")
                 else:
                     logger.warning(f"No app.manifest.json found in {entry_path}, auto-configure.")
                     app_spec = GeeAppSpec(name=entry, path=entry_path, manifest=None, trusted=False)

@@ -20,9 +20,9 @@
     ],
     "security": {
       "csp": {
-        "default-src": "'self' site: asset: http://site.localhost http://localhost:13030 http://127.0.0.1:13030",
-        "frame-src": "'self' site: http://site.localhost",
-        "child-src": "'self' site: http://site.localhost"
+        "default-src": "'self' geenii: asset: http://geenii.localhost http://localhost:13030 http://127.0.0.1:13030",
+        "frame-src": "'self' geenii: http://geenii.localhost",
+        "child-src": "'self' geenii: http://geenii.localhost"
       }
     },
     "withGlobalTauri": true
