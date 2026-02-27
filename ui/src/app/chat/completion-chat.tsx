@@ -78,7 +78,7 @@ const CompletionChat = (props: ChatProps) => {
       console.warn('>> NO OUTPUT FROM XAI RESPONSE')
       return ''
     }
-    return response.output[0]?.content[0]?.text || 'ERROR: No content in response'
+    return response?.output_text || response?.output[0]?.text || 'ERROR: No content in response'
   }
 
 
