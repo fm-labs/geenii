@@ -22,3 +22,13 @@ def get_user_home() -> str:
         return os.environ.get("USERPROFILE", "")
     else:
         return os.environ.get("HOME", "")
+
+
+def get_user_home_dir():
+    home_dir = os.path.expanduser("~")
+    if not home_dir:
+        # fallback to HOME environment variable
+        home_dir = os.environ.get("HOME", "")
+    if not home_dir or not os.path.exists(home_dir):
+        raise ValueError("Unable to determine user home directory.")
+    return home_dir

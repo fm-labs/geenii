@@ -5,8 +5,6 @@ import pwd
 
 import psutil
 
-from geenii import config
-
 
 def get_memory_usage():
     try:
@@ -135,11 +133,6 @@ def get_system_report():
     data = {
         "system": get_system_summary(),
         "disk_usage": get_all_disk_usage(),
-        "settings": {
-            "DATA_DIR": config.DATA_DIR,
-            # "TMP_DIR": config.TMP_DIR,
-            "CACHE_DIR": config.CACHE_DIR,
-        },
         "user": {
             "envuser": os.environ.get("USERNAME"),
             "uid": _getuid(),
@@ -151,8 +144,6 @@ def get_system_report():
             "groupnames": _getgroupnames()
         },
         "directories": {
-            "DATA_DIR": _dirinfo(config.DATA_DIR),
-            "CACHE_DIR": _dirinfo(config.CACHE_DIR),
         },
         "files": {
         },

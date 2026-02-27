@@ -1,16 +1,16 @@
 import os
 import dotenv
+import json
 
-from geenii.utils.os_util import get_user_home
-
-dotenv.load_dotenv()
-dotenv.load_dotenv(".env.local", override=True)
+from geenii.utils.os_util import get_user_home, get_user_home_dir
 
 APP_VERSION = "0.2.0"
 
 USER_HOME_DIR = get_user_home()
 DATA_DIR = os.environ.get("DATA_DIR", USER_HOME_DIR + "/.geenii")
 CACHE_DIR = os.environ.get("CACHE_DIR", DATA_DIR + "/cache")
+
+dotenv.load_dotenv(DATA_DIR + "/.env")
 
 MCP_CONFIG_FILE="mcp.json"
 
@@ -51,3 +51,41 @@ CHAT_DM_NAMESPACE = "a7f3c2e1-4b8d-5a9f-8c3e-2d1b6f0e4a7c"
 CHAT_GROUP_NAMESPACE = "b7f3c2e1-8b4d-5a9f-8c3e-2d1b6f0e4a7a"
 
 
+def get_user_data_dir():
+    #home_dir = get_user_home_dir()
+    #user_dir = os.path.join(home_dir, ".geenii")
+    #if not os.path.exists(user_dir):
+    #    os.makedirs(user_dir, exist_ok=True)
+    #return user_dir
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR, exist_ok=True)
+    return DATA_DIR
+
+
+def read_user_settings():
+    user_settings_path = os.path.join(get_user_data_dir(), "settings.json")
+    default_settings = {
+        "theme": "dark",
+        "notifications": True,
+        "language": "en-US"
+    }
+    if os.path.exists(user_settings_path):
+        try:
+            with open(user_settings_path, "r") as f:
+                settings = json.load(f)
+                return settings
+        except Exception as e:
+            print(f"Error reading user settings: {e}")
+            return default_settings
+    else:
+        return default_settings
+
+
+def write_user_settings(settings: dict):
+    print(f"Saving settings: {settings}")
+    user_settings_path = os.path.join(get_user_data_dir(), "settings.json")
+    try:
+        with open(user_settings_path, "w") as f:
+            json.dump(settings, f, indent=4)
+    except Exception as e:
+        print(f"Error writing user settings: {e}")

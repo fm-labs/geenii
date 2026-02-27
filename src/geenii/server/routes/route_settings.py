@@ -5,51 +5,6 @@ from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-def get_user_home_dir():
-    home_dir = os.path.expanduser("~")
-    if not home_dir:
-        # fallback to HOME environment variable
-        home_dir = os.environ.get("HOME", "")
-    if not home_dir or not os.path.exists(home_dir):
-        raise ValueError("Unable to determine user home directory.")
-    return home_dir
-
-def get_user_data_dir():
-    home_dir = get_user_home_dir()
-    user_dir = os.path.join(home_dir, ".geenii")
-    if not os.path.exists(user_dir):
-        os.makedirs(user_dir, exist_ok=True)
-    return user_dir
-
-
-def read_user_settings():
-    user_settings_path = os.path.join(get_user_data_dir(), "settings.json")
-    default_settings = {
-        "theme": "dark",
-        "notifications": True,
-        "language": "en-US"
-    }
-    if os.path.exists(user_settings_path):
-        try:
-            with open(user_settings_path, "r") as f:
-                settings = json.load(f)
-                return settings
-        except Exception as e:
-            print(f"Error reading user settings: {e}")
-            return default_settings
-    else:
-        return default_settings
-
-
-def write_user_settings(settings: dict):
-    print(f"Saving settings: {settings}")
-    user_settings_path = os.path.join(get_user_data_dir(), "settings.json")
-    try:
-        with open(user_settings_path, "w") as f:
-            json.dump(settings, f, indent=4)
-    except Exception as e:
-        print(f"Error writing user settings: {e}")
-
 
 @router.get("/")
 def get_settings():
