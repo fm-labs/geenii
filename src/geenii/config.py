@@ -1,32 +1,12 @@
 import os
 import dotenv
 
+from geenii.utils.os_util import get_user_home
+
 dotenv.load_dotenv()
 dotenv.load_dotenv(".env.local", override=True)
 
 APP_VERSION = "0.2.0"
-
-def get_os_name() -> str:
-    platform = os.environ.get("PLATFORM", "").lower()
-    if platform in ("windows", "linux", "darwin"):
-        return platform
-    # Fallback to sys.platform if PLATFORM env var is not set or unrecognized
-    import sys
-    if sys.platform.startswith("win"):
-        return "windows"
-    elif sys.platform.startswith("linux"):
-        return "linux"
-    elif sys.platform.startswith("darwin"):
-        return "darwin"
-    else:
-        return "unknown"
-
-def get_user_home() -> str:
-    if get_os_name() == "windows":
-        return os.environ.get("USERPROFILE", "")
-    else:
-        return os.environ.get("HOME", "")
-
 
 USER_HOME_DIR = get_user_home()
 DATA_DIR = os.environ.get("DATA_DIR", USER_HOME_DIR + "/.geenii")

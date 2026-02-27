@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 import logging
 
@@ -194,7 +195,10 @@ app.include_router(app_router, prefix="")
 #     test_websocket()
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=13030, workers=1, reload=False, log_level="info")
+    GEENII_SERVER_HOST = os.getenv("GEENII_SERVER_HOST", "127.0.0.1")
+    GEENII_SERVER_PORT = os.getenv("GEENII_SERVER_PORT", "8080")
+    uvicorn.run(app, host=GEENII_SERVER_HOST, port=int(GEENII_SERVER_PORT),
+                workers=1, reload=False, log_level="info")
 
 # async def serve():
 #     config = uvicorn.Config(app, host="127.0.0.1", port=13030, log_level="info")
