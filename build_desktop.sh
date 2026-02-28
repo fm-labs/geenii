@@ -51,7 +51,7 @@ set +x
 export TAURI_SIGNING_PRIVATE_KEY="$KEY_CONTENT"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
 set -x
-if ! pnpm tauri build $BUILD_ARGS ; then
+if ! pnpm tauri build $BUILD_ARGS $@ ; then
     echo "Tauri build failed. Exiting."
     cd ..
     exit 1
