@@ -1,5 +1,6 @@
 import * as React from 'react'
 import {
+  AudioWaveformIcon,
   BotIcon,
   BrainIcon,
   HammerIcon, InfoIcon, PackageIcon, PaletteIcon,
@@ -43,6 +44,7 @@ import {
 } from '@/constants.ts'
 import Header from '@/components/header.tsx'
 import SystemInfoView from '@/app/settings/components/system-info-view.tsx'
+import AudioSettings from '@/app/settings/components/audio-settings.tsx'
 
 
 const data = {
@@ -64,6 +66,7 @@ const data = {
     //{ name: "Accessibility", icon: Keyboard },
     //{ name: "Mark as read", icon: Check },
     //{ name: "Audio & video", icon: Video },
+    { name: "Audio", icon: AudioWaveformIcon },
     //{ name: "Connected accounts", icon: Link },
     //{ name: "Privacy & visibility", icon: Lock },
     //{ name: "Advanced", icon: Settings },
@@ -129,6 +132,8 @@ const SettingsView = () => {
         return <AppsSettings />
       case "System Info":
         return <SystemInfoView />
+      case "Audio":
+        return <AudioSettings />
       default:
         return <DisabledFeatureSettingsView />;
     }

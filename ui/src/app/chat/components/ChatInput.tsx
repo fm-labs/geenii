@@ -1,5 +1,8 @@
 import React, { ChangeEventHandler, KeyboardEventHandler } from 'react'
 import { SendHorizonal } from 'lucide-react'
+import VoiceRecorder from '@/components/voice-recorder/VoiceRecorder.tsx'
+import { FEATURE_VOICE_RECORDING_ENABLED } from '@/constants.ts'
+import { AiAssistVoicePrompt } from '@/app/aiassist/AiAssistVoicePrompt.tsx'
 
 interface ChatInputProps {
   onChange?: (data: any) => void,
@@ -44,6 +47,16 @@ const ChatInput = (props: ChatInputProps) => {
     }
   }
 
+  const handleVoiceTranscriptionResponse = (data: any) => {
+    console.log('Voice transcription response:', data)
+    if (data?.output_text) {
+      setInput(data.output_text)
+      if (props?.onChange) {
+        props.onChange(data.output_text)
+      }
+    }
+  }
+
   return (
     <div className={'Chat-input'}>
       <div className={'Chat-input-field'}>
@@ -57,7 +70,9 @@ const ChatInput = (props: ChatInputProps) => {
         <div>
           {/*FEATURE_CHAT_FILES_ENABLED && <button onClick={() => setShowFilesPopup(true)}>Add Files</button>*/}
           {/*FEATURE_CHAT_TOOLS_ENABLED && <button>Add Tools</button>*/}
-          {/*FEATURE_VOICE_RECORDING_ENABLED && <VoiceRecorder onAudioRecorded={handleAudioRecorded} />*/}
+          {FEATURE_VOICE_RECORDING_ENABLED && <AiAssistVoicePrompt
+              showProcessingState={true}
+              onResponse={handleVoiceTranscriptionResponse} />}
         </div>
         <div>
           <button className={'border-none'} disabled={input.trim()===''}

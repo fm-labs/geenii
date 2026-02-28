@@ -42,7 +42,7 @@ export function AudioPlayerWithWaveform({ audioBlob }) {
       <div id='waveform' ref={waveformRef}></div>
       {audioBlob && (
         <audio controls>
-          <source src={URL.createObjectURL(audioBlob)} type='audio/wav' />
+          <source src={URL.createObjectURL(audioBlob)} type={audioBlob.type} />
         </audio>
       )}
     </div>
