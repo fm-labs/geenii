@@ -28,11 +28,10 @@ logging.basicConfig(
             omit_repeated_times=False,  # show timestamp every line
             show_level=True,
             show_path=True,  # hide file path
-            rich_tracebacks=True,  # beautiful exception tracebacks
+            rich_tracebacks=False,  # beautiful exception tracebacks
         )
     ]
 )
-
 
 # redis_listener_stop_event = asyncio.Event()
 
@@ -195,6 +194,12 @@ app.include_router(app_router, prefix="")
 #     test_websocket()
 
 if __name__ == "__main__":
+    # ensure data directories exist
+    os.makedirs(f"{DATA_DIR}/apps", exist_ok=True)
+    os.makedirs(f"{DATA_DIR}/cache", exist_ok=True)
+    # os.makedirs(f"{DATA_DIR}/sessions", exist_ok=True)
+    # os.makedirs(f"{DATA_DIR}/tmp", exist_ok=True)
+
     GEENII_SERVER_HOST = os.getenv("GEENII_SERVER_HOST", "127.0.0.1")
     GEENII_SERVER_PORT = os.getenv("GEENII_SERVER_PORT", "13030")
     uvicorn.run(app, host=GEENII_SERVER_HOST, port=int(GEENII_SERVER_PORT),

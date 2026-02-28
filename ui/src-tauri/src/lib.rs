@@ -162,6 +162,35 @@ pub fn setup_path_checker(app: &mut App) -> Result<(), Box<dyn std::error::Error
 }
 
 #[cfg(desktop)]
+pub fn ensure_paths(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
+    let app_handle = app.handle().clone();
+
+    // Ensure $HOME/.geenii and subdirectories exist, since we expect them to be there for storing app data and microsites.
+    let geenii_dir = app_handle.path().home_dir()?.join(".geenii");
+    let apps_dir = geenii_dir.join("apps");
+    let cache_dir = geenii_dir.join("cache");
+
+    tauri::async_runtime::spawn(async move {
+        let base_dirs = vec![
+            ("Geenii Base", geenii_dir),
+            ("Apps", apps_dir),
+            ("Cache", cache_dir),
+        ];
+
+        for entry in base_dirs {
+            let (name, path) = entry;
+            if !path.exists() {
+                match std::fs::create_dir_all(&path) {
+                    Ok(_) => println!("Created directory for {}: {:?}", name, path),
+                    Err(e) => eprintln!("Failed to create directory for {}: {:?}, error: {}", name, path, e),
+                };
+            }
+        }
+    });
+    Ok(())
+}
+
+#[cfg(desktop)]
 pub fn setup_autostart(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     {
         use tauri_plugin_autostart::MacosLauncher;
@@ -424,6 +453,7 @@ pub fn run() {
         .manage(ServerProcess(std::sync::Mutex::new(None)))
         .setup(|app| {
             setup_path_checker(app)?;
+            ensure_paths(app)?;
 
             if tauri::is_dev() {
                 println!("Running in dev mode. Skipping server startup.");

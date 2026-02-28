@@ -24,11 +24,11 @@ pub fn start_server(app: &tauri::AppHandle) -> Result<(), String> {
 
     // Logging setup
     // TODO: refactor using rust tracing or tauri logger plugin
-    let app_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&app_dir)
+    let app_log_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&app_log_dir)
         .map_err(|e| format!("Failed to create log directory: {}", e))?;
 
-    let log_path = app_dir.join("geeniid.log");
+    let log_path = app_log_dir.join("geeniid.log");
     println!("Log file path: {:?}", log_path);
     let log_file = OpenOptions::new()
         .create(true)
