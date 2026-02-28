@@ -5,6 +5,7 @@ type AppContextType = {
     isTauri: boolean;
     xaiApi: IAiClient;
     dockerApi?: IDockerApiClient;
+    apiHealth?: any;
     apiInfo?: any;
 }
 
