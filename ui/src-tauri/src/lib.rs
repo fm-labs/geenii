@@ -1,25 +1,25 @@
 //mod docker;
 mod server;
 
+use std::sync::{
+    atomic::AtomicBool,
+    Mutex,
+};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Mutex,
-};
 
-use serde::{Deserialize, Serialize};
 use mime_guess::MimeGuess;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use tauri::http::{Response, StatusCode};
 //use tauri::image::Image;
 //use tauri::menu::Menu;
 use tauri::path::BaseDirectory;
 //use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{App, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
-use tauri::http::{Response, StatusCode};
 use tauri_plugin_shell::{process::CommandChild, ShellExt};
 
 use server::ServerProcess;
@@ -46,17 +46,6 @@ struct CommandResult {
     exit_code: Option<i32>,
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("HelloScreen, {}! You've been greeted from Rust!", name)
-}
-
-#[tauri::command]
-fn prompt(prompt: &str) -> String {
-    format!("Your wish is my command! You requested: {}", prompt)
-}
-
 // Basic command execution
 #[tauri::command]
 async fn execute_command(
@@ -80,22 +69,6 @@ async fn execute_command(
         exit_code: output.status.code(),
     })
 }
-
-// Spawn built-in python server sidecar
-// #[tauri::command]
-// async fn start_python_sidecar(app: &tauri::AppHandle) -> Result<(), String> {
-//     let sidecar_cmd = app
-//         .shell()
-//         .sidecar("binaries/geeniid")
-//         .map_err(|e| e.to_string())?;
-//
-//     // no args in this example; you could pass e.g. ["--port", "8765"]
-//     let (_rx, _child) = sidecar_cmd.spawn().map_err(|e| e.to_string())?;
-//
-//     // For a long-running FastAPI server, the process will just stay alive.
-//     // If you want to stop it later, store `_child` somewhere in app state.
-//     Ok(())
-// }
 
 #[cfg(desktop)]
 pub fn check_all_tauri_paths(app_handle: &AppHandle) -> Vec<bool> {
@@ -151,21 +124,18 @@ pub fn check_all_tauri_paths(app_handle: &AppHandle) -> Vec<bool> {
 #[cfg(desktop)]
 pub fn setup_path_checker(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle = app.handle().clone();
-
     // Run the check on startup
     tauri::async_runtime::spawn(async move {
         let _checks = check_all_tauri_paths(&app_handle);
         //print_path_report(&checks);
     });
-
     Ok(())
 }
 
 #[cfg(desktop)]
 pub fn ensure_paths(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
+    // Ensure $HOME/.geenii and subdirectories exist.
     let app_handle = app.handle().clone();
-
-    // Ensure $HOME/.geenii and subdirectories exist, since we expect them to be there for storing app data and microsites.
     let geenii_dir = app_handle.path().home_dir()?.join(".geenii");
     let apps_dir = geenii_dir.join("apps");
     let cache_dir = geenii_dir.join("cache");
@@ -218,63 +188,8 @@ pub fn setup_autostart(app: &mut App) -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
-// async fn start_server_internal(app: AppHandle) -> Result<(), String> {
-//     let state = app.state::<ServerState>();
-//
-//     // prevent double-start (atomic, cross-thread safe)
-//     if state.started.swap(true, Ordering::SeqCst) {
-//         return Ok(());
-//     }
-//
-//     let mut guard = state.child.lock().unwrap();
-//     if guard.is_some() {
-//         return Ok(());
-//     }
-//
-//     let (mut rx, child) = app
-//         .shell()
-//         .sidecar("geeniid")
-//         .map_err(|e| e.to_string())?
-//         //.args(["8787"])
-//         .spawn()
-//         .map_err(|e| e.to_string())?;
-//
-//     tauri::async_runtime::spawn(async move {
-//         while let Some(event) = rx.recv().await {
-//             println!("sidecar: {:?}", event);
-//             match event {
-//                 CommandEvent::Stdout(bytes) => {
-//                     print!("{}", String::from_utf8_lossy(&bytes));
-//                 }
-//                 CommandEvent::Stderr(bytes) => {
-//                     eprint!("{}", String::from_utf8_lossy(&bytes));
-//                 }
-//                 CommandEvent::Error(err) => {
-//                     eprintln!("sidecar error: {err}");
-//                 }
-//                 CommandEvent::Terminated(p) => {
-//                     eprintln!(
-//                         "sidecar terminated: code={:?} signal={:?}",
-//                         p.code, p.signal
-//                     );
-//                 }
-//                 _ => {}
-//             }
-//         }
-//     });
-//
-//     *guard = Some(child);
-//     Ok(())
-// }
-
-// #[tauri::command]
-// async fn start_server(app: AppHandle) -> Result<(), String> {
-//     start_server_internal(app).await
-// }
-
 
 // MICROSITES
-
 #[derive(Default)]
 struct Sites(Mutex<HashMap<String, PathBuf>>);
 
@@ -372,8 +287,8 @@ fn get_site_iframe_url(site_id: String) -> String {
     // TODO: Handle ERR_UNKNOWN_URL_SCHEME on Windows, switch to the http mapping below.
     format!("geenii://localhost/{}/index.html", site_id)
 
-    // TODO: Windows uses site.localhost
-    // format!("http://site.localhost/{}/index.html", site_id)
+    // TODO: Windows uses geenii.localhost
+    // format!("http://geenii.localhost/{}/index.html", site_id)
 }
 
 
@@ -433,10 +348,7 @@ pub fn run() {
         //     started: AtomicBool::new(false),
         // })
         .invoke_handler(tauri::generate_handler![
-            greet,
-            prompt,
             execute_command,
-            //start_server
         ])
         // .setup(|app| {
         //     let app_handle = app.handle().clone(); // owned, 'static
