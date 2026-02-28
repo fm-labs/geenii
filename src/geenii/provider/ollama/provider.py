@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
 
-    DEFAULT_MODEL = "mistral:latest"
+    DEFAULT_MODEL = "qwen:3b"
     DEFAULT_TEMPERATURE = 0.7
     DEFAULT_MAX_TOKENS = 4096
     DEFAULT_TOP_K = None # 20
@@ -229,6 +229,8 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             'content': prompt,
         })
         try:
+            print(input_messages)
+
             logger.info(f"OLLAMA: Generating chat completion with model {model} and {len(input_messages)} input messages")
             model_result = self.ollama.chat(
                 model=model,
@@ -289,9 +291,8 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             response = ChatCompletionResponse(
                 id=uuid.uuid4().hex,
                 timestamp=int(time.time()),
+                model=f"{self.name}:{model}",
                 prompt=prompt,
-                model=model,
-                #provider=self.name,
                 output=output_parts, # Parsed output from the model response
                 model_result=model_result.model_dump(),
                 #todo tools_used=[]
@@ -410,9 +411,8 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             response = CompletionResponse(
                 id=uuid.uuid4().hex,
                 timestamp=int(time.time()),
+                model=f"{self.name}:{model}",
                 #prompt=prompt,
-                model=model,
-                #provider=self.name,
                 output=output_parts,
                 output_text=str(content).strip(),
                 model_result=model_result.model_dump()

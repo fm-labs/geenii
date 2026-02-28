@@ -5,42 +5,25 @@ import uuid
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
 from geenii import ai
+from geenii.ai import enumerate_models
 from geenii.datamodels import CompletionErrorResponse, CompletionRequest, CompletionResponse, ChatCompletionRequest, \
     ChatCompletionResponse, ImageGenerationApiResponse, \
     ImageGenerationApiRequest, AudioGenerationApiRequest, AudioGenerationApiResponse, AudioTranscriptionApiRequest, \
-    AudioTranscriptionApiResponse, AudioTranslationApiResponse, AudioTranslationApiRequest
+    AudioTranscriptionApiResponse, AudioTranslationApiResponse, AudioTranslationApiRequest, AIModelInfo
 from geenii.config import DATA_DIR, DEFAULT_AUDIO_TRANSCRIPTION_MODEL
 
 router = APIRouter(prefix="/ai/v1", tags=["ai"])
 
 
 @router.get("/models")
-async def models() -> list[dict]:
+async def models() -> list[AIModelInfo]:
     """
     List all available AI models.
     """
-    return [
-        {
-            "name": "gpt-3.5-turbo",
-            "provider": "openai",
-            "type": "text-completion",
-            "description": "OpenAI's GPT-3.5 Turbo model for text completion tasks."
-        },
-        {
-            "name": "dall-e-2",
-            "provider": "openai",
-            "type": "image-generation",
-            "description": "OpenAI's DALL-E 2 model for generating images from text prompts."
-        },
-        {
-            "name": "whisper-large-v3",
-            "provider": "openai",
-            "type": "audio-transcription",
-            "description": "OpenAI's Whisper Large v3 model for transcribing audio to text."
-        }
-    ]
+    return enumerate_models()
 
-# @router.post("/models/download")
+
+# @router.post("/models/install")
 # async def download_model(provider_name: str, model_name: str) -> dict:
 #     """
 #     Download the specified AI model for local use.

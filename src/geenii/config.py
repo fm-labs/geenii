@@ -25,7 +25,8 @@ DEFAULT_IMAGE_GENERATION_MODEL="openai:dall-e-2"
 # Audio generation / Text-to-Speech
 DEFAULT_AUDIO_GENERATION_MODEL="hf:llama-2:latest"
 # Audio transcription / Speech-to-Text
-DEFAULT_AUDIO_TRANSCRIPTION_MODEL="whisper:whisper-1:latest"
+#DEFAULT_AUDIO_TRANSCRIPTION_MODEL="whisper:whisper-1:latest"
+DEFAULT_AUDIO_TRANSCRIPTION_MODEL="openai:whisper-1"
 DEFAULT_AUDIO_TRANSLATION_MODEL="whisper:whisper-1:latest"
 
 WHISPERCPP_IMAGE="whispercpp:latest"

@@ -196,7 +196,7 @@ app.include_router(app_router, prefix="")
 
 if __name__ == "__main__":
     GEENII_SERVER_HOST = os.getenv("GEENII_SERVER_HOST", "127.0.0.1")
-    GEENII_SERVER_PORT = os.getenv("GEENII_SERVER_PORT", "8080")
+    GEENII_SERVER_PORT = os.getenv("GEENII_SERVER_PORT", "13030")
     uvicorn.run(app, host=GEENII_SERVER_HOST, port=int(GEENII_SERVER_PORT),
                 workers=1, reload=False, log_level="info")
 
