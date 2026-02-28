@@ -1,6 +1,6 @@
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::process::{Child, Command};
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};

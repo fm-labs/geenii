@@ -34,6 +34,8 @@ WHISPERCPP_IMAGE="whispercpp:latest"
 OPENAI_API_KEY=os.environ.get("OPENAI_API_KEY", "")
 ANTHROPIC_API_KEY=os.environ.get("ANTHROPIC_API_KEY", "")
 
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")  # default Ollama API endpoint
+OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", "")
 
 # Database settings
 MONGODB_URI = os.environ.get("MONGODB_URI", "")

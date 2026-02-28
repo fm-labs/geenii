@@ -18,6 +18,11 @@ class AIProvider(abc.ABC):
         return f"AIProvider(name={self.name})"
 
     @abc.abstractmethod
+    def is_configured(self) -> bool:
+        """Return True if this AI provider is properly configured and ready to use"""
+        pass
+
+    @abc.abstractmethod
     def get_capabilities(self) -> list[str]:
         """Return a list of capabilities provided by this AI provider"""
         pass

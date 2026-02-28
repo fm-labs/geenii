@@ -5,6 +5,7 @@ import logging
 
 import ollama
 
+from geenii import config
 from geenii.chat.chat_models import TextContent, ToolCallContent, ContentPart
 from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest, AIModelInfo
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider
@@ -29,11 +30,19 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         """
         super().__init__(name="ollama")
         #self.client = get_ollama_client()
+        self._client = None
 
     @property
     def ollama(self):
-        client = ollama.Client()
-        return client
+        if self._client is None:
+            headers = {}
+            if config.OLLAMA_API_KEY:
+                headers['Authorization'] = f"Bearer {config.OLLAMA_API_KEY}"
+            self._client = ollama.Client(host=config.OLLAMA_HOST, headers=headers)
+        return self._client
+
+    def is_configured(self) -> bool:
+        return config.OLLAMA_HOST
 
     def get_capabilities(self) -> list[str]:
         return ['completion', 'chat_completion', 'tool_calling']
@@ -41,7 +50,12 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
     def get_models(self) -> list[AIModelInfo]:
         models = []
         # map the ollama models to our internal AIModelInfo format
-        ollama_models = self.ollama.list()
+        try:
+            ollama_models = self.ollama.list()
+        except Exception as e:
+            logger.error(f"Error fetching models from Ollama: {e}")
+            return models
+
         if ollama_models and ollama_models.models:
             for model in ollama_models.models:
                 metadata = dict()

@@ -4,15 +4,18 @@ import time
 import uuid
 import datetime
 
+from openai import OpenAI
+
+from geenii import config
 from geenii.chat.chat_models import TextContent, ToolCallContent
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, ChatCompletionRequest, \
     ChatCompletionResponse, AIModelInfo, AudioTranscriptionApiResponse
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider, \
     AIImageGeneratorProvider, AIAudioTranscriptionProvider
-from geenii.provider.openai.client import get_openai_client
 
 
-class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider, AIImageGeneratorProvider, AIAudioTranscriptionProvider):
+class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider, AIImageGeneratorProvider,
+                     AIAudioTranscriptionProvider):
     """
     A class to represent the OpenAI provider for XAI.
     """
@@ -35,7 +38,21 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
 
     def __init__(self, **kwargs):
         super().__init__(name="openai")
-        self.client = get_openai_client()
+        self._client = None
+
+    @property
+    def client(self):
+        if self._client is None:
+            api_key = os.environ.get("OPENAI_API_KEY", None)
+            if not api_key:
+                raise ValueError("OpenAI API key not found. Please set the OPENAI_API_KEY environment variable.")
+
+            print(f"Connecting using OpenAI API Key starting with '{config.OPENAI_API_KEY[:13]}..'")
+            return OpenAI(api_key=config.OPENAI_API_KEY)
+        return self._client
+
+    def is_configured(self) -> bool:
+        return config.OPENAI_API_KEY is not None and len(config.OPENAI_API_KEY) > 0
 
     def get_capabilities(self) -> list[str]:
         return ['completion', 'chat_completion', 'tool_calling', 'image_generation']
@@ -47,8 +64,13 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             """Convert a Unix timestamp to a human-readable datetime isoformat."""
             return datetime.datetime.fromtimestamp(ts).isoformat()
 
-        openai_models = self.client.models.list()
-        #print(openai_models)
+        try:
+            openai_models = self.client.models.list()
+        except Exception as e:
+            print(f"Error fetching models from OpenAI: {e}")
+            return models
+
+        # print(openai_models)
         # Example Entry: Model(id='gpt-4-0613', created=1686588896, object='model', owned_by='openai')
         for model in openai_models.data:
             models.append(AIModelInfo(
@@ -56,16 +78,14 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                 name=model.id,
                 locality="cloud",
                 description=f"OpenAI model {model.id}",
-                capabilities=[], #self.get_capabilities(),
+                capabilities=[],  # self.get_capabilities(),
                 metadata={
                     "created_at": datetime_from_timestamp(model.created),
                     "owned_by": model.owned_by,
                     "object": model.object
                 }
             ))
-
         return models
-
 
     def generate_completion(self, prompt: str, model: str = DEFAULT_MODEL, **kwargs) -> CompletionResponse:
         """
@@ -89,21 +109,22 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         temperature = kwargs.get('temperature', 0.5)
         max_tokens = kwargs.get('max_tokens', 4096)
         top_p = kwargs.get('top_p', None)
-        #top_k = kwargs.get('top_k', None) # top_k is not supported in OpenAI Responses API
+        # top_k = kwargs.get('top_k', None) # top_k is not supported in OpenAI Responses API
         output_format = kwargs.get('output_format', None)
         if isinstance(output_format, str):
             if output_format.lower() == "json" or output_format.lower() == "json_object":
                 output_format = {"type": "json_object"}
             else:
-                raise ValueError(f"Unsupported format: {output_format}. Supported formats are: 'json' or pass a JSON schema object.")
-        #if not isinstance(format, dict):
+                raise ValueError(
+                    f"Unsupported format: {output_format}. Supported formats are: 'json' or pass a JSON schema object.")
+        # if not isinstance(format, dict):
         #    raise ValueError(f"Format must be a string or a JSON schema object, got {type(format)}.")
 
-        #if model not in self.get_models():
+        # if model not in self.get_models():
         #    raise ValueError(f"Model {model} is not supported by {repr(self)}.")
 
         input_messages = kwargs.get('input', [])
-        #if system is not None:
+        # if system is not None:
         #    input_messages.append({"role": "system", "content": system})
         input_messages.append({"role": "user", "content": prompt})
 
@@ -122,9 +143,9 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         response = CompletionResponse(
             id=uuid.uuid4().hex,
             timestamp=int(time.time()),
-            #prompt=prompt,
+            # prompt=prompt,
             model=model,
-            #provider=self.name,
+            # provider=self.name,
             # the output from the model response in OpenAI Responses API format
             output=output,
             # the aggregated text output from all output_text items in the output array
@@ -134,8 +155,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         )
         return response
 
-
-    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry = None) -> ChatCompletionResponse:
+    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry=None) -> ChatCompletionResponse:
         model = request.model or self.DEFAULT_MODEL
         system_prompt = request.system or self.DEFAULT_SYSTEM_PROMPT
         prompt = request.prompt
@@ -149,7 +169,6 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             tool_defs = tool_registry.list_definitions()
             tool_defs_openai = [tool_def for tool_def in tool_defs if tool_def['name'] in tools]
             print(f"OpenAI tools mapped: {len(tool_defs_openai)}")
-
 
         # mapping history/seed model messages to OpenAI Responses API input format
         input_messages = []
@@ -172,7 +191,8 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                             "output": content_item.result
                         })
                     else:
-                        print(f"Unsupported model message content type for openai chat completion input: {content_item.type}")
+                        print(
+                            f"Unsupported model message content type for openai chat completion input: {content_item.type}")
 
         # finally add the user prompt
         input_messages.append({"role": "user", "content": prompt})
@@ -216,12 +236,11 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             timestamp=int(time.time()),
             model=f"{self.name}:{model}",
             prompt=prompt,
-            #provider=self.name,
+            # provider=self.name,
             output=output_parts,
             output_text=model_result.output_text,
             model_result=model_result.model_dump()
         )
-
 
     def generate_audio_transcription(self, model: str, audio: bytes | str, **kwargs) -> AudioTranscriptionApiResponse:
         if isinstance(audio, bytes):
@@ -243,7 +262,8 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             output_text=transcript.text
         )
 
-    def generate_image(self, prompt: str, model: str = "dall-e-2", n: int = 1, size: str = "256x256", **kwargs) -> ImageGenerationApiResponse:
+    def generate_image(self, prompt: str, model: str = "dall-e-2", n: int = 1, size: str = "256x256",
+                       **kwargs) -> ImageGenerationApiResponse:
         """
         Generate an image using OpenAI's DALL-E model.
 
@@ -271,8 +291,6 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             raise ValueError(f"Size {size} is not supported by model {model}. "
                              f"Supported sizes are: {self.DALLE_MODELS[model]['sizes']}.")
 
-
-
         # Fake response for 'response_format=url' for testing purposes
         if kwargs.get('response_format') == "url":
             # todo Implement cloud storage for images
@@ -282,10 +300,9 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                 prompt=prompt,
                 model=f"{self.name}:{model}",
                 provider=self.name,
-                #model_result=img.model_dump(), # skip model_dump() as it contains large data
+                # model_result=img.model_dump(), # skip model_dump() as it contains large data
                 output=[{"url": "https://example.com/fake_image.png"}]  # Fake URL for testing
             )
-
 
         img = self.client.images.generate(
             model=model,
@@ -298,9 +315,9 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             **kwargs  # allow additional parameters
         )
 
-        #image_url = img.data[0].url
-        #image_b64 = img.data[0].b64_json
-        #image_bytes = base64.b64decode(img.data[0].b64_json)
+        # image_url = img.data[0].url
+        # image_b64 = img.data[0].b64_json
+        # image_bytes = base64.b64decode(img.data[0].b64_json)
 
         # img.data contains either 'b64_json' or 'url' keys
         # wanted [{"base64": "..."}, {"url": "https://..."}]
@@ -318,7 +335,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             prompt=prompt,
             model=f"{self.name}:{model}",
             provider=self.name,
-            #model_result=img.model_dump(), # skip model_dump() as it contains large data
+            # model_result=img.model_dump(), # skip model_dump() as it contains large data
             output=[_map_item(item) for item in img.data]
         )
 

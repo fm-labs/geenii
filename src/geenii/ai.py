@@ -42,9 +42,10 @@ def enumerate_models() -> list[AIModelInfo]:
     models = []
     for provider_info in enumerate_providers():
         ai_provider = get_ai_provider(provider_info.name)
-        provider_models = ai_provider.get_models()
-        for model in provider_models:
-            models.append(model)
+        if ai_provider.is_configured():
+            provider_models = ai_provider.get_models()
+            for model in provider_models:
+                models.append(model)
     return models
 
 
