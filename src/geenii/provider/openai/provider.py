@@ -1,20 +1,22 @@
 import json
+import os
 import time
 import uuid
 import datetime
 
 from geenii.chat.chat_models import TextContent, ToolCallContent
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, ChatCompletionRequest, \
-    ChatCompletionResponse, AIModelInfo
+    ChatCompletionResponse, AIModelInfo, AudioTranscriptionApiResponse
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider, \
-    AIImageGeneratorProvider
+    AIImageGeneratorProvider, AIAudioTranscriptionProvider
 from geenii.provider.openai.client import get_openai_client
 
 
-class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider, AIImageGeneratorProvider):
+class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider, AIImageGeneratorProvider, AIAudioTranscriptionProvider):
     """
     A class to represent the OpenAI provider for XAI.
     """
+
     DEFAULT_MODEL = "gpt-3.5-turbo"
     DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer."
 
@@ -22,6 +24,13 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         "gpt-image-1": {"sizes": ["1024x1024", "auto"]},
         "dall-e-2": {"sizes": ["256x256", "512x512", "1024x1024"]},
         "dall-e-3": {"sizes": ["1024x1024", "1792x1024", "1024x1792"]}
+    }
+
+    TRANSCRIPTION_MODELS = {
+        "whisper-1": {},
+        "gpt-4o-transcribe": {},
+        "gpt-4o-mini-transcribe": {},
+        "gpt-4o-transcribe-diarize": {},
     }
 
     def __init__(self, **kwargs):
@@ -205,7 +214,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         return ChatCompletionResponse(
             id=uuid.uuid4().hex,
             timestamp=int(time.time()),
-            model=model,
+            model=f"{self.name}:{model}",
             prompt=prompt,
             #provider=self.name,
             output=output_parts,
@@ -213,6 +222,26 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             model_result=model_result.model_dump()
         )
 
+
+    def generate_audio_transcription(self, model: str, audio: bytes | str, **kwargs) -> AudioTranscriptionApiResponse:
+        if isinstance(audio, bytes):
+            # OpenAI API expects a file-like object, so we can use BytesIO
+            from io import BytesIO
+            audio = BytesIO(audio)
+        elif isinstance(audio, str):
+            if not os.path.exists(audio):
+                raise ValueError(f"Audio file path does not exist: {audio}")
+            audio = open(audio, "rb")
+        transcript = self.client.audio.transcriptions.create(
+            model=model,
+            file=audio,
+        )
+        return AudioTranscriptionApiResponse(
+            id=uuid.uuid4().hex,
+            timestamp=int(time.time()),
+            model=f"{self.name}:{model}",
+            output_text=transcript.text
+        )
 
     def generate_image(self, prompt: str, model: str = "dall-e-2", n: int = 1, size: str = "256x256", **kwargs) -> ImageGenerationApiResponse:
         """
@@ -251,7 +280,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                 id=uuid.uuid4().hex,
                 timestamp=time.time(),
                 prompt=prompt,
-                model=model,
+                model=f"{self.name}:{model}",
                 provider=self.name,
                 #model_result=img.model_dump(), # skip model_dump() as it contains large data
                 output=[{"url": "https://example.com/fake_image.png"}]  # Fake URL for testing
@@ -287,7 +316,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             id=uuid.uuid4().hex,
             timestamp=time.time(),
             prompt=prompt,
-            model=model,
+            model=f"{self.name}:{model}",
             provider=self.name,
             #model_result=img.model_dump(), # skip model_dump() as it contains large data
             output=[_map_item(item) for item in img.data]
