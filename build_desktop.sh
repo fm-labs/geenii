@@ -37,6 +37,9 @@ cd ./ui
 pnpm install --frozen-lockfile || exit 1
 
 BUILD_ARGS=""
+if [[ "$TARGET_TRIPLE" == *"x86_64-unknown-linux"* ]]; then
+    BUILD_ARGS="--bundles deb,rpm,appimage"
+
 if [[ "$TARGET_TRIPLE" == *"aarch64-unknown-linux"* ]]; then
     BUILD_ARGS="--bundles deb,rpm,appimage"
 
