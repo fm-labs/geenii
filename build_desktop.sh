@@ -39,13 +39,10 @@ pnpm install --frozen-lockfile || exit 1
 BUILD_ARGS=""
 if [[ "$TARGET_TRIPLE" == *"x86_64-unknown-linux"* ]]; then
     BUILD_ARGS="--bundles deb,rpm,appimage"
-
-if [[ "$TARGET_TRIPLE" == *"aarch64-unknown-linux"* ]]; then
+elif [[ "$TARGET_TRIPLE" == *"aarch64-unknown-linux"* ]]; then
     BUILD_ARGS="--bundles deb,rpm,appimage"
-
 elif [[ "$TARGET_TRIPLE" == *"darwin"* ]]; then
     BUILD_ARGS="--bundles app,dmg"
-
 elif [[ "$TARGET_TRIPLE" == *"windows"* ]]; then
     BUILD_ARGS="--bundles exe"
 fi
