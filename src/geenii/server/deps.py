@@ -2,8 +2,7 @@ from typing import Annotated
 
 from fastapi import Query, Depends
 
-from geenii import config
-from geenii.db.mongodb import get_mongo_client
+from geenii.utils.mongodb import get_mongo_client
 
 
 def dep_token_in_query(token: Annotated[str, Query]) -> str:

@@ -15,7 +15,7 @@ def get_global_mongo_client() -> MongoClient:
 
 def get_mongo_client(uri=None, ping: bool = False) -> MongoClient:
     if uri is None:
-        uri = settings.MONGODB_URI
+        uri = config.MONGODB_URI
     if not uri or uri.strip() == "":
         raise ValueError("MONGODB_URI is not set in environment variables.")
 

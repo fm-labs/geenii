@@ -7,7 +7,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 
-from geenii.mcp.client import get_mcp_client_for_server, McpClient
+from geenii.mcp import get_mcp_client_for_server, McpClient
 
 logger = logging.getLogger(__name__)
 

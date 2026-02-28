@@ -6,7 +6,7 @@ from mcp.types import Prompt
 
 from geenii import tools
 from geenii.datamodels import MCPServerConfig, MCPToolCallRequest, MCPServerInfo, MCPToolCallResponse
-from geenii.mcp.client import get_mcp_config, read_mcp_config_json, write_mcp_config_json, \
+from geenii.mcp import get_mcp_config, read_mcp_config_json, write_mcp_config_json, \
     get_mcp_client_for_server, get_mcp_config_for_server
 from geenii.utils.cached import cached
 

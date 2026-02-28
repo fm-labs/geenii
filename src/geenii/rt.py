@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from geenii.core.core_tools import geenii_tools
-from geenii.mcp.client import get_mcp_config, McpClient
+from geenii.mcp import get_mcp_config, McpClient
 from geenii.tools import PythonTool, ToolRegistry
 from geenii.utils.cached import cached
 

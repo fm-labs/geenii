@@ -11,7 +11,7 @@ from redis import Redis
 # from pydantic import Field, ConfigDict
 # from pydantic_core import core_schema
 
-from geenii.db.mongodb import get_mongo_collection, get_mongo_client
+from geenii.utils.mongodb import get_mongo_collection, get_mongo_client
 from geenii.config import MONGODB_DB_NAME
 
 

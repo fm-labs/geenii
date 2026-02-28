@@ -13,7 +13,7 @@ def get_global_aioredis_client() -> aioredis.Redis:
     return aio_redis_global
 
 
-def get_aioredis_client(redis_url=settings.REDIS_URI) -> aioredis.Redis:
+def get_aioredis_client(redis_url=config.REDIS_URI) -> aioredis.Redis:
     if not redis_url:
         raise ValueError("REDIS_URI must be set in environment variables.")
     return aioredis.from_url(redis_url, decode_responses=True)
@@ -26,7 +26,7 @@ def get_global_redis_client() -> redis.Redis:
     return redis_global
 
 
-def get_redis_client(redis_url=settings.REDIS_URI) -> redis.Redis:
+def get_redis_client(redis_url=config.REDIS_URI) -> redis.Redis:
     if not redis_url:
         raise ValueError("REDIS_URI must be set in environment variables.")
 

@@ -16,28 +16,6 @@ def echo(message: str) -> str:
 
 
 @geenii_tools.tool()
-def reverse_string(text: str) -> str:
-    """
-    Reverse the input string.
-
-    :param text: The string to reverse.
-    :return: The reversed string.
-    """
-    return text[::-1]
-
-
-@geenii_tools.tool()
-def greet(name: str) -> str:
-    """
-    Generate a greeting message for the given name.
-
-    :param name: The name to greet.
-    :return: A greeting message.
-    """
-    return f"Hello, {name}!"
-
-
-@geenii_tools.tool()
 def file_exists(file_path: str) -> bool:
     """
     Check if a file exists at the specified path.
