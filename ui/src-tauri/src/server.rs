@@ -112,7 +112,7 @@ pub fn start_server(app: &tauri::AppHandle) -> Result<(), String> {
 pub fn stop_server(app: &tauri::AppHandle) {
     let state = app.state::<ServerProcess>();
     let mut lock = state.0.lock().unwrap();
-    if let Some(mut child) = lock.take() {
+    if let Some(child) = lock.take() {
         println!(
             "Stopping {:?} (pid: {:?})",
             server_binary_name(),
