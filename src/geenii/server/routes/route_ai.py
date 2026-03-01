@@ -14,7 +14,6 @@ from geenii.datamodels import CompletionErrorResponse, CompletionRequest, Comple
     AudioTranscriptionApiResponse, AudioTranslationApiResponse, AudioTranslationApiRequest, AIModelInfo, ModelMessage
 from geenii.config import DATA_DIR, DEFAULT_AUDIO_TRANSCRIPTION_MODEL
 from geenii.memory import FileChatMemory
-from geenii.wizards import DEFAULT_WIZARD_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +51,9 @@ async def completion(request: CompletionRequest) -> CompletionResponse | Complet
 
 
 @router.post("/chat/completion")
-async def completion(request: ChatCompletionRequest) -> ChatCompletionResponse | CompletionErrorResponse:
+async def chat_completion(request: ChatCompletionRequest) -> ChatCompletionResponse | CompletionErrorResponse:
     """
-    Generate a completion using the specified AI provider and model.
+    Generate a chat completion using the specified AI provider and model.
     """
     # bot = load_wizard(request.model, context_id=request.context_id)
     # bot = load_wizard_from_request(request)

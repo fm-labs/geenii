@@ -9,7 +9,7 @@ APP_VERSION = "0.2.0"
 USER_HOME_DIR = get_user_home()
 DATA_DIR = os.environ.get("DATA_DIR", USER_HOME_DIR + "/.geenii")
 CACHE_DIR = os.environ.get("CACHE_DIR", DATA_DIR + "/cache")
-CACHE_DISABLED = os.environ.get("CACHE_DISABLED", "true").lower() == "true"
+CACHE_DISABLED = os.environ.get("CACHE_DISABLED", "false").lower() == "true"
 
 dotenv.load_dotenv(DATA_DIR + "/.env")
 
