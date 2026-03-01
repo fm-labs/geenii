@@ -1,22 +1,21 @@
 import React from 'react'
 import { IAiClient, IDockerApiClient } from '../api/xai.types.ts'
-import { initTauriDockerApiClient, initTauriXapi, initWebXapi } from '../init.ts'
+import { initTauriXapi, initWebXapi } from '../init.ts'
 import { AppContext } from './AppContext.tsx'
-import { FEATURE_TAURI_XAPI_ENABLED } from '../constants.ts'
+import { FEATURE_TAURI_XAPI_ENABLED, XAI_API_INFO_CHECK_INTERVAL_MS } from '../constants.ts'
 import TauriWrapper from '../components/tauri/TauriWrapper.tsx'
 import { ServerContext } from './ServerContext.tsx'
-import { Button } from '@/components/ui/button.tsx'
 
 // @ts-ignore
 const isTauri = typeof window.__TAURI__!=='undefined'
 
-const initXapiClient = async (serverUrl: string): Promise<IAiClient> => {
-  if (isTauri && FEATURE_TAURI_XAPI_ENABLED) {
-    return await initTauriXapi()
-  } else {
-    return await initWebXapi(serverUrl)
-  }
-}
+// const initXapiClient = async (serverUrl: string): Promise<IAiClient> => {
+//   if (isTauri && FEATURE_TAURI_XAPI_ENABLED) {
+//     return await initTauriXapi()
+//   } else {
+//     return await initWebXapi(serverUrl)
+//   }
+// }
 
 
 export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
@@ -25,17 +24,14 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
 
   const [dockerApi, setDockerApi] = React.useState<IDockerApiClient | null>(null)
   const [xaiApi, setXaiApi] = React.useState<IAiClient>(null)
-
-  //const apiBaseUrl = DEFAULT_XAI_API_URL
-
   const [apiInfo, setApiInfo] = React.useState<any>(null)
 
   const contextValue = React.useMemo(() => {
     return { isTauri, xaiApi, dockerApi, apiInfo }
   }, [xaiApi, dockerApi, apiInfo])
 
-  const [loading, setLoading] = React.useState<boolean>(true)
-  const [ready, setReady] = React.useState<boolean>(false)
+  //const [loading, setLoading] = React.useState<boolean>(true)
+  //const [ready, setReady] = React.useState<boolean>(false)
   const [bootLog, setBootLog] = React.useState<string[]>([])
 
   const loadXapi = React.useCallback(async () => {
@@ -110,7 +106,7 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
         console.error(`Error fetching API info: ${error.message}`)
         setApiInfo(null)
       })
-    }, 10000)
+    }, XAI_API_INFO_CHECK_INTERVAL_MS)
 
     return () => {
       console.log("clearing info fetch interval")
