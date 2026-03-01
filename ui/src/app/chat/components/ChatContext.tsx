@@ -1,9 +1,10 @@
 import React from "react";
-import { UploadedFile } from "../../../components/file-list";
+import { UploadedFile } from '@/components/file-list';
 import { ChatMessage } from '@/app/chat/components/chat.types.ts'
 
 type ChatContextType = {
     chatId?: string;
+    setChatId: (chatId: string) => void;
     modelName?: string;
     setModelName: (modelName: string) => void;
     messages: ChatMessage[];

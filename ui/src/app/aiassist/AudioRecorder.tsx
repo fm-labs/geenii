@@ -125,19 +125,19 @@ export function AudioRecorder({ ...props }: AudioRecorderProps) {
         <div className={'flex flex-row gap-2'}>
           <div>
             {!isRecording && (
-              <IconButton color={'error'} onClick={startRecording}>
+              <IconButton color={'error'} onClick={startRecording} title={'Click to start recording'} aria-label={'Record'}>
                 <MicOff />
               </IconButton>
             )}
             {isRecording && (
-              <IconButton color={'success'} onClick={stopRecording}>
+              <IconButton color={'success'} onClick={stopRecording} title={'Click to stop recording'} aria-label={'Stop'}>
                 <Mic />
               </IconButton>
             )}
           </div>
-          <div className={'p-2'}>
+          {/*<div className={'p-2'}>
             {isRecording ? 'Recording...' : 'Not recording'}
-          </div>
+          </div>*/}
         </div>
         <div>
           {audioBlob && (

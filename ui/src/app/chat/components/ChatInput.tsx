@@ -66,7 +66,7 @@ const ChatInput = (props: ChatInputProps) => {
                                   onKeyDown={handleInputKeyDown}
                                   onChange={handleInputChange} />
       </div>
-      <div className={'Chat-input-buttons'}>
+      <div className={'Chat-input-buttons w-full flex flex-row justify-end gap-2'}>
         <div>
           {/*FEATURE_CHAT_FILES_ENABLED && <button onClick={() => setShowFilesPopup(true)}>Add Files</button>*/}
           {/*FEATURE_CHAT_TOOLS_ENABLED && <button>Add Tools</button>*/}

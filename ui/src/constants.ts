@@ -31,6 +31,7 @@ export const FEATURE_TAURI_XAPI_ENABLED = import.meta.env.VITE_FEATURE_TAURI_XAP
 export const CHAT_TYPEWRITER_ENABLED = import.meta.env.VITE_CHAT_TYPEWRITER_ENABLED === 'true' || false;
 
 export const AVAILABLE_MODELS = [
+  'ollama:qwen3:8b',
   'ollama:mistral:latest',
   'ollama:llama3.2:3b',
   'ollama:llama3.2:latest',
@@ -40,6 +41,9 @@ export const AVAILABLE_MODELS = [
   'openai:gpt-4',
   'openai:gpt-4o-mini',
   'openai:gpt-3.5-turbo',
+  'geenii:bot:default',
+  'geenii:bot:mac',
+  'geenii:bot:coding',
 ]
 export const PROMPT_INPUT_SUGGESTIONS = [
   'What is the meaning of life?',

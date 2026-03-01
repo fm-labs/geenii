@@ -32,7 +32,7 @@ const CompletionChat = (props: ChatProps) => {
   if (!chatContext) {
     throw new Error('ChatContext is not provided')
   }
-  const { addMessage, modelName, setIsThinking } = chatContext
+  const { addMessage, modelName, setIsThinking, chatId, setChatId } = chatContext
 
   const notify = useNotification()
 
@@ -57,7 +57,7 @@ const CompletionChat = (props: ChatProps) => {
   }
 
   const generateCompletion = async (input: string): Promise<string> => {
-    const response = await appContext.xaiApi.generateCompletion({ model: modelName, prompt: input})
+    const response = await appContext.xaiApi.generateCompletion({ model: modelName, prompt: input, context_id: chatId})
       .catch((err) => {
         console.error('Error generating response:', err)
         setIsThinking(false)
@@ -67,6 +67,12 @@ const CompletionChat = (props: ChatProps) => {
         setIsThinking(false)
       })
     console.log('>> AI COMPLETION RESPONSE', response)
+
+    // check for new chatId in response and update if present
+    if (response && response.context_id && response.context_id !== chatId) {
+      console.log('>> UPDATING CHAT ID', response.context_id)
+      setChatId(response.context_id)
+    }
 
     // check for error message in response
     if (response && response.error) {
@@ -121,6 +127,7 @@ const CompletionChat = (props: ChatProps) => {
           <ChatMessages />
           <ChatModelSelector />
           <ChatInput onSubmit={submitInput} />
+          <div className={"text-muted-foreground text-sm italic mt-2"}>{chatId && `Context ID:  ${chatId}`}</div>
 
           {props?.enableFiles && <ChatFiles />}
           {props?.enableSuggestions && <ChatPromptSuggestions />}

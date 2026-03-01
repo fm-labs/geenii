@@ -22,13 +22,13 @@ const Layout = (props: PropsWithChildren) => {
 
   return (
     <div>
-      <header className={"fixed top-0 left-0 w-full border-b shadow-md z-1000 p-2 bg-accent"}>
+      <header className={"fixed top-0 left-0 w-full border-b shadow-md z-1000 p-2 bg-black"}>
         <div className={"flex flex-row w-full justify-between items-center max-w-7xl px-4 mx-auto"}>
           <div className={"flex flex-row"}>
             <a href="#/"><BotIcon /></a>
-            <span className="ml-2 font-bold text-lg">
+            {/*<span className="ml-2 font-bold text-lg">
               <a href="#/">{APP_NAME}</a>
-            </span>
+            </span>*/}
           </div>
           <div>
             {SHOW_NAV_MENU && <ul className="space-x-3 flex items-center justify-center">

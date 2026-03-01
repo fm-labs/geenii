@@ -154,7 +154,7 @@ const webApiClient = async (baseUrl: string, config?: CreateAxiosDefaults): Prom
     async function generateCompletion(request: AiCompletionApiRequest): Promise<AiCompletionApiResponse> {
         try {
             const response = await httpClient.post(
-              `/ai/v1/completion`, request);
+              `/ai/v1/chat/completion`, request);
             console.log("getCompletion RESPONSE", response);
             return response;
         } catch (error) {

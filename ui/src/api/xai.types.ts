@@ -20,10 +20,12 @@ export type AiCompletionApiRequest = {
     stream?: boolean; // Whether to stream the response
     messages?: { role: string; content: string }[] // For chat-based models
     //response_format?: string; // e.g., "text" or "json"
+    context_id?: string; // Optional context ID for tracking conversations
 }
 
 export type AiCompletionApiResponse = BaseAiProviderResponse & {
     output?: any[]; // List of generated text or message objects
+    context_id?: string; // Optional context ID for tracking conversations
 }
 
 export type AiImageGenerationApiRequest = {

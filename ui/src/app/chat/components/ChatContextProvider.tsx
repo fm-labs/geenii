@@ -1,8 +1,8 @@
 import React, { PropsWithChildren, useState } from 'react'
 import { ChatContext } from './ChatContext.tsx'
-import { UploadedFile } from '../../../components/file-list'
-import { AVAILABLE_MODELS } from '../../../constants.ts'
-import { useNavigate } from '../../../app-router.tsx'
+import { UploadedFile } from '@/components/file-list'
+import { AVAILABLE_MODELS } from '@/constants.ts'
+import { useNavigate } from '@/app-router.tsx'
 import { ChatMessage } from '@/app/chat/components/chat.types.ts'
 
 interface ChatContextProviderProps extends PropsWithChildren<any>{
@@ -16,6 +16,7 @@ interface ChatContextProviderProps extends PropsWithChildren<any>{
 
 const ChatContextProvider = (props: ChatContextProviderProps) => {
 
+    const [chatId, setChatId] = useState(props.chatId || null);
     const [modelName, setModelName] = useState(props.modelName || AVAILABLE_MODELS[0]);
     //const messages = React.useRef<ChatMessage[]>([])
     const [messages, setMessages] = useState<any[]>(props.initialMessages || []);
@@ -36,7 +37,8 @@ const ChatContextProvider = (props: ChatContextProviderProps) => {
     }
 
     const contextValue = {
-        chatId: props.chatId, // This can be set dynamically based on your application logic
+        chatId,
+        setChatId,
         modelName,
         setModelName,
         messages,

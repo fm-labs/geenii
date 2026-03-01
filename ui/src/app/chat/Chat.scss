@@ -1,7 +1,7 @@
 $chat-base-padding: 1rem;
 
 $chat-input-border: 1px solid #ccc;
-$chat-input-border-radius: 1.5rem;
+$chat-input-border-radius: 1.3rem;
 $chat-input-background-color: #ffffff;
 $chat-input-color: #333;
 
@@ -124,7 +124,7 @@ $dark-chat-input-color: #f6f6f6;
     border-radius: $chat-input-border-radius;
     //background-color: $chat-input-background-color;
     //color: $chat-input-color;
-    margin-bottom: $chat-base-padding;
+    //margin-bottom: $chat-base-padding;
 
     &:hover {
       box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
@@ -166,11 +166,11 @@ $dark-chat-input-color: #f6f6f6;
     }
   }
 
-  .Chat-input-buttons {
-    display: flex;
-    justify-content: space-between;
-    padding: calc($chat-base-padding/2);
-  }
+  //.Chat-input-buttons {
+  //  display: flex;
+  //  justify-content: space-between;
+  //  padding: calc($chat-base-padding/2);
+  //}
 
   .Chat-input-suggestions {
     text-align: center;
