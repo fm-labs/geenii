@@ -139,12 +139,18 @@ pub fn ensure_paths(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let geenii_dir = app_handle.path().home_dir()?.join(".geenii");
     let apps_dir = geenii_dir.join("apps");
     let cache_dir = geenii_dir.join("cache");
+    let logs_dir = geenii_dir.join("logs");
+    let sessions_dir = geenii_dir.join("sessions");
+    let wizards_dir = geenii_dir.join("wizards");
 
     tauri::async_runtime::spawn(async move {
         let base_dirs = vec![
-            ("Geenii Base", geenii_dir),
+            ("Geenii", geenii_dir),
             ("Apps", apps_dir),
             ("Cache", cache_dir),
+            ("Logs", logs_dir),
+            ("Sessions", sessions_dir),
+            ("Wizards", wizards_dir),
         ];
 
         for entry in base_dirs {
