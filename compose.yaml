@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: ./Dockerfile
     ports:
-      - "31030:13030"
+      - "31313:31313"
     networks:
       - geenii-net
     extra_hosts:
@@ -26,7 +26,7 @@ services:
       context: ./ui
       dockerfile: ./Dockerfile
     ports:
-      - "31031:80"
+      - "31380:80"
     networks:
       - geenii-net
 
@@ -45,7 +45,7 @@ services:
   mongodb:
     image: mongo:8.2
     ports:
-      - "31017:27017"
+      - "31317:27017"
     environment:
       - MONGO_INITDB_ROOT_USERNAME=geenii
       - MONGO_INITDB_ROOT_PASSWORD=super-secure-password

@@ -1,15 +1,16 @@
-import os
-import dotenv
 import json
+import os
 
-from geenii.utils.os_util import get_user_home, get_user_home_dir
+import dotenv
+
+from geenii.utils.os_util import get_user_home
 
 APP_VERSION = "0.2.0"
 
 USER_HOME_DIR = get_user_home()
-DATA_DIR = os.environ.get("DATA_DIR", USER_HOME_DIR + "/.geenii")
-CACHE_DIR = os.environ.get("CACHE_DIR", DATA_DIR + "/cache")
-CACHE_DISABLED = os.environ.get("CACHE_DISABLED", "false").lower() == "true"
+DATA_DIR = os.environ.get("GEENII_DATA_DIR", USER_HOME_DIR + "/.geenii")
+CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", DATA_DIR + "/cache")
+CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
 
 dotenv.load_dotenv(DATA_DIR + "/.env")
 
@@ -48,11 +49,11 @@ REDIS_URI = os.environ.get("REDIS_URI", "")
 
 ### Chat settings ###
 # Path to the SQLite database file for storing chat history and related data
-CHAT_DB_PATH = os.environ.get("CHAT_DB_PATH", f"{DATA_DIR}/chat.db")
+CHAT_DB_PATH = os.environ.get("GEENII_CHAT_DB_PATH", f"{DATA_DIR}/chat.db")
 
 # A unique namespace UUID for generating deterministic UUIDs for DM room IDs.
-CHAT_DM_NAMESPACE = "a7f3c2e1-4b8d-5a9f-8c3e-2d1b6f0e4a7c"
-CHAT_GROUP_NAMESPACE = "b7f3c2e1-8b4d-5a9f-8c3e-2d1b6f0e4a7a"
+CHAT_DM_NAMESPACE =  os.environ.get("GEENII_CHAT_DM_NAMESPACE", "a7f3c2e1-4b8d-5a9f-8c3e-2d1b6f0e4a7c")
+CHAT_GROUP_NAMESPACE =  os.environ.get("GEENII_CHAT_GROUP_NAMESPACE", "b7f3c2e1-8b4d-5a9f-8c3e-2d1b6f0e4a7a")
 
 
 def get_user_data_dir():

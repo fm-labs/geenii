@@ -1,7 +1,7 @@
 #!/bin/bash
 set -x
 
-BASE_URL="http://localhost:13030"
+BASE_URL="http://localhost:31313"
 
 CMD=$1
 if [ -z "$CMD" ]; then
