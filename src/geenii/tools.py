@@ -21,6 +21,7 @@ class Tool(ABC):
     """Abstract base for all tool types."""
 
     def __init__(self, name: str, description: str = "", parameters: dict | None = None):
+        self.type = "tool"
         self.name = name
         self.description = description
         self.parameters = parameters or {}
@@ -73,6 +74,7 @@ class PythonTool(Tool):
         handler: Callable[..., Any] | None = None,
     ):
         super().__init__(name, description, parameters)
+        self.type = "function"
         self.handler = handler
 
     def invoke(self, **kwargs: Any) -> Any:
@@ -102,6 +104,7 @@ class McpTool(Tool):
         self._name = name
         self.name = f"{mcp_server_id}_{name}"
         self.mcp_server_id = mcp_server_id
+        self.type = "mcp_tool"
 
     def invoke(self, **kwargs: Any) -> Any:
         client: McpClient = get_mcp_client_for_server(self.mcp_server_id)
@@ -215,6 +218,10 @@ class ToolRegistry:
 
     def has(self, name: str) -> bool:
         return name in self._tools
+
+    def list_tool_names(self) -> set[str]:
+        """Return the names of all registered tools (insertion order)."""
+        return set(self._tools.keys())
 
     def list_tools(self) -> list[Tool]:
         """Return all registered tools (insertion order)."""

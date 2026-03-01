@@ -236,10 +236,12 @@ def cached(ttl=None, cachekey=None, store=None):
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
                 key = make_key(args, kwargs)
-                v = store.read_cache(key)
-                if v is not None:
-                    print(f"Cache hit for {func.__name__} with key {key!r}")
-                    return v
+                cache_disabled = config.CACHE_DISABLED
+                if not cache_disabled:
+                    v = store.read_cache(key)
+                    if v is not None:
+                        print(f"Cache hit for {func.__name__} with key {key!r}")
+                        return v
                 result = await func(*args, **kwargs)
                 print(f"Caching result of {func.__name__} with key {key!r} and ttl {ttl}")
                 store.write_cache(key, result, ttl=ttl)
@@ -249,10 +251,12 @@ def cached(ttl=None, cachekey=None, store=None):
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
             key = make_key(args, kwargs)
-            v = store.read_cache(key)
-            if v is not None:
-                print(f"Cache hit for {func.__name__} with key {key!r}")
-                return v
+            cache_disabled = config.CACHE_DISABLED
+            if not cache_disabled:
+                v = store.read_cache(key)
+                if v is not None:
+                    print(f"Cache hit for {func.__name__} with key {key!r}")
+                    return v
             result = func(*args, **kwargs)
             print(f"Caching result of {func.__name__} with key {key!r} and ttl {ttl}")
             store.write_cache(key, result, ttl=ttl)

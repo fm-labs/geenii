@@ -3,16 +3,20 @@ import os
 import time
 import uuid
 import datetime
+import logging
 
 from openai import OpenAI
 
 from geenii import config
 from geenii.chat.chat_models import TextContent, ToolCallContent
+from geenii.config import CACHE_DIR
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, ChatCompletionRequest, \
     ChatCompletionResponse, AIModelInfo, AudioTranscriptionApiResponse
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider, \
     AIImageGeneratorProvider, AIAudioTranscriptionProvider
+from geenii.utils.json_util import write_json
 
+logger = logging.getLogger(__name__)
 
 class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider, AIImageGeneratorProvider,
                      AIAudioTranscriptionProvider):
@@ -66,6 +70,9 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
 
         try:
             openai_models = self.client.models.list()
+
+            cache_data = {"models": [model.model_dump(mode="json") for model in openai_models.data]}
+            write_json(f"{CACHE_DIR}/openai.models.json", cache_data)
         except Exception as e:
             print(f"Error fetching models from OpenAI: {e}")
             return models
@@ -73,6 +80,15 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         # print(openai_models)
         # Example Entry: Model(id='gpt-4-0613', created=1686588896, object='model', owned_by='openai')
         for model in openai_models.data:
+            # filter out models that are not relevant for completion or chat (e.g. audio, image, fine-tuning models)
+            #if not any(keyword in model.id for keyword in ["gpt", "davinci", "curie", "babbage", "ada"]):
+            if not any(keyword in model.id for keyword in ["gpt"]):
+                continue
+
+            # filter out preview models and models with date-suffixes (e.g. gpt-4-2024-08-06)
+            if any(keyword in model.id for keyword in ["preview", "2024-", "2025-", "2026-", "image", "audio", "tts", "codex"]):
+                continue
+
             models.append(AIModelInfo(
                 provider=self.name,
                 name=model.id,
@@ -157,18 +173,23 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
 
     def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry=None) -> ChatCompletionResponse:
         model = request.model or self.DEFAULT_MODEL
-        system_prompt = request.system or self.DEFAULT_SYSTEM_PROMPT
+        if model.startswith("openai:"):
+            model = model[len("openai:"):]
+
         prompt = request.prompt
         messages = request.messages or []
         tools = request.tools or set()
 
+        system_prompt = request.system or [self.DEFAULT_SYSTEM_PROMPT]
+        instructions = "\n".join(system_prompt) if isinstance(system_prompt, list) else system_prompt
+
         # map tool names to tool definitions in openai format
         tool_defs_openai = []
-        print(f"Tool registry provided {tool_registry is not None}, tools requested: {tools}")
+        logger.info(f"Tool registry provided {tool_registry is not None}, tools requested: {tools}")
         if tool_registry is not None and len(tools) > 0:
             tool_defs = tool_registry.list_definitions()
             tool_defs_openai = [tool_def for tool_def in tool_defs if tool_def['name'] in tools]
-            print(f"OpenAI tools mapped: {len(tool_defs_openai)}")
+            logger.info(f"OpenAI tools mapped: {len(tool_defs_openai)}")
 
         # mapping history/seed model messages to OpenAI Responses API input format
         input_messages = []
@@ -199,14 +220,16 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
 
         # perform the API call to OpenAI Responses API
         print(f"Requesting response with input messages:", input_messages)
+        time_start = time.time()
         model_result = self.client.responses.create(
             model=model,
-            instructions=system_prompt,
+            instructions=instructions,
             input=input_messages,
             tools=tool_defs_openai or [],
             stream=False
         )
         print(f"Response received: {model_result}")
+        time_end = time.time()
 
         # mapping OpenAI Responses API output format to generic model messages
         output_parts = []
@@ -230,6 +253,15 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                 output_parts.append(ToolCallContent(name=fn_name, arguments=fn_args, call_id=fn_call_id))
             else:
                 print(f"Unsupported OpenAI response output item type: {output_item.type}")
+
+        # Usage
+        usage = {
+            "input_tokens": model_result.usage.input_tokens,
+            "output_tokens": model_result.usage.output_tokens,
+            "total_tokens": model_result.usage.total_tokens,
+        }
+        logger.info(
+            f"Tokens used in this chat completion: {usage['total_tokens']}, processing time approx: {time_end - time_start:.8f} seconds")
 
         return ChatCompletionResponse(
             id=uuid.uuid4().hex,

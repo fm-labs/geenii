@@ -39,7 +39,7 @@ logging.basicConfig(
 async def initialize_tool_registry():
     print("Initializing tool registry...")
     registry = ToolRegistry()
-    await init_builtin_tools(registry)
+    init_builtin_tools(registry)
     await init_mcp_server_tools(registry)
     return registry
 

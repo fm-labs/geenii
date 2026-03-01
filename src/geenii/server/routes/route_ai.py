@@ -1,16 +1,22 @@
 import os
 import shutil
 import uuid
+import logging
 
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
 from geenii import ai
 from geenii.ai import enumerate_models
+from geenii.chat.chat_models import TextContent
 from geenii.datamodels import CompletionErrorResponse, CompletionRequest, CompletionResponse, ChatCompletionRequest, \
     ChatCompletionResponse, ImageGenerationApiResponse, \
     ImageGenerationApiRequest, AudioGenerationApiRequest, AudioGenerationApiResponse, AudioTranscriptionApiRequest, \
-    AudioTranscriptionApiResponse, AudioTranslationApiResponse, AudioTranslationApiRequest, AIModelInfo
+    AudioTranscriptionApiResponse, AudioTranslationApiResponse, AudioTranslationApiRequest, AIModelInfo, ModelMessage
 from geenii.config import DATA_DIR, DEFAULT_AUDIO_TRANSCRIPTION_MODEL
+from geenii.memory import FileChatMemory
+from geenii.wizards import DEFAULT_WIZARD_SYSTEM_PROMPT
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai/v1", tags=["ai"])
 
@@ -45,13 +51,51 @@ async def completion(request: CompletionRequest) -> CompletionResponse | Complet
     )
 
 
-# @router.post("/assistant", response_model=AssistantApiResponse)
-# async def assistant(request: AssistantApiRequest) -> AssistantApiResponse:
-#     """
-#     Generate an assistant completion using the specified AI provider and model.
-#     """
-#     return ai_service.generate_assistant_completion(request)
+@router.post("/chat/completion")
+async def completion(request: ChatCompletionRequest) -> ChatCompletionResponse | CompletionErrorResponse:
+    """
+    Generate a completion using the specified AI provider and model.
+    """
+    # bot = load_wizard(request.model, context_id=request.context_id)
+    # bot = load_wizard_from_request(request)
 
+    bot_id = "geenii:wizard:default"
+    bot_key = bot_id.replace(":", "-")
+
+    context_id = request.context_id or uuid.uuid4().hex
+    context_memory_dir = f"{DATA_DIR}/sessions/{bot_key}/{context_id}"
+    os.makedirs(context_memory_dir, exist_ok=True)
+
+    logger.info(f"Chat completion request with context_id={context_id}, model={request.model}, prompt={request.prompt}")
+    memory = FileChatMemory(f"{context_memory_dir}/memory.jsonl", create=True, restore=True)
+
+    messages = list(memory.messages)
+    logger.info(f"Loaded {len(messages)} messages from memory for context_id={context_id}")
+    if len(messages) > 10:
+        logger.warning(f"Memory for context_id={context_id} has {len(messages)} messages, which may exceed token limits for some models. Consider implementing memory management strategies.")
+        # todo compact memory
+
+    system = ["You are a helpful assistant that helps the user with their tasks. Give short and concise answers. Always try to help the user as best as you can. If you don't know the answer, say you don't know and don't try to make up an answer."]
+    # skills
+    # skill = find_best_skill_for_prompt(request.prompt, skill_registry)
+    #skills = ["mac-skills", "git-skills"]
+    #for skill in skills:
+    #    system.append(f"Skill: {skill}. Use the {skill} to help answer the user's question if relevant.")
+
+    _request = ChatCompletionRequest(
+        system=system,
+        model=request.model,
+        prompt=request.prompt,
+        messages=messages,
+        context_id=context_id,
+    )
+    response = ai.generate_chat_completion(request=_request)
+
+    # Append the user message and assistant response to memory
+    memory.append(ModelMessage(role="user", content=[TextContent(type="text", text=request.prompt)]))
+    memory.append(ModelMessage(role="assistant", content=response.output))
+
+    return response
 
 ### IMAGE GENERATION
 @router.post("/image/generate")

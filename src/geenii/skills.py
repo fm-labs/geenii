@@ -15,14 +15,18 @@ class Skill:
 
 
 class SkillRegistry:
+    """
+    Registry for managing skills. Provides methods to register, retrieve, and load skills from the filesystem.
+    """
+
     def __init__(self):
         self.skills = {}
 
     def get_skill(self, skill_name) -> Skill | None:
         return self.skills.get(skill_name)
 
-    def list_skills(self) -> list[str]:
-        return list(self.skills.keys())
+    def list_skill_names(self) -> set[str]:
+        return set(self.skills.keys())
     
     def register_skill(self, skill: Skill):
         if not skill or not isinstance(skill, Skill):
@@ -45,9 +49,31 @@ class SkillRegistry:
             del self.skills[skill_name]
             logger.info(f"Skill '{skill_name}' unloaded.")
 
+    def load_all_from_directory(self, directory: str) -> None:
+        base_path = Path(directory)
+        if not base_path.is_dir():
+            logger.warning(f"Skill directory '{directory}' does not exist or is not a directory.")
+            return
 
-def skill_load(skill_name: str) -> Skill:
-    skill_path = skill_locate_path(skill_name)
+        for item in base_path.iterdir():
+            if item.is_dir():
+                try:
+                    skill = skill_load(item.name, Path(base_path / item))
+                    self.register_skill(skill)
+                except Exception as e:
+                    logger.critical(f"Error while loading skill from '{item}': {str(e)}", exc_info=False)
+
+
+def skill_load(skill_name: str, skill_path: Path | None = None) -> Skill:
+    """
+    Load a skill by name, optionally specifying the path to the skill directory.
+
+    :param skill_name: The name of the skill to load.
+    :param skill_path:  Optional path to the skill directory. If not provided, the function will attempt to locate it.
+    :return: A Skill object containing the loaded skill information.
+    """
+    if skill_path is None:
+        skill_path = skill_locate_path(skill_name)
     if not skill_path:
         raise ValueError(f"Skill '{skill_name}' not found in expected locations.")
 
@@ -57,6 +83,12 @@ def skill_load(skill_name: str) -> Skill:
 
 
 def skill_locate_path(skill_name: str) -> Path | None:
+    """
+    Locate the directory containing the skill markdown file for the given skill name.
+
+    :param skill_name: The name of the skill to locate.
+    :return:
+    """
     base_paths = [
         #os.path.join(os.getcwd(), skill_name),
         os.path.join(DATA_DIR, "skills", skill_name)
@@ -65,14 +97,20 @@ def skill_locate_path(skill_name: str) -> Path | None:
         logger.debug(f"Searching for skill '{skill_name}' in path: {path}")
         _path = Path(path).absolute()
         if _path.is_dir():
-            #skill_md_path = _path / "SKILL.md"
-            #if skill_md_path.is_file():
-            #    return _path
-            logger.info(f"Found skill '{skill_name}' in path: {_path}")
-            return _path
+            skill_md_path = _path / "SKILL.md"
+            if skill_md_path.is_file():
+                logger.info(f"Found skill '{skill_name}' in path: {_path}")
+                return _path
     return None
 
+
 def skill_read(skill_dir: str) -> tuple[str, str]:
+    """
+    Read and parse the skill markdown file from the specified directory.
+
+    :param skill_dir: The directory containing the SKILL.md file.
+    :return: A tuple containing the skill header and body content.
+    """
     skill_md_path = f"{skill_dir}/SKILL.md"
     if not os.path.isfile(skill_md_path):
         raise ValueError(f"Skill markdown file not found in skill dir '{skill_dir}'")

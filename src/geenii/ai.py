@@ -1,13 +1,18 @@
+from pathlib import Path
+
+from geenii.config import DATA_DIR
 from geenii.datamodels import CompletionResponse, CompletionErrorResponse, \
     ChatCompletionRequest, ImageGenerationApiRequest, ImageGenerationApiResponse, \
     AudioGenerationApiRequest, AudioGenerationApiResponse, AudioTranscriptionApiRequest, AudioTranscriptionApiResponse, \
-    ModelMessage, AIModelInfo, AIProviderInfo
+    ModelMessage, AIModelInfo, AIProviderInfo, ChatCompletionResponse
 from geenii.provider.interfaces import AICompletionProvider, AIProvider, AIImageGeneratorProvider, \
     AIAudioGeneratorProvider, AIAudioTranscriptionProvider, AIAudioTranslationProvider, AIChatCompletionProvider
 
 from geenii.provider.ollama.provider import OllamaAIProvider
 from geenii.provider.openai.provider import OpenAIProvider
+from geenii.tools import ToolRegistry
 from geenii.utils.cached import cached
+from geenii.utils.json_util import append_jsonl
 
 type AIProviderType = AICompletionProvider | AIImageGeneratorProvider | AIAudioGeneratorProvider \
                       | AIAudioTranscriptionProvider | AIAudioTranslationProvider | AIProvider
@@ -184,6 +189,8 @@ def generate_completion(model: str, prompt: str, stream: bool = False, **kwargs)
 
         # Publish the completion response event
         #publish_event(["ai.completion.completed"], {"response": response.model_dump()})
+
+        #_log_request_response(request, response)
         return response
     except Exception as e:
         print(f"Error in {model} completion API: {str(e)}")
@@ -200,40 +207,48 @@ def generate_completion(model: str, prompt: str, stream: bool = False, **kwargs)
         pass
 
 
-def generate_chat_completion(model: str,
-                             prompt: str,
-                             system: str = None,
-                             messages: list[ModelMessage] = None,
-                             tools: set[str] = None,
-                             tool_registry = None,
-                             output_format: str = None,
-                             output_schema: dict = None,
-                             stream: bool = False,
-                             **kwargs) -> CompletionResponse:
+def generate_chat_completion_deprecated(model: str,
+                                        prompt: str,
+                                        system: str = None,
+                                        messages: list[ModelMessage] = None,
+                                        tools: set[str] = None,
+                                        tool_registry = None,
+                                        output_format: str = None,
+                                        output_schema: dict = None,
+                                        stream: bool = False,
+                                        **kwargs) -> CompletionResponse:
+    """
+    Generate an assistant completion using the specified AI provider and model.
+    """
+    request = ChatCompletionRequest(
+        model=model,
+        system=[system],
+        prompt=prompt,
+        messages=messages or [],
+        tools=tools or set(),
+        output_format=output_format,
+        # output_schema=output_schema,
+        stream=stream,
+        # model_parameters=kwargs
+    )
+    return generate_chat_completion(request, tool_registry=tool_registry)
+
+
+def generate_chat_completion(request: ChatCompletionRequest, tool_registry: ToolRegistry = None) -> ChatCompletionResponse:
     """
     Generate an assistant completion using the specified AI provider and model.
     """
     try:
-        ai, provider_name, model_name = get_ai_completion_provider(model)
+        ai, provider_name, model_name = get_ai_completion_provider(request.model)
         if not isinstance(ai, AIChatCompletionProvider):
             raise RuntimeError(f"Invalid AI provider: {provider_name} does not support assistant completions.")
 
-        request = ChatCompletionRequest(
-            model=model_name,
-            system=system,
-            prompt=prompt,
-            messages=messages or [],
-            tools=tools or set(),
-            output_format=output_format,
-            #output_schema=output_schema,
-            stream=stream,
-            #model_parameters=kwargs
-        )
-
         response = ai.generate_chat_completion(request, tool_registry=tool_registry)
+        response.context_id = request.context_id # pass through context ID from request to response, if any
+        _log_request_response(request, response)
         return response
     except Exception as e:
-        print(f"Error in {model} assistant API: {str(e)}")
+        print(f"Error in {request.model} assistant API: {str(e)}")
         #return ErrorApiResponse(error=str(e))
         raise e
 
@@ -288,3 +303,10 @@ def generate_audio_transcription(request: AudioTranscriptionApiRequest) -> Audio
     except Exception as e:
         return CompletionErrorResponse(error=str(e))
 
+
+def _log_request_response(request, response):
+    #print("Request:", request.model_dump())
+    #print("Response:", response.model_dump())
+    log_file = f"{DATA_DIR}/logs/ai.log"
+    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+    append_jsonl(log_file, {"request": request.model_dump(mode="json"), "response": response.model_dump(mode="json")})

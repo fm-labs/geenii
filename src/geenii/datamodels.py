@@ -1,3 +1,5 @@
+import uuid
+from datetime import datetime, UTC
 from typing import List, Any, Set, Literal
 
 import pydantic
@@ -5,6 +7,7 @@ from fastapi import UploadFile
 
 from geenii import config
 from geenii.chat.chat_models import ContentPart
+
 
 class AIProviderInfo(pydantic.BaseModel):
     name: str
@@ -25,7 +28,17 @@ class ModelMessage(pydantic.BaseModel):
     type: str = "message"
     role: str  # e.g., "user", "assistant", "system"
     content: list[ContentPart] = pydantic.Field(default_factory=list)
+    id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex)
+    timestamp: datetime = pydantic.Field(default_factory=lambda: datetime.now(UTC))
 
+    def to_text(self) -> str:
+        return "\n".join(part.to_text() for part in self.content)
+
+    def to_json(self) -> str:
+        return self.model_dump_json()
+
+    def to_dict(self) -> dict:
+        return self.model_dump(mode="python")
 
 # Completion
 
@@ -36,7 +49,7 @@ class CompletionErrorResponse(pydantic.BaseModel):
 class CompletionRequest(pydantic.BaseModel):
     prompt: str
     model: str | None = config.DEFAULT_COMPLETION_MODEL
-    system: str | None = None
+    system: List[str] | None = None
     # Model tweaking parameters
     temperature: float | None = None
     top_p: float | None = None
@@ -75,11 +88,13 @@ class ChatCompletionRequest(CompletionRequest):
 
 
 class ChatCompletionResponse(CompletionResponse):
-    prompt: str
+    prompt: str # todo deprecated
     # The response may include additional information about the tools used
     tools_used: List[str] | None = None
     # The context ID for the completion request
     context_id: str | None = None
+    # Usage stats dict
+    usage: dict | None = pydantic.Field(default_factory=dict)
 
 
 # Image Generation

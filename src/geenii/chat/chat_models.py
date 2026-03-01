@@ -1,5 +1,6 @@
 from typing import Annotated, Literal, Any
 
+import pydantic
 from pydantic import BaseModel, Field
 
 
@@ -44,15 +45,23 @@ class ToolCallContent(BaseContent):
     arguments: dict | None = None
     call_id: str | None = None  # Unique identifier for this tool call, useful for matching with results
 
+    def to_text(self) -> str:
+        args_str = ", ".join(f"{k}={v!r}" for k, v in (self.arguments or {}).items())
+        return f"Tool call request (call_id={self.call_id}): {self.name}({args_str})]"
 
 class ToolCallResultContent(BaseContent):
     type: Literal["tool_call_result"] = "tool_call_result"
     call_id: str | None = None
     name: str
-    arguments: dict | None = None
+    arguments: dict | None = pydantic.Field(default_factory=dict)
     result: dict | list | str | Any | None = None
     error: str | None = None  # Optional error message if the tool call failed
 
+    def to_text(self) -> str:
+        if self.error:
+            return f"Tool call result for {self.name} (call_id={self.call_id}): ERROR: {self.error}"
+        else:
+            return f"Tool call result for {self.name} (call_id={self.call_id}): {self.result!r}"
 
 class FileContent(BaseContent):
     type: Literal["file"] = "file"

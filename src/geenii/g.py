@@ -1,10 +1,11 @@
 from typing import AsyncGenerator
 
-from geenii.ai import generate_chat_completion
+import geenii.core.core_tools
+from geenii.ai import generate_chat_completion_deprecated
 from geenii.chat.chat_bots import BotInterface
 from geenii.chat.chat_models import ContentPart, TextContent
 from geenii.datamodels import ModelMessage
-from geenii.tools import ToolRegistry
+from geenii.tools import ToolRegistry, PythonTool
 from geenii.wizards import Wizard
 
 
@@ -27,7 +28,8 @@ class EchoBot(BotInterface):
             response_text = f"You said: {message}"
         else:
             response_text = "You sent structured content"
-        yield ModelMessage(role="assistant", content=[TextContent(type="text", text=f">{self.botname}< {response_text}")])
+        yield ModelMessage(role="assistant",
+                           content=[TextContent(type="text", text=f">{self.botname}< {response_text}")])
 
 
 class SimpleBot(BotInterface):
@@ -54,7 +56,7 @@ class SimpleBot(BotInterface):
             else:
                 raise ValueError("Unsupported message format")
 
-            response = generate_chat_completion(
+            response = generate_chat_completion_deprecated(
                 model=model_id,
                 prompt=prompt,
                 system=system_prompt,
@@ -68,18 +70,38 @@ class SimpleBot(BotInterface):
         except Exception:
             yield TextContent(text=f"Uuups, something went wrong :/")
 
-
+def get_weather(location: str) -> str:
+    # Dummy implementation for testing
+    return f"The current temperature in {location} is 25°C with clear skies."
 
 def get_bot(botname: str) -> BotInterface:
-    #return EchoBot(botname=botname)
-    #return SimpleBot(botname=botname)
+    # return EchoBot(botname=botname)
+    # return SimpleBot(botname=botname)
 
     if not botname.startswith("geenii:bot:"):
         raise ValueError(f"Invalid bot name: {botname}. Bot names must start with 'geenii:bot:'")
 
+    tool_registry = geenii.core.core_tools.geenii_tools
+    tool_registry.register(PythonTool(name="get_weather",
+                                      description="Get the weather from the given location.",
+                                      parameters={
+                                          "type": "object",
+                                          "properties": {
+                                              "location": {
+                                                  "type": "string",
+                                                  "description": "City and country e.g. Bogotá, Colombia"
+                                              }
+                                          },
+                                          "required": [
+                                              "location"
+                                          ],
+                                          "additionalProperties": False
+                                      },
+                                      handler=get_weather))
 
     return Wizard(name=botname,
                   model="ollama:qwen3:8b",
                   system_prompt="You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer.",
                   tools={"get_weather", "execute_command", "file_read", "calculate_square_root"},
+                  tool_registry=tool_registry,
                   )

@@ -5,7 +5,7 @@ CLI client for the geenii-chat server.
 Set CHAT_USERNAME env var or pass --username globally:
 
     export CHAT_USERNAME=alice
-    export CHAT_SERVER=http://localhost:3333    # optional, this is the default
+    export CHAT_SERVER=http://localhost:3333
 
 Usage:
     python chat_client.py --username alice create-room --name "general"
@@ -20,7 +20,6 @@ Usage:
 import asyncio
 import hashlib
 import json
-import os.path
 import sys
 from datetime import datetime
 from typing import Any, AsyncIterator
@@ -29,7 +28,8 @@ import click
 import httpx
 import websockets
 
-from geenii.chat.chat_client_inputs import StdinInput, InputReader, UnixSocketInput, UnixSocketServerInput
+from geenii.cli.base import BaseCli
+from geenii.cli.chat_client_inputs import StdinInput, InputReader
 from geenii.chat.chat_manager import dm_room_id
 
 DEFAULT_BASE_URL = "http://localhost:13030"
@@ -95,150 +95,183 @@ def format_timestamp(ts: str) -> str:
 
 # ---------- CLI ----------
 
-@click.group()
-@click.option("--server", default=DEFAULT_BASE_URL, envvar="CHAT_SERVER",
-              show_default=True, help="Base URL of the chat server.")
-@click.option("--username", required=True, envvar="CHAT_USERNAME",
-              help="Your username (or set CHAT_USERNAME).")
-@click.pass_context
-def chatcli(ctx: click.Context, server: str, username: str) -> None:
-    """CLI client for the geenii-chat server."""
-    ctx.ensure_object(dict)
-    ctx.obj["server"] = server
-    ctx.obj["username"] = username
-    ctx.obj["headers"] = auth_headers(username)
+class ChatClientCli(BaseCli):
+
+    def __init__(self, cli: click.core.Group):
+        super().__init__(cli)
+
+        @cli.group()
+        @click.option("--server", default=DEFAULT_BASE_URL, envvar="CHAT_SERVER",
+                      show_default=True, help="Base URL of the chat server.")
+        @click.option("--username", required=True, envvar="CHAT_USERNAME",
+                      help="Your username (or set CHAT_USERNAME).")
+        @click.pass_context
+        def chat(ctx: click.Context, server: str, username: str) -> None:
+            """CLI client for the geenii-chat server (Experimental!)."""
+            ctx.ensure_object(dict)
+            ctx.obj["server"] = server
+            ctx.obj["username"] = username
+            ctx.obj["headers"] = auth_headers(username)
 
 
-# --- create-room ---
+        # --- create-room ---
 
-@chatcli.command("create-room")
-@click.option("--name", required=True, help="Room name.")
-@click.option("--private", "is_private", is_flag=True, help="Make the room private.")
-@click.option("--password", default=None, help="Set a room password.")
-@click.pass_context
-def create_room_cmd(ctx: click.Context, name: str, is_private: bool, password: str | None) -> None:
-    """Create a new chat room."""
-    server, headers = ctx.obj["server"], ctx.obj["headers"]
-    body: dict = {"name": name}
-    if is_private:
-        body["is_public"] = False
-    if password:
-        body["password"] = password
+        @chat.command("create-room")
+        @click.option("--name", required=True, help="Room name.")
+        @click.option("--private", "is_private", is_flag=True, help="Make the room private.")
+        @click.option("--password", default=None, help="Set a room password.")
+        @click.pass_context
+        def create_room_cmd(ctx: click.Context, name: str, is_private: bool, password: str | None) -> None:
+            """Create a new chat room."""
+            server, headers = ctx.obj["server"], ctx.obj["headers"]
+            body: dict = {"name": name}
+            if is_private:
+                body["is_public"] = False
+            if password:
+                body["password"] = password
 
-    with httpx.Client(headers=headers) as client:
-        resp = client.post(api_url(server, ""), json=body)
-    room = handle_response(resp)
-    click.echo(f"Room created: {room['name']}  (id: {room['id']}, owner: {room['owner']})")
-
-
-# --- list-rooms ---
-
-@chatcli.command("list-rooms")
-@click.pass_context
-def list_rooms_cmd(ctx: click.Context) -> None:
-    """List all available rooms."""
-    server, headers = ctx.obj["server"], ctx.obj["headers"]
-    with httpx.Client(headers=headers) as client:
-        resp = client.get(api_url(server, ""))
-    rooms = handle_response(resp)
-    if not rooms:
-        click.echo("No rooms found.")
-        return
-    for r in rooms:
-        visibility = "private" if not r["is_public"] else "public"
-        click.echo(f"  {r['name']:20s}  {visibility:7s}  owner={r['owner']:15s}  id={r['id']}")
+            with httpx.Client(headers=headers) as client:
+                resp = client.post(api_url(server, ""), json=body)
+            room = handle_response(resp)
+            click.echo(f"Room created: {room['name']}  (id: {room['id']}, owner: {room['owner']})")
 
 
-# --- join ---
+        # --- list-rooms ---
 
-@chatcli.command()
-@click.option("--room", required=True, help="Room ID.")
-@click.option("--password", default=None, help="Room password (if required).")
-@click.option("--bot", is_flag=True, help="Join as a bot member.")
-@click.pass_context
-def join(ctx: click.Context, room: str, password: str | None, bot: bool) -> None:
-    """Join a room."""
-    server, headers, username = ctx.obj["server"], ctx.obj["headers"], ctx.obj["username"]
-    body: dict = {"username": username}
-    if password:
-        body["password"] = password
-    if bot:
-        body["member_type"] = "bot"
-
-    with httpx.Client(headers=headers) as client:
-        resp = client.post(api_url(server, f"/rooms/{room}/join"), json=body)
-    member = handle_response(resp)
-    click.echo(f"Joined room {room} as {member['username']} (status: {member['status']})")
+        @chat.command("list-rooms")
+        @click.pass_context
+        def list_rooms_cmd(ctx: click.Context) -> None:
+            """List all available rooms."""
+            server, headers = ctx.obj["server"], ctx.obj["headers"]
+            with httpx.Client(headers=headers) as client:
+                resp = client.get(api_url(server, ""))
+            rooms = handle_response(resp)
+            if not rooms:
+                click.echo("No rooms found.")
+                return
+            for r in rooms:
+                visibility = "private" if not r["is_public"] else "public"
+                click.echo(f"  {r['name']:20s}  {visibility:7s}  owner={r['owner']:15s}  id={r['id']}")
 
 
-# --- invite ---
-
-@chatcli.command()
-@click.option("--room", required=True, help="Room ID.")
-@click.option("--target", required=True, help="Username to invite.")
-@click.option("--bot", is_flag=True, help="Invite as a bot member.")
-@click.pass_context
-def invite(ctx: click.Context, room: str, target: str, bot: bool) -> None:
-    """Invite a user to a room (owner only)."""
-    server, headers = ctx.obj["server"], ctx.obj["headers"]
-    body: dict = {"username": target}
-    if bot:
-        body["member_type"] = "bot"
-
-    with httpx.Client(headers=headers) as client:
-        resp = client.post(api_url(server, f"/rooms/{room}/invite"), json=body)
-    member = handle_response(resp)
-    click.echo(f"Invited {member['username']} to room {room}")
-
-
-# --- send ---
-
-@chatcli.command()
-@click.option("--room", required=True, help="Room ID.")
-@click.option("--text", required=True, help="Message text.")
-@click.pass_context
-def send(ctx: click.Context, room: str, text: str) -> None:
-    """Send a text message to a room via REST."""
-    server, headers = ctx.obj["server"], ctx.obj["headers"]
-    body = {"content": [{"type": "text", "text": text}]}
-
-    with httpx.Client(headers=headers) as client:
-        resp = client.post(api_url(server, f"/rooms/{room}/messages"), json=body)
-    msg = handle_response(resp)
-    click.echo(f"[{format_timestamp(msg['created_at'])}] {msg['username']}: {extract_text(msg['content'])}")
-
-
-# --- poll ---
-
-@chatcli.command()
-@click.option("--room", required=True, help="Room ID.")
-@click.option("--last", "last_n", type=int, default=None, help="Show only the last N messages.")
-@click.option("--after", type=int, default=None, help="Show messages after this message ID.")
-@click.pass_context
-def poll(ctx: click.Context, room: str, last_n: int | None, after: int | None) -> None:
-    """Poll messages from a room."""
-    server, headers = ctx.obj["server"], ctx.obj["headers"]
-    params: dict = {}
-    if after is not None:
-        params["after"] = after
-
-    with httpx.Client(headers=headers) as client:
-        resp = client.get(api_url(server, f"/rooms/{room}/messages"), params=params)
-    messages = handle_response(resp)
-
-    if last_n:
-        messages = messages[-last_n:]
-
-    if not messages:
-        click.echo("No messages.")
-        return
-
-    for msg in messages:
-        ts = format_timestamp(msg["created_at"])
-        text = extract_text(msg["content"])
-        click.echo(f"  [{ts}] #{msg['id']} {msg['username']}: {text}")
+        # --- join ---
+        # @chat.command()
+        # @click.option("--room", required=True, help="Room ID.")
+        # @click.option("--password", default=None, help="Room password (if required).")
+        # @click.option("--bot", is_flag=True, help="Join as a bot member.")
+        # @click.pass_context
+        # def join(ctx: click.Context, room: str, password: str | None, bot: bool) -> None:
+        #     """Join a room."""
+        #     server, headers, username = ctx.obj["server"], ctx.obj["headers"], ctx.obj["username"]
+        #     body: dict = {"username": username}
+        #     if password:
+        #         body["password"] = password
+        #     if bot:
+        #         body["member_type"] = "bot"
+        #
+        #     with httpx.Client(headers=headers) as client:
+        #         resp = client.post(api_url(server, f"/rooms/{room}/join"), json=body)
+        #     member = handle_response(resp)
+        #     click.echo(f"Joined room {room} as {member['username']} (status: {member['status']})")
+        #
+        #
+        # # --- invite ---
+        #
+        # @chat.command()
+        # @click.option("--room", required=True, help="Room ID.")
+        # @click.option("--target", required=True, help="Username to invite.")
+        # @click.option("--bot", is_flag=True, help="Invite as a bot member.")
+        # @click.pass_context
+        # def invite(ctx: click.Context, room: str, target: str, bot: bool) -> None:
+        #     """Invite a user to a room (owner only)."""
+        #     server, headers = ctx.obj["server"], ctx.obj["headers"]
+        #     body: dict = {"username": target}
+        #     if bot:
+        #         body["member_type"] = "bot"
+        #
+        #     with httpx.Client(headers=headers) as client:
+        #         resp = client.post(api_url(server, f"/rooms/{room}/invite"), json=body)
+        #     member = handle_response(resp)
+        #     click.echo(f"Invited {member['username']} to room {room}")
 
 
+        # --- send ---
+
+        @chat.command()
+        @click.option("--room", required=True, help="Room ID.")
+        @click.option("--text", required=True, help="Message text.")
+        @click.pass_context
+        def send(ctx: click.Context, room: str, text: str) -> None:
+            """Send a text message to a room via REST."""
+            server, headers = ctx.obj["server"], ctx.obj["headers"]
+            body = {"content": [{"type": "text", "text": text}]}
+
+            with httpx.Client(headers=headers) as client:
+                resp = client.post(api_url(server, f"/rooms/{room}/messages"), json=body)
+            msg = handle_response(resp)
+            click.echo(f"[{format_timestamp(msg['created_at'])}] {msg['username']}: {extract_text(msg['content'])}")
+
+
+        # --- poll ---
+
+        @chat.command()
+        @click.option("--room", required=True, help="Room ID.")
+        @click.option("--last", "last_n", type=int, default=None, help="Show only the last N messages.")
+        @click.option("--after", type=int, default=None, help="Show messages after this message ID.")
+        @click.pass_context
+        def poll(ctx: click.Context, room: str, last_n: int | None, after: int | None) -> None:
+            """Poll messages from a room."""
+            server, headers = ctx.obj["server"], ctx.obj["headers"]
+            params: dict = {}
+            if after is not None:
+                params["after"] = after
+
+            with httpx.Client(headers=headers) as client:
+                resp = client.get(api_url(server, f"/rooms/{room}/messages"), params=params)
+            messages = handle_response(resp)
+
+            if last_n:
+                messages = messages[-last_n:]
+
+            if not messages:
+                click.echo("No messages.")
+                return
+
+            for msg in messages:
+                ts = format_timestamp(msg["created_at"])
+                text = extract_text(msg["content"])
+                click.echo(f"  [{ts}] #{msg['id']} {msg['username']}: {text}")
+
+
+
+        @chat.command()
+        @click.option("--room", required=True, help="Room ID.")
+        @click.pass_context
+        def start(ctx: click.Context, room: str) -> None:
+            """Start an interactive WebSocket chat session."""
+            server, headers, username = ctx.obj["server"], ctx.obj["headers"], ctx.obj["username"]
+
+            # DM session
+            if room.startswith("@"):
+                peer_username = room[1:]
+                room = dm_room_id(peer_username, username)
+                click.echo(f"Connecting to DM room with {peer_username} (room id: {room}) ...")
+
+            session = LiveChatSession(server, room, username, headers, inputs=[
+                StdinInput(f"{username}> "),
+                #UnixSocketServerInput(f"{os.getcwd()}/tmp/chat-{room}.sock"),
+            ], )
+
+            try:
+                asyncio.run(session.run())
+            except (KeyboardInterrupt, SystemExit):
+                print("\nSession interrupted...")
+
+                # Fallback if signal handler didn't fire (e.g. Windows)
+                if session.transport is not None:
+                    asyncio.run(session.close())
+
+                sys.exit(0)
 # --- chat ---
 
 
@@ -246,7 +279,7 @@ def poll(ctx: click.Context, room: str, last_n: int | None, after: int | None) -
 # Message handling
 # -----------------------------
 
-class MessageHandler:
+class ChatMessageHandler:
     """Handles incoming messages by type. Subclass to customise behaviour."""
 
     def __init__(self, username: str) -> None:
@@ -272,7 +305,7 @@ class MessageHandler:
         pass
 
 
-class CliMessageHandler(MessageHandler):
+class CliChatMessageHandler(ChatMessageHandler):
     """
     Handles incoming WebSocket messages by type.
     Default implementation prints system messages and chat messages to the console.
@@ -371,7 +404,7 @@ class LiveChatSession:
         username: str,
         headers: dict[str, str],
         transport: ChatSessionTransport | None = None,
-        handler: MessageHandler | None = None,
+        handler: ChatMessageHandler | None = None,
         inputs: list[InputReader] | None = None,
     ) -> None:
         self.server = server
@@ -379,7 +412,7 @@ class LiveChatSession:
         self.username = username
         self.headers = {**headers}
 
-        self.handler = handler or CliMessageHandler(username)
+        self.handler = handler or CliChatMessageHandler(username)
         self.inputs = inputs or [StdinInput(prompt=f"{self.username}> ")]
 
         #self.ws: websockets.ClientConnection | None = None
@@ -533,32 +566,8 @@ class LiveChatSession:
             print("Chat session ended.")
 
 
-@chatcli.command()
-@click.option("--room", required=True, help="Room ID.")
-@click.pass_context
-def chat(ctx: click.Context, room: str) -> None:
-    """Start an interactive WebSocket chat session."""
-    server, headers, username = ctx.obj["server"], ctx.obj["headers"], ctx.obj["username"]
 
-    # DM session
-    if room.startswith("@"):
-        peer_username = room[1:]
-        room = dm_room_id(peer_username, username)
-        click.echo(f"Connecting to DM room with {peer_username} (room id: {room}) ...")
-
-    session = LiveChatSession(server, room, username, headers, inputs=[
-        StdinInput(f"{username}> "),
-        #UnixSocketServerInput(f"{os.getcwd()}/tmp/chat-{room}.sock"),
-    ], )
-
-    try:
-        asyncio.run(session.run())
-    except (KeyboardInterrupt, SystemExit):
-        print("\nSession interrupted...")
-
-        # Fallback if signal handler didn't fire (e.g. Windows)
-        if session.transport is not None:
-            asyncio.run(session.close())
-
-        sys.exit(0)
-
+if __name__ == "__main__":
+    cli = click.CommandCollection()
+    ChatClientCli(cli)
+    cli()

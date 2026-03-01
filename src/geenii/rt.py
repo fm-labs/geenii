@@ -28,7 +28,7 @@ def init_tool_registry():
     return registry
 
 
-async def init_builtin_tools(registry: ToolRegistry):
+def init_builtin_tools(registry: ToolRegistry):
     # registry.register(PythonTool(
     #     name="file_exists",
     #     description="Check if a file exists at the specified path.",
@@ -76,6 +76,15 @@ async def init_builtin_tools(registry: ToolRegistry):
         handler=lambda number: number ** 0.5
     ))
 
+    registry.register(PythonTool(
+        name="get_current_time",
+        description="Get the current system time.",
+        parameters={
+            "type": "object",
+            "properties": {}
+        },
+        handler=lambda: __import__("datetime").datetime.now().isoformat()
+    ))
 
 async def init_mcp_server_tools(registry: ToolRegistry):
     # mcp_servers = {
@@ -116,3 +125,9 @@ async def init_mcp_server_tools(registry: ToolRegistry):
         except Exception as e:
             print(f"Error connecting to MCP server {server_name}: {e}")
             continue
+
+def init_mcp_server_tools_sync(registry: ToolRegistry):
+    # wrapper for the async version of init_mcp_server_tools to be used in synchronous contexts
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(init_mcp_server_tools(registry))
