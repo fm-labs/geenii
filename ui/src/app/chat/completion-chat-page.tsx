@@ -15,9 +15,9 @@ const CompletionChatPage = () => {
 
   return (<Layout>
       <ChatContextProvider {...contextProps}>
-        <div className="content max-w-7xl mx-auto pt-12">
+        <div className="content">
           <div className="flex flex-col justify-center min-h-screen">
-            <div className="flex flex-col justify-center mb-4">
+            <div className="flex flex-col justify-center">
               <div className={'grow'}>
                 <div className="max-w-3xl mx-auto p-4">
                   <CompletionChat />

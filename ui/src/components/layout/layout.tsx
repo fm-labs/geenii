@@ -50,20 +50,9 @@ const Layout = (props: PropsWithChildren) => {
         </div>
       </header>
 
-      {/*<div className="content max-w-7xl mx-auto pt-12">
-        <div className="flex flex-col justify-center min-h-screen">
-          <div className="flex flex-col justify-center mb-4">
-            <div className={'grow'}>
-              {props.children}
-            </div>
-          </div>
-        </div>
-      </div>*/}
-
-      <main className={"pt-10"}>
+      <div>
         {props.children}
-      </main>
-
+      </div>
     </div>
   )
 }
