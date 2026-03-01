@@ -31,5 +31,6 @@ dependencies = [
 dev = [
     "pyinstaller>=6.17.0",
     "pytest>=9.0.2",
+    "redis>=7.2.1",
     "testcontainers>=4.13.3",
 ]

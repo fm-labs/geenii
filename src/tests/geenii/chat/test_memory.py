@@ -1,8 +1,8 @@
 import json
 import pytest
 
-from geenii.assistants.memory import FileChatMemory
-from geenii.assistants.models import ChatMessage, ChatMessageContent
+from geenii.memory import FileChatMemory
+from geenii.assistants.models import ModelMessage, ContentPart
 
 
 # Adjust these imports to match your project structure:
@@ -16,9 +16,9 @@ def tmp_json_path(tmp_path):
 
 
 def make_message(role="user", text="hello"):
-    return ChatMessage(
+    return ModelMessage(
         role=role,
-        content=[ChatMessageContent(type="text", text=text)],
+        content=[ContentPart(type="text", text=text)],
     )
 
 
@@ -49,7 +49,7 @@ def test_load_messages_from_existing_file(tmp_json_path):
 
     # Act
     mem = FileChatMemory(str(tmp_json_path), create=True)
-    msgs = mem.get_messages()
+    msgs = mem.messages()
 
     # Assert
     assert len(msgs) == 2
@@ -63,40 +63,40 @@ def test_load_messages_from_existing_file(tmp_json_path):
 
 def test_add_message_appends_and_persists(tmp_json_path):
     mem = FileChatMemory(str(tmp_json_path), create=True)
-    assert mem.get_messages() == []
+    assert mem.messages() == []
 
     msg = make_message(role="user", text="persist me")
-    mem.add_message(msg)
+    mem.append(msg)
 
     # In-memory updated
-    assert len(mem.get_messages()) == 1
-    assert mem.get_messages()[0].role == "user"
-    assert mem.get_messages()[0].content[0].text == "persist me"
+    assert len(mem.messages()) == 1
+    assert mem.messages()[0].role == "user"
+    assert mem.messages()[0].content[0].text == "persist me"
 
     # File updated: reload from disk and verify it round-trips
     mem2 = FileChatMemory(str(tmp_json_path), create=True)
-    assert len(mem2.get_messages()) == 1
-    assert mem2.get_messages()[0].role == "user"
-    assert mem2.get_messages()[0].content[0].text == "persist me"
+    assert len(mem2.messages()) == 1
+    assert mem2.messages()[0].role == "user"
+    assert mem2.messages()[0].content[0].text == "persist me"
 
 
 def test_clear_memory_empties_and_persists(tmp_json_path):
     mem = FileChatMemory(str(tmp_json_path), create=True)
-    mem.add_message(make_message(text="a"))
-    mem.add_message(make_message(text="b"))
-    assert len(mem.get_messages()) == 2
+    mem.append(make_message(text="a"))
+    mem.append(make_message(text="b"))
+    assert len(mem.messages()) == 2
 
-    mem.clear_memory()
-    assert mem.get_messages() == []
+    mem.clear()
+    assert mem.messages() == []
 
     # Ensure file is cleared too
     mem2 = FileChatMemory(str(tmp_json_path))
-    assert mem2.get_messages() == []
+    assert mem2.messages() == []
 
 
 def test_save_messages_writes_valid_json(tmp_json_path):
     mem = FileChatMemory(str(tmp_json_path), create=True)
-    mem.add_message(make_message(role="system", text="x"))
+    mem.append(make_message(role="system", text="x"))
 
     data = json.loads(tmp_json_path.read_text(encoding="utf-8"))
     assert "messages" in data
