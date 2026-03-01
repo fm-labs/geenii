@@ -8,16 +8,8 @@ type JsonViewProps = ReactJsonViewProps & {
 
 const JsonView = ({src, collapsed, ...props}: JsonViewProps) => {
   return (
-    <div className={"rounded-md border bg-muted p-2 overflow-auto mb-2 max-h-100"}>
-      <ReactJson src={src}
-                 collapsed={collapsed}
-                 displayDataTypes={false}
-                 displayObjectSize={false}
-                 displayArrayKey={false}
-                 quotesOnKeys={false}
-                 theme={"twilight"}
-                 enableClipboard={false}
-                 {...props} />
+    <div className={"rounded-md border bg-muted p-2 overflow-y-scroll mb-2 max-h-100 "}>
+      <pre className={"max-w-[500px]"}>{JSON.stringify(src, null, 2)}</pre>
     </div>
   )
 }

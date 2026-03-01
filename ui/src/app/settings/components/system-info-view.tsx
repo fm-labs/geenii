@@ -24,7 +24,6 @@ const SystemInfoView = () => {
 
   return (
     <div>
-      <Header title={"System Info"} />
       {data ? <JsonView src={data} /> : <p>Loading system information...</p>}
     </div>
   )

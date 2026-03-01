@@ -28,28 +28,28 @@ const ToolCard = ({ tool }: { tool: Tool }) => {
   }
 
   const handleSubmit = async ({ formData }) => {
-    console.log("Submitting tool execution with data:", formData)
+    console.log('Submitting tool execution with data:', formData)
     try {
       setIsExecuting(true)
       const response = await fetch(XAI_API_URL + `api/v1/tools/${tool.name}/execute`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json"
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
       })
       if (response.ok) {
         const result = await response.json()
-        console.log("Tool execution result:", result)
+        console.log('Tool execution result:', result)
         // Handle successful execution result (e.g., show a success message or display results)
         setExecutionResult(result)
-        notify.success("Tool executed successfully.")
+        notify.success('Tool executed successfully.')
       } else {
-        console.error("Failed to execute tool:", response.statusText)
+        console.error('Failed to execute tool:', response.statusText)
         notify.error(`Failed to execute tool: ${response.statusText}`)
       }
     } catch (error) {
-      console.error("Error executing tool:", error)
+      console.error('Error executing tool:', error)
       notify.error(error)
     } finally {
       setIsExecuting(false)
@@ -58,10 +58,10 @@ const ToolCard = ({ tool }: { tool: Tool }) => {
   }
 
   return (
-    <div className={"border rounded p-4 mb-4"}>
-      <h2 className={"text-lg font-bold mb-2"}>{tool.name}</h2>
-      <div className={"flex flex-wrap justify-between"}>
-        <p className={"text-gray-600 mb-2"}>{tool.description}</p>
+    <div className={'border rounded p-4 mb-4'}>
+      <h2 className={'text-lg font-bold mb-2'}>{tool.name}</h2>
+      <div className={'flex flex-wrap justify-between'}>
+        <p className={'text-gray-600 mb-2'}>{tool.description}</p>
         <div>
           <Button onClick={handleExecute}><PlaySquareIcon /> Execute</Button>
         </div>
@@ -74,7 +74,7 @@ const ToolCard = ({ tool }: { tool: Tool }) => {
       {showDialog && (
         <SchemaFormDialog schema={tool.parameters}
                           dialogTitle={`${tool.name} ${isExecuting ? 'Executing ...' : ''}`}
-                          onChange={async (values) => console.log("Parameters changed", values)}
+                          onChange={async (values) => console.log('Parameters changed', values)}
                           onSubmit={handleSubmit}
                           open={showDialog}
                           onOpenChange={() => setShowDialog(false)} />
@@ -82,9 +82,9 @@ const ToolCard = ({ tool }: { tool: Tool }) => {
 
       <div>
         {executionResult && (
-          <div className={"mt-4 p-2 border rounded bg-accent"}>
-            <h3 className={"font-bold mb-2"}>Execution Result:</h3>
-            <pre className={"text-sm overflow-x-auto"}>
+          <div className={'mt-4 p-2 border rounded bg-accent'}>
+            <h3 className={'font-bold mb-2'}>Execution Result:</h3>
+            <pre className={'text-sm overflow-x-auto'}>
               {JSON.stringify(executionResult, null, 2)}
             </pre>
           </div>
@@ -95,10 +95,9 @@ const ToolCard = ({ tool }: { tool: Tool }) => {
 }
 
 
-
 const ToolsPage = () => {
 
-  const [tools, setTools] = React.useState<Tool[]>([]);
+  const [tools, setTools] = React.useState<Tool[]>([])
 
   const fetchTools = useCallback(async () => {
     try {
@@ -106,32 +105,28 @@ const ToolsPage = () => {
       if (response.ok) {
         const data = await response.json()
         console.log(data)
-        setTools(data);
+        setTools(data)
       } else {
-        console.error("Failed to fetch tools:", response.statusText)
+        console.error('Failed to fetch tools:', response.statusText)
       }
     } catch (error) {
-      console.error("Error fetching tools:", error)
-      setTools([]);
+      console.error('Error fetching tools:', error)
+      setTools([])
     }
   }, [setTools])
 
   React.useEffect(() => {
     fetchTools()
   }, [fetchTools])
-  
-  return (
-    <Layout>
-      <MainContent>
-        <Header title={"Tools"} subtitle={"Tools can be used by agentic wizards to perform actions or retrieve information."}>
-          {/*<Button>Refresh</Button>*/}
-        </Header>
 
+  return (
+    <div>
+      <div>
         {tools.map((tool) => (
           <ToolCard key={tool.name} tool={tool} />
         ))}
-      </MainContent>
-    </Layout>
+      </div>
+    </div>
   )
 }
 
