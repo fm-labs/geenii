@@ -5,6 +5,7 @@ from geenii.datamodels import CompletionResponse, CompletionErrorResponse, \
     ChatCompletionRequest, ImageGenerationApiRequest, ImageGenerationApiResponse, \
     AudioGenerationApiRequest, AudioGenerationApiResponse, AudioTranscriptionApiRequest, AudioTranscriptionApiResponse, \
     ModelMessage, AIModelInfo, AIProviderInfo, ChatCompletionResponse
+from geenii.provider.geenii.provider import GeeniiProvider
 from geenii.provider.interfaces import AICompletionProvider, AIProvider, AIImageGeneratorProvider, \
     AIAudioGeneratorProvider, AIAudioTranscriptionProvider, AIAudioTranslationProvider, AIChatCompletionProvider
 
@@ -28,6 +29,7 @@ def enumerate_providers() -> list[AIProviderInfo]:
     :return: A list of available provider names.
     """
     providers = []
+    providers.append(AIProviderInfo(name="geenii"))
     providers.append(AIProviderInfo(name="ollama"))
     providers.append(AIProviderInfo(name="openai"))
     #providers.append(AIProviderInfo(name="anthropic"))
@@ -108,10 +110,16 @@ def get_ai_provider(provider: str) -> AIProviderType:
     # except ImportError as e:
     #     raise ImportError(f"Could not import provider '{provider}': {str(e)}")
 
-    if provider.lower() == "ollama":
+    if provider.lower() == "geenii":
+        _ai = GeeniiProvider()
+    elif provider.lower() == "ollama":
         _ai = OllamaAIProvider()
     elif provider.lower() == "openai":
         _ai = OpenAIProvider()
+    elif provider.lower() == "anthropic":
+        raise NotImplementedError("Anthropic provider is not implemented yet.")
+    elif provider.lower() == "openrouter":
+        raise NotImplementedError("OpenRouter provider is not implemented yet.")
     else:
         raise ValueError(f"Unsupported provider: {provider}")
 

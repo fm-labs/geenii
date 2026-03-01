@@ -18,7 +18,7 @@ class AIProviderInfo(pydantic.BaseModel):
 class AIModelInfo(pydantic.BaseModel):
     provider: str
     name: str
-    locality: Literal["local","cloud"]  # "local" or "cloud"
+    locality: Literal["local","cloud","mixed"]  # "local" or "cloud"
     description: str | None = None
     capabilities: List[str] | None = pydantic.Field(default_factory=list)
     metadata: dict | None = pydantic.Field(default_factory=dict)
