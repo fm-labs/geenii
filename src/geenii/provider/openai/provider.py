@@ -8,7 +8,7 @@ import logging
 from openai import OpenAI
 
 from geenii import config
-from geenii.chat.chat_models import TextContent, ToolCallContent
+from geenii.chat.chat_models import TextContent, ToolCallContent, JsonContent
 from geenii.config import CACHE_DIR
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, ChatCompletionRequest, \
     ChatCompletionResponse, AIModelInfo, AudioTranscriptionApiResponse
@@ -26,6 +26,10 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
 
     DEFAULT_MODEL = "gpt-3.5-turbo"
     DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer."
+
+    DEFAULT_TEMPERATURE = 0.3
+    DEFAULT_MAX_TOKENS = 4096
+    DEFAULT_MAX_TOOL_CALLS = 5
 
     DALLE_MODELS = {
         "gpt-image-1": {"sizes": ["1024x1024", "auto"]},
@@ -176,14 +180,8 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         if model.startswith("openai:"):
             model = model[len("openai:"):]
 
-        prompt = request.prompt
-        messages = request.messages or []
-        tools = request.tools or set()
-
-        system_prompt = request.system or [self.DEFAULT_SYSTEM_PROMPT]
-        instructions = "\n".join(system_prompt) if isinstance(system_prompt, list) else system_prompt
-
         # map tool names to tool definitions in openai format
+        tools = request.tools or set()
         tool_defs_openai = []
         logger.info(f"Tool registry provided {tool_registry is not None}, tools requested: {tools}")
         if tool_registry is not None and len(tools) > 0:
@@ -192,6 +190,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             logger.info(f"OpenAI tools mapped: {len(tool_defs_openai)}")
 
         # mapping history/seed model messages to OpenAI Responses API input format
+        messages = request.messages or []
         input_messages = []
         for message in messages:
             if message.content and len(message.content) > 0:
@@ -216,19 +215,45 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                             f"Unsupported model message content type for openai chat completion input: {content_item.type}")
 
         # finally add the user prompt
-        input_messages.append({"role": "user", "content": prompt})
+        prompt = request.prompt
+        if prompt and len(prompt) > 0:
+            input_messages.append({"role": "user", "content": prompt})
 
-        # perform the API call to OpenAI Responses API
-        print(f"Requesting response with input messages:", input_messages)
+        #  build system instructions
+        system_prompt = request.system or [self.DEFAULT_SYSTEM_PROMPT]
+        instructions = "\n".join(system_prompt) if isinstance(system_prompt, list) else system_prompt
+
+        output_format = {"type": "text"}
+        if request.output_schema:
+            schema_name = "OutputSchema"
+            output_format = {"type": "json_schema", "schema": request.output_schema, "name": schema_name}
+        elif request.output_format == "json":
+            output_format = {"type": "json_object"}
+
+        model_params = request.model_parameters or {}
+        temperature = model_params.get('temperature', request.temperature) or self.DEFAULT_TEMPERATURE
+        max_tokens = model_params.get('max_tokens', request.max_tokens) or self.DEFAULT_MAX_TOKENS
+        top_p = model_params.get('top_p', request.top_p) or None
+        max_tool_calls = model_params.get('max_tool_calls', self.DEFAULT_MAX_TOOL_CALLS)
+
+        # call OpenAI Responses API
+        logger.info(f"OPENAI: Generate completion response with %d input messages:", len(input_messages))
         time_start = time.time()
         model_result = self.client.responses.create(
             model=model,
             instructions=instructions,
             input=input_messages,
             tools=tool_defs_openai or [],
-            stream=False
+            stream=False,
+            text={
+                "format": output_format,
+            },
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+            max_tool_calls=max_tool_calls,
+            top_p=top_p,
         )
-        print(f"Response received: {model_result}")
+        logger.info(model_result)
         time_end = time.time()
 
         # mapping OpenAI Responses API output format to generic model messages
@@ -237,10 +262,20 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             if output_item.type == "message":
                 for content_item in output_item.content:
                     if content_item.type == "output_text":
-                        print(f"Model output text: {content_item.text}")
-                        output_parts.append(TextContent(text=content_item.text))
+                        logger.info(f"Model output text: {content_item.text}")
+                        _text = content_item.text
+                        _text_part = TextContent(text=_text)
+                        if _text.strip().startswith("{") and _text.strip().endswith("}"):
+                            logger.info("Looks like the content is JSON, trying to parse it.")
+                            try:
+                                json_data = json.loads(_text)
+                                _text_part = JsonContent(data=json_data)
+                            except json.JSONDecodeError:
+                                logger.warning(
+                                    "Content looks like JSON but failed to parse, adding as plain text.")
+                        output_parts.append(_text_part)
                     elif content_item.type == "refusal":
-                        print(f"Model refusal: {content_item.refusal}")
+                        logger.critical(f"Model refusal: {content_item.refusal}")
                         output_parts.append(TextContent(text=f"Model refusal: {content_item.refusal}"))
 
             elif output_item.type == "function_call":
@@ -248,11 +283,12 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                 fn_call_id = output_item.call_id
                 fn_name = output_item.name
                 fn_args = json.loads(output_item.arguments)
-                print(f"Tool call detected: Function {fn_name} with args: {fn_args} ({fn_call_id})")
+                logger.info(f"Tool call detected: Function {fn_name} with args: {fn_args} ({fn_call_id})")
 
                 output_parts.append(ToolCallContent(name=fn_name, arguments=fn_args, call_id=fn_call_id))
             else:
-                print(f"Unsupported OpenAI response output item type: {output_item.type}")
+                logger.warning(f"Unsupported OpenAI response output item type: {output_item.type}")
+                output_parts.append(TextContent(text=f"Unsupported OpenAI response item type: {output_item.type}"))
 
         # Usage
         usage = {
@@ -268,7 +304,6 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             timestamp=int(time.time()),
             model=f"{self.name}:{model}",
             prompt=prompt,
-            # provider=self.name,
             output=output_parts,
             output_text=model_result.output_text,
             model_result=model_result.model_dump()

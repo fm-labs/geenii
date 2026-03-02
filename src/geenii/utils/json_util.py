@@ -30,3 +30,11 @@ def append_jsonl(file_path: str, item: dict) -> None:
     """Append a single dictionary to a JSONL file."""
     with open(file_path, "a") as f:
         f.write(json.dumps(item) + "\n")
+
+
+def parse_json_safe(json_str: str) -> dict | list | None:
+    """Parse a JSON string safely, returning None if parsing fails."""
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        return None

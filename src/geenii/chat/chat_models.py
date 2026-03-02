@@ -1,3 +1,4 @@
+import json
 from typing import Annotated, Literal, Any
 
 import pydantic
@@ -39,6 +40,11 @@ class FunctionCallContent(BaseContent):
     arguments: dict | None = None
     result: str | None = None
 
+    def to_text(self) -> str:
+        args_str = ", ".join(f"{k}={v!r}" for k, v in (self.arguments or {}).items())
+        return f"Function call request: {self.name}({args_str})"
+
+
 class ToolCallContent(BaseContent):
     type: Literal["tool_call"] = "tool_call"
     name: str
@@ -48,6 +54,7 @@ class ToolCallContent(BaseContent):
     def to_text(self) -> str:
         args_str = ", ".join(f"{k}={v!r}" for k, v in (self.arguments or {}).items())
         return f"Tool call request (call_id={self.call_id}): {self.name}({args_str})]"
+
 
 class ToolCallResultContent(BaseContent):
     type: Literal["tool_call_result"] = "tool_call_result"
@@ -63,12 +70,16 @@ class ToolCallResultContent(BaseContent):
         else:
             return f"Tool call result for {self.name} (call_id={self.call_id}): {self.result!r}"
 
+
 class FileContent(BaseContent):
     type: Literal["file"] = "file"
     url: str
     filename: str
     content_type: str | None = None
     size: int | None = None
+
+    def to_text(self) -> str:
+        return f"File: {self.filename} ({self.content_type}, {self.size} bytes) at {self.url}"
 
 
 class EmbedContent(BaseContent):
@@ -79,14 +90,31 @@ class EmbedContent(BaseContent):
     thumbnail_url: str | None = None
     video_url: str | None = None
 
+    def to_text(self) -> str:
+        parts = [f"Embed: {self.title or 'No title'}"]
+        if self.description:
+            parts.append(f"Description: {self.description}")
+        if self.url:
+            parts.append(f"URL: {self.url}")
+        if self.thumbnail_url:
+            parts.append(f"Thumbnail: {self.thumbnail_url}")
+        if self.video_url:
+            parts.append(f"Video: {self.video_url}")
+        return "\n".join(parts)
 
+
+class JsonContent(BaseContent):
+    type: Literal["json"] = "json"
+    data: dict | list
+
+    def to_text(self) -> str:
+        return json.dumps(self.data)
 
 ContentPart = Annotated[
     TextContent | ImageContent | AudioContent | FileContent | EmbedContent |
-    FunctionCallContent | ToolCallContent | ToolCallResultContent,
+    FunctionCallContent | ToolCallContent | ToolCallResultContent | JsonContent,
     Field(discriminator="type"),
 ]
-
 
 
 # --- Message Models ---

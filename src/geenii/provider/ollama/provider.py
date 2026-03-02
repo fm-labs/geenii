@@ -1,3 +1,4 @@
+import json
 import time
 import uuid
 from typing import List
@@ -6,7 +7,7 @@ import logging
 import ollama
 
 from geenii import config
-from geenii.chat.chat_models import TextContent, ToolCallContent, ContentPart, ToolCallResultContent
+from geenii.chat.chat_models import TextContent, ToolCallContent, ContentPart, ToolCallResultContent, JsonContent
 from geenii.config import CACHE_DIR
 from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest, AIModelInfo, \
     ModelMessage
@@ -151,21 +152,8 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         if model.startswith("ollama:"):
             model = model[len("ollama:"):]
 
-        tools = request.tools or set()
-        prompt = request.prompt
-        # stream = request.stream
-        stream = False  # for now we will not support streaming in chat completions.
-        # if model not in self.get_models():
-        #    raise ValueError(f"Model {model} is not supported by {repr(self)}.")
-        # output_format = kwargs.get('output_format', None)
-
-        model_params = request.model_parameters or {}
-        temperature = model_params.get('temperature', self.DEFAULT_TEMPERATURE)
-        max_tokens = model_params.get('max_tokens', self.DEFAULT_MAX_TOKENS)
-        top_k = model_params.get('top_k', None)
-        top_p = model_params.get('top_p', None)
-
         # TOOLS
+        tools = request.tools or set()
         ollama_tools = []
         logger.info(f"Tool registry provided {tool_registry is not None}, tools requested: {tools}")
         if tool_registry is not None and len(tools) > 0:
@@ -177,19 +165,14 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             ollama_tools = [map_openai_tool_to_ollama(tool_def) for tool_def in openai_tools]
             logger.info(
                 f"Mapped {len(openai_tools)} tools to Ollama format, {[tool['function']['name'] for tool in ollama_tools]}")
-            print("Mapped tools:", ollama_tools)
+            # print("Mapped tools:", ollama_tools)
 
-        # messages that will be sent to the Ollama API, starting with the system prompt, then developer prompt (if any),
-        # then the conversation history messages (if any), and finally the user prompt
+        # messages that will be sent to the Ollama API in the format expected by the API
         input_messages = []
 
         # system prompt goes first in the messages list
-        system_prompt = request.system
-        # if system_prompt is None:
-        # todo make default system prompt configurable
-        # system_prompt = "You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer."
-
-        for system_prompt_part in system_prompt or []:
+        system_prompt = request.system or []
+        for system_prompt_part in system_prompt:
             input_messages.append({
                 'role': 'system',
                 'content': system_prompt_part,
@@ -203,24 +186,29 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         #         'content': developer_prompt,
         #     })
 
-        # if there are existing messages, add them before the user prompt
+        # message history
         if request.messages:
             input_messages.extend(model_messages_to_ollama_format(request.messages))
 
-        # Add the user prompt to the messages list
-        if prompt:
+        # user prompt
+        if request.prompt:
             input_messages.append({
                 'role': 'user',
-                'content': prompt,
+                'content': request.prompt,
             })
-        elif not prompt and len(request.messages) < 1:
+        elif not request.prompt and len(request.messages) < 1:
             raise ValueError("At least a prompt or some messages must be provided for chat completion.")
 
         try:
-            print(input_messages)
+            logger.info(input_messages)
+            output_format = request.output_format or None
+            output_schema = request.output_schema or None
 
-            logger.info(
-                f"OLLAMA: Generating chat completion with model {model} and {len(input_messages)} input messages")
+            model_params = request.model_parameters or {}
+            temperature = model_params.get('temperature', request.temperature) or self.DEFAULT_TEMPERATURE
+            max_tokens = model_params.get('max_tokens', request.max_tokens) or self.DEFAULT_MAX_TOKENS
+            top_p = model_params.get('top_p', request.top_p) or None
+            top_k = model_params.get('top_k', None)
 
             chat_options = {
                 "temperature": temperature,
@@ -231,19 +219,22 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 # todo "stop": stop, # Stop sequences to end the generation. Same as OpenAI API
                 # todo "seed": seed, # Random seed for reproducibility. OpenAI added seed in 2024 (Beta)
             }
+
+            logger.info(
+                f"OLLAMA: Generating chat completion model={model} temperature={temperature} output={output_format} and {len(input_messages)} input messages")
             model_result = self.ollama.chat(
                 model=model,
                 messages=input_messages,
                 tools=ollama_tools,
-                stream=stream,
                 options=chat_options,
+                format=output_schema or output_format,
                 # Not supported yet
-                # format="json",
+                stream=False,
                 # think=None,
                 # logprobs=None,
                 # top_logprobs=None,
             )
-            # print("Model Response:", model_result)
+            print("Model Response:", model_result)
 
             # Check if the response contains a message with content and tool calls
             message = model_result.get('message', default={})
@@ -253,7 +244,8 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             # Check the done reason to see if the model finished generating a complete response
             done_reason = model_result.get('done_reason', 'unknown')
             if done_reason != 'stop':
-                logger.warning(f"Model response done reason is not 'stop', it is '{done_reason}'. This may indicate that the model did not finish generating a complete response.")
+                logger.warning(
+                    f"Model response done reason is not 'stop', it is '{done_reason}'. This may indicate that the model did not finish generating a complete response.")
 
             # Container for the parsed output parts from the model response
             output_parts: List[ContentPart] = []
@@ -262,14 +254,31 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             thinking_content = message.get('thinking', None)
             if thinking_content:
                 logger.info("Thinking content found in the model response.")
-                #output_parts.append(TextContent(text=f"[Thinking]: {thinking_content}"))
-
+                # output_parts.append(TextContent(text=f"[Thinking]: {thinking_content}"))
 
             # TEXT contents
             content = message.get('content')
             if content:
                 logger.info("Text Content found in the message len=%d", len(content))
-                output_parts.append(TextContent(text=content))
+                _out_part = TextContent(text=content)
+                if output_format == 'json':
+                    try:
+                        json_data = json.loads(content)
+                        _out_part = JsonContent(data=json_data)
+                    except json.JSONDecodeError:
+                        logger.warning("Failed to parse content as JSON, adding as plain text.")
+                elif output_format == "auto" or output_format is None:
+                    # Optimistic JSON parsing
+                    # If the content looks like JSON, try to parse it
+                    if isinstance(content, str) and content.strip().startswith("{") and content.strip().endswith("}"):
+                        logger.info("Looks like the content is JSON, trying to parse it.")
+                        try:
+                            json_data = json.loads(content)
+                            _out_part = JsonContent(data=json_data)
+                        except json.JSONDecodeError:
+                            logger.warning(
+                                "Content looks like JSON but failed to parse, adding as plain text.")
+                output_parts.append(_out_part)
 
             # IMAGE content
             images = message.get('images', [])
@@ -277,7 +286,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 logger.info(f"{len(images)} image(s) found in the message.")
                 for image in images:
                     output_parts.append(TextContent(text="[Image content not supported yet]"))
-                    #todo output_parts.append(ImageContent(image=image))
+                    # todo output_parts.append(ImageContent(image=image))
 
             # TOOL CALLS
             tool_calls = message.get('tool_calls', default=[])
@@ -297,24 +306,26 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
 
             # Usage and performance metrics
             usage = {
-                'input_tokens': model_result.get('prompt_eval_count', 0),
-                'output_tokens': model_result.get('eval_count', 0),
-                'total_tokens': model_result.get('prompt_eval_count', 0) + model_result.get('eval_count', 0),
-                'load_duration': model_result.get('load_duration', 0) / 1_000_000, # convert to milliseconds
-                'input_duration': model_result.get('prompt_eval_duration', 0) / 1_000_000, # convert to milliseconds
-                'output_duration': model_result.get('eval_duration', 0) / 1_000_000, # convert to milliseconds
-                'total_duration': model_result.get('total_duration', 0) / 1_000_000, # convert to milliseconds
+                'input_tokens': int(model_result.get('prompt_eval_count', 0)),
+                'output_tokens': int(model_result.get('eval_count', 0)),
+                'total_tokens': int(model_result.get('prompt_eval_count', 0) + model_result.get('eval_count', 0)),
+                'load_duration': int(model_result.get('load_duration', 0) / 1_000_000),  # convert to milliseconds
+                'input_duration': int(model_result.get('prompt_eval_duration', 0) / 1_000_000),  # convert to milliseconds
+                'output_duration': int(model_result.get('eval_duration', 0) / 1_000_000),  # convert to milliseconds
+                'total_duration': int(model_result.get('total_duration', 0) / 1_000_000),  # convert to milliseconds
             }
-            logger.info(f"Tokens used in this chat completion: {usage['total_tokens']}, processing time: {usage['total_duration']} ns")
+            logger.info(
+                f"Tokens used in this chat completion: {usage['total_tokens']}, processing time: {usage['total_duration']} ms")
 
             logger.info("OLLAMA: Chat completion generated with %d output parts", len(output_parts))
+            # todo remove prompt from response
             response = ChatCompletionResponse(
                 id=uuid.uuid4().hex,
                 timestamp=int(time.time()),
                 model=f"{self.name}:{model}",
-                prompt=prompt,
-                # todo remove prompt from response since we already have the messages in the chat completion request
+                prompt=request.prompt,
                 output=output_parts,  # Parsed output from the model response
+                reasoning_output=thinking_content,
                 model_result=model_result.model_dump(),
                 # todo tools_used=[]
                 usage=usage,
@@ -451,7 +462,7 @@ def model_messages_to_ollama_format(messages: List[ModelMessage]) -> List[dict]:
             if not role or not content:
                 logger.warning("Invalid message format, missing 'role' or 'content'")
                 print(message)
-                #continue
+                # continue
 
             for content_item in content:
                 _message = None

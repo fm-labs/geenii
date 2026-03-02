@@ -56,9 +56,10 @@ class CompletionRequest(pydantic.BaseModel):
     max_tokens: int | None = None
     # Output format
     output_format: str | None = None
+    output_schema: dict | None = None
     # Streaming support
     stream: bool | None = False
-    model_parameters: dict | None = None  # Additional model parameters
+    model_parameters: dict | None = pydantic.Field(default_factory=dict)
 
 
 class BaseCompletionResponse(pydantic.BaseModel):
@@ -75,6 +76,7 @@ class CompletionResponse(BaseCompletionResponse):
     # prompt: str
     output: List[ContentPart] | None = None
     output_text: str | None = None
+    reasoning_output: str | None = None
 
 
 # Chat completion
