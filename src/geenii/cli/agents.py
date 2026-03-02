@@ -31,7 +31,7 @@ class CliAgentRunner:
 
     async def _run(self, prompt: str):
         while prompt.lower() != "exit" and len(prompt) > 0:
-            async for msg in self.agent.prompt([TextContent(text=prompt)]):
+            async for msg in self.agent.prompt(prompt):
                 for part in msg.content:
                     click.secho(f">>> [{part.type}] {part.to_text()}", fg="cyan")
 

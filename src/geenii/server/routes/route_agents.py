@@ -26,7 +26,5 @@ def list_agents():
     """
     List all available agents.
     """
-    # For demonstration purposes, return static agents.
-    # In a real application, this could fetch from a database or configuration.
     agents = read_agents_from_file()
     return {"agents": agents}

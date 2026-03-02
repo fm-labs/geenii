@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
     DEFAULT_MODEL = "qwen:3b"
-    DEFAULT_TEMPERATURE = 0.3
-    DEFAULT_MAX_TOKENS = 2048
+    DEFAULT_TEMPERATURE = 0.2
+    DEFAULT_MAX_TOKENS = 4096
     DEFAULT_TOP_K = None  # 20
     DEFAULT_TOP_P = None  # 0.9
 
