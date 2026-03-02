@@ -14,6 +14,7 @@ from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, Ch
     ChatCompletionResponse, AIModelInfo, AudioTranscriptionApiResponse
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider, \
     AIImageGeneratorProvider, AIAudioTranscriptionProvider
+from geenii.tools import ToolRegistry
 from geenii.utils.json_util import write_json
 
 logger = logging.getLogger(__name__)
@@ -175,7 +176,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         )
         return response
 
-    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry=None) -> ChatCompletionResponse:
+    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry: ToolRegistry=None) -> ChatCompletionResponse:
         model = request.model or self.DEFAULT_MODEL
         if model.startswith("openai:"):
             model = model[len("openai:"):]
@@ -185,8 +186,8 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         tool_defs_openai = []
         logger.info(f"Tool registry provided {tool_registry is not None}, tools requested: {tools}")
         if tool_registry is not None and len(tools) > 0:
-            tool_defs = tool_registry.list_definitions()
-            tool_defs_openai = [tool_def for tool_def in tool_defs if tool_def['name'] in tools]
+            _tools = tool_registry.list_tools()
+            tool_defs_openai = [_tool.to_openai() for _tool in _tools if _tool.name in tools]
             logger.info(f"OpenAI tools mapped: {len(tool_defs_openai)}")
 
         # mapping history/seed model messages to OpenAI Responses API input format

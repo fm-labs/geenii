@@ -6,7 +6,7 @@ from geenii.chat.chat_bots import BotInterface
 from geenii.chat.chat_models import ContentPart, TextContent
 from geenii.datamodels import ModelMessage
 from geenii.tools import ToolRegistry, PythonTool
-from geenii.wizards import Wizard
+from geenii.agents import Agent
 
 
 class EchoBot(BotInterface):
@@ -70,9 +70,11 @@ class SimpleBot(BotInterface):
         except Exception:
             yield TextContent(text=f"Uuups, something went wrong :/")
 
+
 def get_weather(location: str) -> str:
     # Dummy implementation for testing
     return f"The current temperature in {location} is 25°C with clear skies."
+
 
 def get_bot(botname: str) -> BotInterface:
     # return EchoBot(botname=botname)
@@ -99,9 +101,9 @@ def get_bot(botname: str) -> BotInterface:
                                       },
                                       handler=get_weather))
 
-    return Wizard(name=botname,
-                  model="ollama:qwen3:8b",
-                  system_prompt="You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer.",
-                  tools={"get_weather", "execute_command", "file_read", "calculate_square_root"},
-                  tool_registry=tool_registry,
-                  )
+    return Agent(name=botname,
+                 model="ollama:qwen3:8b",
+                 system_prompt="You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer.",
+                 tools={"get_weather", "execute_command", "file_read", "calculate_square_root"},
+                 tool_registry=tool_registry,
+                 )

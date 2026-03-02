@@ -20,7 +20,7 @@ from geenii.utils.json_util import read_json, parse_json_safe
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_WIZARD_SYSTEM_PROMPT = """
+DEFAULT_AGENT_SYSTEM_PROMPT = """
 You are an AI assistant that MUST use available tools when they are relevant.
 
 CORE RULES:
@@ -53,7 +53,7 @@ def message_to_prompt(message: str | list[ContentPart]) -> str | None:
 
 class BaseTask(abc.ABC):
     """
-    Base class for a task in the wizard's process.
+    Base class for a task in the agent's process.
     A task represents a unit of work that can be executed asynchronously and can yield messages as it runs.
     """
 
@@ -65,52 +65,52 @@ class BaseTask(abc.ABC):
         yield ModelMessage(role="assistant", content=[TextContent(text=f"Not implemented.")])
 
 
-class BaseWizardTask(BaseTask, abc.ABC):
+class BaseAgentTask(BaseTask, abc.ABC):
     """
-    Base class for a wizard task.
-    The wizard tasks has a reference to the wizard instance and can access its tools, skills, memory, etc. to perform its work.
+    Base class for a agent task.
+    The agent tasks has a reference to the agent instance and can access its tools, skills, memory, etc. to perform its work.
     """
 
-    def __init__(self, wizard: "Wizard"):
-        self.wizard = wizard
+    def __init__(self, agent: "Agent"):
+        self.agent = agent
 
 
-class LLMTask(BaseWizardTask):
+class LLMTask(BaseAgentTask):
     """Generate LLM chat completion response in the current context. Handles tool calls"""
-    def __init__(self, wizard: "Wizard", message: str | list[ContentPart], allowed_tools: Set[str] | None = None):
-        super().__init__(wizard)
+    def __init__(self, agent: "Agent", message: str | list[ContentPart], allowed_tools: Set[str] | None = None):
+        super().__init__(agent)
         self.message = message
         self.allowed_tools = allowed_tools
         if self.allowed_tools is None:
-            self.allowed_tools = set(self.wizard.allowed_tools)
+            self.allowed_tools = set(self.agent.allowed_tools)
 
     async def execute(self) -> AsyncGenerator[ModelMessage, None]:
         full_system_prompt = self._build_system_prompt()
         # print(full_system_prompt)
         prompt = message_to_prompt(self.message)
         #allowed_tools = set(self._tool_registry.list_tool_names())
-        #allowed_tools = self.wizard.allowed_tools.intersection(set(self.wizard.tools.list_tool_names()))
+        #allowed_tools = self.agent.allowed_tools.intersection(set(self.agent.tools.list_tool_names()))
         allowed_tools = self.allowed_tools
-        input_messages = list(self.wizard.message_history[-10:])  # snapshot of the current message history (last 10 messages)
+        input_messages = list(self.agent.message_history[-10:])  # snapshot of the current message history (last 10 messages)
 
         # run sync task in thread pool to avoid blocking the event loop while waiting for the response
         request = ChatCompletionRequest(prompt=prompt,
-                                        model=self.wizard.model,
+                                        model=self.agent.model,
                                         system=full_system_prompt,
                                         messages=input_messages,  # snapshot of the current message history
                                         tools=allowed_tools,
-                                        context_id=self.wizard.context_id
+                                        context_id=self.agent.context_id
                                         )
         response = await asyncio.to_thread(self._request_completion, request)
         logger.info(f"Received model response for prompt '{prompt}' with {len(response.output)} content parts.")
 
         # add user request to message history
         user_message = ModelMessage(role="user", content=[TextContent(text=prompt)])
-        self.wizard.message_history.append(user_message)
+        self.agent.message_history.append(user_message)
 
         # add model response to message history
         bot_message = ModelMessage(role="assistant", content=response.output)
-        self.wizard.message_history.append(bot_message)
+        self.agent.message_history.append(bot_message)
 
         # yield the output message
         yield bot_message
@@ -121,25 +121,25 @@ class LLMTask(BaseWizardTask):
             if isinstance(item, ToolCallContent):
                 tool_calls += 1
                 # enqueue tool call for processing and yield a placeholder message until the tool result is available
-                await self.wizard.enqueue_task(ToolCallTask(self.wizard, tool_name=item.name, arguments=item.arguments, call_id=item.call_id))
+                await self.agent.enqueue_task(ToolCallTask(self.agent, tool_name=item.name, arguments=item.arguments, call_id=item.call_id))
 
         # if there were tool calls, we can optionally trigger a follow-up action,
         # e.g. by enqueuing another task to process the tool results or to ask the LLM for the next step based on the tool results.
         if tool_calls > 0:
             logger.info(
                 f"{tool_calls} tool calls were made in the response. Enqueuing follow-up task to process tool results.")
-            await self.wizard.enqueue_task(FinalizeTask(self.wizard))
+            await self.agent.enqueue_task(FinalizeTask(self.agent))
 
 
     def _request_completion(self, request):
-        response = generate_chat_completion(request=request, tool_registry=self.wizard.tools, )
+        response = generate_chat_completion(request=request, tool_registry=self.agent.tools, )
         return response
 
     def _build_system_prompt(self) -> list[str]:
         """
-        Build the full system prompt for the wizard, including the base system prompt and any additional information from loaded skills.
+        Build the full system prompt for the agent, including the base system prompt and any additional information from loaded skills.
         """
-        system_prompts = [self.wizard.system_prompt]
+        system_prompts = [self.agent.system_prompt]
         skills_prompts = self._build_skills_prompt()
         system_prompts.extend(skills_prompts)
         return system_prompts
@@ -147,14 +147,14 @@ class LLMTask(BaseWizardTask):
     def _build_skills_prompt(self) -> list[str]:
         """
         Returns a combined prompt for all loaded skills that can be included in the system prompt
-        to provide the wizard with information about its skills and how to use them.
+        to provide the agent with information about its skills and how to use them.
         :return:
         """
         skills_prompts = []
-        if not self.wizard.skills or len(self.wizard.skills.list_skill_names()) == 0:
+        if not self.agent.skills or len(self.agent.skills.list_skill_names()) == 0:
             return skills_prompts
-        for skill_name in self.wizard.skills.list_skill_names():
-            skill = self.wizard.skills.get_skill(skill_name)
+        for skill_name in self.agent.skills.list_skill_names():
+            skill = self.agent.skills.get_skill(skill_name)
             if skill:
                 skills_prompt = f"You have a special skill named {skill_name}:\n"
                 skills_prompt += f"{skill.description}\n"
@@ -162,20 +162,20 @@ class LLMTask(BaseWizardTask):
                 skills_prompts.append(skills_prompt)
         return skills_prompts
 
-class FinalizeTask(BaseWizardTask):
-    def __init__(self, wizard: "Wizard"):
-        super().__init__(wizard)
+class FinalizeTask(BaseAgentTask):
+    def __init__(self, agent: "Agent"):
+        super().__init__(agent)
 
     async def execute(self) -> AsyncGenerator[ModelMessage|BaseTask, None]:
         yield ModelMessage(role="assistant",
                            content=[TextContent(text=f"Finalizing response after processing tool results.")])
 
-        yield LLMTask(self.wizard, message="Based on the previous outputs generate a final response", allowed_tools=set())
+        yield LLMTask(self.agent, message="Based on the previous outputs generate a final response", allowed_tools=set())
 
 
-class ToolCallTask(BaseWizardTask):
-    def __init__(self, wizard: "Wizard", tool_name: str, arguments: dict, call_id: str = None):
-        super().__init__(wizard)
+class ToolCallTask(BaseAgentTask):
+    def __init__(self, agent: "Agent", tool_name: str, arguments: dict, call_id: str = None):
+        super().__init__(agent)
         self.tool_name = tool_name
         self.arguments = arguments
         self.call_id = call_id
@@ -184,7 +184,7 @@ class ToolCallTask(BaseWizardTask):
         tool_name = self.tool_name
         arguments = self.arguments
         call_id = self.call_id
-        tool_usage_approved = await self.wizard.request_tool_execution(tool_name=tool_name, arguments=arguments,
+        tool_usage_approved = await self.agent.request_tool_execution(tool_name=tool_name, arguments=arguments,
                                                                        call_id=call_id)
         if not tool_usage_approved:
             logger.critical(f"Tool execution for {tool_name} was rejected by the request_tool_execution method.")
@@ -192,12 +192,12 @@ class ToolCallTask(BaseWizardTask):
             msg = ModelMessage(role="tool", content=[
                 ToolCallResultContent(name=tool_name, arguments=arguments, result=tool_result, call_id=call_id)])
             yield msg
-            self.wizard.message_history.append(msg)
+            self.agent.message_history.append(msg)
             return
 
         logger.info(f"Calling tool {tool_name} with arguments {arguments}")
         try:
-            tool_result = execute_tool_call(self.wizard.tools, tool_name, **arguments)
+            tool_result = await execute_tool_call(self.agent.tools, tool_name, **arguments)
             logger.info(f"Tool {tool_name} returned result: {tool_result}")
         except Exception as e:
             logger.exception(f"Error executing tool {tool_name}", exc_info=e)
@@ -205,10 +205,10 @@ class ToolCallTask(BaseWizardTask):
         msg = ModelMessage(role="tool", content=[
             ToolCallResultContent(name=tool_name, arguments=arguments, result=tool_result, call_id=call_id)])
         yield msg
-        self.wizard.message_history.append(msg)
+        self.agent.message_history.append(msg)
 
 
-class ToolFilterTask(BaseWizardTask):
+class ToolFilterTask(BaseAgentTask):
     """Task to find the best-suitable tool to call based on the current message and context"""
 
     SYSTEM_PROMPT = """
@@ -238,8 +238,8 @@ class ToolFilterTask(BaseWizardTask):
         "additionalProperties": False
     }
 
-    def __init__(self, wizard: "Wizard", prompt: str, tool_registry: ToolRegistry):
-        super().__init__(wizard)
+    def __init__(self, agent: "Agent", prompt: str, tool_registry: ToolRegistry):
+        super().__init__(agent)
         self.prompt = prompt
         self.tool_registry = tool_registry
 
@@ -248,7 +248,7 @@ class ToolFilterTask(BaseWizardTask):
         tools_str = "\n".join([f"- {tool_name}: {self.tool_registry.get_tool_description(tool_name)}" for tool_name in self.tool_registry.list_tool_names()])
 
         request = ChatCompletionRequest(
-            model=self.wizard.model,
+            model=self.agent.model,
             model_parameters={"temperature": 0.1, "max_tokens": 512},
             system=[self.SYSTEM_PROMPT, f"Available tools:\n{tools_str}"],
             prompt=self.prompt,
@@ -272,9 +272,9 @@ class ToolFilterTask(BaseWizardTask):
                     selected_tools = parsed["tools"]
                     logger.info(f"Tool filter selected tools: {selected_tools} with confidence {parsed.get('confidence', 'N/A')}")
 
-        # now update the wizard's tool registry to only allow the selected tools for the next LLM response
-        # self.wizard.set_allowed_tools(selected_tools)
-        # yield WizModMessage(self.wizard, allowed_tools=selected_tools)
+        # now update the agent's tool registry to only allow the selected tools for the next LLM response
+        # self.agent.set_allowed_tools(selected_tools)
+        # yield WizModMessage(self.agent, allowed_tools=selected_tools)
 
         # yield a no-op message just to trigger the next step in the process
         yield ModelMessage(role="assistant", content=[TextContent(text=f"Selected tools: {', '.join(selected_tools)}")])
@@ -289,28 +289,28 @@ class ToolFilterTask(BaseWizardTask):
 #             yield msg
 
 
-class HandoffTask(BaseWizardTask):
-    """Task to hand off the conversation to another wizard or agent"""
+class HandoffTask(BaseAgentTask):
+    """Task to hand off the conversation to another agent or agent"""
 
-    def __init__(self, wizard: "Wizard", target_wizard_name: str, prompt: str = None):
-        super().__init__(wizard)
-        self.target_wizard_name = target_wizard_name
-        self.prompt = prompt or f"Handing off the conversation to {target_wizard_name}."
+    def __init__(self, agent: "Agent", target_agent_name: str, prompt: str = None):
+        super().__init__(agent)
+        self.target_agent_name = target_agent_name
+        self.prompt = prompt or f"Handing off the conversation to {target_agent_name}."
 
-        sub = init_wizard_by_name(target_wizard_name)
+        sub = init_agent_by_name(target_agent_name)
         if not sub:
-            raise ValueError(f"Target wizard '{target_wizard_name}' not found for handoff.")
+            raise ValueError(f"Target agent '{target_agent_name}' not found for handoff.")
         self.sub = sub
 
     async def execute(self) -> AsyncGenerator[ModelMessage, None]:
-        # This is a placeholder implementation. In a real implementation, you would look up the target wizard by name,
-        # transfer the conversation context and message history to the target wizard, and yield a message indicating the handoff.
+        # This is a placeholder implementation. In a real implementation, you would look up the target agent by name,
+        # transfer the conversation context and message history to the target agent, and yield a message indicating the handoff.
         msg = ModelMessage(role="assistant",
-                           content=[TextContent(text=f"Handing off conversation to {self.target_wizard_name}.")])
-        self.wizard.message_history.append(msg)
+                           content=[TextContent(text=f"Handing off conversation to {self.target_agent_name}.")])
+        self.agent.message_history.append(msg)
 
         # todo transfer conversation context and message history
-        self.sub.message_history.extend(list(self.wizard.message_history[-6:]))  # transfer last 6 messages as context
+        self.sub.message_history.extend(list(self.agent.message_history[-6:]))  # transfer last 6 messages as context
 
         async for msg in self.sub.prompt(self.prompt):
             yield msg
@@ -319,7 +319,7 @@ class HandoffTask(BaseWizardTask):
 
 class HumanInTheLoopHandler:
     """
-    This class can be used to handle human-in-the-loop interactions for tool call approvals or other decision points in the wizard's process.
+    This class can be used to handle human-in-the-loop interactions for tool call approvals or other decision points in the agent's process.
     """
 
     async def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
@@ -330,7 +330,7 @@ class HumanInTheLoopHandler:
         return True
 
 
-class Wizard(BotInterface):
+class Agent(BotInterface):
 
     MAX_TASKS = 10  # maximum number of tasks to process in the queue to prevent infinite loops
 
@@ -342,7 +342,7 @@ class Wizard(BotInterface):
         self.name = name
         self.description = description
         self.model = model or DEFAULT_COMPLETION_MODEL
-        self.system_prompt = system_prompt or DEFAULT_WIZARD_SYSTEM_PROMPT
+        self.system_prompt = system_prompt or DEFAULT_AGENT_SYSTEM_PROMPT
         self.message_history: List[ModelMessage] = []
         self.memory = memory or None
         self.context_id = context_id or None
@@ -354,7 +354,7 @@ class Wizard(BotInterface):
         self._hidl = hidl or HumanInTheLoopHandler()
 
     def __repr__(self):
-        return f"Wizard(name={self.name}, context_id={self.context_id}, model={self.model}, tools={self.allowed_tools}, skills={self.skills.list_skill_names()})"
+        return f"Agent(name={self.name}, context_id={self.context_id}, model={self.model}, tools={self.allowed_tools}, skills={self.skills.list_skill_names()})"
 
     @property
     def tools(self) -> ToolRegistry:
@@ -365,7 +365,7 @@ class Wizard(BotInterface):
         return self._skill_registry
 
     async def enqueue_task(self, task: BaseTask):
-        """Enqueue a task to be processed by the wizard."""
+        """Enqueue a task to be processed by the agent."""
         await self._tasks.put(task)
 
     async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ModelMessage, None]:
@@ -426,9 +426,9 @@ class Wizard(BotInterface):
 
     def load_skill(self, skill_name: str):
         """
-        Load a skill by name and add its tools to the wizard's available tools.
+        Load a skill by name and add its tools to the agent's available tools.
         """
-        logger.warning(f"Using deprecated method Wizard.load_skill(). Use 'Wizard.skills.load({skill_name})' instead.")
+        logger.warning(f"Using deprecated method Agent.load_skill(). Use 'Agent.skills.load({skill_name})' instead.")
         self.skills.load_skill(skill_name)
 
     def unload_skill(self, skill_name: str):
@@ -436,11 +436,11 @@ class Wizard(BotInterface):
         Unload a skill by name.
         """
         logger.warning(
-            f"Using deprecated method Wizard.unload_skill(). Use 'Wizard.skills.unload({skill_name})' instead.")
+            f"Using deprecated method Agent.unload_skill(). Use 'Agent.skills.unload({skill_name})' instead.")
         self.skills.unload_skill(skill_name)
 
 
-class CliWizard(Wizard):
+class CliAgent(Agent):
 
     async def request_tool_execution(self, tool_name: str, arguments: dict, call_id: int) -> bool:
         asyncio.create_task(asyncio.to_thread(
@@ -450,10 +450,10 @@ class CliWizard(Wizard):
         return user_input.lower() == 'y'
 
 
-class WizardConfig(pydantic.BaseModel):
+class AgentConfig(pydantic.BaseModel):
     """
-    BotConfig represents the configuration for a wizard, including its name, model, system prompt, description, tools, and skills.
-    This can be used to define wizards in JSON files and load them into Wizard instances.
+    BotConfig represents the configuration for a agent, including its name, model, system prompt, description, tools, and skills.
+    This can be used to define agents in JSON files and load them into Agent instances.
     """
     name: str
     model: str
@@ -463,38 +463,39 @@ class WizardConfig(pydantic.BaseModel):
     tools: list[str] | None = pydantic.Field(default_factory=list)
     mcp_servers: dict[str, dict] | None = pydantic.Field(default_factory=dict)
     skills: list[str] | None = pydantic.Field(default_factory=list)
+    model_parameters: dict | None = pydantic.Field(default_factory=dict)
 
 
-def init_wizard_by_name(name: str, file_path: str = None) -> Wizard:
+def init_agent_by_name(name: str, file_path: str = None) -> Agent:
     """
-    Load a wizard configuration from a JSON file and create a Wizard instance.
+    Load a agent configuration from a JSON file and create a Agent instance.
     The JSON file should contain the following fields:
-    - name: The name of the wizard
-    - model: (optional) The AI model to use for this wizard
-    - system: (optional) The system prompt to use for this wizard
-    - description: (optional) A description of the wizard's purpose and capabilities
-    - tools: (optional) A list of tool definitions that the wizard can use
-    - mcp_servers: (optional) A dictionary of MCP server configurations that the wizard can connect to
+    - name: The name of the agent
+    - model: (optional) The AI model to use for this agent
+    - system: (optional) The system prompt to use for this agent
+    - description: (optional) A description of the agent's purpose and capabilities
+    - tools: (optional) A list of tool definitions that the agent can use
+    - mcp_servers: (optional) A dictionary of MCP server configurations that the agent can connect to
     """
     if file_path is None:
-        file_path = f"{DATA_DIR}/wizards.json"
+        file_path = f"{DATA_DIR}/agents.json"
 
     data = read_json(file_path)
     if not isinstance(data, list):
-        raise ValueError(f"Invalid wizard configuration in {file_path}: expected a JSON list of BotConfig data.")
+        raise ValueError(f"Invalid agent configuration in {file_path}: expected a JSON list of BotConfig data.")
 
     config = next((item for item in data if item.get("name") == name), None)
     if config is None:
-        raise ValueError(f"Wizard configuration with name '{name}' not found in {file_path}.")
+        raise ValueError(f"Agent configuration with name '{name}' not found in {file_path}.")
 
     try:
-        botconf = WizardConfig.model_validate(config)
+        botconf = AgentConfig.model_validate(config)
     except pydantic.ValidationError as e:
-        raise ValueError(f"Invalid wizard configuration in {file_path}: {str(e)}")
-    return init_wizard(botconf)
+        raise ValueError(f"Invalid agent configuration in {file_path}: {str(e)}")
+    return init_agent(botconf)
 
 
-def init_wizard(botconf: WizardConfig) -> Wizard:
+def init_agent(botconf: AgentConfig) -> Agent:
     tool_registry = ToolRegistry()
     init_builtin_tools(tool_registry)
     # for tool in tools:
@@ -505,88 +506,92 @@ def init_wizard(botconf: WizardConfig) -> Wizard:
     for skill in botconf.skills:
         skill_registry.load_skill(skill)
 
-    system_prompt = botconf.system or DEFAULT_WIZARD_SYSTEM_PROMPT
-    # if an INSTRUCTIONS.md exist in wizard's directory, we can append it to the system prompt
-    wizard_dir = f"{DATA_DIR}/wizards/{botconf.name}"
-    instructions_path = f"{wizard_dir}/INSTRUCTIONS.md"
+    system_prompt = botconf.system or DEFAULT_AGENT_SYSTEM_PROMPT
+    # if an INSTRUCTIONS.md exist in agent's directory, we can append it to the system prompt
+    agent_dir = f"{DATA_DIR}/agents/{botconf.name}"
+    instructions_path = f"{agent_dir}/INSTRUCTIONS.md"
     if os.path.exists(instructions_path):
         with open(instructions_path, "r") as f:
             instructions = f.read()
             system_prompt += f"\n\n{instructions}"
 
-    wizard = Wizard(name=botconf.name, description=botconf.description,
+    agent = Agent(name=botconf.name, description=botconf.description,
                     model=botconf.model, system_prompt=system_prompt,
                     allowed_tools=set(botconf.tools),
                     tool_registry=tool_registry, skill_registry=skill_registry)
-    return wizard
+    return agent
 
 
-class WizardRegistry:
-    def __init__(self, config_path: str = None, auto_load: bool = True):
-        self._wizard_configs: dict[str, WizardConfig] = {}
-        self._wizards: dict[str, Wizard] = {}
-        self._config_path = config_path or f"{DATA_DIR}/wizards.json"
+class AgentRegistry:
+    def __init__(self, config_path: str = None, auto_load: bool = False):
+        self._agent_configs: dict[str, AgentConfig] = {}
+        self._agents: dict[str, Agent] = {}
+        self._config_path = config_path or f"{DATA_DIR}/agents.json"
         if auto_load:
             self.from_config_file()
 
-    def get_config(self, name) -> WizardConfig | None:
-        """Get the configuration for a wizard by name. Returns None if no configuration is found."""
-        return self._wizard_configs.get(name)
+    def get_config(self, name) -> AgentConfig | None:
+        """Get the configuration for a agent by name. Returns None if no configuration is found."""
+        return self._agent_configs.get(name)
 
-    def get_instance(self, name) -> Wizard | None:
-        """Get a Wizard instance by name. If the wizard is not already loaded, it will be initialized from its configuration if available. Returns None if no wizard instance can be found or initialized."""
-        if name in self._wizards:
-            return self._wizards[name]
-        elif name in self._wizard_configs:
+    def get_instance(self, name) -> Agent | None:
+        """Get a Agent instance by name. If the agent is not already loaded, it will be initialized from its configuration if available. Returns None if no agent instance can be found or initialized."""
+        if name in self._agents:
+            return self._agents[name]
+        elif name in self._agent_configs:
             try:
-                wizard = init_wizard(self._wizard_configs[name])
-                self._register_wizard(wizard)
-                return wizard
+                agent = init_agent(self._agent_configs[name])
+                self._register_agent(agent)
+                return agent
             except Exception as e:
-                logger.error(f"Error initializing wizard '{name}': {str(e)}", exc_info=e)
+                logger.error(f"Error initializing agent '{name}': {str(e)}", exc_info=e)
                 return None
-        return self._wizards.get(name)
+        return self._agents.get(name)
 
     def list_configured(self) -> set[str]:
-        """Names of configured wizards"""
-        return set(self._wizard_configs.keys())
+        """Names of configured agents"""
+        return set(self._agent_configs.keys())
 
     def list_loaded(self) -> set[str]:
-        """Names of currently loaded wizards"""
-        return set(self._wizards.keys())
+        """Names of currently loaded agents"""
+        return set(self._agents.keys())
 
-    def unload_wizard(self, name: str) -> None:
-        """Unload a wizard by name. This removes the wizard instance from the registry but keeps its configuration available for future loading. If the wizard is not currently loaded, this method does nothing."""
-        if name in self._wizards:
-            del self._wizards[name]
-            logger.info(f"Wizard '{name}' unloaded.")
+    def unload_agent(self, name: str) -> None:
+        """Unload a agent by name. This removes the agent instance from the registry but keeps its configuration available for future loading. If the agent is not currently loaded, this method does nothing."""
+        if name in self._agents:
+            del self._agents[name]
+            logger.info(f"Agent '{name}' unloaded.")
         else:
-            logger.warning(f"Attempted to unload wizard '{name}' which is not currently loaded.")
+            logger.warning(f"Attempted to unload agent '{name}' which is not currently loaded.")
 
-    def _register_wizard(self, wizard: Wizard):
+    def _register_agent(self, agent: Agent):
         """Internal method"""
-        if not wizard or not isinstance(wizard, Wizard):
-            raise ValueError("Invalid wizard object provided for registration.")
-        if wizard.name in self._wizards:
-            raise ValueError(f"Wizard with name '{wizard.name}' is already registered.")
-        self._wizards[wizard.name] = wizard
-        logger.info(f"Wizard '{wizard.name}' registered.")
+        if not agent or not isinstance(agent, Agent):
+            raise ValueError("Invalid agent object provided for registration.")
+        if agent.name in self._agents:
+            raise ValueError(f"Agent with name '{agent.name}' is already registered.")
+        self._agents[agent.name] = agent
+        logger.info(f"Agent '{agent.name}' registered.")
 
     def from_config_file(self):
         if os.path.exists(self._config_path):
             data = read_json(self._config_path)
             if not isinstance(data, list):
                 raise ValueError(
-                    f"Invalid wizard configuration in {self._config_path}: expected a JSON list of BotConfig data.")
+                    f"Invalid agent configuration in {self._config_path}: expected a JSON list of BotConfig data.")
             for config in data:
                 try:
-                    botconf = WizardConfig.model_validate(config)
-                    # wizard = init_wizard(botconf)
-                    # self.register_wizard(wizard)
-                    # logger.info(f"Loaded wizard '{wizard.name}' from config.")
-                    self._wizard_configs[botconf.name] = botconf
-                    logger.info(f"Wizard '{botconf.name}' registered.")
+                    botconf = AgentConfig.model_validate(config)
+                    # agent = init_agent(botconf)
+                    # self.register_agent(agent)
+                    # logger.info(f"Loaded agent '{agent.name}' from config.")
+                    self._agent_configs[botconf.name] = botconf
+                    logger.info(f"Agent '{botconf.name}' registered.")
                 except Exception as e:
-                    logger.error(f"Error loading wizard from config: {str(e)}", exc_info=e)
+                    logger.error(f"Error loading agent from config: {str(e)}", exc_info=e)
         else:
-            logger.warning(f"Wizard configuration file not found at {self._config_path}. No wizards loaded.")
+            logger.warning(f"Agent configuration file not found at {self._config_path}. No agents loaded.")
+
+
+def init_agent_registry(config_path: str = None, auto_load: bool = False) -> AgentRegistry:
+    return AgentRegistry(config_path=config_path, auto_load=auto_load)

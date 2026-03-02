@@ -23,7 +23,7 @@ export const McpServerProvider = ({ children, server, serverName }: PropsWithChi
         // setTools(response)
         // return response
         try {
-            const response = await fetch(`${serverUrl}api/mcp/servers/${serverName}`)
+            const response = await fetch(`${serverUrl}api/v1/mcp/servers/${serverName}`)
             if (response.ok) {
                 const data = await response.json()
                 console.log(data)
@@ -43,7 +43,7 @@ export const McpServerProvider = ({ children, server, serverName }: PropsWithChi
         // // @todo validate inputs
         // return await api.post(`/api/mcp-servers/${serverName}/tools/${toolName}/call`, toolInput)
         try {
-            const response =await fetch(`${serverUrl}api/mcp/servers/${serverName}/tool/call`, {
+            const response =await fetch(`${serverUrl}api/v1/mcp/servers/${serverName}/tool/call`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"

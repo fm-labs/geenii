@@ -46,7 +46,7 @@ const AppsSettings = () => {
   const [apps, setApps] = React.useState<AppSpecModel[]>([])
 
   const fetchApps = async () => {
-    const response = await fetch(XAI_API_URL + 'apps/', {
+    const response = await fetch(XAI_API_URL + 'api/v1/apps/', {
       headers: {
         "Content-Type": "application/json",
       }

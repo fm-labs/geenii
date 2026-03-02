@@ -13,7 +13,7 @@ export const McpServersProvider = ({ children }: PropsWithChildren) => {
 
     const fetchServers = useCallback(async () => {
         try {
-            const response = await fetch(XAI_API_URL + `api/mcp/servers`)
+            const response = await fetch(XAI_API_URL + `api/v1/mcp/servers`)
             if (response.ok) {
                 const mcpServerData = await response.json()
                 setServers(mcpServerData);

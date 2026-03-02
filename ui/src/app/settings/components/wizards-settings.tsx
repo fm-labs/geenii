@@ -30,7 +30,7 @@ const WizardsSettings = () => {
   const [wizards, setWizards] = React.useState<WizardModel[]>([])
 
   const fetchWizards = async () => {
-    const response = await fetch(XAI_API_URL + 'wizards/', {
+    const response = await fetch(XAI_API_URL + 'api/v1/wizards/', {
       headers: {
         "Content-Type": "application/json",
       }

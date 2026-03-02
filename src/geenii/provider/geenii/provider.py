@@ -17,7 +17,7 @@ class GeeniiProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider)
             AIModelInfo(
                 name="default",
                 provider="geenii",
-                description="The default wizard for general purpose tasks.",
+                description="The default agent for general purpose tasks.",
                 capabilities=["completion", "chat_completion"],
                 locality="mixed",
             )

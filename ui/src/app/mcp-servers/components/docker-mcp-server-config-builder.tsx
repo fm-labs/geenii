@@ -21,7 +21,7 @@ const DockerMcpServerConfigBuilder = ({ serverName, serverDef }: { serverName: s
     if (serverDef.type === 'server') {
       mcpType = 'stdio'
       properties['command'] = 'docker'
-      properties['args'] = 'run --rm -i ' + serverDef.image
+      properties['args'] = ['run', '--rm', '-i', serverDef.image]
     } else if (serverDef.type === 'remote') {
       mcpType = 'http'
       properties['url'] = serverDef.remote.url
@@ -129,8 +129,8 @@ const DockerMcpServerConfigBuilder = ({ serverName, serverDef }: { serverName: s
           In your .geenii/mcp.json configuration file, update the "mcpServers"
           section to include the following entry:
         </p>
-        <JsonView src={result} />
-        <JsonView src={formData} />
+        <JsonView src={result} className={"max-w-[300px]"} />
+        {/*<JsonView src={formData} />*/}
       </div>}
     </div>
   )

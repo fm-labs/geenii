@@ -10,7 +10,7 @@ from geenii.mcp import get_mcp_config, read_mcp_config_json, write_mcp_config_js
     get_mcp_client_for_server, get_mcp_config_for_server
 from geenii.utils.cached import cached
 
-router = APIRouter(prefix="/api/mcp", tags=["mcp"])
+router = APIRouter(prefix="/mcp", tags=["mcp"])
 
 ### MCP
 @router.get("/servers")

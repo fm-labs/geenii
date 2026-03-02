@@ -6,7 +6,7 @@ from geenii.server.routes.route_tools import router as tools_router
 from geenii.server.routes.route_ai import router as ai_router
 #from geenii.server.routes.route_ap import router as ap_router
 from geenii.server.routes.route_assistants import router as assistants_router
-from geenii.server.routes.route_wizards import router as wizards_router
+from geenii.server.routes.route_agents import router as agents_router
 from geenii.server.routes.route_mcp_admin import router as mcp_router
 #from geenii.server.routes.route_pubsub import router as pubsub_router
 #from geenii.server.routes.route_ws import router as ws_router
@@ -16,16 +16,19 @@ from geenii.server.routes.route_apps import router as apps_router
 
 
 app_router = APIRouter()
-app_router.include_router(api_router)
-app_router.include_router(settings_router)
-app_router.include_router(ai_router)
-app_router.include_router(tools_router)
-app_router.include_router(mcp_router)
+
+# API Routes
+API_ROUTE_PREFIX = "/api/v1"
+app_router.include_router(api_router, prefix=API_ROUTE_PREFIX)
+app_router.include_router(settings_router, prefix=API_ROUTE_PREFIX)
+app_router.include_router(ai_router, prefix=API_ROUTE_PREFIX)
+app_router.include_router(tools_router, prefix=API_ROUTE_PREFIX)
+app_router.include_router(mcp_router, prefix=API_ROUTE_PREFIX)
 #app_router.include_router(assistants_router)
-app_router.include_router(wizards_router)
-app_router.include_router(chat_router)
-app_router.include_router(supervisor_router)
-app_router.include_router(apps_router)
+app_router.include_router(agents_router, prefix=API_ROUTE_PREFIX)
+app_router.include_router(chat_router, prefix=API_ROUTE_PREFIX)
+app_router.include_router(supervisor_router, prefix=API_ROUTE_PREFIX)
+app_router.include_router(apps_router, prefix=API_ROUTE_PREFIX)
 #app_router.include_router(ap_router)
 #app_router.include_router(pubsub_router)
 #app_router.include_router(ws_router)

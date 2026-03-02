@@ -523,11 +523,10 @@ def map_openai_tool_to_ollama(tool: dict) -> dict:
         }
     }
     """
-    if 'type' not in tool:
-        raise ValueError("Tool definition must include a 'type' field.")
-
-    if tool['type'] != 'function':
-        raise ValueError("Ollama only supports function type tools.")
+    #if 'type' not in tool:
+    #    raise ValueError("Tool definition must include a 'type' field.")
+    #if tool['type'] != 'function':
+    #    raise ValueError("Ollama only supports function type tools.")
 
     if 'name' not in tool:
         raise ValueError("Tool definition must include a 'name' field.")

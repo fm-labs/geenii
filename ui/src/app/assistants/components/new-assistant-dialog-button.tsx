@@ -83,7 +83,7 @@ export function NewAssistantDialogButton({open, onOpenChange}: NewAssistantProps
     // Add logic to create a new assistant with the provided data
 
     try {
-      const response = await fetch(XAI_API_URL + 'ai/v1/assistants', {
+      const response = await fetch(XAI_API_URL + 'api/v1/assistants', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

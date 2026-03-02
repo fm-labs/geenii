@@ -17,7 +17,7 @@ from geenii.memory import FileChatMemory
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/ai/v1", tags=["ai"])
+router = APIRouter(prefix="/ai", tags=["ai"])
 
 
 @router.get("/models")
@@ -55,10 +55,10 @@ async def chat_completion(request: ChatCompletionRequest) -> ChatCompletionRespo
     """
     Generate a chat completion using the specified AI provider and model.
     """
-    # bot = load_wizard(request.model, context_id=request.context_id)
-    # bot = load_wizard_from_request(request)
+    # bot = load_agent(request.model, context_id=request.context_id)
+    # bot = load_agent_from_request(request)
 
-    bot_id = "geenii:wizard:default"
+    bot_id = "geenii:agent:default"
     bot_key = bot_id.replace(":", "-")
 
     context_id = request.context_id or uuid.uuid4().hex

@@ -9,7 +9,7 @@ const SystemInfoView = () => {
 
   const fetchInfo = async () => {
     try {
-      const response = await fetch(XAI_API_URL + 'api/info')
+      const response = await fetch(XAI_API_URL + 'api/v1/info')
       const data = await response.json()
       console.log('System Info:', data)
       setData(data)

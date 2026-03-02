@@ -71,7 +71,7 @@ const AssistantChat = ({ assistant, conversationId: initialConvId }: AssistantCh
 
     setIsThinking(true)
     try {
-      let submitUrl = XAI_API_URL + `ai/v1/assistants/${assistant.id}/chats`
+      let submitUrl = XAI_API_URL + `api/v1/assistants/${assistant.id}/chats`
       if (conversationId) {
         submitUrl += `/${conversationId}`
       }

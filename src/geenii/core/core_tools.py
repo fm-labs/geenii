@@ -4,15 +4,11 @@ from geenii.tools import ToolRegistry
 
 geenii_tools = ToolRegistry()
 
-@geenii_tools.tool()
-def noop():
-    """A no-operation tool that does nothing."""
-    pass
+# @geenii_tools.tool()
+# def noop():
+#     """A no-operation tool that does nothing."""
+#     pass
 
-@geenii_tools.tool()
-def finalize():
-    """A tool that indicates the agent has completed its task."""
-    pass
 
 @geenii_tools.tool()
 def echo(message: str) -> str:

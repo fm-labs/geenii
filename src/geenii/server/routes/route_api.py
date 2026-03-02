@@ -8,7 +8,7 @@ from geenii.config import APP_VERSION, get_user_data_dir
 from geenii.utils.os_util import get_user_home_dir
 from geenii.utils.system_util import get_system_report
 
-router = APIRouter(prefix="/api", tags=["api"])
+router = APIRouter(prefix="", tags=["api"])
 
 ALLOWED_ENV_VARS = ["PATH", "HOME", "USER", "USERNAME"]
 

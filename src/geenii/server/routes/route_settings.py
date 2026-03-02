@@ -3,7 +3,7 @@ import json
 
 from fastapi import APIRouter
 
-router = APIRouter(prefix="/api/settings", tags=["settings"])
+router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 @router.get("/")

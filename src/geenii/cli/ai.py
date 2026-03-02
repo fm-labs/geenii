@@ -9,7 +9,7 @@ from geenii.config import DEFAULT_COMPLETION_MODEL
 from geenii.core.core_tools import execute_command
 from geenii.datamodels import ModelMessage
 from geenii.tools import ToolRegistry, PythonTool
-from geenii.wizards import DEFAULT_WIZARD_SYSTEM_PROMPT
+from geenii.agents import DEFAULT_AGENT_SYSTEM_PROMPT
 
 
 class AiCli(BaseCli):
@@ -74,7 +74,7 @@ class AiCli(BaseCli):
                 # generate a response based on the chat history
                 response = generate_chat_completion_deprecated(prompt=prompt,
                                                                model=model,
-                                                               system=DEFAULT_WIZARD_SYSTEM_PROMPT,
+                                                               system=DEFAULT_AGENT_SYSTEM_PROMPT,
                                                                messages=memory,
                                                                tool_registry=tool_registry,
                                                                tools={"get_weather", "execute_command"},

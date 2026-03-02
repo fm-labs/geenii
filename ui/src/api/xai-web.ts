@@ -142,7 +142,7 @@ const webApiClient = async (baseUrl: string, config?: CreateAxiosDefaults): Prom
     async function getInfo(): Promise<any> {
         try {
             const response = await httpClient.get(
-              `/api/info`);
+              `/api/v1/info`);
             console.log("getInfo RESPONSE", response);
             return response;
         } catch (error) {
@@ -154,7 +154,7 @@ const webApiClient = async (baseUrl: string, config?: CreateAxiosDefaults): Prom
     async function generateCompletion(request: AiCompletionApiRequest): Promise<AiCompletionApiResponse> {
         try {
             const response = await httpClient.post(
-              `/ai/v1/chat/completion`, request);
+              `/api/v1/ai/chat/completion`, request);
             console.log("getCompletion RESPONSE", response);
             return response;
         } catch (error) {
@@ -166,7 +166,7 @@ const webApiClient = async (baseUrl: string, config?: CreateAxiosDefaults): Prom
     async function generateChatCompletion(prompt: string, messages: any[], options: AiCompletionApiRequest): Promise<string> {
         try {
             const response = await httpClient.post(
-              `/ai/v1/chat/completion`,
+              `/api/v1/ai/chat/completion`,
               { prompt, messages, model: options.model, stream: false },
             );
             console.log("getChatCompletion RESPONSE", response);
@@ -180,7 +180,7 @@ const webApiClient = async (baseUrl: string, config?: CreateAxiosDefaults): Prom
     async function generateImage(request: AiImageGenerationApiRequest): Promise<AiImageGenerationApiResponse> {
         try {
             const response = await httpClient.post(
-              `/ai/v1/image/generate`, request);
+              `/api/v1/ai/image/generate`, request);
             console.log("generateImage RESPONSE", response);
             return response;
         } catch (error) {
@@ -192,7 +192,7 @@ const webApiClient = async (baseUrl: string, config?: CreateAxiosDefaults): Prom
     async function generateVideo(request: AiVideoGenerationApiRequest): Promise<AiVideoGenerationApiResponse> {
         try {
             const response = await httpClient.post(
-              `/ai/v1/video/generate`, request);
+              `/api/v1/ai/video/generate`, request);
             console.log("generateVideo RESPONSE", response);
             return response;
         } catch (error) {
@@ -204,7 +204,7 @@ const webApiClient = async (baseUrl: string, config?: CreateAxiosDefaults): Prom
     async function generateAudio(request: AiAudioGenerationApiRequest): Promise<AiAudioGenerationApiResponse> {
         try {
             const response = await httpClient.post(
-              `/ai/v1/audio/speech`, request);
+              `/api/v1/ai/audio/speech`, request);
             console.log("generateAudio RESPONSE", response);
             return response;
         } catch (error) {
@@ -216,7 +216,7 @@ const webApiClient = async (baseUrl: string, config?: CreateAxiosDefaults): Prom
     async function generateAudioTranscription(request: AiAudioTranscriptionApiRequest): Promise<AiAudioTranscriptionApiResponse> {
         try {
             const response = await httpClient.post(
-              `/ai/v1/audio/transcribe`, request);
+              `/api/v1/ai/audio/transcribe`, request);
             console.log("generateAudioTranscription RESPONSE", response);
             return response;
         } catch (error) {
@@ -229,7 +229,7 @@ const webApiClient = async (baseUrl: string, config?: CreateAxiosDefaults): Prom
     async function generateAudioTranslation(request: AiAudioTranslationApiRequest): Promise<AiAudioTranslationApiResponse> {
         try {
             const response = await httpClient.post(
-              `/ai/v1/audio/translate`, request);
+              `/api/v1/ai/audio/translate`, request);
             console.log("generateAudioTranslation RESPONSE", response);
             return response;
         } catch (error) {

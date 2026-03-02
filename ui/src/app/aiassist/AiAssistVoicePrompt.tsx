@@ -36,7 +36,7 @@ export const AiAssistVoicePrompt = ({ ...props }: AiAssistVoicePromptProps) => {
         //   });
 
 
-        const response = await fetch(XAI_API_URL + `ai/v1/audio/transcribe`, {
+        const response = await fetch(XAI_API_URL + `api/v1/ai/audio/transcribe`, {
           method: 'POST',
           body: formData,
         })
