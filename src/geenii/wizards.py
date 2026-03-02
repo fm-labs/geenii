@@ -2,14 +2,13 @@ import abc
 import asyncio
 import logging
 import os
-from abc import ABC
-from typing import List, AsyncGenerator, Any, Callable
+from typing import List, AsyncGenerator, Any, Set
 
 import pydantic
 
 from geenii.ai import generate_chat_completion
 from geenii.chat.chat_bots import BotInterface
-from geenii.chat.chat_models import ToolCallResultContent, ContentPart, TextContent, ToolCallContent
+from geenii.chat.chat_models import ToolCallResultContent, ContentPart, TextContent, ToolCallContent, JsonContent
 from geenii.config import DEFAULT_COMPLETION_MODEL, DATA_DIR
 from geenii.datamodels import ModelMessage, ChatCompletionRequest
 from geenii.memory import ChatMemory
@@ -17,7 +16,7 @@ from geenii.rt import init_builtin_tools
 from geenii.skills import SkillRegistry
 from geenii.tools import execute_tool_call, ToolRegistry
 from geenii.tts import tts_say_cli
-from geenii.utils.json_util import read_json
+from geenii.utils.json_util import read_json, parse_json_safe
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +58,7 @@ class BaseTask(abc.ABC):
     """
 
     @abc.abstractmethod
-    async def run(self) -> AsyncGenerator[Any, None]:
+    async def execute(self) -> AsyncGenerator[Any, None]:
         """
         The run method should be implemented by subclasses to perform the task's work and yield messages or other content as needed.
         """
@@ -77,22 +76,101 @@ class BaseWizardTask(BaseTask, abc.ABC):
 
 
 class LLMTask(BaseWizardTask):
-    def __init__(self, wizard: "Wizard", message: str | list[ContentPart]):
+    """Generate LLM chat completion response in the current context. Handles tool calls"""
+    def __init__(self, wizard: "Wizard", message: str | list[ContentPart], allowed_tools: Set[str] | None = None):
         super().__init__(wizard)
         self.message = message
+        self.allowed_tools = allowed_tools
+        if self.allowed_tools is None:
+            self.allowed_tools = set(self.wizard.allowed_tools)
 
-    async def run(self) -> AsyncGenerator[ModelMessage, None]:
-        async for msg in self.wizard._ask_llm(self.message):
-            yield msg
+    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+        full_system_prompt = self._build_system_prompt()
+        # print(full_system_prompt)
+        prompt = message_to_prompt(self.message)
+        #allowed_tools = set(self._tool_registry.list_tool_names())
+        #allowed_tools = self.wizard.allowed_tools.intersection(set(self.wizard.tools.list_tool_names()))
+        allowed_tools = self.allowed_tools
+        input_messages = list(self.wizard.message_history[-10:])  # snapshot of the current message history (last 10 messages)
 
+        # run sync task in thread pool to avoid blocking the event loop while waiting for the response
+        request = ChatCompletionRequest(prompt=prompt,
+                                        model=self.wizard.model,
+                                        system=full_system_prompt,
+                                        messages=input_messages,  # snapshot of the current message history
+                                        tools=allowed_tools,
+                                        context_id=self.wizard.context_id
+                                        )
+        response = await asyncio.to_thread(self._request_completion, request)
+        logger.info(f"Received model response for prompt '{prompt}' with {len(response.output)} content parts.")
+
+        # add user request to message history
+        user_message = ModelMessage(role="user", content=[TextContent(text=prompt)])
+        self.wizard.message_history.append(user_message)
+
+        # add model response to message history
+        bot_message = ModelMessage(role="assistant", content=response.output)
+        self.wizard.message_history.append(bot_message)
+
+        # yield the output message
+        yield bot_message
+
+        tool_calls = 0
+        for item in response.output:
+            # handle tool calls
+            if isinstance(item, ToolCallContent):
+                tool_calls += 1
+                # enqueue tool call for processing and yield a placeholder message until the tool result is available
+                await self.wizard.enqueue_task(ToolCallTask(self.wizard, tool_name=item.name, arguments=item.arguments, call_id=item.call_id))
+
+        # if there were tool calls, we can optionally trigger a follow-up action,
+        # e.g. by enqueuing another task to process the tool results or to ask the LLM for the next step based on the tool results.
+        if tool_calls > 0:
+            logger.info(
+                f"{tool_calls} tool calls were made in the response. Enqueuing follow-up task to process tool results.")
+            await self.wizard.enqueue_task(FinalizeTask(self.wizard))
+
+
+    def _request_completion(self, request):
+        response = generate_chat_completion(request=request, tool_registry=self.wizard.tools, )
+        return response
+
+    def _build_system_prompt(self) -> list[str]:
+        """
+        Build the full system prompt for the wizard, including the base system prompt and any additional information from loaded skills.
+        """
+        system_prompts = [self.wizard.system_prompt]
+        skills_prompts = self._build_skills_prompt()
+        system_prompts.extend(skills_prompts)
+        return system_prompts
+
+    def _build_skills_prompt(self) -> list[str]:
+        """
+        Returns a combined prompt for all loaded skills that can be included in the system prompt
+        to provide the wizard with information about its skills and how to use them.
+        :return:
+        """
+        skills_prompts = []
+        if not self.wizard.skills or len(self.wizard.skills.list_skill_names()) == 0:
+            return skills_prompts
+        for skill_name in self.wizard.skills.list_skill_names():
+            skill = self.wizard.skills.get_skill(skill_name)
+            if skill:
+                skills_prompt = f"You have a special skill named {skill_name}:\n"
+                skills_prompt += f"{skill.description}\n"
+                skills_prompt += f"Instructions for {skill_name} are following:\n{skill.instructions}\n\n"
+                skills_prompts.append(skills_prompt)
+        return skills_prompts
 
 class FinalizeTask(BaseWizardTask):
     def __init__(self, wizard: "Wizard"):
         super().__init__(wizard)
 
-    async def run(self) -> AsyncGenerator[ModelMessage, None]:
+    async def execute(self) -> AsyncGenerator[ModelMessage|BaseTask, None]:
         yield ModelMessage(role="assistant",
-                           content=[TextContent(text=f"Finalized response after processing tool results.")])
+                           content=[TextContent(text=f"Finalizing response after processing tool results.")])
+
+        yield LLMTask(self.wizard, message="Based on the previous outputs generate a final response", allowed_tools=set())
 
 
 class ToolCallTask(BaseWizardTask):
@@ -102,7 +180,7 @@ class ToolCallTask(BaseWizardTask):
         self.arguments = arguments
         self.call_id = call_id
 
-    async def run(self) -> AsyncGenerator[ModelMessage, None]:
+    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
         tool_name = self.tool_name
         arguments = self.arguments
         call_id = self.call_id
@@ -111,8 +189,10 @@ class ToolCallTask(BaseWizardTask):
         if not tool_usage_approved:
             logger.critical(f"Tool execution for {tool_name} was rejected by the request_tool_execution method.")
             tool_result = {"error": "Tool execution rejected."}
-            yield ModelMessage(role="tool", content=[
+            msg = ModelMessage(role="tool", content=[
                 ToolCallResultContent(name=tool_name, arguments=arguments, result=tool_result, call_id=call_id)])
+            yield msg
+            self.wizard.message_history.append(msg)
             return
 
         logger.info(f"Calling tool {tool_name} with arguments {arguments}")
@@ -122,8 +202,82 @@ class ToolCallTask(BaseWizardTask):
         except Exception as e:
             logger.exception(f"Error executing tool {tool_name}", exc_info=e)
             tool_result = {"error": str(e)}
-        yield ModelMessage(role="tool", content=[
+        msg = ModelMessage(role="tool", content=[
             ToolCallResultContent(name=tool_name, arguments=arguments, result=tool_result, call_id=call_id)])
+        yield msg
+        self.wizard.message_history.append(msg)
+
+
+class ToolFilterTask(BaseWizardTask):
+    """Task to find the best-suitable tool to call based on the current message and context"""
+
+    SYSTEM_PROMPT = """
+    You are an AI tool orchestrator. Given a user prompt you must:
+    1. Select the best-fit agent(s) from the provided list.
+    2. Produce a short execution plan.
+
+    Always respond with valid JSON in exactly this shape:
+    {
+      "tools":       ["<tool>", ...],
+      "confidence":   <0.0-1.0>
+    }
+
+    If nothing fits well, pick the closest options and lower the confidence score.
+    """.strip()
+
+    OUTPUT_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "tools": {
+                "type": "array",
+                "items": {"type": "string"}
+            },
+            "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+        },
+        "required": ["tools", "confidence"],
+        "additionalProperties": False
+    }
+
+    def __init__(self, wizard: "Wizard", prompt: str, tool_registry: ToolRegistry):
+        super().__init__(wizard)
+        self.prompt = prompt
+        self.tool_registry = tool_registry
+
+    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+
+        tools_str = "\n".join([f"- {tool_name}: {self.tool_registry.get_tool_description(tool_name)}" for tool_name in self.tool_registry.list_tool_names()])
+
+        request = ChatCompletionRequest(
+            model=self.wizard.model,
+            model_parameters={"temperature": 0.1, "max_tokens": 512},
+            system=[self.SYSTEM_PROMPT, f"Available tools:\n{tools_str}"],
+            prompt=self.prompt,
+            messages=[],
+            output_format="json",
+            output_schema=self.OUTPUT_SCHEMA,
+            # tools=tool_names,
+        )
+        response = await asyncio.to_thread(generate_chat_completion, request)
+        logger.info(f"Received model response for tool filtering with {len(response.output)} content parts.")
+        selected_tools = []
+        if len(response.output) > 0:
+            if isinstance(response.output[0], JsonContent):
+                parsed = response.output[0].data
+                if parsed and "tools" in parsed and isinstance(parsed["tools"], list):
+                    selected_tools = parsed["tools"]
+                    logger.info(f"Tool filter selected tools: {selected_tools} with confidence {parsed.get('confidence', 'N/A')}")
+            if isinstance(response.output[0], TextContent):
+                parsed = parse_json_safe(response.output[0].text)
+                if parsed and "tools" in parsed and isinstance(parsed["tools"], list):
+                    selected_tools = parsed["tools"]
+                    logger.info(f"Tool filter selected tools: {selected_tools} with confidence {parsed.get('confidence', 'N/A')}")
+
+        # now update the wizard's tool registry to only allow the selected tools for the next LLM response
+        # self.wizard.set_allowed_tools(selected_tools)
+        # yield WizModMessage(self.wizard, allowed_tools=selected_tools)
+
+        # yield a no-op message just to trigger the next step in the process
+        yield ModelMessage(role="assistant", content=[TextContent(text=f"Selected tools: {', '.join(selected_tools)}")])
 
 
 # class AnonymousTask(BaseTask):
@@ -133,6 +287,34 @@ class ToolCallTask(BaseWizardTask):
 #     async def run(self) -> AsyncGenerator[ModelMessage, None]:
 #         async for msg in self.fn():
 #             yield msg
+
+
+class HandoffTask(BaseWizardTask):
+    """Task to hand off the conversation to another wizard or agent"""
+
+    def __init__(self, wizard: "Wizard", target_wizard_name: str, prompt: str = None):
+        super().__init__(wizard)
+        self.target_wizard_name = target_wizard_name
+        self.prompt = prompt or f"Handing off the conversation to {target_wizard_name}."
+
+        sub = init_wizard_by_name(target_wizard_name)
+        if not sub:
+            raise ValueError(f"Target wizard '{target_wizard_name}' not found for handoff.")
+        self.sub = sub
+
+    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+        # This is a placeholder implementation. In a real implementation, you would look up the target wizard by name,
+        # transfer the conversation context and message history to the target wizard, and yield a message indicating the handoff.
+        msg = ModelMessage(role="assistant",
+                           content=[TextContent(text=f"Handing off conversation to {self.target_wizard_name}.")])
+        self.wizard.message_history.append(msg)
+
+        # todo transfer conversation context and message history
+        self.sub.message_history.extend(list(self.wizard.message_history[-6:]))  # transfer last 6 messages as context
+
+        async for msg in self.sub.prompt(self.prompt):
+            yield msg
+
 
 
 class HumanInTheLoopHandler:
@@ -154,6 +336,7 @@ class Wizard(BotInterface):
 
     def __init__(self, name, model: str = None, system_prompt: str = None, description: str = None,
                  tool_registry: ToolRegistry = None, skill_registry: SkillRegistry = None,
+                 allowed_tools: Set[str] = None,
                  context_id: str = None, memory: ChatMemory = None, hidl: HumanInTheLoopHandler = None):
 
         self.name = name
@@ -163,14 +346,15 @@ class Wizard(BotInterface):
         self.message_history: List[ModelMessage] = []
         self.memory = memory or None
         self.context_id = context_id or None
+        self.allowed_tools: Set[str] = allowed_tools or set()
 
         self._tool_registry = tool_registry or ToolRegistry()
         self._skill_registry = skill_registry or SkillRegistry()
-        self._tasks: asyncio.Queue[dict|BaseTask] = asyncio.Queue()
+        self._tasks: asyncio.Queue[BaseTask] = asyncio.Queue()
         self._hidl = hidl or HumanInTheLoopHandler()
 
     def __repr__(self):
-        return f"Wizard(name={self.name}, context_id={self.context_id}, model={self.model}, tools={self.tools.list_tool_names()}, skills={self.skills.list_skill_names()})"
+        return f"Wizard(name={self.name}, context_id={self.context_id}, model={self.model}, tools={self.allowed_tools}, skills={self.skills.list_skill_names()})"
 
     @property
     def tools(self) -> ToolRegistry:
@@ -180,10 +364,15 @@ class Wizard(BotInterface):
     def skills(self) -> SkillRegistry:
         return self._skill_registry
 
+    async def enqueue_task(self, task: BaseTask):
+        """Enqueue a task to be processed by the wizard."""
+        await self._tasks.put(task)
+
     async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ModelMessage, None]:
         """Process an incoming message and generate a response by enqueuing tasks to the internal queue and processing them sequentially."""
         # enqueue new llm task
-        await self._tasks.put({"task": "ask_llm", "arguments": {"message": message}})
+        await self._tasks.put(LLMTask(self, message=message))
+
         # process the queue and yield messages
         async for msg in self._process_queue():
             yield msg
@@ -198,117 +387,32 @@ class Wizard(BotInterface):
         while self._tasks.qsize() > 0 and i < self.MAX_TASKS:
             task = await self._tasks.get()
             i += 1
-            logger.info(f"Task #{i}")
+            logger.info(f"Task #{i} {task.__class__.__name__} started. Queue size: {self._tasks.qsize()}")
             try:
                 if isinstance(task, BaseTask):
-                    async for msg in task.run():
-                        yield msg
-                elif isinstance(task, dict) and "task" in task and "arguments" in task:
-                    if task["task"] == "ask_llm":
-                        async for msg in self._ask_llm(**task["arguments"]):
-                            yield msg
-                    # elif task["task"] == "process_tool_results":
-                    #    async for msg in self._process_tool_results(**task["arguments"]):
-                    #        yield msg
-                    #elif task["task"] == "call_tool":
-                    #    async for msg in self._call_tool(**task["arguments"]):
-                    #        yield msg
-                    #elif task["task"] == "finalize":
-                    #    async for msg in self._finalize():
-                    #        yield msg
-                    else:
-                        logger.critical(f"Unknown task: {task['task']}")
+                    async for result in task.execute():
+                        # parse task results
+                        if result is None:
+                            continue
+                        if isinstance(result, ModelMessage):
+                            yield result
+                        elif isinstance(result, BaseTask):
+                            # if the task yields another task, we enqueue it
+                            await self.enqueue_task(result)
+                            continue
+                        else:
+                            logger.critical(f"Task {task} yielded an invalid message of type {type(result)}: {result}")
+                            raise ValueError(f"Unsupported task response type: {type(result)}")
                 else:
-                    logger.critical(f"Invalid task type: {type(task)}")
+                    logger.critical(f"Unsupported task type: {type(task)}")
+                    raise ValueError(f"Unsupported task type: {type(task)}")
             except Exception as e:
-                logger.exception(f"Error processing task {task['task']}: {str(e)}", exc_info=e)
+                logger.exception(f"Error processing task {task.__class__.__name__}: {str(e)}", exc_info=e)
                 # todo handle exceptions properly, e.g. by yielding an error message
                 yield ModelMessage(role="assistant",
                                    content=[TextContent(text=f"An error occurred while processing the task: {str(e)}")])
             finally:
                 self._tasks.task_done()
-
-    def _request_completion(self, request):
-        response = generate_chat_completion(request=request, tool_registry=self._tool_registry, )
-        return response
-
-    async def _ask_llm(self, message: str | list[ContentPart]) -> AsyncGenerator[ModelMessage, None]:
-        """Generate LLM chat completion response in the current context. Handles tool calls"""
-        full_system_prompt = self._build_system_prompt()
-        # print(full_system_prompt)
-        prompt = message_to_prompt(message)
-        allowed_tools = set(self._tool_registry.list_tool_names())  # todo filter tools
-        input_messages = list(self.message_history[:10])  # snapshot of the current message history (last 10 messages)
-
-        # run sync task in thread pool to avoid blocking the event loop while waiting for the response
-        request = ChatCompletionRequest(prompt=prompt,
-                                        model=self.model,
-                                        system=full_system_prompt,
-                                        messages=input_messages,  # snapshot of the current message history
-                                        tools=allowed_tools,
-                                        context_id=self.context_id
-                                        )
-        response = await asyncio.to_thread(self._request_completion, request)
-        logger.info(f"Received model response for prompt '{prompt}' with {len(response.output)} content parts.")
-
-        # add user request to message history
-        user_message = ModelMessage(role="user", content=[TextContent(text=prompt)])
-        self.message_history.append(user_message)
-
-        # add model response to message history
-        bot_message = ModelMessage(role="assistant", content=response.output)
-        self.message_history.append(bot_message)
-
-        # yield the output message
-        yield bot_message
-
-        tool_calls = 0
-        for item in response.output:
-            # handle tool calls
-            if isinstance(item, ToolCallContent):
-                tool_calls += 1
-                # enqueue tool call for processing and yield a placeholder message until the tool result is available
-                #await self._tasks.put({"task": "call_tool", "arguments": {"tool_name": item.name, "arguments": item.arguments}})
-                await self._tasks.put(ToolCallTask(self, tool_name=item.name, arguments=item.arguments, call_id=item.call_id))
-
-
-        # if there were tool calls, we can optionally trigger a follow-up action,
-        # e.g. by enqueuing another task to process the tool results or to ask the LLM for the next step based on the tool results.
-        if tool_calls > 0:
-            logger.info(
-                f"{tool_calls} tool calls were made in the response. Enqueuing follow-up task to process tool results.")
-            #await self._tasks.put({"task": "finalize", "arguments": {}})
-            await self._tasks.put(FinalizeTask(self))
-
-    # async def _call_tool(self, tool_name: str, arguments: dict, call_id: str = None) -> AsyncGenerator[ModelMessage, None]:
-    #     """Call a tool and yield the result as a message."""
-    #     tool_usage_approved = await self.request_tool_execution(tool_name=tool_name, arguments=arguments, call_id=call_id)
-    #     if not tool_usage_approved:
-    #         logger.critical(f"Tool execution for {tool_name} was rejected by the request_tool_execution method.")
-    #         tool_result = {"error": "Tool execution rejected."}
-    #         yield ModelMessage(role="tool", content=[ToolCallResultContent(name=tool_name, arguments=arguments, result=tool_result, call_id=call_id)])
-    #         return
-    #
-    #     logger.info(f"Calling tool {tool_name} with arguments {arguments}")
-    #     try:
-    #         tool_result = execute_tool_call(self._tool_registry, tool_name, **arguments)
-    #         logger.info(f"Tool {tool_name} returned result: {tool_result}")
-    #     except Exception as e:
-    #         logger.exception(f"Error executing tool {tool_name}", exc_info=e)
-    #         tool_result = {"error": str(e)}
-    #     yield ModelMessage(role="tool", content=[ToolCallResultContent(name=tool_name, arguments=arguments, result=tool_result, call_id=call_id)])
-
-    # async def _process_tool_results(self, tool_results: List[ToolCallResultContent]) -> AsyncGenerator[ModelMessage, None]:
-    #     """ Process the results of tool calls. """
-    #     logger.info(f"Processing {len(tool_results)} tool results.")
-    #     for tool_result in tool_results:
-    #         logger.info(f"Tool result: {tool_result.name} with args {tool_result.arguments} returned {tool_result.result}")
-    #     yield ModelMessage(role="assistant", content=[TextContent(text=f"Processed {len(tool_results)} tool results.")])
-
-    # async def _finalize(self) -> AsyncGenerator[ModelMessage, None]:
-    #     """Finalize the response after processing tool results. This can be used to trigger follow-up actions, e.g. by asking the LLM for the next step based on the tool results."""
-    #     logger.info(f"Finalizing response after processing tool results.")
-    #     yield ModelMessage(role="assistant", content=[TextContent(text=f"Finalized response after processing tool results.")])
 
     async def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
         """
@@ -319,39 +423,13 @@ class Wizard(BotInterface):
             return await self._hidl.request_tool_execution(tool_name, arguments, call_id)
         return True
 
-    def _build_system_prompt(self) -> list[str]:
-        """
-        Build the full system prompt for the wizard, including the base system prompt and any additional information from loaded skills.
-        """
-        system_prompts = [self.system_prompt]
-        skills_prompts = self._build_skills_prompt()
-        system_prompts.extend(skills_prompts)
-        return system_prompts
-
-    def _build_skills_prompt(self) -> list[str]:
-        """
-        Returns a combined prompt for all loaded skills that can be included in the system prompt
-        to provide the wizard with information about its skills and how to use them.
-        :return:
-        """
-        skills_prompts = []
-        if not self._skill_registry or len(self._skill_registry.list_skill_names()) == 0:
-            return skills_prompts
-        for skill_name in self._skill_registry.list_skill_names():
-            skill = self._skill_registry.get_skill(skill_name)
-            if skill:
-                skills_prompt = f"You have a special skill named {skill_name}:\n"
-                skills_prompt += f"{skill.description}\n"
-                skills_prompt += f"Instructions for {skill_name} are following:\n{skill.instructions}\n\n"
-                skills_prompts.append(skills_prompt)
-        return skills_prompts
 
     def load_skill(self, skill_name: str):
         """
         Load a skill by name and add its tools to the wizard's available tools.
         """
         logger.warning(f"Using deprecated method Wizard.load_skill(). Use 'Wizard.skills.load({skill_name})' instead.")
-        self._skill_registry.load_skill(skill_name)
+        self.skills.load_skill(skill_name)
 
     def unload_skill(self, skill_name: str):
         """
@@ -359,7 +437,7 @@ class Wizard(BotInterface):
         """
         logger.warning(
             f"Using deprecated method Wizard.unload_skill(). Use 'Wizard.skills.unload({skill_name})' instead.")
-        self._skill_registry.unload_skill(skill_name)
+        self.skills.unload_skill(skill_name)
 
 
 class CliWizard(Wizard):
@@ -438,6 +516,7 @@ def init_wizard(botconf: WizardConfig) -> Wizard:
 
     wizard = Wizard(name=botconf.name, description=botconf.description,
                     model=botconf.model, system_prompt=system_prompt,
+                    allowed_tools=set(botconf.tools),
                     tool_registry=tool_registry, skill_registry=skill_registry)
     return wizard
 

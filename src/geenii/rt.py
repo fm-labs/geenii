@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime
+
 from geenii.core.core_tools import geenii_tools
 from geenii.mcp import get_mcp_config, McpClient
 from geenii.tools import PythonTool, ToolRegistry
@@ -78,12 +80,12 @@ def init_builtin_tools(registry: ToolRegistry):
 
     registry.register(PythonTool(
         name="get_current_time",
-        description="Get the current system time.",
+        description="Get the current UTC system time.",
         parameters={
             "type": "object",
             "properties": {}
         },
-        handler=lambda: __import__("datetime").datetime.now().isoformat()
+        handler=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat()
     ))
 
 async def init_mcp_server_tools(registry: ToolRegistry):
