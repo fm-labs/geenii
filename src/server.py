@@ -201,12 +201,12 @@ if __name__ == "__main__":
     # os.makedirs(f"{DATA_DIR}/tmp", exist_ok=True)
 
     GEENII_SERVER_HOST = os.getenv("GEENII_SERVER_HOST", "127.0.0.1")
-    GEENII_SERVER_PORT = os.getenv("GEENII_SERVER_PORT", "31313")
+    GEENII_SERVER_PORT = os.getenv("GEENII_SERVER_PORT", "33311")
     uvicorn.run(app, host=GEENII_SERVER_HOST, port=int(GEENII_SERVER_PORT),
                 workers=1, reload=False, log_level="info")
 
 # async def serve():
-#     config = uvicorn.Config(app, host="127.0.0.1", port=31313, log_level="info")
+#     config = uvicorn.Config(app, host="127.0.0.1", port=33311, log_level="info")
 #     server = uvicorn.Server(config)
 #
 #     # Custom shutdown on SIGTERM/SIGINT

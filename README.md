@@ -48,7 +48,7 @@ docker-compose up
 ```
 
 
-→ The API server will be available at `http://localhost:31313`.
+→ The API server will be available at `http://localhost:33311`.
 
 → The WebUI will be available at `http://localhost:13031`.
 
@@ -91,13 +91,13 @@ pnpm install
 ### Run server in development mode from sources
 
 ```bash
-uv run uvicorn --app-dir ./src --port 31313 server:app --reload --log-level debug
+uv run uvicorn --app-dir ./src --port 33311 server:app --reload --log-level debug
 ```
 
 ### Run server in production mode from sources
 
 ```bash
-uv run uvicorn --app-dir ./src --port 31313 server:app
+uv run uvicorn --app-dir ./src --port 33311 server:app
 ```
 
 ### Run desktop UI in development mode

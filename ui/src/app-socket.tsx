@@ -10,7 +10,7 @@ import {
 } from '@/app/chat/components/chat.types.ts'
 import { convo } from '@/convo.ts'
 
-const APP_SOCKET_URL = 'ws://localhost:31313/ws'
+const APP_SOCKET_URL = 'ws://localhost:33311/ws'
 
 
 const useWebSocket = (url: string) => {

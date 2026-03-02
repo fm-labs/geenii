@@ -6,7 +6,7 @@ ENV PYTHONPATH=/app/src
 ENV PATH="/app/.venv/bin:$PATH"
 
 #ENV API_HOST=0.0.0.0
-#ENV API_PORT=31313
+#ENV API_PORT=33311
 #ENV API_DEBUG=1
 
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#compiling-bytecode
@@ -57,9 +57,9 @@ COPY ./src/server.py /app/src/
 
 # Run
 USER app
-CMD ["uv", "run", "uvicorn", "--app-dir", "/app/src", "--host", "0.0.0.0", "--port", "31313", "server:app"]
-EXPOSE 31313
+CMD ["uv", "run", "uvicorn", "--app-dir", "/app/src", "--host", "0.0.0.0", "--port", "33311", "server:app"]
+EXPOSE 33311
 
 # Health check
 HEALTHCHECK --interval=60s --timeout=3s --retries=3 \
- CMD curl --fail http://localhost:31313/api/health || exit 1
+ CMD curl --fail http://localhost:33311/api/health || exit 1

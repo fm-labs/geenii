@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: ./Dockerfile
     ports:
-      - "31313:31313"
+      - "33311:33311"
     networks:
       - geenii-net
     extra_hosts:

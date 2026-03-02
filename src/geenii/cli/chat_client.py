@@ -32,7 +32,7 @@ from geenii.cli.base import BaseCli
 from geenii.cli.chat_client_inputs import StdinInput, InputReader
 from geenii.chat.chat_manager import dm_room_id
 
-DEFAULT_BASE_URL = "http://localhost:31313"
+DEFAULT_BASE_URL = "http://localhost:33311"
 API_PREFIX = "/chat"
 
 
