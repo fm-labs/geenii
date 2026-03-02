@@ -19,7 +19,6 @@ export const FEATURE_CHAT_MODEL_SELECTION_ENABLED = import.meta.env.VITE_FEATURE
 export const FEATURE_CHAT_PROMPT_SUGGESTIONS_ENABLED = import.meta.env.VITE_FEATURE_CHAT_PROMPT_SUGGESTIONS_ENABLED === 'true' || false;
 export const FEATURE_VOICE_RECORDING_ENABLED = import.meta.env.VITE_FEATURE_VOICE_RECORDING_ENABLED === 'true' || false;
 export const FEATURE_VOICE_TRANSCRIPTION_ENABLED = import.meta.env.VITE_FEATURE_VOICE_TRANSCRIPTION_ENABLED === 'true' || false;
-export const FEATURE_WIZARDS_ENABLED = import.meta.env.VITE_FEATURE_WIZARDS_ENABLED === 'true' || false;
 export const FEATURE_AGENTS_ENABLED = import.meta.env.VITE_FEATURE_AGENTS_ENABLED === 'true' || false;
 export const FEATURE_MCP_ENABLED = import.meta.env.VITE_FEATURE_MCP_ENABLED === 'true' || false;
 export const FEATURE_TOOLS_ENABLED = import.meta.env.VITE_FEATURE_TOOLS_ENABLED === 'true' || false;

@@ -12,6 +12,7 @@ import WelcomeScreen from '@/app/welcome/WelcomeScreen.tsx'
 import ToolsPage from '@/app/tools/tools.page.tsx'
 import AppPage from '@/app/apps/app-page.tsx'
 import AppsPage from '@/app/apps/apps-page.tsx'
+import DashboardPage from '@/app/dashboard/dashboard.page.tsx'
 
 
 
@@ -58,7 +59,7 @@ const AppRouter = () => {
   const routes: Route[] = [
     {
       path: '/',
-      element: <WelcomeScreen />,
+      element: <DashboardPage />,
     },
     {
       path: '/chat',
@@ -69,7 +70,7 @@ const AppRouter = () => {
       element: <CompletionsPage />,
     },
     {
-      path: '/assistants',
+      path: '/agents',
       element: <AssistantChatsPage />,
     },
     {

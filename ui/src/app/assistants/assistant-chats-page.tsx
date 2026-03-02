@@ -29,6 +29,7 @@ import AssistantChatList from '@/app/assistants/assistant-chat-list.tsx'
 import { XAI_API_URL } from '@/constants.ts'
 import '../chat/Chat.scss'
 import { NewAssistantDialogButton } from '@/app/assistants/components/new-assistant-dialog-button.tsx'
+import MainContent from '@/components/layout/main-content.tsx'
 
 export function AssistantChatsPage() {
   const [search, setSearch] = useState('')
@@ -46,14 +47,14 @@ export function AssistantChatsPage() {
   const [chatMessages, setChatMessages] = useState<any[]>()
 
   const fetchAssistants = async () => {
-    const response = await fetch(XAI_API_URL + 'api/v1/wizards/', {
+    const response = await fetch(XAI_API_URL + 'api/v1/agents/', {
       headers: {
         "Content-Type": "application/json",
       }
     })
     const data = await response.json()
     console.log("Fetched assistants", data)
-    return data?.wizards || []
+    return data?.agents || []
   }
 
   const fetchAssistantChats = async (assistantId: string) => {
@@ -141,15 +142,16 @@ export function AssistantChatsPage() {
 
   return (
     <Layout>
+      <MainContent>
       <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 flex-1 overflow-auto">
-        <section className="flex h-full min-h-[90vh] gap-6">
+        <section className="flex h-full min-h-[70vh] gap-6">
           {/* Left Side */}
           <div className="flex w-full flex-col gap-2 sm:w-56 lg:w-72 2xl:w-80">
             <div
               className="bg-background sticky top-0 z-10 -mx-4 px-4 pb-3 shadow-md sm:static sm:z-auto sm:mx-0 sm:p-0 sm:shadow-none">
               <div className="flex items-center justify-between py-2">
                 <div className="flex gap-2">
-                  <h1 className="text-2xl font-bold">Assistants</h1>
+                  <h1 className="text-2xl font-bold">Agents</h1>
                   <BotMessageSquare size={20} />
                 </div>
 
@@ -274,6 +276,7 @@ export function AssistantChatsPage() {
         {/*<NewAssistantDialog />*/}
         {/*<AlertDialogDemo />*/}
       </div>
+      </MainContent>
     </Layout>
   )
 }

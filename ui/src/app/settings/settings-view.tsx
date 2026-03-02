@@ -40,7 +40,7 @@ import {
   FEATURE_APPS_ENABLED,
   FEATURE_MCP_ENABLED,
   FEATURE_TOOLS_ENABLED,
-  FEATURE_WIZARDS_ENABLED,
+  FEATURE_AGENTS_ENABLED,
 } from '@/constants.ts'
 import Header from '@/components/header.tsx'
 import SystemInfoView from '@/app/settings/components/system-info-view.tsx'
@@ -121,7 +121,7 @@ const SettingsView = () => {
         }
         return <ToolsView />
       case "Wizards":
-        if (!FEATURE_WIZARDS_ENABLED) {
+        if (!FEATURE_AGENTS_ENABLED) {
           return <DisabledFeatureSettingsView />;
         }
         return <WizardsSettings />

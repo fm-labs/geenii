@@ -35,7 +35,7 @@ const Layout = (props: PropsWithChildren) => {
               {/*<li className="text-sm text-gray-600 hover:bg-blue-50 px-1"><a href="#/welcome">Start</a></li>*/}
               {FEATURE_COMPLETION_ENABLED && <li className={navItemStyle}><a href="#/completions">Completions</a></li>}
               {/*FEATURE_CHAT_ENABLED && <li className={navItemStyle}><a href="#/chat">Chat</a></li>*/}
-              {/*FEATURE_AGENTS_ENABLED && <li className={navItemStyle}><a href="#/assistants">Assistants</a></li>*/}
+              {FEATURE_AGENTS_ENABLED && <li className={navItemStyle}><a href="#/agents">Agents</a></li>}
               {/*FEATURE_TOOLS_ENABLED && <li className={navItemStyle}><a href="#/tools">Tools</a></li>*/}
               {/*FEATURE_MCP_ENABLED && <li className={navItemStyle}><a href="#/mcp">MCP</a></li>*/}
               {FEATURE_APPS_ENABLED && <li className={navItemStyle}><a href="#/apps">Apps</a></li>}

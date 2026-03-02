@@ -52,7 +52,7 @@ const AppsView = () => {
 
   return (
     <div>
-      <div className={"grid grid-cols-4 gap-4"}>
+      <div className={"grid sm:grid-cols-1 lg:grid-cols-3 gap-4"}>
         {sortedApps.map((app) => (
           <AppViewCard key={app.name} app={app} />
         ))}

@@ -8,6 +8,7 @@ import { PlaySquareIcon } from 'lucide-react'
 import { SchemaFormDialog } from '@/components/form/schema-form-dialog.tsx'
 import useNotification from '@/hooks/useNotification.ts'
 import JsonView from '@/components/json-view.tsx'
+import { Badge } from '@/components/ui/badge.tsx'
 
 type Tool = {
   name: string;
@@ -60,12 +61,15 @@ const ToolCard = ({ tool }: { tool: Tool }) => {
   }
 
   return (
-    <div className={'border rounded p-4 mb-4'}>
-      <h2 className={'text-lg font-bold mb-2'}>{tool.name}  ({tool.type})</h2>
-      <div className={'flex flex-wrap justify-between'}>
-        <p className={'text-gray-600 mb-2'}>{tool.description}</p>
+    <div className={'border rounded-lg p-4 mb-4'}>
+      <h2 className={'text-lg font-bold mb-2'}>{tool.name}</h2>
+      <p className={'text-gray-600 mb-4'}>{tool.description}</p>
+      <div className={'flex justify-between'}>
         <div>
-          <Button onClick={handleExecute}><PlaySquareIcon /> Try it out</Button>
+          <Badge variant={"outline"} className={""}>{tool.type}</Badge>
+        </div>
+        <div>
+          <Button size={"sm"} variant={"default"} onClick={handleExecute}><PlaySquareIcon /> Execute</Button>
         </div>
       </div>
 
@@ -124,7 +128,7 @@ const ToolsPage = () => {
 
   return (
     <div>
-      <div>
+      <div className={"grid sm:grid-cols-1 lg:grid-cols-4 gap-4"}>
         {tools.map((tool) => (
           <ToolCard key={tool.name} tool={tool} />
         ))}
