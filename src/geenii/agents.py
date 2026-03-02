@@ -71,13 +71,14 @@ class BaseAgentTask(BaseTask, abc.ABC):
     The agent tasks has a reference to the agent instance and can access its tools, skills, memory, etc. to perform its work.
     """
 
-    def __init__(self, agent: "Agent"):
+    def __init__(self, agent: "BaseAgent"):
         self.agent = agent
 
 
 class LLMTask(BaseAgentTask):
     """Generate LLM chat completion response in the current context. Handles tool calls"""
-    def __init__(self, agent: "Agent", message: str | list[ContentPart], allowed_tools: Set[str] | None = None):
+
+    def __init__(self, agent: "BaseAgent", message: str | list[ContentPart], allowed_tools: Set[str] | None = None):
         super().__init__(agent)
         self.message = message
         self.allowed_tools = allowed_tools
@@ -88,10 +89,11 @@ class LLMTask(BaseAgentTask):
         full_system_prompt = self._build_system_prompt()
         # print(full_system_prompt)
         prompt = message_to_prompt(self.message)
-        #allowed_tools = set(self._tool_registry.list_tool_names())
-        #allowed_tools = self.agent.allowed_tools.intersection(set(self.agent.tools.list_tool_names()))
+        # allowed_tools = set(self._tool_registry.list_tool_names())
+        # allowed_tools = self.agent.allowed_tools.intersection(set(self.agent.tools.list_tool_names()))
         allowed_tools = self.allowed_tools
-        input_messages = list(self.agent.message_history[-10:])  # snapshot of the current message history (last 10 messages)
+        input_messages = list(
+            self.agent.message_history[-10:])  # snapshot of the current message history (last 10 messages)
 
         # run sync task in thread pool to avoid blocking the event loop while waiting for the response
         request = ChatCompletionRequest(prompt=prompt,
@@ -121,7 +123,8 @@ class LLMTask(BaseAgentTask):
             if isinstance(item, ToolCallContent):
                 tool_calls += 1
                 # enqueue tool call for processing and yield a placeholder message until the tool result is available
-                await self.agent.enqueue_task(ToolCallTask(self.agent, tool_name=item.name, arguments=item.arguments, call_id=item.call_id))
+                await self.agent.enqueue_task(
+                    ToolCallTask(self.agent, tool_name=item.name, arguments=item.arguments, call_id=item.call_id))
 
         # if there were tool calls, we can optionally trigger a follow-up action,
         # e.g. by enqueuing another task to process the tool results or to ask the LLM for the next step based on the tool results.
@@ -129,7 +132,6 @@ class LLMTask(BaseAgentTask):
             logger.info(
                 f"{tool_calls} tool calls were made in the response. Enqueuing follow-up task to process tool results.")
             await self.agent.enqueue_task(FinalizeTask(self.agent))
-
 
     def _request_completion(self, request):
         response = generate_chat_completion(request=request, tool_registry=self.agent.tools, )
@@ -162,19 +164,21 @@ class LLMTask(BaseAgentTask):
                 skills_prompts.append(skills_prompt)
         return skills_prompts
 
+
 class FinalizeTask(BaseAgentTask):
-    def __init__(self, agent: "Agent"):
+    def __init__(self, agent: "BaseAgent"):
         super().__init__(agent)
 
-    async def execute(self) -> AsyncGenerator[ModelMessage|BaseTask, None]:
+    async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
         yield ModelMessage(role="assistant",
                            content=[TextContent(text=f"Finalizing response after processing tool results.")])
 
-        yield LLMTask(self.agent, message="Based on the previous outputs generate a final response", allowed_tools=set())
+        yield LLMTask(self.agent, message="Based on the previous outputs generate a final response",
+                      allowed_tools=set())
 
 
 class ToolCallTask(BaseAgentTask):
-    def __init__(self, agent: "Agent", tool_name: str, arguments: dict, call_id: str = None):
+    def __init__(self, agent: "BaseAgent", tool_name: str, arguments: dict, call_id: str = None):
         super().__init__(agent)
         self.tool_name = tool_name
         self.arguments = arguments
@@ -185,7 +189,7 @@ class ToolCallTask(BaseAgentTask):
         arguments = self.arguments
         call_id = self.call_id
         tool_usage_approved = await self.agent.request_tool_execution(tool_name=tool_name, arguments=arguments,
-                                                                       call_id=call_id)
+                                                                      call_id=call_id)
         if not tool_usage_approved:
             logger.critical(f"Tool execution for {tool_name} was rejected by the request_tool_execution method.")
             tool_result = {"error": "Tool execution rejected."}
@@ -238,14 +242,15 @@ class ToolFilterTask(BaseAgentTask):
         "additionalProperties": False
     }
 
-    def __init__(self, agent: "Agent", prompt: str, tool_registry: ToolRegistry):
+    def __init__(self, agent: "BaseAgent", prompt: str, tool_registry: ToolRegistry):
         super().__init__(agent)
         self.prompt = prompt
         self.tool_registry = tool_registry
 
     async def execute(self) -> AsyncGenerator[ModelMessage, None]:
 
-        tools_str = "\n".join([f"- {tool_name}: {self.tool_registry.get_tool_description(tool_name)}" for tool_name in self.tool_registry.list_tool_names()])
+        tools_str = "\n".join([f"- {tool_name}: {self.tool_registry.get_tool_description(tool_name)}" for tool_name in
+                               self.tool_registry.list_tool_names()])
 
         request = ChatCompletionRequest(
             model=self.agent.model,
@@ -265,12 +270,14 @@ class ToolFilterTask(BaseAgentTask):
                 parsed = response.output[0].data
                 if parsed and "tools" in parsed and isinstance(parsed["tools"], list):
                     selected_tools = parsed["tools"]
-                    logger.info(f"Tool filter selected tools: {selected_tools} with confidence {parsed.get('confidence', 'N/A')}")
+                    logger.info(
+                        f"Tool filter selected tools: {selected_tools} with confidence {parsed.get('confidence', 'N/A')}")
             if isinstance(response.output[0], TextContent):
                 parsed = parse_json_safe(response.output[0].text)
                 if parsed and "tools" in parsed and isinstance(parsed["tools"], list):
                     selected_tools = parsed["tools"]
-                    logger.info(f"Tool filter selected tools: {selected_tools} with confidence {parsed.get('confidence', 'N/A')}")
+                    logger.info(
+                        f"Tool filter selected tools: {selected_tools} with confidence {parsed.get('confidence', 'N/A')}")
 
         # now update the agent's tool registry to only allow the selected tools for the next LLM response
         # self.agent.set_allowed_tools(selected_tools)
@@ -292,7 +299,7 @@ class ToolFilterTask(BaseAgentTask):
 class HandoffTask(BaseAgentTask):
     """Task to hand off the conversation to another agent or agent"""
 
-    def __init__(self, agent: "Agent", target_agent_name: str, prompt: str = None):
+    def __init__(self, agent: "BaseAgent", target_agent_name: str, prompt: str = None):
         super().__init__(agent)
         self.target_agent_name = target_agent_name
         self.prompt = prompt or f"Handing off the conversation to {target_agent_name}."
@@ -301,6 +308,7 @@ class HandoffTask(BaseAgentTask):
         if not sub:
             raise ValueError(f"Target agent '{target_agent_name}' not found for handoff.")
         self.sub = sub
+        self.sub._hidl = self.agent._hidl  # share the same human-in-the-loop handler
 
     async def execute(self) -> AsyncGenerator[ModelMessage, None]:
         # This is a placeholder implementation. In a real implementation, you would look up the target agent by name,
@@ -310,11 +318,96 @@ class HandoffTask(BaseAgentTask):
         self.agent.message_history.append(msg)
 
         # todo transfer conversation context and message history
-        self.sub.message_history.extend(list(self.agent.message_history[-6:]))  # transfer last 6 messages as context
+        #self.sub.message_history.extend(list(self.agent.message_history[-6:]))  # transfer last 6 messages as context
 
         async for msg in self.sub.prompt(self.prompt):
             yield msg
 
+
+class FindBestAgentTask(BaseAgentTask):
+    """Find the best-suitable agent to handle the current conversation based on the current message and context"""
+
+    SYSTEM_PROMPT = """
+    You are an AI agent selector. Given a user prompt and conversation context, you must:
+    1. Select the best-fit agent from the provided list.
+    2. Provide a brief rationale for your choice.
+    
+    The list includes a brief description of each agent's capabilities and purpose to help you make an informed decision.
+    Format:
+    - <agent_name>: <brief description of the agent's purpose>
+
+    Rules:
+    - Always select the agent that is best suited to handle the user's request based on its capabilities and the conversation context.
+    - Only produce a final answer with the selected agent's name and rationale. Do not list multiple agents or provide any other information.
+
+    Always respond with valid JSON in exactly this shape:
+    {
+      "agent":       "<agent_name>",
+      "confidence":   <0.0-1.0>,
+      "rationale":    "<brief explanation of why this agent is the best fit>"
+    }
+
+    If no agent fits well, pick the closest option or 'NONE' and lower the confidence score.
+    """.strip()
+
+    OUTPUT_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "agent": {"type": "string"},
+            "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+            "rationale": {"type": "string"}
+        },
+        "required": ["agent", "confidence", "rationale"],
+        "additionalProperties": False
+    }
+
+    def __init__(self, agent: "BaseAgent", prompt: str):
+        super().__init__(agent)
+        self.prompt = prompt
+        self.agent_registry = init_agent_registry(auto_load=True)
+
+    async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
+        available_agents = []
+        for agent in self.agent_registry._agent_configs.values():
+            description = agent.description or "No description available."
+            tools = ",".join(agent.tools) if agent.tools else "No tools"
+            skills = ",".join(agent.skills) if agent.skills else "No special skills"
+            agent_info = f"{agent.name}: {description} using {tools}"
+            available_agents.append(agent_info)
+        agents_str = "\n - ".join(available_agents)
+
+        request = ChatCompletionRequest(
+            model=self.agent.model,
+            model_parameters={"temperature": 0.1, "max_tokens": 512},
+            system=[self.SYSTEM_PROMPT, f"Available agents:\n{agents_str}"],
+            prompt=self.prompt,
+            messages=[],
+            output_format="json",
+            output_schema=self.OUTPUT_SCHEMA,
+        )
+        response = await asyncio.to_thread(generate_chat_completion, request)
+        logger.info(f"Received model response for agent selection with {len(response.output)} content parts.")
+        selected_agent = None
+        if len(response.output) > 0:
+            parsed = None
+            if isinstance(response.output[0], JsonContent):
+                parsed = response.output[0].data
+            if isinstance(response.output[0], TextContent):
+                parsed = parse_json_safe(response.output[0].text)
+
+            logger.info(parsed)
+            if parsed and "agent" in parsed and isinstance(parsed["agent"], str):
+                selected_agent = parsed["agent"]
+                logger.info(
+                    f"Agent selector selected agent: {selected_agent} with confidence {parsed.get('confidence', 'N/A')}. Rationale: {parsed.get('rationale', 'N/A')}")
+
+        if selected_agent:
+            yield ModelMessage(role="assistant", content=[TextContent(
+                text=f"Selected agent: {selected_agent} with confidence {parsed.get('confidence', 'N/A')}. Rationale: {parsed.get('rationale', 'N/A')}")])
+            yield HandoffTask(self.agent, target_agent_name=selected_agent, prompt=self.prompt)
+
+        else:
+            yield ModelMessage(role="assistant", content=[TextContent(text=f"No suitable agent found.")])
 
 
 class HumanInTheLoopHandler:
@@ -330,8 +423,7 @@ class HumanInTheLoopHandler:
         return True
 
 
-class Agent(BotInterface):
-
+class BaseAgent(BotInterface, abc.ABC):
     MAX_TASKS = 10  # maximum number of tasks to process in the queue to prevent infinite loops
 
     def __init__(self, name, model: str = None, system_prompt: str = None, description: str = None,
@@ -371,11 +463,19 @@ class Agent(BotInterface):
     async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ModelMessage, None]:
         """Process an incoming message and generate a response by enqueuing tasks to the internal queue and processing them sequentially."""
         # enqueue new llm task
-        await self._tasks.put(LLMTask(self, message=message))
+        # await self._tasks.put(LLMTask(self, message=message))
+        # await self._tasks.put(FindBestAgentTask(self, prompt=message_to_prompt(message)))
+        await self._handle_prompt(message)
 
         # process the queue and yield messages
         async for msg in self._process_queue():
             yield msg
+
+    @abc.abstractmethod
+    async def _handle_prompt(self, message: str | list[ContentPart]):
+        """Handle an incoming prompt message by enqueuing an LLM task to generate a response."""
+        # await self.enqueue_task(LLMTask(self, message=message))
+        ...
 
     async def _process_queue(self) -> AsyncGenerator[ModelMessage, None]:
         """
@@ -423,7 +523,6 @@ class Agent(BotInterface):
             return await self._hidl.request_tool_execution(tool_name, arguments, call_id)
         return True
 
-
     def load_skill(self, skill_name: str):
         """
         Load a skill by name and add its tools to the agent's available tools.
@@ -438,6 +537,16 @@ class Agent(BotInterface):
         logger.warning(
             f"Using deprecated method Agent.unload_skill(). Use 'Agent.skills.unload({skill_name})' instead.")
         self.skills.unload_skill(skill_name)
+
+
+class Agent(BaseAgent):
+    async def _handle_prompt(self, message: str | list[ContentPart]):
+        await self.enqueue_task(LLMTask(self, message=message))
+
+
+class RoutingAgent(BaseAgent):
+    async def _handle_prompt(self, message: str | list[ContentPart]):
+        await self.enqueue_task(FindBestAgentTask(self, prompt=message_to_prompt(message)))
 
 
 class CliAgent(Agent):
@@ -515,10 +624,14 @@ def init_agent(botconf: AgentConfig) -> Agent:
             instructions = f.read()
             system_prompt += f"\n\n{instructions}"
 
-    agent = Agent(name=botconf.name, description=botconf.description,
-                    model=botconf.model, system_prompt=system_prompt,
-                    allowed_tools=set(botconf.tools),
-                    tool_registry=tool_registry, skill_registry=skill_registry)
+    agent_class = Agent
+    if botconf.name == "default":
+        agent_class = RoutingAgent
+
+    agent = agent_class(name=botconf.name, description=botconf.description,
+                  model=botconf.model, system_prompt=system_prompt,
+                  allowed_tools=set(botconf.tools),
+                  tool_registry=tool_registry, skill_registry=skill_registry)
     return agent
 
 
@@ -566,7 +679,7 @@ class AgentRegistry:
 
     def _register_agent(self, agent: Agent):
         """Internal method"""
-        if not agent or not isinstance(agent, Agent):
+        if not agent or not isinstance(agent, BaseAgent):
             raise ValueError("Invalid agent object provided for registration.")
         if agent.name in self._agents:
             raise ValueError(f"Agent with name '{agent.name}' is already registered.")
