@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import logging
 
 from geenii import config
-from geenii.chat.chat_models import ContentPart, Room, Member, Message, RoomType
+from geenii.chat.chat_models import ContentPart, Room, Member, ChatMessage, RoomType
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +54,10 @@ def _row_to_room(row: sqlite3.Row) -> Room:
     return Room(**d)
 
 
-def _row_to_message(row: sqlite3.Row) -> Message:
+def _row_to_message(row: sqlite3.Row) -> ChatMessage:
     d = dict(row)
     d["content"] = _deserialize_content(d["content"])
-    return Message(**d)
+    return ChatMessage(**d)
 
 
 class ChatManager:
@@ -100,11 +100,11 @@ class ChatManager:
                 UNIQUE(room_id, username)
             );
             CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT PRIMARY KEY,
                 room_id TEXT NOT NULL REFERENCES rooms(id),
-                username TEXT NOT NULL,
+                sender_id TEXT NOT NULL,
                 content TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000)
             );
             CREATE INDEX IF NOT EXISTS idx_messages_room ON messages(room_id, id);
         """)
@@ -325,24 +325,34 @@ class ChatManager:
 
     # ---------- Messages ----------
 
-    def add_message(self, room_id: str, username: str, content: list[ContentPart]) -> Message:
-        serialized = _serialize_content(content)
+    def add_message(self, msg: ChatMessage) -> None:
+        serialized = _serialize_content(msg.content)
         cur = self.conn.execute(
-            "INSERT INTO messages (room_id, username, content, created_at) VALUES (?, ?, ?, ?)",
-            (room_id, username, serialized, _now()),
+            "INSERT INTO messages (id, room_id, sender_id, content, created_at) VALUES (?, ?, ?, ?, ?)",
+            (msg.id, msg.room_id, msg.sender_id, serialized, msg.created_at),
         )
         self.conn.commit()
-        row = self.conn.execute("SELECT * FROM messages WHERE id = ?", (cur.lastrowid,)).fetchone()
-        return _row_to_message(row)
+        #row = self.conn.execute("SELECT * FROM messages WHERE id = ?", (cur.lastrowid,)).fetchone()
+        #return _row_to_message(row)
 
-    def get_messages(self, room_id: str, after: int | None = None) -> list[Message]:
+    # def add_message(self, room_id: str, sender_id: str, content: list[ContentPart]) -> ChatMessage:
+    #     serialized = _serialize_content(content)
+    #     cur = self.conn.execute(
+    #         "INSERT INTO messages (room_id, sender_id, content, created_at) VALUES (?, ?, ?, ?)",
+    #         (room_id, sender_id, serialized, _now()),
+    #     )
+    #     self.conn.commit()
+    #     row = self.conn.execute("SELECT * FROM messages WHERE id = ?", (cur.lastrowid,)).fetchone()
+    #     return _row_to_message(row)
+
+    def get_messages(self, room_id: str, after: int | None = None) -> list[ChatMessage]:
         if after is not None:
             rows = self.conn.execute(
-                "SELECT * FROM messages WHERE room_id = ? AND id > ? ORDER BY id",
+                "SELECT * FROM messages WHERE room_id = ? AND created_at > ? ORDER BY created_at ASC",
                 (room_id, after),
             ).fetchall()
         else:
             rows = self.conn.execute(
-                "SELECT * FROM messages WHERE room_id = ? ORDER BY id", (room_id,)
+                "SELECT * FROM messages WHERE room_id = ? ORDER BY created_at ASC", (room_id,)
             ).fetchall()
         return [_row_to_message(r) for r in rows]

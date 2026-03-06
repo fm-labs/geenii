@@ -3,14 +3,17 @@ from contextlib import asynccontextmanager
 import logging
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from rich.logging import RichHandler
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from geenii.apps import AppRegistry
 from geenii.chat.chat_server_ctx import ChatServerState
 
 from geenii.config import APP_VERSION, DATA_DIR
+from geenii.datamodels import Problem
 # from geenii.server.middleware.proxy_middleware import ProxyMiddleware
 # from geenii.server.middleware.request_logger_middleware import RequestLoggerMiddleware
 from geenii.server.router import app_router
@@ -123,6 +126,25 @@ app.add_middleware(
 #     timeout=30.0
 # )
 
+# Global exception handlers that emit Problem JSON responses
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_: Request, exc: HTTPException):
+    problem = Problem(error=exc.detail or exc.status_code,
+                      status=exc.status_code,
+                      detail=str(exc.detail))
+    return JSONResponse(status_code=exc.status_code,
+                        content=problem.model_dump(),
+                        media_type="application/json")
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(_: Request, exc: Exception):
+    logging.error(f"Unhandled exception: {exc}", exc_info=False)
+    problem = Problem(error="Internal Server Error",
+                      status=500,
+                      detail=str(exc))
+    return JSONResponse(status_code=200,
+                        content=problem.model_dump(),
+                        media_type="application/json")
 app.include_router(app_router, prefix="")
 
 # # WebSocket endpoint

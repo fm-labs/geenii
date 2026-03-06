@@ -1,5 +1,11 @@
+import os
 import subprocess
+import uuid
+import asyncio
+import shlex
 
+from geenii.config import DATA_DIR
+from geenii.sandbox import run_docker_sandbox_python
 from geenii.tools import ToolRegistry
 
 geenii_tools = ToolRegistry()
@@ -10,15 +16,15 @@ geenii_tools = ToolRegistry()
 #     pass
 
 
-@geenii_tools.tool()
-def echo(message: str) -> str:
-    """
-    A simple echo function that returns the input message.
-
-    :param message: The message to echo.
-    :return: The echoed message.
-    """
-    return f"Echo: {message}"
+# @geenii_tools.tool()
+# def echo(message: str) -> str:
+#     """
+#     A simple echo function that returns the input message.
+#
+#     :param message: The message to echo.
+#     :return: The echoed message.
+#     """
+#     return f"Echo: {message}"
 
 
 @geenii_tools.tool()
@@ -58,24 +64,48 @@ def file_write(file_path: str, contents: str) -> None:
 
 
 @geenii_tools.tool()
-def execute_command(command: str) -> str:
+def execute_command(command: str, skill: str | None = None) -> str:
     """
     Execute a shell command on the local machine and return its output.
 
-    :param command: The shell command to execute.
+    :param command: The shell command to execute. The command should be a single string, e.g. "ls -la /tmp".
+    :param skill: The name of the skill that is requesting the command execution.
     :return: The output of the command as a string.
     """
     # todo: implement tool usage policy
-    allowed_commands = ["ls", "pwd", "whoami", "date", "osascript", "echo", "cat", "head", "tail"]
-    if not any(command.startswith(allowed) for allowed in allowed_commands):
-        return f"Error: Command '{command}' is not allowed."
+    #allowed_commands = ["ls", "pwd", "whoami", "date", "osascript", "echo", "cat", "head", "tail"]
+    #if not any(command.startswith(allowed) for allowed in allowed_commands):
+    #    return f"Error: Command '{command}' is not allowed."
 
-    result = subprocess.run(command, shell=True, capture_output=True, text=True)
-    # debug print the command, return code, stdout and stderr
-    print(f">Executed command: {command}")
-    print(f">Return code: {result.returncode}")
-    print(f">Standard output: {result.stdout}")
-    print(f">Standard error: {result.stderr}")
+    working_directory = os.getcwd()
+    _env = {}
+    if skill:
+        skill_dir = f"{DATA_DIR}/skills/{skill}"
+        #if os.path.isdir(skill_dir):
+        #    working_directory = skill_dir
+        _env.update({"SKILL_NAME": skill, "SKILL_DIR": skill_dir})
+
+    use_supervisor = os.environ.get("USE_SUPERVISOR", "false").lower()  == "true"
+    async def run_with_supervisor(cmd, env, cwd):
+        #supervisor = g.SUPERVISOR
+        name = f"adhoc-{skill or 'unknown'}-{uuid.uuid4().hex}"
+        #await supervisor.ensure(name, ProcConfig(name=name,cmd=cmd, env=env, cwd=cwd, restart=False))
+        #await supervisor.run(cmd=cmd, env=env, cwd=cwd)
+        print(f">Supervisor command return code: {result.returncode}")
+        print(f">Supervisor command stdout: {result.stdout}")
+        print(f">Supervisor command stderr: {result.stderr}")
+        return result
+
+    if use_supervisor:
+        loop = asyncio.get_event_loop()
+        result = loop.run_until_complete(run_with_supervisor(command, _env, working_directory))
+    else:
+        result = subprocess.run(command, shell=True, capture_output=True, text=True, env=_env, cwd=working_directory)
+        # debug print the command, return code, stdout and stderr
+        print(f">Executed command: {command}", f"in directory: {working_directory}", f"with environment: { _env}")
+        print(f">Return code: {result.returncode}")
+        print(f">Standard output: {result.stdout}")
+        print(f">Standard error: {result.stderr}")
 
     return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
 
@@ -97,6 +127,32 @@ def execute_applescript(script: str) -> str:
     print(f">Standard error: {result.stderr}")
 
     return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+
+@geenii_tools.tool()
+def execute_python(script_path: str, args: str = '', skill: str | None = None) -> str:
+    """
+    Execute a Python script and return its output.
+
+    :param script_path: The path to the Python script to execute.
+    :param args: Additional arguments to pass to the Python script as a single string, e.g. "--option value".
+    :param skill: The name of the skill that is requesting the command execution, used for context and potential sandboxing.
+    :return: The output of the command as a string.
+    """
+    print(">Executing Python script with path:", script_path, "and args:", args)
+
+
+    script_dir = os.path.dirname(script_path)
+    script_name = os.path.basename(script_path)
+    script_args = shlex.split(args)
+    rc, stdout, stderr = run_docker_sandbox_python(script_dir, script_name,
+                                                   script_args=script_args,
+                                                   network_mode="bridge", timeout=10)
+
+    print(f">Return code: {rc}")
+    print(f">Standard output: {stdout}")
+    print(f">Standard error: {stderr}")
+
+    return stdout.strip() if rc == 0 else stderr.strip()
 
 
 # @geenii_tools.tool()

@@ -8,6 +8,12 @@ from geenii.config import DATA_DIR
 logger = logging.getLogger(__name__)
 
 @dataclass
+class SkillSpec:
+    id: str
+    path: str
+
+
+@dataclass
 class Skill:
     name: str
     description: str

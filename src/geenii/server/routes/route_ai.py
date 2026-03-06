@@ -55,14 +55,8 @@ async def chat_completion(request: ChatCompletionRequest) -> ChatCompletionRespo
     """
     Generate a chat completion using the specified AI provider and model.
     """
-    # bot = load_agent(request.model, context_id=request.context_id)
-    # bot = load_agent_from_request(request)
-
-    bot_id = "geenii:agent:default"
-    bot_key = bot_id.replace(":", "-")
-
     context_id = request.context_id or uuid.uuid4().hex
-    context_memory_dir = f"{DATA_DIR}/sessions/{bot_key}/{context_id}"
+    context_memory_dir = f"{DATA_DIR}/sessions/chat/{context_id}"
     os.makedirs(context_memory_dir, exist_ok=True)
 
     logger.info(f"Chat completion request with context_id={context_id}, model={request.model}, prompt={request.prompt}")
@@ -75,26 +69,26 @@ async def chat_completion(request: ChatCompletionRequest) -> ChatCompletionRespo
         # todo compact memory
 
     system = ["You are a helpful assistant that helps the user with their tasks. Give short and concise answers. Always try to help the user as best as you can. If you don't know the answer, say you don't know and don't try to make up an answer."]
-    # skills
-    # skill = find_best_skill_for_prompt(request.prompt, skill_registry)
-    #skills = ["mac-skills", "git-skills"]
-    #for skill in skills:
-    #    system.append(f"Skill: {skill}. Use the {skill} to help answer the user's question if relevant.")
 
-    _request = ChatCompletionRequest(
-        system=system,
-        model=request.model,
-        prompt=request.prompt,
-        messages=messages,
-        context_id=context_id,
-    )
-    response = ai.generate_chat_completion(request=_request)
+    try:
+        _request = ChatCompletionRequest(
+            system=system,
+            model=request.model,
+            prompt=request.prompt,
+            messages=messages,
+            context_id=context_id,
+        )
+        response = ai.generate_chat_completion(request=_request)
 
-    # Append the user message and assistant response to memory
-    memory.append(ModelMessage(role="user", content=[TextContent(type="text", text=request.prompt)]))
-    memory.append(ModelMessage(role="assistant", content=response.output))
+        # Append the user message and assistant response to memory
+        memory.append(ModelMessage(role="user", content=[TextContent(type="text", text=request.prompt)]))
+        memory.append(ModelMessage(role="assistant", content=response.output))
 
-    return response
+        return response
+    except Exception as e:
+        logger.error(f"Error during chat completion for context_id={context_id}: {e}")
+        return CompletionErrorResponse(error=str(e))
+
 
 ### IMAGE GENERATION
 @router.post("/image/generate")

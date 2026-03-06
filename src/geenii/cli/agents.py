@@ -2,12 +2,13 @@ import asyncio
 
 import click
 
-from geenii.agents import Agent, HumanInTheLoopHandler, init_agent_registry
+from geenii.agents import Agent, init_agent_registry
+from geenii.hidl import HumanInTheLoopController
 from geenii.chat.chat_models import TextContent
 from geenii.cli.base import BaseCli
 
 
-class CliHumanInTheLoopHandler(HumanInTheLoopHandler):
+class CliHumanInTheLoopController(HumanInTheLoopController):
 
     async def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
         click.secho(f"Tool execution requested: {tool_name} with arguments {arguments} (call_id={call_id})", fg="yellow")
@@ -20,7 +21,7 @@ class CliAgentRunner:
     def __init__(self, agent: Agent, interactive: bool = True):
         self.interactive = interactive
         self.agent = agent
-        self.agent._hidl = CliHumanInTheLoopHandler()
+        self.agent._hidl = CliHumanInTheLoopController()
 
         print("Bot initialized. Starting interaction...")
         print(agent)
@@ -75,8 +76,6 @@ class AgentsCli(BaseCli):
             PROMPT  The initial prompt to start the agent with.
             """
             click.echo(f"Running agent '{name}' with prompt: {prompt}")
-            #g_bot = init_agent_by_name(name)
-            #g_bot.load_skill("mac-skills")
             g_bot = self.agents.get_instance(name)
             if not g_bot:
                 click.echo(f"Agent '{name}' not found. Please check the available agents with 'agents list'.")

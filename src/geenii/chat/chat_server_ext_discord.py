@@ -126,6 +126,9 @@ class DiscordBotConnector:
         if message.author.id == self.client.user.id:
             return
 
+        username = f"discord:user:{message.author.id}"
+        bot_id = f"geenii:bot:default"
+
         if isinstance(message.channel, discord.DMChannel):
             logger.info(f"DM in Channel {message.channel.id} from {message.author} ({message.author.id}): {message.content}")
             await message.channel.send("[ext] Got your message 👍")
@@ -133,8 +136,6 @@ class DiscordBotConnector:
             # todo mapping of discord user ID to chat server username. discord:{user_id} -> {username}
             # todo mapping of user bots. username -> bot_id
 
-            username = f"discord:user:{message.author.id}"
-            bot_id = f"geenii:bot:default"
 
             # ensure DM room exists in chat manager, if not create it
             dm_room = self._chat_mgr.get_dm_room(owner=username, peer=bot_id, auto_create=True)
@@ -162,8 +163,6 @@ class DiscordBotConnector:
             logger.info(f"GUILD: {repr(message.guild)}")
             await message.channel.send("Got your message in the guild 👍")
 
-            username = f"discord:user:{message.author.id}"
-            bot_id = f"geenii:bot:default"
             room_key = f"discord:guild:{message.guild.id}"
             
             # check for explicit mentions of the bot user and only process those messages

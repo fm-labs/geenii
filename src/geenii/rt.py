@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime
 
 from geenii.core.core_tools import geenii_tools
@@ -10,58 +11,21 @@ from geenii.utils.cached import cached
 TOOLS: ToolRegistry | None = None
 
 
-def get_tool_registry() -> ToolRegistry:
+def get_default_tool_registry() -> ToolRegistry:
     global TOOLS
     if TOOLS is None:
-        TOOLS = init_tool_registry()
+        TOOLS = init_default_tool_registry()
     return TOOLS
 
 
-def init_tool_registry():
-    # todo: load built-in tools and register them in the registry
-    # todo: load tools from config file or database
-    # todo: support dynamic loading of tools from plugins or external sources
-    # todo: implement caching and efficient lookup of tools in the registry
-    # todo: implement tool policies and access control in the registry
+def init_default_tool_registry():
     registry = ToolRegistry()
     init_builtin_tools(registry)
-    init_mcp_server_tools(registry)
-
+    init_mcp_server_tools_sync(registry)
     return registry
 
 
 def init_builtin_tools(registry: ToolRegistry):
-    # registry.register(PythonTool(
-    #     name="file_exists",
-    #     description="Check if a file exists at the specified path.",
-    #     parameters={
-    #         "type": "object",
-    #         "properties": {
-    #             "file_path": {"type": "string", "description": "The path to the file to check."}
-    #         },
-    #         "required": ["file_path"]
-    #     },
-    #     handler=file_exists
-    # ))
-    # registry.register(PythonTool(
-    #     name="file_read",
-    #     description="Read and return the contents of a file.",
-    #     parameters={
-    #         "type": "object",
-    #         "properties": {
-    #             "file_path": {"type": "string", "description": "The path to the file to read."}
-    #         },
-    #         "required": ["file_path"]
-    #     },
-    #     handler=file_read
-    # ))
-    # registry.register_function(fn=file_exists, )
-    # registry.register_function(fn=file_read, )
-    # registry.register_function(fn=file_write, )
-    # registry.register_function(fn=echo, )
-    # registry.register_function(fn=reverse_string, )
-    # registry.register_function(fn=greet, )
-
     for name, tool in geenii_tools._tools.items():
         registry.register(tool)
 
@@ -109,7 +73,18 @@ async def init_mcp_server_tools(registry: ToolRegistry):
     async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
         try:
             mcp_client = McpClient(server_name, server_conf)
-            tools = await mcp_client.list_tools()
+            try:
+                tools = await mcp_client.list_tools()
+            except Exception as e:
+                # try again after a short delay in case the server is still starting up
+                print(f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds...")
+                try:
+                    await asyncio.sleep(1)
+                    tools = await mcp_client.list_tools()
+                except Exception as e:
+                    print(f"Error listing tools from MCP server {server_name} on second attempt: {e}. Skipping this server.")
+                    return []
+
             return tools
         except Exception as e:
             print(f"Error retrieving tools from MCP server {server_name}: {e}")
@@ -130,6 +105,9 @@ async def init_mcp_server_tools(registry: ToolRegistry):
 
 def init_mcp_server_tools_sync(registry: ToolRegistry):
     # wrapper for the async version of init_mcp_server_tools to be used in synchronous contexts
-    import asyncio
+    #asyncio.run(init_mcp_server_tools(registry))
+    async def initialize():
+        await init_mcp_server_tools(registry)
+
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(init_mcp_server_tools(registry))
+    loop.run_until_complete(initialize())

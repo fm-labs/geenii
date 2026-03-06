@@ -216,7 +216,7 @@ class CommandHandler:
     def __init__(self, commands: dict[str, Callable]) -> None:
         self.commands = commands
 
-    def handle_slash_command(self, command: str):
+    def execute(self, command: str):
         if command == "help":
             return "Available commands: " + ", ".join(self.commands.keys())
         elif command == "ping":
@@ -272,7 +272,7 @@ class MessageHandler:
                  conns: ConnectionManager,
                  shutdown_event: asyncio.Event) -> None:
 
-        self.inbound: asyncio.Queue = inbound
+        self.inbound: asyncio.Queue[WireMessage] = inbound
         self.outbound: asyncio.Queue = outbound
         self.shutdown_event = shutdown_event # asyncio.Event()
         self.conns = conns
@@ -312,10 +312,10 @@ class MessageHandler:
             return existing
         logger.info("Creating new bot connection for bot=%s in room=%s", botname, room_id)
 
-        print("Initializing bot runner for bot %s in room %s", botname, room_id)
+        logger.info("Initializing bot runner for bot %s in room %s", botname, room_id)
         g_bot = get_bot(botname)
         botrunner = BotRunner(botname=botname, room_id=room_id, bot=g_bot)
-        print("Bot runner initialized for bot %s in room %s: %s", botname, room_id, botrunner)
+        logger.info("Bot runner initialized for bot %s in room %s: %s", botname, room_id, botrunner)
         
         bot_conn = BotConnection(botname, room_id, bot=botrunner, outbox=self.outbound)
         bot_conn.start()
@@ -326,7 +326,7 @@ class MessageHandler:
 
     async def _process_inbound_messages(self):
         """Continuously process messages from the inbound queue."""
-        logger.info("Messagehandler listening for inbound messages ...")
+        logger.info("MH: listening for inbound messages ...")
         while True:
             if self.shutdown_event.is_set():
                 logger.info("MH: Shutdown event set, stopping inbound message processing loop ...")
@@ -335,9 +335,12 @@ class MessageHandler:
             message = await self.inbound.get()
             logger.info("MH: Messagehandler got message %s", message)
             try:
-                await self._process_message(message)
+                if isinstance(message, ChatMessage):
+                    await self._process_message(message)
+                else:
+                    logger.critical("MH: Messagehandler got unexpected message of type %s", type(message))
             except Exception as e:
-                logger.error("Error processing message: %s. Message: %s", e, message, exc_info=e)
+                logger.error("MH: Error processing message: %s. Message: %s", e, message, exc_info=e)
             finally:
                 self.inbound.task_done()
 
@@ -372,7 +375,7 @@ class MessageHandler:
 
         # store inbound messages chat history
         if isinstance(message, ChatMessage):
-            self.chat_mgr.add_message(room_id, sender, message.content)
+            self.chat_mgr.add_message(message)
 
         # inspect the first content part to check for commands (e.g. to trigger bot actions or other system events)
         if content and len(content) > 0 and content[0].type == "text":
@@ -384,7 +387,7 @@ class MessageHandler:
                 await self.conns.broadcast(room_id, SystemMessage(room_id=room_id,
                                                                   content=f"User {sender} issued command: {command}"))
 
-                command_response = self.commands.handle_slash_command(command)
+                command_response = self.commands.execute(command)
                 await self.conns.broadcast(room_id, SystemMessage(room_id=room_id,
                                                                   content=f"Command response: {command_response}"))
 
@@ -396,18 +399,18 @@ class MessageHandler:
 
     async def _process_outbound_messages(self):
         """Continuously process messages from the outbound queue and broadcast to rooms."""
-        logger.info("Messagehandler listening for outbound messages ...")
+        logger.info("MH: listening for outbound messages ...")
         while True:
             if self.shutdown_event.is_set():
                 logger.info("MH: Shutdown event set, stopping outbound message processing loop ...")
                 break
 
             message: ChatMessage | SystemMessage = await self.outbound.get()
-            logger.info("Messagehandler got outbound message %s", message)
+            logger.info("MH: got outbound message %s", message)
             try:
                 # store outbound messages in chat history
                 if isinstance(message, ChatMessage):
-                    self.chat_mgr.add_message(message.room_id, message.sender_id, message.content)
+                    self.chat_mgr.add_message(message)
 
                 await self.conns.broadcast(message.room_id, message)
             finally:

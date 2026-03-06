@@ -24,7 +24,7 @@ class GeeniiProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider)
         ]
 
     def generate_completion(self, model: str, prompt: str, **kwargs) -> CompletionResponse:
-        pass
+        raise NotImplementedError("Not implemented yet")
 
     def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry=None) -> ChatCompletionResponse:
-        pass
+        raise NotImplementedError("Not implemented yet")

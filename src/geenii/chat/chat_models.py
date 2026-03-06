@@ -1,5 +1,7 @@
 import json
+import uuid
 from typing import Annotated, Literal, Any
+import datetime
 
 import pydantic
 from pydantic import BaseModel, Field
@@ -49,7 +51,9 @@ class ToolCallContent(BaseContent):
     type: Literal["tool_call"] = "tool_call"
     name: str
     arguments: dict | None = None
-    call_id: str | None = None  # Unique identifier for this tool call, useful for matching with results
+    call_id: str | None = None  # Unique call ID
+    require_approval: bool = False  # True, if HIDL approval is required before executing the tool
+    approval_id: str | None = None  # Unique approval ID for HIDL, if require_approval is True
 
     def to_text(self) -> str:
         args_str = ", ".join(f"{k}={v!r}" for k, v in (self.arguments or {}).items())
@@ -110,9 +114,35 @@ class JsonContent(BaseContent):
     def to_text(self) -> str:
         return json.dumps(self.data)
 
+
+class UserConfirmationContent(BaseContent):
+    type: Literal["confirmation"] = "confirmation"
+    confirmation_id: str = Field(default_factory=lambda: uuid.uuid4().hex)  # Unique confirmation ID
+    text: str = ""  # Prompt or question for the user
+    confirmed: bool | None = None  # True if user confirmed, False if rejected, None if not responded yet
+
+    def to_text(self) -> str:
+        status = "Confirmed" if self.confirmed else "Rejected" if self.confirmed is False else "Pending"
+        return f"UserConfirmation (id={self.confirmation_id}): {self.text} [Status: {status}]"
+
+
+class UserInteractionContent(BaseContent):
+    type: Literal["interaction"] = "interaction"
+    interaction_id: str = Field(default_factory=lambda: uuid.uuid4().hex)  # Unique interaction ID
+    interaction_type: str
+    text: str = ""  # Prompt or question for the user
+    choices: list[str] = Field(default_factory=list)  # List of valid choices for the user
+    choice: str | None = None  # The user's choice (if applicable)
+
+    def to_text(self) -> str:
+        choices_str = ", ".join(self.choices)
+        return f"UserInteraction (id={self.interaction_id}): choices=[{choices_str}] selected={self.choice!r}"
+
+
 ContentPart = Annotated[
     TextContent | ImageContent | AudioContent | FileContent | EmbedContent |
-    FunctionCallContent | ToolCallContent | ToolCallResultContent | JsonContent,
+    FunctionCallContent | ToolCallContent | ToolCallResultContent | JsonContent |
+    UserInteractionContent | UserConfirmationContent,
     Field(discriminator="type"),
 ]
 
@@ -123,15 +153,6 @@ class MessageCreate(BaseModel):
     content: list[ContentPart]
 
 
-class Message(BaseModel):
-    id: int
-    room_id: str
-    username: str
-    content: list[ContentPart]
-    created_at: str
-
-
-
 # --- Wire Message Models (connection/queue level, no DB id/created_at) ---
 
 class ChatMessage(BaseModel):
@@ -140,6 +161,8 @@ class ChatMessage(BaseModel):
     room_id: str
     sender_id: str
     content: list[ContentPart]
+    id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex)
+    created_at: int = pydantic.Field(default_factory=lambda: int(datetime.datetime.now().timestamp() * 1000)) # default to current timestamp in milliseconds
 
 
 class SystemMessage(BaseModel):

@@ -1,3 +1,6 @@
+import os
+import shutil
+
 import click.core
 
 from geenii.cli.base import BaseCli
@@ -30,6 +33,7 @@ class SkillsCli(BaseCli):
             for skill in self.skills.skills:
                 self.success(f"- {skill}: {self.skills.get_skill(skill).description}")
 
+
         @skills.command(name="inspect")
         @click.argument("name")
         def inspect_skill(name: str):
@@ -43,3 +47,32 @@ class SkillsCli(BaseCli):
                 print(f"Instructions:\n{skill.instructions}")
             else:
                 print(f"Skill '{name}' not found.")
+
+
+        @skills.command(name="install")
+        @click.argument("name")
+        @click.argument("source")
+        def install_skill(name: str, source: str):
+            """
+            Install a new skill from a given source (e.g., GitHub repo, local file).
+            """
+            target_dir = f"{DATA_DIR}/skills/{name}"
+
+            # validate source
+            if not source.startswith("file://"):
+                self.error("Currently only local file sources are supported. Please provide a source in the format 'file://path/to/skill'.")
+                return
+
+            src_dir = source[len("file://"):]
+            if not os.path.isdir(src_dir):
+                self.error(f"Dir '{src_dir}' does not exist.")
+                return
+
+            # make sure target directory does not already exist
+            if os.path.exists(target_dir):
+                self.error(f"Skill '{name}' already exists. Please choose a different name or remove the existing skill first.")
+                return
+
+            shutil.copytree(src_dir, target_dir)
+            self.success(f"Skill '{name}' installed successfully from '{source}'.")
+

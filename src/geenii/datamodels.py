@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, UTC
-from typing import List, Any, Set, Literal
+from typing import List, Any, Set, Literal, Optional
 
 import pydantic
 from fastapi import UploadFile
@@ -186,3 +186,16 @@ class MCPServerInfo(pydantic.BaseModel):
     tools: List[dict] | None = pydantic.Field(default_factory=list)
     resources: List[dict] | None = pydantic.Field(default_factory=list)
     prompts: List[dict] | None = pydantic.Field(default_factory=list)
+
+
+# Standard error model (Problem Details, RFC 7807)
+class Problem(pydantic.BaseModel):
+    error: str = pydantic.Field(..., description="Short, human-readable summary of the problem type")
+    status: int = pydantic.Field(..., description="HTTP status code")
+    detail: Optional[str] = pydantic.Field(None, description="Human-readable explanation specific to this occurrence")
+    #problem_type: str = pydantic.Field(default="about:blank", description="URI identifying the problem type")
+    #instance: Optional[str] = Field(None, description="URI reference that identifies the specific occurrence")
+    #errors: Optional[dict[str, Any]] = Field(
+    #    None, description="Optional field for validation or field-specific errors"
+    #)
+

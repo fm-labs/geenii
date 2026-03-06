@@ -1,16 +1,6 @@
-import uuid
-import json
-import os
-from typing import List
-
 import pydantic
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter
 from pydantic import ConfigDict
-from starlette import status
-
-from geenii.memory import ChatMemory, FileChatMemory
-from geenii.server.deps import dep_current_user
-from geenii.config import DATA_DIR
 
 router = APIRouter(prefix="/assistants", tags=["agents"])
 

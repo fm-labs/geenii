@@ -1,21 +1,19 @@
 import asyncio
-import hashlib
 import json
 import logging
 import sqlite3
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.params import Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
 from sse_starlette import EventSourceResponse
 from starlette.requests import HTTPConnection, Request
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from geenii.chat.chat_manager import ChatManager
-from geenii.chat.chat_models import Room, RoomCreate, Member, JoinRoom, LeaveRoom, InviteUser, Message, MessageCreate, \
+from geenii.chat.chat_models import Room, RoomCreate, Member, JoinRoom, LeaveRoom, InviteUser, ChatMessage, MessageCreate, \
     SystemMessage, ChatMessage
 from geenii.chat.chat_server_core import SseConnection, WebSocketConnection, MessageHandler, ConnectionManager
+from geenii.server.deps import dep_current_user, User
 
 logger = logging.getLogger(__name__)
 
@@ -35,40 +33,10 @@ async def dep_msg_handler(request: HTTPConnection) -> "MessageHandler":
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-
-def _dummy_token(username: str) -> str:
-    """Hash a username into a dummy bearer token (must match chat_client.make_token)."""
-    return hashlib.sha256(username.encode()).hexdigest()
-
-# Pre-built registry: token -> username.  Add entries for every dummy user you need.
-DUMMY_USERS = ["alice", "bob", "charlie", "dummy_user", "admin"]
-TOKEN_REGISTRY: dict[str, str] = {_dummy_token(u): u for u in DUMMY_USERS}
-
-
-# ---------- Security dependency ----------
-
-class User(BaseModel):
-    username: str
-    is_active: bool = True
-
-
-async def get_current_user(
-        credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
-) -> User:
-    """Resolve bearer token to a User via the dummy token registry."""
-    #token = credentials.credentials
-    #username = TOKEN_REGISTRY.get(token)
-    #print(f"Authenticating token={token}, resolved username={username}")
-    #if username is None:
-    #    raise HTTPException(status_code=401, detail="Invalid or unknown bearer token")
-    #return User(username=username)
-    return User(username="dummy_user")  # TODO replace with real auth
-
-
 # ---------- REST: Rooms ----------
 @router.post("", response_model=Room, status_code=201)
-def create_room_endpoint(body: RoomCreate, 
-                         current_user: User = Depends(get_current_user),
+def create_room_endpoint(body: RoomCreate,
+                         current_user: User = Depends(dep_current_user),
                          chat_mgr:ChatManager=Depends(dep_chat_mgr)):
     try:
         return chat_mgr.create_room(
@@ -86,7 +54,7 @@ def create_room_endpoint(body: RoomCreate,
 
 
 @router.get("", response_model=list[Room])
-def list_rooms_endpoint(current_user: User = Depends(get_current_user), chat_mgr:ChatManager=Depends(dep_chat_mgr)):
+def list_rooms_endpoint(current_user: User = Depends(dep_current_user), chat_mgr:ChatManager=Depends(dep_chat_mgr)):
     return chat_mgr.list_rooms()
 
 
@@ -106,7 +74,7 @@ def stats_endpoint(chat_mgr:ChatManager=Depends(dep_chat_mgr), conns:ConnectionM
 
 @router.get("/rooms/{room_id}")
 def get_room_endpoint(room_id: str,
-                      current_user: User = Depends(get_current_user), 
+                      current_user: User = Depends(dep_current_user),
                       chat_mgr:ChatManager=Depends(dep_chat_mgr)):
     room = chat_mgr.get_room(room_id)
     if not room:
@@ -117,9 +85,9 @@ def get_room_endpoint(room_id: str,
 
 # ---------- REST: Participants ----------
 @router.post("/rooms/{room_id}/join", response_model=Member, status_code=201)
-def join_room_endpoint(room_id: str, 
+def join_room_endpoint(room_id: str,
                        body: JoinRoom,
-                       current_user: User = Depends(get_current_user),
+                       current_user: User = Depends(dep_current_user),
                        chat_mgr:ChatManager=Depends(dep_chat_mgr)):
     if not chat_mgr.get_room(room_id):
         raise HTTPException(status_code=404, detail="Room not found")
@@ -138,7 +106,7 @@ def join_room_endpoint(room_id: str,
 
 
 @router.post("/rooms/{room_id}/leave", response_model=Member)
-def leave_room_endpoint(room_id: str, body: LeaveRoom, current_user: User = Depends(get_current_user),
+def leave_room_endpoint(room_id: str, body: LeaveRoom, current_user: User = Depends(dep_current_user),
                         chat_mgr:ChatManager=Depends(dep_chat_mgr)):
     if not chat_mgr.get_room(room_id):
         raise HTTPException(status_code=404, detail="Room not found")
@@ -149,7 +117,7 @@ def leave_room_endpoint(room_id: str, body: LeaveRoom, current_user: User = Depe
 
 
 @router.post("/rooms/{room_id}/invite", response_model=Member, status_code=201)
-def invite_user_endpoint(room_id: str, body: InviteUser, current_user: User = Depends(get_current_user),
+def invite_user_endpoint(room_id: str, body: InviteUser, current_user: User = Depends(dep_current_user),
                          chat_mgr:ChatManager=Depends(dep_chat_mgr)):
     if not chat_mgr.get_room(room_id):
         raise HTTPException(status_code=404, detail="Room not found")
@@ -163,19 +131,27 @@ def invite_user_endpoint(room_id: str, body: InviteUser, current_user: User = De
 
 # ---------- REST: Messages ----------
 
-@router.post("/rooms/{room_id}/messages", response_model=Message, status_code=201)
-def send_message_endpoint(room_id: str, body: MessageCreate, current_user: User = Depends(get_current_user),
-                          chat_mgr:ChatManager=Depends(dep_chat_mgr)):
+@router.post("/rooms/{room_id}/messages", response_model=ChatMessage, status_code=201)
+async def send_message_endpoint(room_id: str, body: MessageCreate, current_user: User = Depends(dep_current_user),
+                          chat_mgr:ChatManager=Depends(dep_chat_mgr), msg_handler:MessageHandler=Depends(dep_msg_handler)):
     if not chat_mgr.get_room(room_id):
         raise HTTPException(status_code=404, detail="Room not found")
     if not chat_mgr.is_member(room_id, current_user.username):
         raise HTTPException(status_code=403, detail="Not a member of this room")
     logger.info("REST message in room=%s from user=%s", room_id, current_user.username)
-    return chat_mgr.add_message(room_id, current_user.username, body.content)
+    #msg = chat_mgr.add_message(room_id, current_user.username, body.content)
+    #return msg
+    try:
+        msg = ChatMessage(room_id=room_id, sender_id=current_user.username, content=body.content)
+        await msg_handler.inbound.put(msg)
+        return msg
+    except Exception as e:
+        logger.error("Error putting message into handler queue: %s", e)
+        raise HTTPException(status_code=500, detail="Error processing message")
 
 
-@router.get("/rooms/{room_id}/messages", response_model=list[Message])
-def poll_messages_endpoint(room_id: str, current_user: User = Depends(get_current_user),
+@router.get("/rooms/{room_id}/messages", response_model=list[ChatMessage])
+def poll_messages_endpoint(room_id: str, current_user: User = Depends(dep_current_user),
                            after: int | None = Query(default=None), chat_mgr:ChatManager=Depends(dep_chat_mgr)):
     if not chat_mgr.get_room(room_id):
         raise HTTPException(status_code=404, detail="Room not found")
@@ -187,7 +163,7 @@ def poll_messages_endpoint(room_id: str, current_user: User = Depends(get_curren
 @router.get("/rooms/{room_id}/stream")
 async def stream_messages_endpoint(room_id: str,
                                    request: Request,
-                                   current_user: User = Depends(get_current_user),
+                                   current_user: User = Depends(dep_current_user),
                                    conns: ConnectionManager=Depends(dep_conn_mgr),
                                    chat_mgr: ChatManager=Depends(dep_chat_mgr)):
 

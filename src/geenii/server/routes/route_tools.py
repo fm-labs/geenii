@@ -1,4 +1,3 @@
-from docutils.writers.latex2e import definitions
 from fastapi import APIRouter, Depends
 from starlette.requests import Request
 
@@ -21,4 +20,4 @@ async def execute_tool(tool_name: str, args: dict, registry: ToolRegistry = Depe
     tool = registry.get(tool_name)
     if not tool:
         raise ValueError(f"Tool '{tool_name}' not found.")
-    return await tool.invoke(**args)
+    return await tool.invoke(args=args)

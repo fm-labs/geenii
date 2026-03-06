@@ -1,6 +1,7 @@
 import subprocess
 import os
 import time
+from typing import Literal
 
 SANDBOX_PYTHON3_BASEIMAGE = "python:3.13-slim"
 
@@ -31,7 +32,9 @@ def run_docker_subprocess(command: list[str], timeout: int = 30) -> tuple[int, s
 
 
 def run_docker_sandbox_python(base_dir: str, script_name: str = "main.py", script_args: list[str] = None,
-                              mounts: list[str] = None, network_mode: str = "none", cap_add: list[str] = None,
+                              mounts: list[str] = None,
+                              network_mode: Literal["none", "bridge", "host"] = "none",
+                              cap_add: list[str] = None,
                               cpu_limit: float = 0.5, mem_limit: str = "256m", pid_limit: int = 100,
                               timeout: int = 30,) -> tuple[int, str, str]:
     """

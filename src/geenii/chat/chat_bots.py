@@ -3,7 +3,9 @@ import logging
 from typing import AsyncGenerator
 
 from geenii.chat.chat_models import TextContent, ContentPart, ChatMessage
+from geenii.config import DATA_DIR
 from geenii.datamodels import ModelMessage
+from geenii.hidl import HumanInTheLoopController, FileTicketHumanInTheLoopController
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,7 @@ class BotInterface(abc.ABC):
         yield ModelMessage(role="admin", content=[TextContent(text="Not implemented")])
 
 
+
 class BotRunner:
     """
     A BotRunner is an ultra-thin wrapper around BotInterface and responsible for running the bot's internal logic.
@@ -36,6 +39,7 @@ class BotRunner:
         self.botname = botname
         self.room_id = room_id
         self.bot = bot
+        self.bot._hidl = FileTicketHumanInTheLoopController(ticket_dir=f"{DATA_DIR}/cache/hidl")
 
     async def prompt(self, message: ChatMessage) -> AsyncGenerator[ModelMessage, None]:
         logger.info("Bot %s processing message in room %s: %s", self.botname, self.room_id, message)

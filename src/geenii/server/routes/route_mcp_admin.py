@@ -8,6 +8,8 @@ from geenii import tools
 from geenii.datamodels import MCPServerConfig, MCPToolCallRequest, MCPServerInfo, MCPToolCallResponse
 from geenii.mcp import get_mcp_config, read_mcp_config_json, write_mcp_config_json, \
     get_mcp_client_for_server, get_mcp_config_for_server
+from geenii.rt import init_mcp_server_tools
+from geenii.tools import ToolRegistry
 from geenii.utils.cached import cached
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
@@ -186,7 +188,8 @@ async def call_mcp_server_tool(server_name: str, request: MCPToolCallRequest) ->
     async with client:
         try:
             print("Calling MCP tool:", tool_name, "with arguments):", arguments)
-            result: CallToolResult = await tools.execute_tool_call(tool_name, arguments=arguments)
+            #result: CallToolResult = await tools.execute_tool_call(registry=registry,tool_name=tool_name, arguments=arguments)
+            raise NotImplementedError("Tool execution not implemented yet")
             return MCPToolCallResponse(**{"tool_name": tool_name, "arguments": arguments, "result": dataclasses.asdict(result)})
         except Exception as e:
             return MCPToolCallResponse(**{"tool_name": tool_name, "arguments": arguments, "error": str(e)})

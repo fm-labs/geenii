@@ -34,7 +34,7 @@ class Tool(ABC):
     #    return f"<{self.__class__.__name__} name={self.name!r}>"
 
     @abstractmethod
-    async def invoke(self, **kwargs: Any) -> Any:
+    async def invoke(self, args: dict[str,Any], **kwargs: Any) -> Any:
         ...
 
     def to_definition(self) -> dict:
@@ -86,16 +86,16 @@ class PythonTool(Tool):
         self.type = "function"
         self.handler = handler
 
-    async def invoke(self, **kwargs: Any) -> Any:
+    async def invoke(self, args: dict[str,Any], **kwargs: Any) -> Any:
         if self.handler is None:
             raise RuntimeError(f"No handler registered for tool {self.name!r}")
 
         # support sync and async handlers
         if inspect.iscoroutinefunction(self.handler):
-            result = await self.handler(**kwargs)
+            result = await self.handler(**args)
         else:
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, lambda: self.handler(**kwargs))
+            result = await loop.run_in_executor(None, lambda: self.handler(**args))
 
         #print(f"Tool {self.name!r} returned:", result)
         return result
@@ -122,9 +122,9 @@ class McpTool(Tool):
         self.mcp_server_id = mcp_server_id
         self.type = "mcp_tool"
 
-    async def invoke(self, **kwargs: Any) -> Any:
+    async def invoke(self, args: dict[str,Any], **kwargs: Any) -> Any:
         client: McpClient = get_mcp_client_for_server(self.mcp_server_id)
-        return await client.call_tool(self._name, args=kwargs)
+        return await client.call_tool(self._name, args=args)
 
 
 # ---------------------------------------------------------------------------
@@ -248,11 +248,11 @@ class ToolRegistry:
 
     # -- invocation ---------------------------------------------------------
 
-    def invoke(self, name: str, **kwargs: Any) -> Any:
+    def invoke(self, name: str, args: dict, **kwargs: Any) -> Any:
         """Look up a tool by *name* and call it with *kwargs*."""
         tool = self.get(name)
         logger.debug("invoking tool %r with %s", name, kwargs)
-        return tool.invoke(**kwargs)
+        return tool.invoke(args=args, **kwargs)
 
     # -- dunder -------------------------------------------------------------
 
@@ -309,15 +309,15 @@ def _params_from_signature(fn: Callable[..., Any]) -> dict:
 
 
 
-async def execute_tool_call(registry: ToolRegistry, tool_name: str, **kwargs) -> Any:
-    """Look up and execute a tool by name, passing kwargs as arguments."""
+async def execute_tool_call(registry: ToolRegistry, tool_name: str, args: dict[str,Any], **kwargs) -> Any:
+    """Look up and execute a tool by name and given arguments."""
     tool = registry.get(tool_name)
     if tool is None:
         raise ValueError(f"Tool {tool_name!r} is not registered")
-    logger.info(f'EXECUTING TOOL "{tool_name}" with args {kwargs}')
-    return await tool.invoke(**kwargs)
+    logger.info(f'EXECUTING TOOL "{tool_name}" with args {args}')
+    return await tool.invoke(args=args, **kwargs)
 
 
-def execute_tool_call_sync(registry: ToolRegistry, tool_name: str, **kwargs) -> Any:
+def execute_tool_call_sync(registry: ToolRegistry, tool_name: str, args: dict[str,Any], **kwargs) -> Any:
     """Synchronous wrapper around execute_tool_call."""
-    return asyncio.run(execute_tool_call(registry, tool_name, **kwargs))
+    return asyncio.run(execute_tool_call(registry, tool_name, args, **kwargs))

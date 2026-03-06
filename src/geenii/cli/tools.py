@@ -1,7 +1,7 @@
 import click
 
 from geenii.cli.base import BaseCli
-from geenii.rt import init_builtin_tools
+from geenii.rt import init_builtin_tools, init_mcp_server_tools_sync
 from geenii.tools import ToolRegistry
 
 
@@ -11,6 +11,7 @@ class ToolsCli(BaseCli):
         super().__init__(cli)
         self.tool_registry = ToolRegistry()
         init_builtin_tools(self.tool_registry)
+        #init_mcp_server_tools_sync(self.tool_registry)
 
         @cli.group()
         def tools():
