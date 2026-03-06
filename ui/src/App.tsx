@@ -12,7 +12,7 @@ const App = () => {
 
   return (
     <>
-      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
         <ServerContextProvider>
           <AppContextProvider>
             <AppRouter />

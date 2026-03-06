@@ -9,8 +9,8 @@ const CompletionChatPage = () => {
     //className: 'CustomChatClass',
     //enableSuggestions: true,
     //suggestions: ['Hello, how can I help you?', 'What is the weather like today?'],
-    //enableFiles: true,
-    //files: [],
+    enableFiles: true,
+    files: [],
   }
 
   return (<Layout>
@@ -20,7 +20,7 @@ const CompletionChatPage = () => {
             <div className="flex flex-col justify-center">
               <div className={'grow'}>
                 <div className="max-w-3xl mx-auto p-4">
-                  <CompletionChat />
+                  <CompletionChat enableFiles={false} />
                 </div>
               </div>
             </div>

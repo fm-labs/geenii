@@ -1,9 +1,9 @@
 import Popup, { PopupProps } from "../../../components/Popup.tsx";
 import FileUploader from "@/components/uploader/FileUploader.tsx";
-import { UploadedFile } from "../../../components/file-list";
+import { UploadedFile } from '@/components/file-list';
 import { useContext } from "react";
 import { ChatContext } from "./ChatContext.tsx";
-import { FEATURE_CHAT_FILES_ENABLED } from "../../../constants.ts";
+import { FEATURE_CHAT_FILES_ENABLED } from '@/constants.ts';
 
 const ChatFilesUploaderPopup = (props: Omit<PopupProps,'children'>) => {
 

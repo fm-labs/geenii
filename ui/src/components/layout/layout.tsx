@@ -25,7 +25,7 @@ const Layout = (props: PropsWithChildren) => {
       <header className={"fixed top-0 left-0 w-full border-b shadow-md z-1000 p-2 bg-black"}>
         <div className={"flex flex-row w-full justify-between items-center max-w-7xl px-4 mx-auto"}>
           <div className={"flex flex-row"}>
-            <a href="#/"><BotIcon /></a>
+            <a href="#/"><BotIcon color={'#FFF'} /></a>
             {/*<span className="ml-2 font-bold text-lg">
               <a href="#/">{APP_NAME}</a>
             </span>*/}
@@ -34,7 +34,7 @@ const Layout = (props: PropsWithChildren) => {
             {SHOW_NAV_MENU && <ul className="space-x-3 flex items-center justify-center">
               {/*<li className="text-sm text-gray-600 hover:bg-blue-50 px-1"><a href="#/welcome">Start</a></li>*/}
               {FEATURE_COMPLETION_ENABLED && <li className={navItemStyle}><a href="#/completions">Completions</a></li>}
-              {/*FEATURE_CHAT_ENABLED && <li className={navItemStyle}><a href="#/chat">Chat</a></li>*/}
+              {FEATURE_CHAT_ENABLED && <li className={navItemStyle}><a href="#/chat">Chat</a></li>}
               {FEATURE_AGENTS_ENABLED && <li className={navItemStyle}><a href="#/agents">Agents</a></li>}
               {/*FEATURE_TOOLS_ENABLED && <li className={navItemStyle}><a href="#/tools">Tools</a></li>*/}
               {/*FEATURE_MCP_ENABLED && <li className={navItemStyle}><a href="#/mcp">MCP</a></li>*/}

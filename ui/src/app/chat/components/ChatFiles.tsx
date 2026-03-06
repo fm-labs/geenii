@@ -3,6 +3,7 @@ import FileList, { UploadedFile } from "../../../components/file-list";
 import { ChatContext } from "./ChatContext.tsx";
 import ChatFilesUploaderPopup from '@/app/chat/components/ChatFilesUploaderPopup.tsx'
 import { FEATURE_CHAT_FILES_ENABLED } from '@/constants.ts'
+import { Button } from '@/components/ui/button.tsx'
 
 const ChatFiles = () => {
 
@@ -45,6 +46,7 @@ const ChatFiles = () => {
             </div>
             {/* FileUpload */}
             <ChatFilesUploaderPopup show={showFilesPopup} onClose={() => setShowFilesPopup(false)} />
+            <Button onClick={() => setShowFilesPopup(true)}>Upload</Button>
         </div>
     );
 };
