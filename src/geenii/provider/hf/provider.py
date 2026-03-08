@@ -5,12 +5,12 @@ import time
 import uuid
 
 from geenii import config
-from geenii.datamodels import AudioGenerationApiResponse
+from geenii.datamodels import AudioSpeechGenerationApiResponse
 #from xai.provider.hf.tts_kokoro import run_tts_pipeline
-from geenii.provider.interfaces import AIAudioGeneratorProvider
+from geenii.provider.interfaces import AISpeechGeneratorProvider
 
 
-class HuggingFaceAIProvider(AIAudioGeneratorProvider):
+class HuggingFaceAIProvider(AISpeechGeneratorProvider):
     """
     Hugging Face AI provider for audio generation.
     This class extends the AIAudioGeneratorProvider to provide audio generation capabilities using Hugging Face models.
@@ -47,7 +47,7 @@ class HuggingFaceAIProvider(AIAudioGeneratorProvider):
             # Return the response in the expected format
             data_url = f"data:audio/wav;base64,{base64_audio.decode('utf-8')}"
 
-            return AudioGenerationApiResponse(
+            return AudioSpeechGenerationApiResponse(
                 id=str(uuid.uuid4()),
                 timestamp=time.time(),
                 model=model,

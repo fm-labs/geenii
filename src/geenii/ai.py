@@ -3,19 +3,19 @@ from pathlib import Path
 from geenii.config import DATA_DIR
 from geenii.datamodels import CompletionResponse, CompletionErrorResponse, \
     ChatCompletionRequest, ImageGenerationApiRequest, ImageGenerationApiResponse, \
-    AudioGenerationApiRequest, AudioGenerationApiResponse, AudioTranscriptionApiRequest, AudioTranscriptionApiResponse, \
+    AudioGenerationApiRequest, AudioSpeechGenerationApiResponse, AudioTranscriptionApiRequest, AudioTranscriptionApiResponse, \
     ModelMessage, AIModelInfo, AIProviderInfo, ChatCompletionResponse
 from geenii.provider.geenii.provider import GeeniiProvider
 from geenii.provider.interfaces import AICompletionProvider, AIProvider, AIImageGeneratorProvider, \
-    AIAudioGeneratorProvider, AIAudioTranscriptionProvider, AIAudioTranslationProvider, AIChatCompletionProvider
+    AISpeechGeneratorProvider, AIAudioTranscriptionProvider, AIAudioTranslationProvider, AIChatCompletionProvider
 
 from geenii.provider.ollama.provider import OllamaAIProvider
 from geenii.provider.openai.provider import OpenAIProvider
-from geenii.tools import ToolRegistry
+from geenii.tool.registry import ToolRegistry
 from geenii.utils.cached import cached
 from geenii.utils.json_util import append_jsonl
 
-type AIProviderType = AICompletionProvider | AIImageGeneratorProvider | AIAudioGeneratorProvider \
+type AIProviderType = AICompletionProvider | AIImageGeneratorProvider | AISpeechGeneratorProvider \
                       | AIAudioTranscriptionProvider | AIAudioTranslationProvider | AIProvider
 
 
@@ -156,11 +156,11 @@ def get_ai_image_generator_provider(model_id: str) -> tuple[AIImageGeneratorProv
     return get_ai_provider_from_model_id(model_id, AIImageGeneratorProvider)
 
 
-def get_ai_audio_generator_provider(model_id: str) -> tuple[AIAudioGeneratorProvider, str, str]:
+def get_ai_audio_generator_provider(model_id: str) -> tuple[AISpeechGeneratorProvider, str, str]:
     """
     Get the AI audio generator provider instance based on the provider name.
     """
-    return get_ai_provider_from_model_id(model_id, AIAudioGeneratorProvider)
+    return get_ai_provider_from_model_id(model_id, AISpeechGeneratorProvider)
 
 
 def get_ai_audio_transcription_provider(model_id: str) -> tuple[AIAudioTranscriptionProvider, str, str]:
@@ -286,7 +286,7 @@ def generate_image(request: ImageGenerationApiRequest) -> ImageGenerationApiResp
         return CompletionErrorResponse(error=str(e))
 
 
-def generate_speech(request: AudioGenerationApiRequest) -> AudioGenerationApiResponse | CompletionErrorResponse:
+def generate_speech(request: AudioGenerationApiRequest) -> AudioSpeechGenerationApiResponse | CompletionErrorResponse:
     """
     Generate speech from text using the specified AI provider and model.
     """

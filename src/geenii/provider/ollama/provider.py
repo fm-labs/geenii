@@ -472,6 +472,12 @@ def model_messages_to_ollama_format(messages: List[ModelMessage]) -> List[dict]:
                         'role': role,
                         'content': content_item.text,
                     }
+                #elif isinstance(content_item, JsonContent):
+                #    # print(f"Adding message with role {role} and JSON content: {content_item.data}")
+                #    _message = {
+                #        'role': role,
+                #        'content': json.dumps(content_item.data),
+                #    }
                 elif isinstance(content_item, ToolCallContent):
                     # print(f"Adding message with role {role} and tool call content: {content_item.name} with arguments {content_item.arguments}")
                     _message = {

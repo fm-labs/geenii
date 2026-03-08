@@ -6,10 +6,10 @@ from geenii.ai import generate_completion, generate_chat_completion_deprecated
 from geenii.chat.chat_models import TextContent
 from geenii.cli.base import BaseCli
 from geenii.config import DEFAULT_COMPLETION_MODEL
-from geenii.core.core_tools import execute_command
+from geenii.core.tools import execute_command
 from geenii.datamodels import ModelMessage
-from geenii.tools import ToolRegistry, PythonTool
-from geenii.agents import DEFAULT_AGENT_SYSTEM_PROMPT
+from geenii.tool.registry import ToolRegistry, PythonTool
+from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
 
 
 class AiCli(BaseCli):

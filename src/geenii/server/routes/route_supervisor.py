@@ -1,35 +1,11 @@
-import os
 from typing import Dict, List, Optional
 
-from fastapi import Depends, HTTPException, Request, status, APIRouter
+from fastapi import Depends, HTTPException, Request, APIRouter
 from fastapi.responses import StreamingResponse
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
+from geenii.server.deps import require_api_key
 from geenii.supervisor import Supervisor
-
-# ---------------------------------------------------------------------------
-# Auth
-# ---------------------------------------------------------------------------
-
-_bearer = HTTPBearer(auto_error=False)
-
-def _api_key() -> Optional[str]:
-    return os.environ.get("SUPERVISOR_API_KEY")
-
-
-async def require_auth(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
-) -> None:
-    key = _api_key()
-    if key is None:
-        return  # auth disabled
-    if credentials is None or credentials.credentials != key:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or missing API key",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -65,12 +41,12 @@ def dep_supervisor(request: Request) -> Supervisor:
 
 # --- Status & logs ----------------------------------------------------------
 
-@router.get("/status", dependencies=[Depends(require_auth)])
+@router.get("/status", dependencies=[Depends(require_api_key)])
 async def supervisor_status(supervisor: Supervisor = Depends(dep_supervisor)):
     return supervisor.status()
 
 
-@router.get("/logs/{name}", dependencies=[Depends(require_auth)])
+@router.get("/logs/{name}", dependencies=[Depends(require_api_key)])
 async def supervisor_logs(name: str, tail: int = 100, supervisor: Supervisor = Depends(dep_supervisor)):
     try:
         return {"name": name, "lines": supervisor.logs(name, tail=tail)}
@@ -78,7 +54,7 @@ async def supervisor_logs(name: str, tail: int = 100, supervisor: Supervisor = D
         raise HTTPException(status_code=404, detail=f"unknown process: {name}")
 
 
-@router.get("/logs/{name}/stream", dependencies=[Depends(require_auth)])
+@router.get("/logs/{name}/stream", dependencies=[Depends(require_api_key)])
 async def supervisor_logs_stream(name: str, request: Request, supervisor: Supervisor = Depends(dep_supervisor)):
     """
     Server-Sent Events stream of plain-text log lines.
@@ -102,7 +78,7 @@ async def supervisor_logs_stream(name: str, request: Request, supervisor: Superv
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-@router.get("/logs/{name}/stream/jsonl", dependencies=[Depends(require_auth)])
+@router.get("/logs/{name}/stream/jsonl", dependencies=[Depends(require_api_key)])
 async def supervisor_logs_stream_jsonl(name: str, request: Request, supervisor: Supervisor = Depends(dep_supervisor)):
     """
     Server-Sent Events stream of structured JSONL log events.
@@ -151,7 +127,7 @@ async def supervisor_logs_stream_jsonl(name: str, request: Request, supervisor: 
 #     return {"ok": True, "name": name}
 
 
-@router.post("/procs/{name}/restart", dependencies=[Depends(require_auth)])
+@router.post("/procs/{name}/restart", dependencies=[Depends(require_api_key)])
 async def restart_proc(name: str, supervisor: Supervisor = Depends(dep_supervisor)):
     try:
         await supervisor.restart_process(name)
@@ -160,7 +136,7 @@ async def restart_proc(name: str, supervisor: Supervisor = Depends(dep_superviso
     return {"ok": True, "name": name}
 
 
-@router.delete("/procs/{name}", dependencies=[Depends(require_auth)])
+@router.delete("/procs/{name}", dependencies=[Depends(require_api_key)])
 async def stop_proc(name: str, disable_restart: bool = True, supervisor: Supervisor = Depends(dep_supervisor)):
     await supervisor.stop_process(name, disable_restart=disable_restart)
     return {"ok": True, "name": name, "disable_restart": disable_restart}

@@ -5,7 +5,7 @@ from geenii.ai import generate_chat_completion_deprecated
 from geenii.chat.chat_bots import BotInterface
 from geenii.chat.chat_models import ContentPart, TextContent
 from geenii.datamodels import ModelMessage
-from geenii.tools import ToolRegistry, PythonTool
+from geenii.tool.registry import ToolRegistry, PythonTool
 
 
 class EchoBot(BotInterface):

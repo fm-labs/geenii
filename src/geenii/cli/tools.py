@@ -1,8 +1,8 @@
 import click
 
 from geenii.cli.base import BaseCli
-from geenii.rt import init_builtin_tools, init_mcp_server_tools_sync
-from geenii.tools import ToolRegistry
+from geenii.tools import init_builtin_tools
+from geenii.tool.registry import ToolRegistry
 
 
 class ToolsCli(BaseCli):

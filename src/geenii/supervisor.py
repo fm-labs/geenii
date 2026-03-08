@@ -5,9 +5,8 @@ Process supervisor
 import asyncio
 import json
 import os
-import signal
-import uuid
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, List, Literal, Optional
 
@@ -401,8 +400,10 @@ class Supervisor:
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
-                    self._log(name, f"spawn error: {type(exc).__name__}: {exc}")
-                    await asyncio.sleep(1.0)
+                    # Avoid tight crash loops; reset on success
+                    backoff = 30
+                    self._log(name, f"spawn error: {type(exc).__name__}: {exc}. retrying in {backoff:.1f}s")
+                    await asyncio.sleep(backoff)
 
     async def _spawn(self, name: str, cfg: ProcConfig) -> None:
         self._log(name, f"starting: {' '.join(cfg.cmd)}")
@@ -506,38 +507,38 @@ class Supervisor:
         self._runtime.pop(name, None)
 
 
-if __name__ == "__main__":
-
-    supervisor = Supervisor()
-
-    # attach signal handlers for graceful shutdown
-    def _shutdown_handler():
-        print("Received shutdown signal, stopping supervisor...")
-        asyncio.create_task(supervisor.stop())
-
-    #loop = asyncio.get_event_loop()
-    #for sig in (signal.SIGINT, signal.SIGTERM):
-    #    loop.add_signal_handler(sig, _shutdown_handler)
-
-    async def main():
-        # Example 1: ensure a process and print status every 10 seconds
-        await supervisor.ensure("example", ProcConfig(name="example", cmd=["/bin/bash", "-c", "while true; do echo `date`; sleep 2; done"]))
-        # Example 2: one-shot process that exits immediately
-        await supervisor.ensure("oneshot", ProcConfig(name="oneshot", cmd=["/bin/bash", "-c", "echo one-shot; exit 0"], restart=False))
-
-        i = 0
-        while supervisor.is_active():
-            i += 1
-            print(json.dumps(supervisor.status(), indent=2))
-            await asyncio.sleep(3)
-            if i == 3:
-                print("Restarting example process...")
-                await supervisor.restart_process("example")
-            if i == 6:
-                print("Stopping example process...")
-                await supervisor.stop_process("example")
-            if i == 9:
-                print("Stopping supervisor...")
-                await supervisor.stop()
-
-    asyncio.run(main())
+# if __name__ == "__main__":
+#
+#     supervisor = Supervisor()
+#
+#     # attach signal handlers for graceful shutdown
+#     def _shutdown_handler():
+#         print("Received shutdown signal, stopping supervisor...")
+#         asyncio.create_task(supervisor.stop())
+#
+#     #loop = asyncio.get_event_loop()
+#     #for sig in (signal.SIGINT, signal.SIGTERM):
+#     #    loop.add_signal_handler(sig, _shutdown_handler)
+#
+#     async def main():
+#         # Example 1: ensure a process and print status every 10 seconds
+#         await supervisor.ensure("example", ProcConfig(name="example", cmd=["/bin/bash", "-c", "while true; do echo `date`; sleep 2; done"]))
+#         # Example 2: one-shot process that exits immediately
+#         await supervisor.ensure("oneshot", ProcConfig(name="oneshot", cmd=["/bin/bash", "-c", "echo one-shot; exit 0"], restart=False))
+#
+#         i = 0
+#         while supervisor.is_active():
+#             i += 1
+#             print(json.dumps(supervisor.status(), indent=2))
+#             await asyncio.sleep(3)
+#             if i == 3:
+#                 print("Restarting example process...")
+#                 await supervisor.restart_process("example")
+#             if i == 6:
+#                 print("Stopping example process...")
+#                 await supervisor.stop_process("example")
+#             if i == 9:
+#                 print("Stopping supervisor...")
+#                 await supervisor.stop()
+#
+#     asyncio.run(main())

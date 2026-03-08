@@ -1,0 +1,12 @@
+
+services:
+  kokoro-web:
+    image: ghcr.io/eduardolat/kokoro-web:latest
+    ports:
+      - "33300:3000"
+    environment:
+      - KW_SECRET_API_KEY=no-key
+      - KW_PUBLIC_NO_TRACK=true
+    volumes:
+      - ./data/kokoro-cache:/kokoro/cache  # Cache downloaded models and voices
+    restart: unless-stopped

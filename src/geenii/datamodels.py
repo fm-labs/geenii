@@ -128,11 +128,11 @@ class AudioGenerationApiRequest(pydantic.BaseModel):
     speed: float | None = 1.0  # Default speech speed
 
 
-class AudioGenerationApiResponse(BaseCompletionResponse):
+class AudioSpeechGenerationApiResponse(BaseCompletionResponse):
     text: str
     output: List[dict] | None = None  # contains either 'base64' or 'url' keys
-    # url: str | None = None  # URL to the generated audio file
-    # base64: str | None = None  # Base64 encoded audio data, if applicable
+    url: str | None = None  # URL to the generated audio file
+    base64: str | None = None  # Base64 encoded audio data, if applicable
 
 
 # Audio Transcription

@@ -2,7 +2,8 @@ import abc
 from typing import List
 
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, AudioTranscriptionApiResponse, \
-    AudioGenerationApiResponse, AudioTranslationApiResponse, ChatCompletionResponse, ChatCompletionRequest, AIModelInfo
+    AudioSpeechGenerationApiResponse, AudioTranslationApiResponse, ChatCompletionResponse, ChatCompletionRequest, \
+    AIModelInfo, AudioTranscriptionApiRequest
 
 
 class AIProvider(abc.ABC):
@@ -69,14 +70,14 @@ class AIImageGeneratorProvider(abc.ABC):
         pass
 
 
-class AIAudioGeneratorProvider(abc.ABC):
+class AISpeechGeneratorProvider(abc.ABC):
     """Abstract base class for AI text-to-speech providers.
     This class defines the interface for AI text-to-speech providers, which can be used to
     convert text into speech.
     """
 
     @abc.abstractmethod
-    def generate_speech(self, model: str, text: str, **kwargs) -> AudioGenerationApiResponse:
+    def generate_speech(self, model: str, text: str, **kwargs) -> AudioSpeechGenerationApiResponse:
         """Convert the given text into speech"""
         pass
 

@@ -5,7 +5,7 @@ from typing import Literal
 
 SANDBOX_PYTHON3_BASEIMAGE = "python:3.13-slim"
 
-def run_docker_subprocess(command: list[str], timeout: int = 30) -> tuple[int, str, str]:
+def run_docker_subprocess(command: list[str], timeout: int = 30, env: dict | None = None) -> tuple[int, str, str]:
     """
     Run a subprocess command with a timeout and return the exit code, stdout, and stderr.
 
@@ -22,7 +22,8 @@ def run_docker_subprocess(command: list[str], timeout: int = 30) -> tuple[int, s
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout
+            timeout=timeout,
+            env=env,
         )
         return result.returncode, result.stdout, result.stderr
     except subprocess.TimeoutExpired as e:
@@ -36,7 +37,7 @@ def run_docker_sandbox_python(base_dir: str, script_name: str = "main.py", scrip
                               network_mode: Literal["none", "bridge", "host"] = "none",
                               cap_add: list[str] = None,
                               cpu_limit: float = 0.5, mem_limit: str = "256m", pid_limit: int = 100,
-                              timeout: int = 30,) -> tuple[int, str, str]:
+                              timeout: int = 30, env: dict | None = None) -> tuple[int, str, str]:
     """
     Run a Python script in a Docker sandbox.
 
@@ -125,7 +126,7 @@ def run_docker_sandbox_python(base_dir: str, script_name: str = "main.py", scrip
 
     print(f"Running command: {' '.join(command)}")
     start_time = time.time()
-    result = run_docker_subprocess(command, timeout)
+    result = run_docker_subprocess(command, timeout=timeout, env=env)
     end_time = time.time()
     print(f"Command finished in {end_time - start_time:.8f} seconds with exit code {result[0]}")
     return result

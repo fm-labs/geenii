@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from starlette.requests import Request
 
-from geenii.tools import ToolRegistry
+from geenii.tool.registry import ToolRegistry
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 

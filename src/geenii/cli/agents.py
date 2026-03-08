@@ -2,7 +2,8 @@ import asyncio
 
 import click
 
-from geenii.agents import Agent, init_agent_registry
+from geenii.agents import Agent
+from geenii.g import init_agent_registry
 from geenii.hidl import HumanInTheLoopController
 from geenii.chat.chat_models import TextContent
 from geenii.cli.base import BaseCli
@@ -21,7 +22,7 @@ class CliAgentRunner:
     def __init__(self, agent: Agent, interactive: bool = True):
         self.interactive = interactive
         self.agent = agent
-        self.agent._hidl = CliHumanInTheLoopController()
+        #self.agent._hidl = CliHumanInTheLoopController()
 
         print("Bot initialized. Starting interaction...")
         print(agent)

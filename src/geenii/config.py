@@ -5,14 +5,18 @@ import dotenv
 
 from geenii.utils.os_util import get_user_home
 
+
 APP_VERSION = "0.3.0"
 
 USER_HOME_DIR = get_user_home()
 DATA_DIR = os.environ.get("GEENII_DATA_DIR", USER_HOME_DIR + "/.geenii")
+
+dotenv.load_dotenv(DATA_DIR + "/.env", override=True, verbose=True)
+
 CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", DATA_DIR + "/cache")
 CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
 
-dotenv.load_dotenv(DATA_DIR + "/.env")
+GEENII_BIN = os.getenv("GEENII_BIN", "geenii")
 
 MCP_CONFIG_FILE="mcp.json"
 

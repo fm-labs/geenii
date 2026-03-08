@@ -15,7 +15,7 @@ class SkillsCli(BaseCli):
         if not self._skills:
             self._skills = SkillRegistry()
             self.info(f"Loading skills from directory '{DATA_DIR}/skills'...")
-            self._skills.load_all_from_directory(f"{DATA_DIR}/skills")
+            self._skills.register_all_from_directory(f"{DATA_DIR}/skills")
         return self._skills
 
     def __init__(self, cli: click.core.Group):
@@ -31,7 +31,7 @@ class SkillsCli(BaseCli):
         def list_skills():
             """List all registered skills."""
             for skill in self.skills.skills:
-                self.success(f"- {skill}: {self.skills.get_skill(skill).description}")
+                self.success(f"- {skill}: {self.skills.get(skill).description}")
 
 
         @skills.command(name="inspect")
@@ -40,11 +40,19 @@ class SkillsCli(BaseCli):
             """
             Show details for a specific skill.
             """
-            skill = self.skills.get_skill(name)
+            skill = self.skills.get(name)
             if skill:
+                print(f"Path: {skill.path}")
                 print(f"Name: {skill.name}")
                 print(f"Description: {skill.description}")
-                print(f"Instructions:\n{skill.instructions}")
+                print(f"Metadata:")
+                if skill.metadata:
+                    for key, value in skill.metadata.items():
+                        print(f"- {key}: {value}")
+                print(f"Instructions:")
+                print(f"---" * 13)
+                print(skill.instructions)
+                print(f"---" * 13)
             else:
                 print(f"Skill '{name}' not found.")
 

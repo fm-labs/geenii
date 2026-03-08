@@ -9,7 +9,7 @@ from starlette.websockets import WebSocket, WebSocketState
 from geenii.chat.chat_bots import BotRunner
 from geenii.chat.chat_manager import ChatManager
 from geenii.chat.chat_models import WireMessage, ChatMessage, ContentPart, SystemMessage
-from geenii.core.core_tools import display_desktop_notification
+from geenii.core.tools import display_desktop_notification
 from geenii.datamodels import ModelMessage
 from geenii.g import get_bot
 

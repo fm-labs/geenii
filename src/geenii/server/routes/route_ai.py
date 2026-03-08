@@ -10,7 +10,7 @@ from geenii.ai import enumerate_models
 from geenii.chat.chat_models import TextContent
 from geenii.datamodels import CompletionErrorResponse, CompletionRequest, CompletionResponse, ChatCompletionRequest, \
     ChatCompletionResponse, ImageGenerationApiResponse, \
-    ImageGenerationApiRequest, AudioGenerationApiRequest, AudioGenerationApiResponse, AudioTranscriptionApiRequest, \
+    ImageGenerationApiRequest, AudioGenerationApiRequest, AudioSpeechGenerationApiResponse, AudioTranscriptionApiRequest, \
     AudioTranscriptionApiResponse, AudioTranslationApiResponse, AudioTranslationApiRequest, AIModelInfo, ModelMessage
 from geenii.config import DATA_DIR, DEFAULT_AUDIO_TRANSCRIPTION_MODEL
 from geenii.memory import FileChatMemory
@@ -101,7 +101,7 @@ async def generate_image(request: ImageGenerationApiRequest) -> ImageGenerationA
 
 # AUDIO GENERATION - TEXT-TO-SPEECH
 @router.post("/audio/speech")
-async def generate_speech(request: AudioGenerationApiRequest) -> AudioGenerationApiResponse | CompletionErrorResponse:
+async def generate_speech(request: AudioGenerationApiRequest) -> AudioSpeechGenerationApiResponse | CompletionErrorResponse:
     """
     Generate speech from text using the specified AI provider and model.
     """

@@ -6,26 +6,9 @@ import shlex
 
 from geenii.config import DATA_DIR
 from geenii.sandbox import run_docker_sandbox_python
-from geenii.tools import ToolRegistry
+from geenii.tool.registry import ToolRegistry
 
 geenii_tools = ToolRegistry()
-
-# @geenii_tools.tool()
-# def noop():
-#     """A no-operation tool that does nothing."""
-#     pass
-
-
-# @geenii_tools.tool()
-# def echo(message: str) -> str:
-#     """
-#     A simple echo function that returns the input message.
-#
-#     :param message: The message to echo.
-#     :return: The echoed message.
-#     """
-#     return f"Echo: {message}"
-
 
 @geenii_tools.tool()
 def file_exists(file_path: str) -> bool:
@@ -35,7 +18,6 @@ def file_exists(file_path: str) -> bool:
     :param file_path: The path to the file to check.
     :return: True if the file exists, False otherwise.
     """
-    import os
     return os.path.isfile(file_path)
 
 
@@ -140,6 +122,9 @@ def execute_python(script_path: str, args: str = '', skill: str | None = None) -
     """
     print(">Executing Python script with path:", script_path, "and args:", args)
 
+    # replace environment variables in the script path and args
+    script_path = os.path.expandvars(script_path)
+    args = os.path.expandvars(args)
 
     script_dir = os.path.dirname(script_path)
     script_name = os.path.basename(script_path)

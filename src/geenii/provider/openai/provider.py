@@ -14,7 +14,7 @@ from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, Ch
     ChatCompletionResponse, AIModelInfo, AudioTranscriptionApiResponse
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider, \
     AIImageGeneratorProvider, AIAudioTranscriptionProvider
-from geenii.tools import ToolRegistry
+from geenii.tool.registry import ToolRegistry
 from geenii.utils.json_util import write_json
 
 logger = logging.getLogger(__name__)
