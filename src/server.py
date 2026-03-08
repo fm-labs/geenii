@@ -1,8 +1,7 @@
+import logging
 import os
 import shlex
-import uuid
 from contextlib import asynccontextmanager
-import logging
 
 import dotenv
 import uvicorn
@@ -14,17 +13,16 @@ from starlette.responses import JSONResponse
 
 from geenii.apps import AppRegistry
 from geenii.chat.chat_server_ctx import ChatServerState
-
-from geenii.config import APP_VERSION, DATA_DIR, GEENII_BIN
+from geenii.config import APP_VERSION, DATA_DIR
 from geenii.datamodels import Problem
-from geenii.scheduler import Scheduler, ScheduledTask
+from geenii.scheduler import Scheduler
 # from geenii.server.middleware.proxy_middleware import ProxyMiddleware
 # from geenii.server.middleware.request_logger_middleware import RequestLoggerMiddleware
 from geenii.server.router import app_router
-from geenii.tools import init_builtin_tools, init_mcp_server_tools
+from geenii.skills import SkillRegistry
 from geenii.supervisor import Supervisor, ProcConfig
 from geenii.tool.registry import ToolRegistry
-from geenii.skills import SkillRegistry
+from geenii.tools import init_builtin_tools, init_mcp_server_tools
 
 # logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logging.basicConfig(
@@ -57,13 +55,15 @@ async def initialize_tool_registry():
 async def initialize_supervisor():
     print("Initializing supervisor...")
     supervisor = Supervisor()
-    # await supervisor.ensure("geenii_startup", ProcConfig(name="geenii_startup", cmd=["/bin/bash", "-c", "echo 'Geenii API Server Started'; echo `date` >> data/startup.log"], restart=False))
-    await supervisor.ensure("geenii_beat", ProcConfig(name="geenii_beat", cmd=["/bin/bash", "-c", "while true; do echo `date`; sleep 30; done"]))
+    await supervisor.ensure("geenii_startup", ProcConfig(name="geenii_startup", restart=False, cmd=["/bin/bash", "-c", "echo 'Geenii API Server Started'"]))
+    await supervisor.ensure("geenii_pulse", ProcConfig(name="geenii_pulse", restart=True, cmd=["/bin/bash", "-c", "while true; do echo `date`; sleep 60; done"]))
 
-    # GEENII_BIN=os.getenv("GEENII_BIN", "uv run src/cli.py")
-    # cmd = shlex.split(GEENII_BIN)
-    # cmd += ["agents", "ask", "--name", "radio-bot", "'What is the current playing song on FM4?'"]
-    # await supervisor.ensure("geenii_agent_test", ProcConfig(name="geenii_agent_test", cmd=cmd, restart=False))
+    # register a self-diagnostics proc on startup
+    GEENII_BIN=os.getenv("GEENII_BIN", "uv run src/cli.py")
+    cmd = shlex.split(GEENII_BIN)
+    cmd += ["info"]
+    await supervisor.ensure("geenii_self_diagnostics", ProcConfig(name="geenii_self_diagnostics", restart=False, cmd=cmd))
+
     return supervisor
 
 
@@ -73,23 +73,12 @@ async def initialize_scheduler(supervisor: Supervisor):
     scheduler.load_config(f"{DATA_DIR}/scheduler.json")
     await scheduler.start()
 
-    # def hello():
-    #     print("Hello from the scheduled task!")
+    # async def enqueue_agent_proc(*args):
+    #     name = f"agent-test-{uuid.uuid4().hex[:6]}"
+    #     cmd = shlex.split(GEENII_BIN)
+    #     cmd += ["agents", "ask", "--name", "geenii:core", "Are you self-aware?"]
+    #     await supervisor.ensure(name, ProcConfig(name="geenii_core_awareness_check", cmd=cmd, restart=False))
     #
-    async def enqueue_agent_proc(*args):
-        name = f"agent-test-{uuid.uuid4().hex[:6]}"
-        print("Enqueueing agent proc with GEENII_BIN:", GEENII_BIN)
-        cmd = shlex.split(GEENII_BIN)
-        cmd += ["agents", "ask", "--name", "radio-bot", "'What is the current playing song on FM4?'"]
-        await supervisor.ensure(name, ProcConfig(name="geenii_agent_test", cmd=cmd, restart=False))
-
-    # await scheduler.add_task(ScheduledTask(
-    #     name="hello_task",
-    #     cron="* * * * *",  # every minute
-    #     module="",
-    #     run_fn=hello,
-    # ))
-
     # await scheduler.add_task(ScheduledTask(
     #     name="geenii_agent_test_proc_task",
     #     cron="* * * * *",  # every 5 minutes

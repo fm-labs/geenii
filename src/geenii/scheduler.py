@@ -15,14 +15,13 @@ Config file format (tasks.json):
             {
                 "name": "cleanup",
                 "cron": "0 * * * *",
-                "module": "geenii.tasks.cleanup"
+                "module": "geenii.tasks.cleanup",
+                "args": ["--force"],
+                "env": {"ENV_VAR": "value"},
+                "oneshot": false
             }
         ]
     }
-
-Usage:
-    python scheduler.py                  # uses tasks.json
-    python scheduler.py my_tasks.json    # uses custom config path
 """
 
 from __future__ import annotations
@@ -41,11 +40,14 @@ from typing import Any, Callable
 import pydantic
 from croniter import croniter
 
+from geenii.logging import get_rotating_file_log_handler
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-logger = logging.getLogger("scheduler")
+logger = logging.getLogger(__name__)
+logger.addHandler(get_rotating_file_log_handler("scheduler"))
 
 
 @dataclass

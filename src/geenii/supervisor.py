@@ -4,12 +4,21 @@ Process supervisor
 
 import asyncio
 import json
+import logging
 import os
 import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, List, Literal, Optional
 
+from geenii.logging import get_rotating_file_log_handler
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+logger.addHandler(get_rotating_file_log_handler("supervisor"))
 
 # ---------------------------------------------------------------------------
 # Internal state
@@ -459,7 +468,7 @@ class Supervisor:
         self._emit(name, "supervisor", msg)
 
     def _emit(self, name: str, tag: Tag, msg: str) -> None:
-        print(f"[{name}][{tag}] {msg}")
+        logger.info(f"[{name}][{tag}] {msg}")
         event = LogEvent(t=time.time(), name=name, tag=tag, msg=msg)
         self._logs.setdefault(name, LogBus()).append(event)
 
