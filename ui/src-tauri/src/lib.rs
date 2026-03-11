@@ -297,6 +297,37 @@ fn get_site_iframe_url(site_id: String) -> String {
     // format!("http://geenii.localhost/{}/index.html", site_id)
 }
 
+#[tauri::command]
+fn create_task(input: String) -> Result<(), String> {
+    println!("create_task called: input={input}");
+    // TODO
+    Ok(())
+}
+
+fn open_create_task_window(app: &tauri::AppHandle) -> tauri::Result<()> {
+    // If already open, just focus it
+    if let Some(window) = app.get_webview_window("create-task") {
+        window.show()?;
+        window.set_focus()?;
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(
+        app,
+        "create-task",
+        WebviewUrl::App("create-task.html".into()),
+    )
+        .title("Create task")
+        .inner_size(520.0, 150.0)
+        //.decorations(false)
+        .resizable(false)
+        .always_on_top(true)
+        //.skip_taskbar(true)
+        .build()?;
+
+    Ok(())
+}
+
 
 #[cfg(desktop)]
 pub fn run() {
@@ -306,9 +337,9 @@ pub fn run() {
         //.plugin(tauri_plugin_autostart::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![
-            execute_command,
-        ])
+        // .invoke_handler(tauri::generate_handler![
+        //     execute_command,
+        // ])
         .manage(ServerProcess(std::sync::Mutex::new(None)))
         .setup(|app| {
             // PATHS
@@ -316,8 +347,14 @@ pub fn run() {
             ensure_paths(app)?;
 
             // TRAY MENU
-            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit_i])?;
+            let create_task_item =
+                MenuItem::with_id(app, "create-task", "Create task", true, None::<&str>)?;
+            let show_item =
+                MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
+            let quit_item =
+                MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+
+            let menu = Menu::with_items(app, &[&show_item, &create_task_item, &quit_item])?;
 
             //let tray_icon = Image::from_bytes(include_bytes!("../icons/icon.icns"));
             let tray_icon = Image::from_path("icons/32x32.png").expect("Failed to load tray icon");
@@ -326,8 +363,18 @@ pub fn run() {
                 .tooltip("Ask geenii")
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
+                    "create-task" => {
+                        if let Err(err) = open_create_task_window(app) {
+                            eprintln!("failed to open create-task window: {err}");
+                        }
+                    }
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
                     "quit" => {
-                        println!("quit menu item was clicked");
                         app.exit(0);
                     }
                     _ => {
@@ -373,7 +420,7 @@ pub fn run() {
             }
         })
         .manage(Sites::default())
-        .invoke_handler(tauri::generate_handler![register_site_root, register_app, open_site_window, get_site_iframe_url])
+        .invoke_handler(tauri::generate_handler![register_site_root, register_app, open_site_window, get_site_iframe_url, create_task])
         .register_uri_scheme_protocol("geenii", |ctx, request| {
             let app = ctx.app_handle();
             let sites = app.state::<Sites>();

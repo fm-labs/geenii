@@ -13,11 +13,11 @@
     "windows": [
       {
         "title": "geenii",
-        "width": 1024,
-        "height": 768,
+        "width": 1200,
+        "height": 800,
         "resizable": true,
-        "decorations": false,
-        "transparent": true
+        "decorations": true,
+        "transparent": false
       }
     ],
     "security": {
