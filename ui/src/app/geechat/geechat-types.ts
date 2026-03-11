@@ -1,10 +1,10 @@
 export type ChatMessage = {
-  id: string;
+  id?: string;
   type: 'message'
   room_id: string
   sender_id: string
   content: ContentPart[]
-  created_at: number // timestamp in milliseconds
+  created_at?: number // timestamp in milliseconds
 }
 
 type TextContent = {

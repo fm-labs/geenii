@@ -183,8 +183,8 @@ function JsonCard({ part }) {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-3 py-2">
-            <ScrollArea className="max-h-48">
-              <pre className="font-mono text-[11px] text-foreground leading-relaxed whitespace-pre-wrap break-all">
+            <ScrollArea className="max-h-48 overflow-hidden">
+              <pre className="font-mono text-left text-[11px] text-foreground leading-relaxed whitespace-pre-wrap break-all max-h-[400px] overflow-y-scroll">
                 {JSON.stringify(part.data, null, 2)}
               </pre>
             </ScrollArea>

@@ -1,6 +1,6 @@
 import React from 'react'
 import { XAI_API_URL } from '@/constants.ts'
-import { BotIcon, MessageCircleIcon } from 'lucide-react'
+import { BotIcon, BrainIcon, MessageCircleIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import Popup from '@/components/Popup.tsx'
@@ -14,6 +14,7 @@ const AgentCard = ({ agent }: { agent: AgentType }) => {
         <div className={"flex flex-row items-center justify-start mb-2 space-x-2"}>
           <BotIcon size={42} />
           <h3 className={"font-bold"}>{agent.name}</h3>
+          <p className={"text-sm text-muted-foreground"}><span>🧠</span> {agent?.model}</p>
         </div>
         <p className={""}>{agent?.description}</p>
       </div>
