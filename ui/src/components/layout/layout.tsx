@@ -1,18 +1,16 @@
 import React, { PropsWithChildren } from 'react'
 import {
   BotIcon,
-  SlidersHorizontalIcon,
 } from 'lucide-react'
 import {
-  APP_NAME,
   FEATURE_AGENTS_ENABLED, FEATURE_APPS_ENABLED,
   FEATURE_CHAT_ENABLED,
   FEATURE_COMPLETION_ENABLED,
   FEATURE_FLOWS_ENABLED,
-  FEATURE_MCP_ENABLED,
-  FEATURE_SETTINGS_ENABLED,
-  FEATURE_TOOLS_ENABLED,
+  FEATURE_MESSAGE_INBOX_ENABLED,
+  FEATURE_SETTINGS_ENABLED, FEATURE_TAURI_TITLEBAR_ENABLED,
 } from '@/constants.ts'
+import MessageInbox from '@/components/layout/message-inbox.tsx'
 
 const SHOW_NAV_MENU = true
 
@@ -22,8 +20,8 @@ const Layout = (props: PropsWithChildren) => {
 
   return (
     <div>
-      <header className={"fixed top-0 left-0 w-full border-b shadow-md z-1000 p-2 bg-black"}>
-        <div className={"flex flex-row w-full justify-between items-center max-w-7xl px-4 mx-auto"}>
+      <header className={`fixed top-0 left-0 w-full border-b shadow-md z-1000 p-2 bg-black ${FEATURE_TAURI_TITLEBAR_ENABLED ? 'pt-8' : ''}`}>
+        <div className={"flex flex-row w-full justify-between items-center _max-w-7xl px-4 mx-auto"}>
           <div className={"flex flex-row"}>
             <a href="#/"><BotIcon color={'#FFF'} /></a>
             {/*<span className="ml-2 font-bold text-lg">
@@ -40,12 +38,13 @@ const Layout = (props: PropsWithChildren) => {
               {/*FEATURE_MCP_ENABLED && <li className={navItemStyle}><a href="#/mcp">MCP</a></li>*/}
               {FEATURE_APPS_ENABLED && <li className={navItemStyle}><a href="#/apps">Apps</a></li>}
               {FEATURE_FLOWS_ENABLED && <li className={navItemStyle}><a href="#/flows">Flows</a></li>}
+              {FEATURE_SETTINGS_ENABLED && <li className={navItemStyle}><a href="#/settings">Settings</a></li>}
             </ul>}
           </div>
           <div className={"flex flex-row"}>
             {/*<SettingsIcon />*/}
-            {FEATURE_SETTINGS_ENABLED && <a href="#/settings"><SlidersHorizontalIcon /></a>}
             {/*<UserIcon />*/}
+            {FEATURE_MESSAGE_INBOX_ENABLED && <MessageInbox pollInterval={30_000} />}
           </div>
         </div>
       </header>
