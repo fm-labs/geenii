@@ -38,37 +38,37 @@ pub struct ServerState {
 //     }
 // }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct CommandResult {
-    success: bool,
-    stdout: String,
-    stderr: String,
-    exit_code: Option<i32>,
-}
-
-// Basic command execution
-#[tauri::command]
-async fn execute_command(
-    app: AppHandle,
-    command: String,
-    args: Vec<String>,
-) -> Result<CommandResult, String> {
-    let shell = app.shell();
-
-    let output = shell
-        .command(command)
-        .args(args)
-        .output()
-        .await
-        .map_err(|e| format!("Failed to execute command: {}", e))?;
-
-    Ok(CommandResult {
-        success: output.status.success(),
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        exit_code: output.status.code(),
-    })
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// struct CommandResult {
+//     success: bool,
+//     stdout: String,
+//     stderr: String,
+//     exit_code: Option<i32>,
+// }
+//
+// // Basic command execution
+// #[tauri::command]
+// async fn execute_command(
+//     app: AppHandle,
+//     command: String,
+//     args: Vec<String>,
+// ) -> Result<CommandResult, String> {
+//     let shell = app.shell();
+//
+//     let output = shell
+//         .command(command)
+//         .args(args)
+//         .output()
+//         .await
+//         .map_err(|e| format!("Failed to execute command: {}", e))?;
+//
+//     Ok(CommandResult {
+//         success: output.status.success(),
+//         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+//         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+//         exit_code: output.status.code(),
+//     })
+// }
 
 #[cfg(desktop)]
 pub fn check_all_tauri_paths(app_handle: &AppHandle) -> Vec<bool> {
@@ -356,8 +356,8 @@ pub fn run() {
 
             let menu = Menu::with_items(app, &[&show_item, &create_task_item, &quit_item])?;
 
-            //let tray_icon = Image::from_bytes(include_bytes!("../icons/icon.icns"));
-            let tray_icon = Image::from_path("icons/32x32.png").expect("Failed to load tray icon");
+            let tray_icon = Image::from_bytes(include_bytes!("../icons/32x32.png")).expect("Failed to load tray icon");
+            //let tray_icon = Image::from_path("icons/32x32.png").expect("Failed to load tray icon");
             let _tray = TrayIconBuilder::new()
                 .icon(tray_icon)
                 .tooltip("Ask geenii")
