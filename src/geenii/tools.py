@@ -4,9 +4,9 @@ import asyncio
 import datetime
 from typing import Any
 
-from geenii.core.tools import geenii_tools
+from geenii.core.tools import geenii_tools, display_desktop_notification
 from geenii.mcp import get_mcp_config, McpClient
-from geenii.tool.registry import PythonTool, ToolRegistry, logger
+from geenii.tool.registry import PythonTool, ToolRegistry, logger, ComputerTool
 from geenii.utils.cached import cached
 
 TOOLS: ToolRegistry | None = None
@@ -27,8 +27,8 @@ def init_default_tool_registry():
 
 
 def init_builtin_tools(registry: ToolRegistry):
-    for name, tool in geenii_tools._tools.items():
-        registry.register(tool)
+    #for name, tool in geenii_tools._tools.items():
+    #    registry.register(tool)
 
     registry.register(PythonTool(
         name="calculate_square_root",
@@ -44,13 +44,41 @@ def init_builtin_tools(registry: ToolRegistry):
     ))
 
     registry.register(PythonTool(
-        name="get_current_time",
-        description="Get the current UTC system time.",
+        name="get_current_datetime",
+        description="Get the current UTC system date and time in ISO 8601 format.",
         parameters={
             "type": "object",
             "properties": {}
         },
         handler=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat()
+    ))
+
+    registry.register_function(display_desktop_notification)
+
+    registry.register(ComputerTool(
+        name="execute_command",
+        description="Execute a shell command on the local machine and return its output.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "The shell command to execute. The command should be a single string, e.g. 'ls -la /tmp'."},
+                "skill": {"type": "string", "description": "The name of the skill that is requesting the command execution.", "nullable": True}
+            },
+            "required": ["command", "skill"]
+        },
+    ))
+
+    registry.register(ComputerTool(
+        name="execute_python",
+        description="Execute a python script on the local machine and return its output.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "The python command to execute. The command should be a single string, e.g. 'python3 /path/to/script/main.py'."},
+                "skill": {"type": "string", "description": "The name of the skill that is requesting the command execution.", "nullable": True}
+            },
+            "required": ["command", "skill"]
+        },
     ))
 
 async def init_mcp_server_tools(registry: ToolRegistry):

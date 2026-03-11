@@ -198,6 +198,8 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                 for content_item in message.content:
                     if content_item.type == "text":
                         input_messages.append({"role": message.role, "content": content_item.text})
+                    elif content_item.type == "json":
+                        input_messages.append({"role": message.role, "content": json.dumps(content_item.data)})
                     elif content_item.type == "tool_call":
                         input_messages.append({
                             "type": "function_call",
@@ -307,7 +309,8 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             prompt=prompt,
             output=output_parts,
             output_text=model_result.output_text,
-            model_result=model_result.model_dump()
+            model_result=model_result.model_dump(),
+            usage=usage
         )
 
     def generate_audio_transcription(self, model: str, audio: bytes | str, **kwargs) -> AudioTranscriptionApiResponse:

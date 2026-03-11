@@ -67,10 +67,18 @@ def execute_command(command: str, skill: str | None = None) -> str:
         #    working_directory = skill_dir
         _env.update({"SKILL_NAME": skill, "SKILL_DIR": skill_dir})
 
+    # Special handling of python commands to run them in a sandboxed environment
+    # if command.startswith("python3 ") or command.startswith("python "):
+    #     parts = shlex.split(command)
+    #     script_path = parts[1]
+    #     args = " ".join(parts[2:])
+    #     return execute_python(script_path=script_path, args=args, skill=skill)
+
+
     use_supervisor = os.environ.get("USE_SUPERVISOR", "false").lower()  == "true"
     async def run_with_supervisor(cmd, env, cwd):
         #supervisor = g.SUPERVISOR
-        name = f"adhoc-{skill or 'unknown'}-{uuid.uuid4().hex}"
+        name = f"execute-command-{uuid.uuid4().hex}"
         #await supervisor.ensure(name, ProcConfig(name=name,cmd=cmd, env=env, cwd=cwd, restart=False))
         #await supervisor.run(cmd=cmd, env=env, cwd=cwd)
         print(f">Supervisor command return code: {result.returncode}")
@@ -110,14 +118,14 @@ def execute_applescript(script: str) -> str:
 
     return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
 
+
 @geenii_tools.tool()
-def execute_python(script_path: str, args: str = '', skill: str | None = None) -> str:
+def execute_python(script_path: str, args: str = '') -> str:
     """
     Execute a Python script and return its output.
 
     :param script_path: The path to the Python script to execute.
     :param args: Additional arguments to pass to the Python script as a single string, e.g. "--option value".
-    :param skill: The name of the skill that is requesting the command execution, used for context and potential sandboxing.
     :return: The output of the command as a string.
     """
     print(">Executing Python script with path:", script_path, "and args:", args)
@@ -172,9 +180,13 @@ def display_desktop_notification(message: str, title: str = "Message from Geenii
     #command = f"""osascript -e 'display notification "{message}" with title "{title}"'"""
     command = f"""osascript -e 'display dialog "{message}" with title "{title}"'"""
     print(">Displaying desktop notification with command:", command)
-    subprocess.run(command, shell=True)
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    print(f">Executed notification command: {command}")
+    print(f">Return code: {result.returncode}")
+    print(f">Standard output: {result.stdout}")
+    print(f">Standard error: {result.stderr}")
 
-    return "Notification sent."
+    return f"Notification sent: {title} - {message}" if result.returncode == 0 else f"Failed to send notification: {result.stderr.strip()}"
 
 
 @geenii_tools.tool()

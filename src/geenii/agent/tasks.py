@@ -1,14 +1,16 @@
 import asyncio
-from typing import AsyncGenerator, Set
 import logging
+from datetime import datetime
+from typing import AsyncGenerator, Set
 
 from geenii.agent.base import BaseAgentTask, BaseTask, message_to_prompt
+from geenii.agent.utils import estimate_token_count
 from geenii.ai import generate_chat_completion
 from geenii.chat.chat_models import UserInteractionContent, ToolCallResultContent, ContentPart, TextContent, \
     ToolCallContent, JsonContent
 from geenii.datamodels import ModelMessage, ChatCompletionRequest
+from geenii.g import init_agent_registry, init_agent_by_name
 from geenii.tool.registry import ToolRegistry
-from geenii.tools import execute_tool_call
 from geenii.utils.json_util import parse_json_safe
 
 logger = logging.getLogger(__name__)
@@ -24,6 +26,7 @@ class ToolCallTask(BaseAgentTask):
         tool_name = self.tool_name
         arguments = self.arguments
         call_id = self.call_id
+        selected_skill = self.agent.selected_skill
 
         # yield a message, requesting approval for the tool call before executing it
         tool_usage_request_message = ModelMessage(role="assistant", content=[
@@ -48,7 +51,18 @@ class ToolCallTask(BaseAgentTask):
 
         logger.info(f"Calling tool {tool_name} with arguments {arguments}")
         try:
-            tool_result = await execute_tool_call(self.agent.tools, tool_name=tool_name, args=arguments)
+            #tool_result = await execute_tool_call(self.agent.tools, tool_name=tool_name, args=arguments)
+            tool = self.agent.tools.get(tool_name)
+            if tool is None:
+                raise ValueError(f"Tool {tool_name!r} is not registered")
+            #logger.info(f'EXECUTING TOOL "{tool_name}" with args {arguments}')
+
+            tool_env = {
+                "SKILL_NAME": selected_skill or "",
+                "SKILL_DIR": f"{self.agent.skills.get(selected_skill).path}" if selected_skill else "",
+            }
+            tool_result = await tool.invoke(args=arguments, env=tool_env)
+
             logger.info(f"Tool {tool_name} returned result: {tool_result}")
         except Exception as e:
             logger.exception(f"Error executing tool {tool_name}", exc_info=e)
@@ -62,6 +76,8 @@ class ToolCallTask(BaseAgentTask):
 class LLMTask(BaseAgentTask):
     """Generate LLM chat completion response in the current context. Handles tool calls"""
 
+    MAX_TOOL_CALLS = 5  # to prevent infinite loops of tool calls
+
     def __init__(self, agent: "BaseAgent", message: str | list[ContentPart], allowed_tools: Set[str] | None = None):
         super().__init__(agent)
         self.message = message
@@ -73,74 +89,88 @@ class LLMTask(BaseAgentTask):
         full_system_prompt = self._build_system_prompt()
         # print(full_system_prompt)
         prompt = message_to_prompt(self.message)
-        # allowed_tools = set(self._tool_registry.list_tool_names())
-        # allowed_tools = self.agent.allowed_tools.intersection(set(self.agent.tools.list_tool_names()))
         allowed_tools = self.allowed_tools
-        input_messages = list(
-            self.agent.message_history[-10:])  # snapshot of the current message history (last 10 messages)
+        input_messages = list(self.agent.message_history[-10:]) # message history (max 10 messages)
 
         # run sync task in thread pool to avoid blocking the event loop while waiting for the response
         request = ChatCompletionRequest(prompt=prompt,
                                         model=self.agent.model,
                                         system=full_system_prompt,
-                                        messages=input_messages,  # snapshot of the current message history
+                                        messages=input_messages,
                                         tools=allowed_tools,
                                         context_id=self.agent.context_id
                                         )
         response = await asyncio.to_thread(self._request_completion, request)
         logger.info(f"Received model response for prompt '{prompt}' with {len(response.output)} content parts.")
 
-        # iterate the response content and yield messages for tool calls and the final response
-        # out_parts = []
-        # requested_tool_calls = []
-        # for content in response.output:
-        #     if isinstance(content, ToolCallContent):
-        #         requested_tool_calls.append(content)
-        #     else:
-        #         out_parts.append(content)
-        #
-        # if len(out_parts) > 0:
-        #     bot_message = ModelMessage(role="assistant", content=out_parts)
-        #     self.agent.message_history.append(bot_message)
-        #     yield bot_message
-        #
-        # tool_calls = 0
-        # for tool_call in requested_tool_calls:
-        #     tool_calls += 1
-        #
-        #     tool_task = ToolCallTask(agent=self.agent, tool_name=tool_call.name, arguments=tool_call.arguments, call_id=tool_call.call_id)
-        #     async for msg in tool_task.execute():
-        #         if isinstance(msg.content[0], ToolCallResultContent):
-        #             result = msg.content[0].result
-        #             if isinstance(result, dict) and "error" in result:
-        #                 out_parts.append(TextContent(text=f"Error executing tool {tool_call.name}: {result['error']}"))
-
         # add user request to message history
-        user_message = ModelMessage(role="user", content=[TextContent(text=prompt)])
-        self.agent.message_history.append(user_message)
+        if prompt and len(prompt.strip()) > 0:
+            user_message = ModelMessage(role="user", content=[TextContent(text=prompt)])
+            self.agent.message_history.append(user_message)
 
         # add model response to message history
         bot_message = ModelMessage(role="assistant", content=response.output)
         self.agent.message_history.append(bot_message)
 
-        # yield the output message
+        # yield the model response message
         yield bot_message
 
-        tool_calls = 0
-        for item in response.output:
-            # handle tool calls
-            if isinstance(item, ToolCallContent):
-                tool_calls += 1
-                # enqueue tool call for processing and yield a placeholder message until the tool result is available
-                await self.agent.enqueue_task(
-                    ToolCallTask(self.agent, tool_name=item.name, arguments=item.arguments, call_id=item.call_id))
+        # handle tools calls
+        tools_called = 0
+        while True:
+            tool_call_contents = [content for content in response.output if isinstance(content, ToolCallContent)]
+            logger.warning(f"Detected {len(tool_call_contents)} tool calls in the model response.")
+            if len(tool_call_contents) < 1:
+                if tools_called == 0:
+                    logger.info("No tool calls detected in the model response. Proceeding to yield the final response.")
+                break  # no tool calls, we can proceed without re-generating the response.
 
-        # if there were tool calls, we can optionally trigger a follow-up action,
-        # e.g. by enqueuing another task to process the tool results or to ask the LLM for the next step based on the tool results.
-        if tool_calls > 0:
+            if tools_called > self.MAX_TOOL_CALLS:
+                logger.error(f"Too many tool calls detected in the response. Stopping further processing to avoid infinite loops.")
+                yield ModelMessage(role="assistant", content=[TextContent(text=f"Error: Too many tool calls detected in the response. Stopping further processing.")])
+                break
+
+            # handle the first tool call in the response and then re-generate the response based on the tool result,
+            # until there are no more tool calls in the response
+            tool_call = tool_call_contents.pop(0)
+            logger.warning(f"Next tool call to process: {tool_call.name} with arguments {tool_call.arguments} and call ID {tool_call.call_id}")
+            tool_task = ToolCallTask(agent=self.agent, tool_name=tool_call.name, arguments=tool_call.arguments, call_id=tool_call.call_id)
+            tool_result = None
+            async for msg in tool_task.execute():
+                if isinstance(msg, ModelMessage) and isinstance(msg.content[0], ToolCallResultContent):
+                    tool_result = msg.content[0].result
+                    # add the tool result to the message history so that it can be used as context for the next response generation
+                    self.agent.message_history.append(msg)
+                else:
+                    # if the tool task yields any other messages (e.g. user interaction requests), we yield them immediately
+                    # todo: add to message history as well?
+                    yield msg
+
+            tools_called += 1
+            if tool_result is not None:
+                # re-generate the response based on the tool result
+                tool_result_message = ModelMessage(role="assistant", content=[TextContent(text=f"Tool '{tool_call.name}' returned result: {tool_result}")])
+                self.agent.message_history.append(tool_result_message)
+
+                # now we can re-generate the response based on the original prompt and the updated message history that includes the tool result
+                request.prompt = ""
+                request.messages = list(self.agent.message_history[-((tools_called*2) + 3):])  # snapshot of the updated message history
+                response = await asyncio.to_thread(self._request_completion, request)
+                logger.info(f"Received model response for prompt '{prompt}' after tool call with {len(response.output)} content parts.")
+            else:
+                logger.error(f"Tool call {tool_call.name} did not return a valid result. Skipping re-generation of the response.")
+                yield ModelMessage(role="assistant", content=[TextContent(text=f"Tool '{tool_call.name}' did not return a valid result.")])
+                break  # if the tool call did not return a valid result, we stop the process to avoid infinite loops
+
+        # if there were tool calls, trigger a follow-up action,
+        # to ask the LLM for the next step based on the tool results.
+        if tools_called > 0:
             logger.info(
-                f"{tool_calls} tool calls were made in the response. Enqueuing follow-up task to process tool results.")
-            await self.agent.enqueue_task(FinalizeTask(self.agent))
+                f"{tools_called} tool calls were made in the response. Enqueuing follow-up task to process tool results.")
+            #await self.agent.enqueue_task(FinalizeTask(self.agent))
+            await self.agent.enqueue_task(LLMTask(self.agent,
+                          message="Based on the tool results, continue processing the original prompt and provide the next response.",
+                          allowed_tools=allowed_tools))
 
     def _request_completion(self, request):
         response = generate_chat_completion(request=request, tool_registry=self.agent.tools, )
@@ -150,7 +180,12 @@ class LLMTask(BaseAgentTask):
         """
         Build the full system prompt for the agent, including the base system prompt and any additional information from loaded skills.
         """
-        system_prompts = [self.agent.system_prompt]
+        current_datetime = datetime.now().isoformat()
+        agent_context_info = "\n".join(["CONTEXT INFORMATION:",
+                          f"Current conversation context ID: {self.agent.context_id}",
+                          f"Current date and time: {current_datetime}"])
+
+        system_prompts = [self.agent.system_prompt, agent_context_info]
         skills_prompts = self._build_skills_prompt()
         system_prompts.extend(skills_prompts)
         return system_prompts
@@ -176,15 +211,15 @@ class LLMTask(BaseAgentTask):
         return skills_prompts
 
 
-class FinalizeTask(BaseAgentTask):
-    def __init__(self, agent: "BaseAgent"):
-        super().__init__(agent)
-
-    async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
-        #yield ModelMessage(role="assistant",
-        #                   content=[TextContent(text=f"Finalizing response after processing tool results.")])
-        yield LLMTask(self.agent, message="Based on the previous outputs generate a final response",
-                      allowed_tools=set())
+# class FinalizeTask(BaseAgentTask):
+#     def __init__(self, agent: "BaseAgent"):
+#         super().__init__(agent)
+#
+#     async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
+#         #yield ModelMessage(role="assistant",
+#         #                   content=[TextContent(text=f"Finalizing response after processing tool results.")])
+#         yield LLMTask(self.agent, message="Based on the tool results, continue processing the original prompt and provide the next response.",
+#                       allowed_tools=set())
 
 
 class ToolFilterTask(BaseAgentTask):
@@ -339,9 +374,9 @@ class FindBestAgentTask(BaseAgentTask):
             if agent.name == "default":
                 continue  # skip default agent
             description = agent.description or "No description available."
-            tools = ",".join(agent.tools) if agent.tools else "No tools"
-            skills = ",".join(agent.skills) if agent.skills else "No special skills"
-            agent_info = f"{agent.name}: {description} using {tools}"
+            tools = ", ".join(agent.tools) if agent.tools else "No tools"
+            skills = ", ".join(agent.skills) if agent.skills else "No special skills"
+            agent_info = f"{agent.name}: {description} using Tools: {tools}"
             available_agents.append(agent_info)
         agents_str = "\n - ".join(available_agents)
 
@@ -420,9 +455,10 @@ class FindBestSkillTask(BaseAgentTask):
         "additionalProperties": False
     }
 
-    def __init__(self, agent: "BaseAgent", prompt: str):
+    def __init__(self, agent: "BaseAgent", prompt: str, suggested: str | None = None):
         super().__init__(agent)
         self.prompt = prompt
+        self.suggested = suggested # pre-selected skills
 
     async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
 
@@ -437,6 +473,12 @@ class FindBestSkillTask(BaseAgentTask):
             #    text=f"Only one skill available. Selected skill: {selected_skill}.")])
             self.agent.selected_skill = selected_skill
             logger.info("Selected skill the only skill: %s", selected_skill)
+            return
+
+        if self.suggested and len(self.suggested) == 1:
+            selected_skill = self.suggested[0]
+            self.agent.selected_skill = selected_skill
+            logger.info("Selected skill from pre-selection: %s", selected_skill)
             return
 
         available_skills = []
@@ -496,26 +538,23 @@ class PlanTask(BaseAgentTask):
 
     SYSTEM_PROMPT = """
 You are an expert planner agent. Your task is to create a clear, step-by-step plan to accomplish a complex task based on the user's request and the conversation context.
-Rules:
+
+Workflow:
 1. Break down the task into clear, sequential steps.
-2. For each step, explicitly mention if any specific tools or skills are required to accomplish that step.
-3. Ensure the plan is actionable and can be executed step by step.
-4. Always respond with a structured plan in JSON format with the following shape:
+2. For each step, explicitly mention the skill to be used to accomplish that step. The steps MUST be in the list of skills available to the agent. If no special skill is required for a step, use "None" or leave empty.
+4. Ensure the plan is actionable and can be executed step by step.
+5. Always respond with a structured plan in JSON format with the following shape:
 {
   "plan": [
     {
       "step": "<description of the step>",
-      "tools": ["<tool_name>", ...],  // list of required tools for this step, can be empty if no tools are needed
-      "skills": ["<skill_name>", ...]  // list of required skills for this step, can be empty if no skills are needed
+      "skill": "<skill_name>"  // optional name of the required skill for this step, can be "None" or empty if no special skill is needed
     },
     ...
   ]
 }
 
-If the task is simple and does not require multiple steps, tools, or skills, you can return a plan with a single step that describes the action to be taken.
-
-AVAILABLE TOOLS:
-{{{tools_list}}}
+If the task is simple and does not require multiple steps, return a plan with a single step that describes the action to be taken.
 
 AVAILABLE SKILLS:
 {{{skills_list}}}
@@ -529,7 +568,15 @@ AVAILABLE SKILLS:
     def _build_tools_list(self) -> str:
         if not self.agent.tools or len(self.agent.tools.list_tool_names()) == 0:
             return "No tools available."
-        return "\n".join([f"- {tool_name}: {self.agent.tools.get(tool_name).description}" for tool_name in self.agent.tools.list_tool_names()])
+
+        enabled_tools_list = []
+        for tool_name in self.agent.tools.list_tool_names():
+            if tool_name in self.agent.allowed_tools:
+                enabled_tools_list.append(f"- {tool_name}: {self.agent.tools.get(tool_name).description} (enabled)")
+            else:
+                #enabled_tools_list.append(f"- {tool_name}: {self.agent.tools.get(tool_name).description} (disabled)")
+                pass  # skip disabled tools in the list to avoid confusion
+        return "\n".join(enabled_tools_list)
 
     def _build_skills_list(self) -> str:
         if not self.agent.skills or len(self.agent.skills.names()) == 0:
@@ -541,9 +588,15 @@ AVAILABLE SKILLS:
         skills_list = self._build_skills_list()
         system_prompt = self.SYSTEM_PROMPT.replace("{{{tools_list}}}", tools_list).replace("{{{skills_list}}}", skills_list)
 
+        print("***" * 10)
+        print(system_prompt)
+        print("***" * 10)
+        print(estimate_token_count(system_prompt, 1000))
+        print("***" * 10)
+
         request = ChatCompletionRequest(
             model=self.agent.model,
-            model_parameters={"temperature": 0.1, "max_tokens": 4096},
+            model_parameters={"temperature": 0.1, "max_tokens": 1024},
             system=[system_prompt],
             prompt=self.prompt,
             messages=[],
@@ -557,16 +610,9 @@ AVAILABLE SKILLS:
                             "type": "object",
                             "properties": {
                                 "step": {"type": "string"},
-                                "tools": {
-                                    "type": "array",
-                                    "items": {"type": "string"}
-                                },
-                                "skills": {
-                                    "type": "array",
-                                    "items": {"type": "string"}
-                                }
+                                "skill": {"type": "string"}
                             },
-                            "required": ["step", "tools", "skills"],
+                            "required": ["step"],
                             "additionalProperties": False
                         }
                     }
@@ -583,7 +629,27 @@ AVAILABLE SKILLS:
                 parsed = response.output[0].data
                 if parsed and "plan" in parsed and isinstance(parsed["plan"], list):
                     plan = parsed["plan"]
-                    yield ModelMessage(role="assistant", content=[JsonContent(data={"plan": plan})])
+                    #yield ModelMessage(role="assistant", content=[JsonContent(data={"plan": plan})])
+                    #self.agent.message_history.append(ModelMessage(role="assistant", content=[JsonContent(data={"plan": plan})]))
+
+                    # execute the plan step by step, yielding messages for each step and handling any required skills or tools
+                    for idx, item in enumerate(plan):
+                        step_description = item.get("step", "")
+                        suggested_skills = []
+                        skill = item.get("skill", None)
+                        if skill and skill.lower() != "none":
+                            suggested_skills.append(skill.lower())
+
+                        yield ModelMessage(role="assistant", content=[
+                            TextContent(text=f"Step {idx + 1}: {step_description} (suggested skill: {skill})")])
+
+                        # nevertheless, try to find the best skill, but we add the suggested skill as a hint in the prompt for the FindBestSkillTask
+                        yield FindBestSkillTask(self.agent,
+                                                prompt=f"For the following step in the plan: '{step_description}', select the best skill to accomplish this step from the available skills.",
+                                                suggested=suggested_skills)
+                        yield LLMTask(self.agent, message=f"Execute the step: '{step_description}' using the selected skill.")
+                        # todo tool suggestions for LLMTask
+
                 else:
                     logger.error("PlanTask: Invalid plan format in model response.")
             else:

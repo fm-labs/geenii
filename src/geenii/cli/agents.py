@@ -3,17 +3,21 @@ import asyncio
 import click
 
 from geenii.agents import Agent
+from geenii.cli.base import BaseCli
 from geenii.g import init_agent_registry
 from geenii.hidl import HumanInTheLoopController
-from geenii.chat.chat_models import TextContent
-from geenii.cli.base import BaseCli
 
 
 class CliHumanInTheLoopController(HumanInTheLoopController):
 
     async def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
-        click.secho(f"Tool execution requested: {tool_name} with arguments {arguments} (call_id={call_id})", fg="yellow")
-        response = click.prompt("Do you want to execute this tool? (y/n)", default="n")
+        click.secho(f"Tool execution requested: {tool_name} with arguments {arguments} (call_id={call_id})",
+                    fg="yellow")
+
+        #asyncio.create_task(asyncio.to_thread(
+        #    tts_say_cli(f"A tool call was requested: {tool_name} with {len(arguments)} arguments. Do you approve?")))
+
+        response = click.prompt("Do you approve? (y/n)", default="n")
         return response.lower() == "y"
 
 
@@ -22,11 +26,10 @@ class CliAgentRunner:
     def __init__(self, agent: Agent, interactive: bool = True):
         self.interactive = interactive
         self.agent = agent
-        #self.agent._hidl = CliHumanInTheLoopController()
+        # self.agent._hidl = CliHumanInTheLoopController()
 
         print("Bot initialized. Starting interaction...")
         print(agent)
-
 
     def run(self, prompt: str):
         asyncio.run(self._run(prompt))
@@ -65,11 +68,11 @@ class AgentsCli(BaseCli):
             for agent_name in self.agents.list_loaded():
                 click.echo(f"- {agent_name}")
 
-
         @agents.command(name="ask")
         @click.argument("prompt")
         @click.option("name", "--name", "-n", default="default", help="Name of the agent to run.")
-        @click.option("continue_conversation", "--continue", "-c", is_flag=True, help="Continue the conversation after the initial prompt.")
+        @click.option("continue_conversation", "--continue", "-c", is_flag=True,
+                      help="Continue the conversation after the initial prompt.")
         def ask_agent(prompt: str, name: str, continue_conversation: bool):
             """
             Run a agent with the given name and prompt.
@@ -82,7 +85,6 @@ class AgentsCli(BaseCli):
                 click.echo(f"Agent '{name}' not found. Please check the available agents with 'agents list'.")
                 return
             CliAgentRunner(g_bot, interactive=continue_conversation).run(prompt)
-
 
         @agents.command(name="inspect")
         @click.argument("name")
@@ -99,4 +101,4 @@ class AgentsCli(BaseCli):
             self.info(f"Tools: {agent_config.tools}")
             self.info(f"Skills: {agent_config.skills}")
             self.info(f"System Prompt: {agent_config.system}")
-            #print(agent_config)
+            # print(agent_config)

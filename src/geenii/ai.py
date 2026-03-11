@@ -1,4 +1,8 @@
+from datetime import datetime
 from pathlib import Path
+import uuid
+
+import pydantic
 
 from geenii.config import DATA_DIR
 from geenii.datamodels import CompletionResponse, CompletionErrorResponse, \
@@ -251,9 +255,18 @@ def generate_chat_completion(request: ChatCompletionRequest, tool_registry: Tool
         if not isinstance(ai, AIChatCompletionProvider):
             raise RuntimeError(f"Invalid AI provider: {provider_name} does not support assistant completions.")
 
+        # enforce a context ID for all chat completions, if not provided in the request, generate a new one
+        if not request.context_id:
+            request.context_id = str(uuid.uuid4())
+        _ai_log("completion.request", request)
+
+        # generate completion
         response = ai.generate_chat_completion(request, tool_registry=tool_registry)
-        response.context_id = request.context_id # pass through context ID from request to response, if any
-        _log_request_response(request, response)
+
+        # pass through context ID from request to response, if not set by the provider implementation
+        response.context_id = response.context_id or request.context_id
+        _ai_log("completion.response", response)
+        _ai_usage_log(provider_name, model_name, response.context_id, response.usage or {})
         return response
     except Exception as e:
         print(f"Error in {request.model} assistant API: {str(e)}")
@@ -312,9 +325,25 @@ def generate_audio_transcription(request: AudioTranscriptionApiRequest) -> Audio
         return CompletionErrorResponse(error=str(e))
 
 
-def _log_request_response(request, response):
-    #print("Request:", request.model_dump())
-    #print("Response:", response.model_dump())
-    log_file = f"{DATA_DIR}/logs/ai.log"
+def _ai_log(what: str, data: dict | pydantic.BaseModel):
+    date_formatted = datetime.now().strftime("%Y-%m-%d")
+    log_file = f"{DATA_DIR}/logs/ai-{date_formatted}.log"
     Path(log_file).parent.mkdir(parents=True, exist_ok=True)
-    append_jsonl(log_file, {"request": request.model_dump(mode="json"), "response": response.model_dump(mode="json")})
+    if isinstance(data, pydantic.BaseModel):
+        data = data.model_dump(mode="json")
+    append_jsonl(log_file, {f"{what}": data})
+
+
+def _ai_usage_log(provider: str, model: str, context_id: str, usage: dict):
+    """Log AI usage data to a file for tracking and analysis."""
+    date_formatted = datetime.now().strftime("%Y-%m")
+    log_file = f"{DATA_DIR}/logs/ai-usage-{date_formatted}.log"
+    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "provider": provider,
+        "context_id": context_id,
+        "model": model,
+        "usage": usage
+    }
+    append_jsonl(log_file, log_entry)

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
     DEFAULT_MODEL = "qwen:3b"
     DEFAULT_TEMPERATURE = 0.2
-    DEFAULT_MAX_TOKENS = 8192
+    DEFAULT_MAX_TOKENS = 4096
     DEFAULT_TOP_K = None  # 20
     DEFAULT_TOP_P = None  # 0.9
 
@@ -187,6 +187,8 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         #     })
 
         # message history
+        logger.info(f"Input messages provided {len(request.messages)}")
+        print(request.messages)
         if request.messages:
             input_messages.extend(model_messages_to_ollama_format(request.messages))
 
@@ -311,7 +313,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 'total_tokens': int(model_result.get('prompt_eval_count', 0) + model_result.get('eval_count', 0)),
                 'load_duration': int(model_result.get('load_duration', 0) / 1_000_000),  # convert to milliseconds
                 'input_duration': int(model_result.get('prompt_eval_duration', 0) / 1_000_000),  # convert to milliseconds
-                'output_duration': int(model_result.get('eval_duration', 0) / 1_000_000),  # convert to milliseconds
+                'output_duration': int((model_result.get('eval_duration') or 0) / 1_000_000),  # convert to milliseconds
                 'total_duration': int(model_result.get('total_duration', 0) / 1_000_000),  # convert to milliseconds
             }
             logger.info(
@@ -472,12 +474,12 @@ def model_messages_to_ollama_format(messages: List[ModelMessage]) -> List[dict]:
                         'role': role,
                         'content': content_item.text,
                     }
-                #elif isinstance(content_item, JsonContent):
-                #    # print(f"Adding message with role {role} and JSON content: {content_item.data}")
-                #    _message = {
-                #        'role': role,
-                #        'content': json.dumps(content_item.data),
-                #    }
+                elif isinstance(content_item, JsonContent):
+                   # print(f"Adding message with role {role} and JSON content: {content_item.data}")
+                   _message = {
+                       'role': role,
+                       'content': json.dumps(content_item.data),
+                   }
                 elif isinstance(content_item, ToolCallContent):
                     # print(f"Adding message with role {role} and tool call content: {content_item.name} with arguments {content_item.arguments}")
                     _message = {

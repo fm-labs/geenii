@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import subprocess
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 
@@ -16,7 +17,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Base
 # ---------------------------------------------------------------------------
-
 
 class Tool(ABC):
     """Abstract base for all tool types."""
@@ -34,7 +34,7 @@ class Tool(ABC):
     #    return f"<{self.__class__.__name__} name={self.name!r}>"
 
     @abstractmethod
-    async def invoke(self, args: dict[str,Any], **kwargs: Any) -> Any:
+    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
         ...
 
     def to_definition(self) -> dict:
@@ -71,7 +71,6 @@ class Tool(ABC):
 # Python tool
 # ---------------------------------------------------------------------------
 
-
 class PythonTool(Tool):
     """A tool backed by a plain Python callable."""
 
@@ -86,7 +85,7 @@ class PythonTool(Tool):
         self.type = "function"
         self.handler = handler
 
-    async def invoke(self, args: dict[str,Any], **kwargs: Any) -> Any:
+    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
         if self.handler is None:
             raise RuntimeError(f"No handler registered for tool {self.name!r}")
 
@@ -102,9 +101,63 @@ class PythonTool(Tool):
 
 
 # ---------------------------------------------------------------------------
-# MCP tool
+# Computer tool
 # ---------------------------------------------------------------------------
 
+class ComputerTool(Tool):
+    """A tool that executes a command on the local machine."""
+
+    def __init__(
+        self,
+        name: str,
+        description: str = "",
+        parameters: dict | None = None,
+        command_template: str | None = None,
+    ):
+        super().__init__(name, description, parameters)
+        self.type = "computer"
+        self.command_template = command_template
+
+    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
+        command = args.get("command")
+        skill = kwargs.get("skill")
+        if not command:
+            raise ValueError(f"Missing 'command' argument for ComputerTool {self.name!r}")
+
+        logger.info(f"Executing ComputerTool command: {command}")
+
+        # run the command in a thread to avoid blocking the event loop
+        result = await asyncio.to_thread(self.run_subprocess, command, env)
+        logger.info(f"Command result: {result}")
+        return result
+
+
+    def run_subprocess(self, command: str, env: dict[str, str] | None) -> str:
+        result = subprocess.run(command, shell=True, capture_output=True, text=True, env=env)
+        logger.info(f"Executed command: {command} with environment: {env}")
+        logger.info(f"Return code: {result.returncode}")
+        logger.info(f"Standard output: {result.stdout}")
+        logger.info(f"Standard error: {result.stderr}")
+        return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+
+
+class AppleScriptTool(ComputerTool):
+
+    """A ComputerTool that executes AppleScript commands on MacOS."""
+
+    def __init__(
+        self,
+        name: str,
+        description: str = "",
+        parameters: dict | None = None,
+    ):
+        super().__init__(name, description, parameters, command_template="osascript -e '{command}'")
+
+
+
+# ---------------------------------------------------------------------------
+# MCP tool
+# ---------------------------------------------------------------------------
 
 class McpTool(Tool):
     """A tool whose execution is delegated to an MCP server."""
@@ -122,7 +175,7 @@ class McpTool(Tool):
         self.mcp_server_id = mcp_server_id
         self.type = "mcp_tool"
 
-    async def invoke(self, args: dict[str,Any], **kwargs: Any) -> Any:
+    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
         client: McpClient = get_mcp_client_for_server(self.mcp_server_id)
         return await client.call_tool(self._name, args=args)
 

@@ -16,6 +16,7 @@ class SkillsCli(BaseCli):
             self._skills = SkillRegistry()
             self.info(f"Loading skills from directory '{DATA_DIR}/skills'...")
             self._skills.register_all_from_directory(f"{DATA_DIR}/skills")
+            self._skills.register_all_from_directory(f"{DATA_DIR}/vendor/skills/anthropic/skills")
         return self._skills
 
     def __init__(self, cli: click.core.Group):

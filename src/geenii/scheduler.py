@@ -312,8 +312,13 @@ class Scheduler:
 
         # Pre-calculate next run times.
         self._schedule.update({
-            task.name: task.next_run() for task in self.tasks
+            task.name: task.next_run(after=None) for task in self.tasks
         })
+
+        def _handle_task_result(t: asyncio.Task) -> None:
+            self._running_tasks.discard(t)
+            if not t.cancelled() and t.exception():
+                logger.error("Task '%s' raised an exception", task.name, exc_info=t.exception())
 
         while not self._stop_event.is_set():
             now = datetime.now(timezone.utc)
@@ -329,9 +334,9 @@ class Scheduler:
                     #logger.info("Checking task '%s': now=%s, next_run=%s", task.name, now, next_time)
                     if now >= next_time:
                         logger.info("Task '%s' is due: now=%s, offset=%s", task.name, now, now - next_time)
-                        _run = asyncio.create_task(task.run())
-                        self._running_tasks.add(_run)
-                        _run.add_done_callback(lambda t: self._running_tasks.discard(t))
+                        _t = asyncio.create_task(task.run())
+                        self._running_tasks.add(_t)
+                        _t.add_done_callback(_handle_task_result)
 
                         if task.oneshot:
                             logger.info("Task '%s' is oneshot, marked for removal", task.name)

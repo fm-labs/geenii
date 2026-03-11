@@ -1,6 +1,3 @@
-import logging
-import os
-import shlex
 from contextlib import asynccontextmanager
 
 import dotenv
@@ -14,6 +11,7 @@ from starlette.responses import JSONResponse
 from geenii.apps import AppRegistry
 from geenii.chat.chat_server_ctx import ChatServerState
 from geenii.config import APP_VERSION, DATA_DIR
+from geenii.core.tasks import *  # important! register any built-in tasks
 from geenii.datamodels import Problem
 from geenii.scheduler import Scheduler
 # from geenii.server.middleware.proxy_middleware import ProxyMiddleware
@@ -101,8 +99,10 @@ async def initialize_skill_registry():
     print("Initializing skill registry...")
     skill_registry = SkillRegistry()
     skill_registry.register_all_from_directory(f"{DATA_DIR}/skills")
+    skill_registry.register_all_from_directory(f"{DATA_DIR}/vendor/skills/anthropic/skills")
     print(f"Initialized {len(skill_registry.skills)} skills: {list(skill_registry.skills.keys())}")
     return skill_registry
+
 
 
 @asynccontextmanager

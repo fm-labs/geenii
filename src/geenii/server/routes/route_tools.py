@@ -20,4 +20,4 @@ async def execute_tool(tool_name: str, args: dict, registry: ToolRegistry = Depe
     tool = registry.get(tool_name)
     if not tool:
         raise ValueError(f"Tool '{tool_name}' not found.")
-    return await tool.invoke(args=args)
+    return await tool.invoke(args=args, env={})

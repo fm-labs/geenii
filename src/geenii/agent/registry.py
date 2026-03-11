@@ -4,7 +4,7 @@ import logging
 import pydantic
 
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
-from geenii.agents import BaseAgent
+from geenii.agent.base_agent import BaseAgent
 from geenii.chat.chat_bots import BotInterface
 from geenii.config import DATA_DIR
 from geenii.skills import SkillRegistry
