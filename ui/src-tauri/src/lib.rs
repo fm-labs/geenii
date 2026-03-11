@@ -15,11 +15,11 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use tauri::http::{Response, StatusCode};
-//use tauri::image::Image;
-//use tauri::menu::Menu;
+use tauri::image::Image;
 use tauri::path::BaseDirectory;
-//use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{App, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_shell::{process::CommandChild, ShellExt};
 
 use server::ServerProcess;
@@ -304,75 +304,56 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         //.plugin(tauri_plugin_autostart::init())
-        // .setup(|app| {
-        //     setup_path_checker(app)?;
-        //
-        //     //let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-        //     //let menu = Menu::with_items(app, &[&quit_i])?;
-        //
-        //     let empty_menu = Menu::new(app)?;
-        //
-        //     //let tray_icon = Image::from_bytes(include_bytes!("../icons/icon.icns"));
-        //     let tray_icon = Image::from_path("icons/32x32.png").expect("Failed to load tray icon");
-        //     let _tray = TrayIconBuilder::new()
-        //         .icon(tray_icon)
-        //         .tooltip("Ask geenii")
-        //         .menu(&empty_menu)
-        //         .on_menu_event(|app, event| match event.id.as_ref() {
-        //             "quit" => {
-        //                 println!("quit menu item was clicked");
-        //                 app.exit(0);
-        //             }
-        //             _ => {
-        //                 println!("menu item {:?} not handled", event.id);
-        //             }
-        //         })
-        //         .on_tray_icon_event(|tray, event| match event {
-        //             TrayIconEvent::Click {
-        //                 button: MouseButton::Left,
-        //                 button_state: MouseButtonState::Up,
-        //                 ..
-        //             } => {
-        //                 //println!("left click pressed and released");
-        //                 let app = tray.app_handle();
-        //                 if let Some(window) = app.get_webview_window("main") {
-        //                     let _ = window.show();
-        //                     let _ = window.set_focus();
-        //                 }
-        //             }
-        //             _ => {
-        //                 //println!("unhandled event {event:?}");
-        //             }
-        //         })
-        //         .build(app)?;
-        //     Ok(())
-        // })
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        // .manage(ServerState {
-        //     child: Mutex::new(None),
-        //     started: AtomicBool::new(false),
-        // })
         .invoke_handler(tauri::generate_handler![
             execute_command,
         ])
-        // .setup(|app| {
-        //     let app_handle = app.handle().clone(); // owned, 'static
-        //                                            // fire and forget: start sidecar when app starts
-        //     tauri::async_runtime::spawn(async move {
-        //         eprintln!("Starting sidecar server...");
-        //         if let Err(e) = start_server_internal(app_handle).await {
-        //             eprintln!("Failed to start server: {e}");
-        //         }
-        //     });
-        //
-        //     Ok(())
-        // })
         .manage(ServerProcess(std::sync::Mutex::new(None)))
         .setup(|app| {
+            // PATHS
             setup_path_checker(app)?;
             ensure_paths(app)?;
 
+            // TRAY MENU
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&quit_i])?;
+
+            //let tray_icon = Image::from_bytes(include_bytes!("../icons/icon.icns"));
+            let tray_icon = Image::from_path("icons/32x32.png").expect("Failed to load tray icon");
+            let _tray = TrayIconBuilder::new()
+                .icon(tray_icon)
+                .tooltip("Ask geenii")
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "quit" => {
+                        println!("quit menu item was clicked");
+                        app.exit(0);
+                    }
+                    _ => {
+                        println!("menu item {:?} not handled", event.id);
+                    }
+                })
+                .on_tray_icon_event(|tray, event| match event {
+                    TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } => {
+                        //println!("left click pressed and released");
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    _ => {
+                        //println!("unhandled event {event:?}");
+                    }
+                })
+                .build(app)?;
+
+            // DAEMON
             if tauri::is_dev() {
                 println!("Running in dev mode. Skipping server startup.");
             } else {
