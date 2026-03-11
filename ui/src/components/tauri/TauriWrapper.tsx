@@ -1,15 +1,20 @@
 import React, { PropsWithChildren } from 'react'
 import TauriPanel from './TauriPanel.tsx'
-import { TauriPanelProvider } from '@/components/tauri/TauriPanelContext.tsx'
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { FEATURE_TAURI_TITLEBAR_ENABLED } from '@/constants.ts'
 
 // when using `"withGlobalTauri": true`, you may use
 // const { getCurrentWindow } = window.__TAURI__.window;
 
-const appWindow = getCurrentWindow();
 
 
 const TauriTitleBar = () => {
+
+  const appWindow = getCurrentWindow();
+  if (!appWindow) {
+    console.warn('Tauri API is not available. Title bar controls will not work.');
+    return null;
+  }
 
   React.useEffect(() => {
     document
@@ -81,7 +86,7 @@ const TauriTitleBar = () => {
 const TauriWrapper = (props: PropsWithChildren) => {
   return (
     <div className={'TauriWrapper'}>
-      <TauriTitleBar />
+      {FEATURE_TAURI_TITLEBAR_ENABLED && <TauriTitleBar />}
       {props.children}
       <TauriPanel />
     </div>

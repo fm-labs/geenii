@@ -25,9 +25,11 @@ export const FEATURE_TOOLS_ENABLED = import.meta.env.VITE_FEATURE_TOOLS_ENABLED 
 export const FEATURE_APPS_ENABLED = import.meta.env.VITE_FEATURE_APPS_ENABLED === 'true' || false;
 export const FEATURE_FLOWS_ENABLED = import.meta.env.VITE_FEATURE_FLOWS_ENABLED === 'true' || false;
 export const FEATURE_SETTINGS_ENABLED = import.meta.env.VITE_FEATURE_SETTINGS_ENABLED === 'true' || false;
+export const FEATURE_MESSAGE_INBOX_ENABLED = import.meta.env.VITE_FEATURE_MESSAGE_INBOX_ENABLED === 'true' || false;
 
 export const FEATURE_TAURI_ENABLED = import.meta.env.VITE_FEATURE_TAURI_ENABLED === 'true' || false;
 export const FEATURE_TAURI_XAPI_ENABLED = import.meta.env.VITE_FEATURE_TAURI_XAPI_ENABLED === 'true' || false;
+export const FEATURE_TAURI_TITLEBAR_ENABLED = import.meta.env.VITE_FEATURE_TAURI_TITLEBAR_ENABLED === 'true' || false;
 
 export const CHAT_TYPEWRITER_ENABLED = import.meta.env.VITE_CHAT_TYPEWRITER_ENABLED === 'true' || false;
 

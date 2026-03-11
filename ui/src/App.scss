@@ -2,8 +2,8 @@
   margin-top: 30px;
 
   .titlebar {
-    height: 30px;
-    background: #329ea3;
+    height: 32px;
+    background: #000;
     user-select: none;
     display: grid;
     grid-template-columns: auto max-content;
@@ -11,6 +11,10 @@
     top: 0;
     left: 0;
     right: 0;
+  }
+
+  .titlebar:HOVER {
+    background-color: #333;
   }
 
   .titlebar > .controls {
