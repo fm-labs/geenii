@@ -12,7 +12,6 @@ TARGET_TRIPLE=$(rustc --print host-tuple)
 # Trap to ensure we return to the original directory on exit
 trap "cd $WD" EXIT
 
-
 # Path or content of your private key
 KEY_PATH="$HOME/.tauri/signing.key"
 KEY_CONTENT=$(cat "$KEY_PATH")
@@ -33,7 +32,12 @@ if [[ $SKIP_BUILD_BINARIES -eq 0 ]]; then
 fi
 
 
-cd ./ui
+# clean
+#cd $WD/ui/src-tauri || exit 1
+#cargo clean
+#rm -rf $WD/ui/src-tauri/target/release/bundle
+
+cd $WD/ui || exit 1
 pnpm install --frozen-lockfile || exit 1
 
 BUILD_ARGS=""
@@ -55,6 +59,18 @@ if ! pnpm tauri build $BUILD_ARGS $@ ; then
     echo "Tauri build failed. Exiting."
     cd ..
     exit 1
+fi
+
+# check the signature on macOs / darwin
+if [[ "$TARGET_TRIPLE" == *"darwin"* ]]; then
+    APP_PATH="./src-tauri/target/release/bundle/macos/geenii-desktop.app"
+    find "${APP_PATH}/Contents" -maxdepth 3 | sort
+    if ! codesign --verify --deep --strict --verbose=4 "$APP_PATH"; then
+        echo "Code signing verification failed for $APP_PATH. Exiting."
+        cd ..
+        exit 1
+    fi
+    spctl -a -t exec -vvv "src-tauri/target/release/bundle/macos/geenii-desktop.app"
 fi
 
 cd "$WD"

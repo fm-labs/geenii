@@ -1,5 +1,5 @@
 import os
-
+from shutil import which
 
 def get_os_name() -> str:
     platform = os.environ.get("PLATFORM", "").lower()
@@ -32,3 +32,11 @@ def get_user_home_dir():
     if not home_dir or not os.path.exists(home_dir):
         raise ValueError("Unable to determine user home directory.")
     return home_dir
+
+
+def locate_binary(binary_name: str) -> str | None:
+    """Check if a binary is available in the system PATH."""
+    try:
+        return which(binary_name)
+    except Exception:
+        return None

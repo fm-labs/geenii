@@ -4,6 +4,7 @@ import Header from '@/components/header.tsx'
 import Layout from '@/components/layout/layout.tsx'
 import { useRoute } from '@/app-router.tsx'
 import { NotFoundError } from '@/features/errors/not-found-error.tsx'
+import MainContent from '@/components/layout/main-content.tsx'
 
 const AppPage = () => {
 
@@ -21,8 +22,9 @@ const AppPage = () => {
   }
 
   return (
-    <Layout>
-      <div className={"p-4"}>
+    <Layout>a
+      <MainContent>
+      <div className={""}>
         {/*<<Header title={appId}>
           select value={appId} onChange={(e) => setAppId(e.target.value)}>
             <option value={''}>-- Select App --</option>
@@ -33,6 +35,7 @@ const AppPage = () => {
         </Header>*/}
         {appId && <TauriAppViewer appId={appId} />}
       </div>
+      </MainContent>
     </Layout>
   )
 }

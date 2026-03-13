@@ -171,7 +171,7 @@ class McpTool(Tool):
     ):
         super().__init__(name, description, parameters)
         self._name = name
-        self.name = f"{mcp_server_id}_{name}"
+        self.name = f"mcp__{mcp_server_id}__{name}"
         self.mcp_server_id = mcp_server_id
         self.type = "mcp_tool"
 

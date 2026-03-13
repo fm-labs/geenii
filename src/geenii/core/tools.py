@@ -178,7 +178,7 @@ def display_desktop_notification(message: str, title: str = "Message from Geenii
     :return: A message indicating that the notification has been sent.
     """
     #command = f"""osascript -e 'display notification "{message}" with title "{title}"'"""
-    command = f"""osascript -e 'display dialog "{message}" with title "{title}"'"""
+    command = """osascript -e 'display dialog "%s" with title "%s" buttons {"OK"} giving up after 60'""" % (message, title)
     print(">Displaying desktop notification with command:", command)
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     print(f">Executed notification command: {command}")

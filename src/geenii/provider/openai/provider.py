@@ -8,7 +8,7 @@ import logging
 from openai import OpenAI
 
 from geenii import config
-from geenii.chat.chat_models import TextContent, ToolCallContent, JsonContent
+from geenii.chat.chat_models import TextContent, ToolCallContent, JsonContent, ImageContent
 from geenii.config import CACHE_DIR
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, ChatCompletionRequest, \
     ChatCompletionResponse, AIModelInfo, AudioTranscriptionApiResponse
@@ -32,7 +32,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
     DEFAULT_MAX_TOKENS = 4096
     DEFAULT_MAX_TOOL_CALLS = 5
 
-    DALLE_MODELS = {
+    IMAGE_MODELS = {
         "gpt-image-1": {"sizes": ["1024x1024", "auto"]},
         "dall-e-2": {"sizes": ["256x256", "512x512", "1024x1024"]},
         "dall-e-3": {"sizes": ["1024x1024", "1792x1024", "1024x1792"]}
@@ -333,7 +333,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             output_text=transcript.text
         )
 
-    def generate_image(self, prompt: str, model: str = "dall-e-2", n: int = 1, size: str = "256x256",
+    def generate_image(self,  model: str, prompt: str, n: int = 1, size: str = "256x256",
                        **kwargs) -> ImageGenerationApiResponse:
         """
         Generate an image using OpenAI's DALL-E model.
@@ -356,24 +356,24 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             kwargs['output_format'] = "png"
 
         # check parameters
-        if model not in self.DALLE_MODELS:
+        if model not in self.IMAGE_MODELS:
             raise ValueError(f"Model {model} is not supported by {repr(self)}.")
-        if size not in self.DALLE_MODELS[model]['sizes']:
+        if size not in self.IMAGE_MODELS[model]['sizes']:
             raise ValueError(f"Size {size} is not supported by model {model}. "
-                             f"Supported sizes are: {self.DALLE_MODELS[model]['sizes']}.")
+                             f"Supported sizes are: {self.IMAGE_MODELS[model]['sizes']}.")
 
-        # Fake response for 'response_format=url' for testing purposes
-        if kwargs.get('response_format') == "url":
-            # todo Implement cloud storage for images
-            return ImageGenerationApiResponse(
-                id=uuid.uuid4().hex,
-                timestamp=time.time(),
-                prompt=prompt,
-                model=f"{self.name}:{model}",
-                provider=self.name,
-                # model_result=img.model_dump(), # skip model_dump() as it contains large data
-                output=[{"url": "https://example.com/fake_image.png"}]  # Fake URL for testing
-            )
+        # # Fake response for 'response_format=url' for testing purposes
+        # if kwargs.get('response_format') == "url":
+        #     # todo Implement cloud storage for images
+        #     return ImageGenerationApiResponse(
+        #         id=uuid.uuid4().hex,
+        #         timestamp=time.time(),
+        #         prompt=prompt,
+        #         model=f"{self.name}:{model}",
+        #         provider=self.name,
+        #         # model_result=img.model_dump(), # skip model_dump() as it contains large data
+        #         output=[{"url": "https://example.com/fake_image.png"}]  # Fake URL for testing
+        #     )
 
         img = self.client.images.generate(
             model=model,
@@ -394,20 +394,20 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         # wanted [{"base64": "..."}, {"url": "https://..."}]
         def _map_item(item):
             if item.b64_json:
-                return {"base64": item.b64_json}
+                return {"type": "image", "base64": item.b64_json}
             elif item.url:
-                return {"url": item.url}
+                return {"type": "image", "url": item.url}
             else:
                 raise ValueError("Image data does not contain 'b64_json' or 'url' key.")
 
         return ImageGenerationApiResponse(
             id=uuid.uuid4().hex,
-            timestamp=time.time(),
+            timestamp=int(time.time()),
             prompt=prompt,
             model=f"{self.name}:{model}",
-            provider=self.name,
+            #provider=self.name,
             # model_result=img.model_dump(), # skip model_dump() as it contains large data
-            output=[_map_item(item) for item in img.data]
+            output=[ImageContent.model_validate(_map_item(item)) for item in img.data]
         )
 
 

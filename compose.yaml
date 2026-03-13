@@ -13,20 +13,21 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
+      - "$HOME/.geenii:/home/app/.geenii"
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - OLLAMA_HOST=http://host.docker.internal:11434
       - MONGODB_URI=mongodb://geenii:super-secure-password@mongodb:27017?authSource=admin
       - REDIS_URI=redis://redis:6379/0
     env_file:
-      - .env
+      - "$HOME/.geenii/.env"
 
   ui:
     build:
       context: ./ui
       dockerfile: ./Dockerfile
     ports:
-      - "31380:80"
+      - "33380:80"
     networks:
       - geenii-net
 
@@ -41,6 +42,8 @@ services:
     volumes:
       #- redis-data:/data
       - ./volumes/redis:/data
+    profiles:
+      - advanced
 
   mongodb:
     image: mongo:8.2
@@ -55,6 +58,8 @@ services:
     volumes:
       #- mongo-data:/data/db
       - ./volumes/mongodb:/data/db
+    profiles:
+      - advanced
 
 
   #  ollama:

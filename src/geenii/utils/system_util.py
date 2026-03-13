@@ -2,8 +2,11 @@ import getpass
 import grp
 import os
 import pwd
+import shutil
 
 import psutil
+
+from geenii.utils.os_util import locate_binary
 
 
 def get_memory_usage():
@@ -130,6 +133,12 @@ def get_system_report():
         except Exception as e:
             return str(e)
 
+    def _locate_binaries():
+        binaries = ["python3", "node", "npm", "npx", "pnpm", "yarn", "go", "git", "docker", "podman", "ssh",
+                    "curl", "wget", "ffmpeg", "convert", "magick", "gh", "aws", "az", "gcloud",
+                    "claude", "gemini"]
+        return {bin: locate_binary(bin) for bin in binaries}
+
     data = {
         "system": get_system_summary(),
         "disk_usage": get_all_disk_usage(),
@@ -143,10 +152,11 @@ def get_system_report():
             "groupids": _getgroupids(),
             "groupnames": _getgroupnames()
         },
-        "directories": {
-        },
-        "files": {
-        },
+        # "directories": {
+        # },
+        # "files": {
+        # },
+        "binaries": _locate_binaries(),
     }
     # dump the env variables
     data.update({"env": dict(os.environ)})

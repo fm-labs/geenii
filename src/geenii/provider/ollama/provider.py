@@ -46,7 +46,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         return self._client
 
     def is_configured(self) -> bool:
-        return config.OLLAMA_HOST
+        return True if config.OLLAMA_HOST is not None else False
 
     def get_capabilities(self) -> list[str]:
         return ['completion', 'chat_completion', 'tool_calling']

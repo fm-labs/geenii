@@ -1,6 +1,8 @@
 .idea/
 .venv/
 .git/
+.github/
+.geenii/
 bak/
 data/
 build/
@@ -17,3 +19,4 @@ volumes/
 .env.local
 .env.development.local
 .env.test.local
+.env.*

@@ -6,33 +6,104 @@ Hybrid AI platform for local and remote large language models (LLMs)
 - Build and run your own chat assistants, autonomous agents and AI workflows with ease.
 - Supports models from Ollama, OpenAI, HuggingFace, Local LLMs and more.
 - Rich toolset for assistants and agents supporting python functions and serverless functions
-- Integrates with MCP for orchestration and tooling capabilities.
-- Runs locally with docker compose.
+- Supports Model-Context-Protocol (MCP) server tools.
+- User-friendly CLI and WebUI for managing models, agents, tools and skills.
+- Self-hosted solution for privacy and control over your AI workloads.
+- Upcoming support for Anthropic's AGENT and SKILL specification format for reusable agent components.
 
 
-## Goals
+## Quick start with Geenii CLI
 
-- **Local-first and Privacy-first** approach to AI workloads.
-- Provide a **unified API** for accessing different LLM providers and models.
-- Enable easy switching between **local and remote models**.
-- Facilitate building AI applications and agents that can leverage multiple models.
-- Offer a **self-hosted solution for privacy and control** over AI workloads.
-- Enable developers to build and deploy **AI applications without relying on cloud providers**.
-- Focus on modularity and extensibility to support new models and providers easily.
-- **Focus on MCP integration for maximum tooling and orchestration capabilities**.
-- Aims for interoperability with other agent frameworks (e.g., via Agent Protocol).
+To get started with Geenii, you can use the command-line interface (CLI).
+
+Here are some basic commands to help you get started:
 
 
-## Getting Started
+```bash
+# Ask a simple question
+geenii agents ask "What is the capital of France?"
+
+# Ask a different agent or model
+geenii agents ask --model "openai:gpt-4o-mini" "What is the capital of France?"
+geenii agents ask --name "my_custom_agent" --model "ollama:qwen3:8b" "What is the capital of France?"
+
+# Create/Ask a specific agent
+geenii agents create "weather" --tools "get_weather_forecast" --system "You are a helpful assistant that provides weather information based on the get_weather_forecast tool."
+geenii agents ask --name "weather" "What is the weather like in New York?"
+
+# Create/Ask a specific agent with a specific tool
+geenii agents create "computer" --tools "bash,applescript" --system "You are a helpful assistant that can control the computer using AppleScript."
+geenii agents ask --name "computer" --tools "applescript" "Open Safari and navigate to https://www.google.com"
+
+# Create/Ask an agent to perform a task
+geenii agents create "organizer" --skills "email,calendar" --system "You are an organizer assistant that can send emails to help manage my schedule."
+geenii agents ask --name "organizer" "Send an email to John Doe with the subject 'Meeting Reminder' and the body 'Don't forget about our meeting tomorrow at 10am.'"
+
+# Create/Ask the default agent with a specific skill
+geenii agents create "math_agent" --skills "math" --system "You are a helpful assistant that can perform mathematical calculations."
+geenii agents ask "Is 33311 a prime number?"
+
+# Create/Ask agent with a specific tool and skill
+geenii agents create "data_analysis" --tools "python" --skills "pandas" --system "You are a data analyst assistant that can analyze sales data and provide insights."
+geenii agents ask --name "data_analysis" --input @data.csv "Analyze the sales data for the last quarter and provide insights."
+
+
+# Tools
+# Note: Tools are registered callable functions that an agent can use to perform specific tasks. 
+# They can be implemented in any programming language and can be registered with Geenii.
+
+# List installed tools
+geenii tools list
+
+# Get information about a specific tool
+geenii tools inspect "my_tool"
+
+# Call a tool directly from the CLI
+geenii tools call "my_tool" --args arg1=value1 arg2=value2
+
+# MCP Tools
+# Note: MCP (Model-Context-Protocol) tools are a special type of tool that can interact with language models in a more structured way. 
+# Under the hood, MCP tools are registered as regular tools.
+
+# List installed MCP servers
+geenii mcp server list
+
+# Add a new MCP server
+geenii mcp server add "my_mcp_server" --url "http://localhost:8000"
+geenii mcp server add "my_local_mcp_server_stdio" --command "docker run --rm my_mcp_stdio_server_image"
+
+# Get information about a specific MCP server
+geenii mcp server info "my_mcp_server"
+
+# Skills
+# Note: Skills are reusable components, represented as a directory containing a SKILL.md file
+
+# List installed skills
+geenii skills list
+
+# Get information about a specific skill
+geenii skills inspect "my_skill"
+
+# Install a skill from a directory
+geenii skills install "/path/to/skills/my_skill"
+
+# Install a skill from a url (e.g. a folder in a GitHub repository)
+# Only install from trusted sources!!
+geenii skills install "https://github.com/geenii/geenii-skills/skills/mac-calendar"
+
+```
+
+
+## Quick start with Geenii-in-a-box (Docker Compose)
 
 ### Prerequisites
 
 - Docker and Docker Compose installed on your machine. Easiest way is to install is downloading [Docker Desktop](https://www.docker.com/products/docker-desktop).
 - Ollama installed for local LLM support (optional but recommended). You can download it from [Ollama's official website](https://ollama.com/download).
-- (Optional) An OpenAI API key if you want to use OpenAI cloud models.
-- (Optional) Ollama API key if you want to use Ollama's cloud models.
-- (Optional) Claude API key if you want to use Anthropic cloud models.
-- (Optional) OpenRouter API key if you want to use OpenRouter cloud models.
+- (Optional) An OpenAI API key to use OpenAI cloud models.
+- (Optional) Ollama API key to use Ollama's cloud models.
+- (Optional) Claude API key to use Anthropic cloud models.
+- (Optional) OpenRouter API key to use OpenRouter cloud models.
 
 ### Clone the repository
 
@@ -41,92 +112,29 @@ git clone https://github.com/fm-labs/geenii.git
 cd geenii
 ```
 
+## Configure environment
+
+**Note** the local stack reads env variables from `$HOME/.geenii/.env` file. 
+You can create this file and add your API keys there, or you can set the env variables in your shell before running docker compose.
+
+
+```bash
+mkdir -p $HOME/.geenii
+touch $HOME/.geenii/.env
+echo "OPENAI_API_KEY=your_openai_api_key" >> $HOME/.geenii/.env
+echo "OLLAMA_API_KEY=your_ollama_api_key" >> $HOME/.geenii/.env
+echo "CLAUDE_API_KEY=your_claude_api_key" >> $HOME/.geenii/.env
+echo "OPENROUTER_API_KEY=your_openrouter_api_key" >> $HOME/.geenii/.env
+```
+
 ### Start the local stack
+
 
 ```bash
 docker-compose up
 ```
 
+→ The API server will be running at `http://localhost:33311`.
 
-→ The API server will be available at `http://localhost:33311`.
+→ The WebUI will be available at `http://localhost:33380`.
 
-→ The WebUI will be available at `http://localhost:13031`.
-
-
-
-
-## For Developers
-
-### Prerequisites
-
-- Python 3.13 or higher installed on your machine.
-- uv for package management and build tool. You can install it with pip: `pip install uv`
-- Node.js and pnpm for building the Web UI. You can install Node.js from [nodejs.org](https://nodejs.org/) and then install pnpm with npm: `npm install -g pnpm`.
-- Rust toolchain for building the Desktop UI. You can install it from [rustup.rs](https://rustup.rs/).
-- Tauri dependencies. See the official [Tauri documentation for the latest requirements](https://tauri.app/start/prerequisites/)
-- Additionally, for Ubuntu/Debian-based systems, you may need to install the following dependencies for building Tauri applications:
-  ```bash
-  sudo apt update
-  sudo apt install -y build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev libxdo-dev librsvg2-dev
-  ```
-- Additionally, for CentOS/RHEL-based systems, you may need to install the following dependencies for building Tauri applications:
-  ```bash
-  sudo yum install -y gcc openssl-devel libappindicator-gtk3-devel gtk3-devel libxdo-devel librsvg2-devel libsoup-devel webkit2gtk-4.1-devel
-  ```
-- (Optional) Docker and Docker Compose installed on your machine. Easiest way is to install is downloading [Docker Desktop](https://www.docker.com/products/docker-desktop).
-
-
-### Install dependencies
-
-```bash
-# Python dependencies
-uv sync
-
-# UI dependencies
-cd ui
-pnpm install
-```
-
-
-### Run server in development mode from sources
-
-```bash
-uv run uvicorn --app-dir ./src --port 33311 server:app --reload --log-level debug
-```
-
-### Run server in production mode from sources
-
-```bash
-uv run uvicorn --app-dir ./src --port 33311 server:app
-```
-
-### Run desktop UI in development mode
-
-```bash
-cd ui
-pnpm tauri dev
-```
-
-### Run web UI in development mode
-
-```bash
-cd ui
-pnpm run dev
-```
-
-
-### Run docker compose for development
-
-```bash
-docker-compose up --watch
-```
-
-
-
-### Testing
-
-To run tests, use the following command:
-
-```bash
-pytest src/
-```

@@ -53,7 +53,7 @@ COPY ./pyproject.toml ./uv.lock /app/
 RUN uv sync --no-cache-dir
 
 COPY ./src/geenii /app/src/geenii
-COPY ./src/server.py /app/src/
+COPY ./src/server.py ./src/cli.py /app/src/
 
 # Run
 USER app
@@ -62,4 +62,4 @@ EXPOSE 33311
 
 # Health check
 HEALTHCHECK --interval=60s --timeout=3s --retries=3 \
- CMD curl --fail http://localhost:33311/api/health || exit 1
+ CMD curl --fail http://localhost:33311/api/v1/health || exit 1

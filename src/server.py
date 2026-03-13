@@ -8,6 +8,7 @@ from rich.logging import RichHandler
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from geenii import config
 from geenii.apps import AppRegistry
 from geenii.chat.chat_server_ctx import ChatServerState
 from geenii.config import APP_VERSION, DATA_DIR
@@ -57,8 +58,7 @@ async def initialize_supervisor():
     await supervisor.ensure("geenii_pulse", ProcConfig(name="geenii_pulse", restart=True, cmd=["/bin/bash", "-c", "while true; do echo `date`; sleep 60; done"]))
 
     # register a self-diagnostics proc on startup
-    GEENII_BIN=os.getenv("GEENII_BIN", "uv run src/cli.py")
-    cmd = shlex.split(GEENII_BIN)
+    cmd = shlex.split(config.GEENII_BIN)
     cmd += ["info"]
     await supervisor.ensure("geenii_self_diagnostics", ProcConfig(name="geenii_self_diagnostics", restart=False, cmd=cmd))
 

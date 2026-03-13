@@ -1,7 +1,4 @@
 import React, { useCallback } from 'react'
-import Layout from '@/components/layout/layout.tsx'
-import MainContent from '@/components/layout/main-content.tsx'
-import Header from '@/components/header.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { XAI_API_URL } from '@/constants.ts'
 import { PlaySquareIcon } from 'lucide-react'
@@ -102,7 +99,7 @@ const ToolCard = ({ tool }: { tool: Tool }) => {
 }
 
 
-const ToolsPage = () => {
+const ToolsView = () => {
 
   const [tools, setTools] = React.useState<Tool[]>([])
 
@@ -128,7 +125,7 @@ const ToolsPage = () => {
 
   return (
     <div>
-      <div className={"grid sm:grid-cols-1 lg:grid-cols-4 gap-4"}>
+      <div className={"grid sm:grid-cols-1 md:grid-cols-2 gap-4"}>
         {tools.map((tool) => (
           <ToolCard key={tool.name} tool={tool} />
         ))}
@@ -137,4 +134,4 @@ const ToolsPage = () => {
   )
 }
 
-export default ToolsPage
+export default ToolsView

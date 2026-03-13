@@ -9,7 +9,9 @@ dist/
 volumes/
 /lib/
 .env.local
+.env.docker
 .env
+.env.*
 *.local
 *.bak
 *.log

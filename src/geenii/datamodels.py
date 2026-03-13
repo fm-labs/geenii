@@ -11,6 +11,7 @@ from geenii.chat.chat_models import ContentPart
 
 class AIProviderInfo(pydantic.BaseModel):
     name: str
+    configured: bool = False
     #description: str | None = None
     #website: str | None = None
     #models: List[str] | None = pydantic.Field(default_factory=list)
@@ -22,6 +23,7 @@ class AIModelInfo(pydantic.BaseModel):
     description: str | None = None
     capabilities: List[str] | None = pydantic.Field(default_factory=list)
     metadata: dict | None = pydantic.Field(default_factory=dict)
+    installed: bool = False
 
 
 class ModelMessage(pydantic.BaseModel):
@@ -112,7 +114,7 @@ class ImageGenerationApiRequest(pydantic.BaseModel):
 
 class ImageGenerationApiResponse(BaseCompletionResponse):
     prompt: str
-    output: List[dict] | None = None  # contains either 'base64' or 'url' keys
+    output: List[ContentPart] | None = None  # contains either 'base64' or 'url' keys
     # url: str | None = None  # URL to the generated audio file
     # base64: str | None = None  # Base64 encoded audio data, if applicable
 

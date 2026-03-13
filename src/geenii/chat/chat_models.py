@@ -26,7 +26,8 @@ class TextContent(BaseContent):
 
 class ImageContent(BaseContent):
     type: Literal["image"] = "image"
-    url: str
+    url: str | None = None
+    base64: str | None = None
     alt: str | None = None
 
 

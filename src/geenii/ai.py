@@ -22,6 +22,8 @@ from geenii.utils.json_util import append_jsonl
 type AIProviderType = AICompletionProvider | AIImageGeneratorProvider | AISpeechGeneratorProvider \
                       | AIAudioTranscriptionProvider | AIAudioTranslationProvider | AIProvider
 
+SUPPORTED_PROVIDERS = ["geenii", "ollama", "openai"]  # "anthropic", "openrouter", "whisper", "huggingface"
+
 
 #@cached(ttl=3600)
 def enumerate_providers() -> list[AIProviderInfo]:
@@ -33,13 +35,13 @@ def enumerate_providers() -> list[AIProviderInfo]:
     :return: A list of available provider names.
     """
     providers = []
-    providers.append(AIProviderInfo(name="geenii"))
-    providers.append(AIProviderInfo(name="ollama"))
-    providers.append(AIProviderInfo(name="openai"))
-    #providers.append(AIProviderInfo(name="anthropic"))
-    #providers.append(AIProviderInfo(name="openrouter"))
-    #providers.append(AIProviderInfo(name="whisper"))
-    #providers.append(AIProviderInfo(name="huggingface"))
+    for provider_name in SUPPORTED_PROVIDERS:
+        try:
+            ai_provider = get_ai_provider(provider_name)
+            configured = ai_provider.is_configured()
+            providers.append(AIProviderInfo(name=provider_name, configured=configured))
+        except Exception as e:
+            print(f"Error initializing provider '{provider_name}': {str(e)}")
     return providers
 
 
@@ -51,12 +53,15 @@ def enumerate_models() -> list[AIModelInfo]:
     :return: A list of available models
     """
     models = []
-    for provider_info in enumerate_providers():
-        ai_provider = get_ai_provider(provider_info.name)
-        if ai_provider.is_configured():
-            provider_models = ai_provider.get_models()
-            for model in provider_models:
-                models.append(model)
+    for provider_name in SUPPORTED_PROVIDERS:
+        try:
+            ai_provider = get_ai_provider(provider_name)
+            if ai_provider.is_configured():
+                provider_models = ai_provider.get_models()
+                for model in provider_models:
+                    models.append(model)
+        except Exception as e:
+            print(f"Error initializing provider '{provider_name}': {str(e)}")
     return models
 
 
