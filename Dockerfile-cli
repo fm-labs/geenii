@@ -1,0 +1,42 @@
+FROM python:3.14-alpine AS builder
+
+WORKDIR /builder
+
+# Install python dependencies
+COPY ./pyproject.toml ./uv.lock /builder/
+RUN uv sync --frozen --no-cache-dir --no-dev
+
+COPY ./src/geenii /builder/src/geenii
+COPY ./src/cli.py /builder/src/
+
+RUN mkdir -p ./build && mkdir -p ./dist && \
+    uv run pyinstaller --clean --onefile --distpath ./dist --workpath ./build --specpath ./build \
+    --name geenii \
+    ./src/cli.py
+
+
+FROM python:3.14-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    bash \
+    curl \
+    git \
+    nodejs \
+    docker-cli \
+    docker-compose \
+    && rm -rf /var/cache/apk/* \
+    && node i -g pnpm npm && npm cache clean --force
+
+# Create non-root user and group, set permissions for geeusr and home directory
+RUN addgroup --gid 33311 -S geeusr && adduser --uid 33311 -S geeusr -G geeusr && \
+    mkdir -p /geeusr && \
+    chown -R geeusr:geeusr /geeusr && \
+    mkdir -p /home/geeusr && \
+    chown -R geeusr:geeusr /home/geeusr 
+
+COPY --from=builder /builder/dist/geenii /usr/local/bin/geenii
+
+WORKDIR /geeusr
+USER geeusr
+CMD ["geenii", "--help"]

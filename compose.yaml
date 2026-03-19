@@ -4,7 +4,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: ./Dockerfile
+      dockerfile: Dockerfile-localserver
     ports:
       - "33311:33311"
     networks:
@@ -13,72 +13,8 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
-      - "$HOME/.geenii:/home/app/.geenii"
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - "$HOME/.geenii:/home/geenii/.geenii"
     environment:
       - OLLAMA_HOST=http://host.docker.internal:11434
-      - MONGODB_URI=mongodb://geenii:super-secure-password@mongodb:27017?authSource=admin
-      - REDIS_URI=redis://redis:6379/0
     env_file:
       - "$HOME/.geenii/.env"
-
-  ui:
-    build:
-      context: ./ui
-      dockerfile: ./Dockerfile
-    ports:
-      - "33380:80"
-    networks:
-      - geenii-net
-
-  redis:
-    image: redis:8.4
-    ports:
-      - "33379:6379"
-    #expose:
-    #  - "6379"
-    networks:
-      - geenii-net
-    volumes:
-      #- redis-data:/data
-      - ./volumes/redis:/data
-    profiles:
-      - advanced
-
-  mongodb:
-    image: mongo:8.2
-    ports:
-      - "33317:27017"
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=geenii
-      - MONGO_INITDB_ROOT_PASSWORD=super-secure-password
-      - MONGO_INITDB_ROOT_AUTHENTICATION_DATABASE=admin
-    networks:
-      - geenii-net
-    volumes:
-      #- mongo-data:/data/db
-      - ./volumes/mongodb:/data/db
-    profiles:
-      - advanced
-
-
-  #  ollama:
-  #    image: ollama/ollama:latest
-  #    volumes:
-  #      #- ./data/ollama:/root/.ollama
-  #      - ~/.ollama:/root/.ollama
-  #    ports:
-  #      - "11434:11434" # ollama api
-
-
-#volumes:
-#  redis-data:
-#    driver: local
-#  mongo-data:
-#    driver: local
-
-
-networks:
-  geenii-net:
-    driver: bridge
-    name: geenii-net
