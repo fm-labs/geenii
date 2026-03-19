@@ -21,4 +21,3 @@ src/*.egg-info/
 src/x*.py
 src/x*.*
 src/xaidev
-updates.latest.json
