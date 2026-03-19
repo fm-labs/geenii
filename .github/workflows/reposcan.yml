@@ -12,11 +12,11 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: Run Repo Scan
       id: repo-scan
-      uses: fm-labs/action-repo-scan@v1
+      uses: fm-labs/action-repo-scan@v1.0.1
       with:
         path: '.'  # Optional: defaults to '.'
         
