@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, List, Literal, Optional
 
-from geenii.logging import get_rotating_file_log_handler
+from geenii.logs import get_rotating_file_log_handler
 
 logging.basicConfig(
     level=logging.INFO,

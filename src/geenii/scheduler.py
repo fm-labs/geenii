@@ -40,7 +40,7 @@ from typing import Any, Callable
 import pydantic
 from croniter import croniter
 
-from geenii.logging import get_rotating_file_log_handler
+from geenii.logs import get_rotating_file_log_handler
 
 logging.basicConfig(
     level=logging.INFO,
