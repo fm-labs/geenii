@@ -4,7 +4,7 @@ from typing import List
 from fastapi import APIRouter
 
 from geenii.ai import enumerate_models, enumerate_providers
-from geenii.config import APP_VERSION, get_user_data_dir
+from geenii.config import APP_VERSION, get_data_dir
 from geenii.utils.os_util import get_user_home_dir
 from geenii.utils.system_util import get_system_report
 
@@ -28,7 +28,7 @@ async def info() -> dict:
             "version": APP_VERSION,
             "cwd": os.getcwd(),
             "user_home_dir": get_user_home_dir(),
-            "data_dir": get_user_data_dir()
+            "data_dir": get_data_dir()
         },
         "config": {
 

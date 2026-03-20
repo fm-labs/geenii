@@ -9,7 +9,8 @@ from geenii.utils.os_util import get_user_home
 APP_VERSION = "0.3.1"
 
 USER_HOME_DIR = get_user_home()
-DATA_DIR = os.environ.get("GEENII_DATA_DIR", USER_HOME_DIR + "/.geenii")
+USER_DIR = os.environ.get("GEENII_DIR", USER_HOME_DIR + "/.geenii")
+DATA_DIR = os.environ.get("GEENII_DATA_DIR", "data")
 
 dotenv.load_dotenv(DATA_DIR + "/.env", override=True, verbose=True)
 
@@ -60,7 +61,13 @@ CHAT_DM_NAMESPACE =  os.environ.get("GEENII_CHAT_DM_NAMESPACE", "a7f3c2e1-4b8d-5
 CHAT_GROUP_NAMESPACE =  os.environ.get("GEENII_CHAT_GROUP_NAMESPACE", "b7f3c2e1-8b4d-5a9f-8c3e-2d1b6f0e4a7a")
 
 
-def get_user_data_dir():
+def get_user_dir():
+    if not os.path.exists(USER_DIR):
+        os.makedirs(USER_DIR, exist_ok=True)
+    return USER_DIR
+
+
+def get_data_dir():
     #home_dir = get_user_home_dir()
     #user_dir = os.path.join(home_dir, ".geenii")
     #if not os.path.exists(user_dir):
@@ -72,7 +79,7 @@ def get_user_data_dir():
 
 
 def read_user_settings():
-    user_settings_path = os.path.join(get_user_data_dir(), "settings.json")
+    user_settings_path = os.path.join(get_data_dir(), "settings.json")
     default_settings = {
         "theme": "dark",
         "notifications": True,
@@ -92,7 +99,7 @@ def read_user_settings():
 
 def write_user_settings(settings: dict):
     print(f"Saving settings: {settings}")
-    user_settings_path = os.path.join(get_user_data_dir(), "settings.json")
+    user_settings_path = os.path.join(get_data_dir(), "settings.json")
     try:
         with open(user_settings_path, "w") as f:
             json.dump(settings, f, indent=4)

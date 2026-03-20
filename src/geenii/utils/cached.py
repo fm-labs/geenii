@@ -203,6 +203,25 @@ class FileCacheStore:
         os.replace(tmp_path, path)
 
 
+class InMemoryCacheStore:
+    def __init__(self):
+        self.store = {}
+
+    def read_cache(self, key: str) -> Any | None:
+        entry = self.store.get(key)
+        if entry is None:
+            return None
+        expiry, value = entry
+        if expiry is not None and time.time() > expiry:
+            del self.store[key]
+            return None
+        return value
+
+    def write_cache(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+        expiry = None if ttl is None else (time.time() + float(ttl))
+        self.store[key] = (expiry, value)
+
+
 def default_cache_key(func, args, kwargs):
     raw = {"func": func.__name__, "args": args, "kwargs": kwargs}
     print(">>> Generating cache key for:", raw)
@@ -210,8 +229,12 @@ def default_cache_key(func, args, kwargs):
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 def default_cache_store():
-    # return FileCacheStore(".cache")
-    return SqliteCacheStore(f"{config.CACHE_DIR}/cache.sqlite")
+    try:
+        return SqliteCacheStore(f"{config.CACHE_DIR}/cache.sqlite")
+    except Exception as e:
+        print(f"Error initializing SqliteCacheStore: {e}")
+        print("Falling back to InMemoryCacheStore (non-persistent, not shared across processes)")
+        return InMemoryCacheStore()
 
 def cached(ttl=None, cachekey=None, store=None):
     """

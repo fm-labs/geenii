@@ -4,7 +4,6 @@ import pydantic
 
 from geenii.agent.registry import AgentRegistry, AgentConfig, init_agent
 from geenii.chat.chat_bots import BotInterface
-from geenii.config import DATA_DIR
 from geenii.utils.json_util import read_json
 
 
@@ -20,12 +19,10 @@ def get_bot(botname: str) -> BotInterface:
     return init_agent_by_name(name)
 
 
-def init_agent_registry(config_path: str = None, auto_load: bool = False) -> AgentRegistry:
+def init_agent_registry(base_path: str = None, auto_load: bool = False) -> AgentRegistry:
     reg = AgentRegistry()
-    if config_path is None:
-        config_path = f"{DATA_DIR}/agents.json"
     if auto_load:
-        reg.from_config_file(config_path)
+        reg.from_config_file(base_path)
     return reg
 
 
@@ -40,7 +37,7 @@ def init_agent_by_name(name: str) -> "Agent":
     - tools: (optional) A list of tool definitions that the agent can use
     - mcp_servers: (optional) A dictionary of MCP server configurations that the agent can connect to
     """
-    file_path = f"{DATA_DIR}/agents.json"
+    file_path = f"{USER_DIR}/agents.json"
 
     data = read_json(file_path)
     if not isinstance(data, list):

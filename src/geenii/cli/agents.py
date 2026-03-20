@@ -1,104 +1,44 @@
-import asyncio
-
 import click
 
-from geenii.agents import Agent
-from geenii.cli.base import BaseCli
+from geenii.cli.click_helper import click_error, click_info
 from geenii.g import init_agent_registry
-from geenii.hidl import HumanInTheLoopController
 
 
-class CliHumanInTheLoopController(HumanInTheLoopController):
 
-    async def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
-        click.secho(f"Tool execution requested: {tool_name} with arguments {arguments} (call_id={call_id})",
-                    fg="yellow")
-
-        #asyncio.create_task(asyncio.to_thread(
-        #    tts_say_cli(f"A tool call was requested: {tool_name} with {len(arguments)} arguments. Do you approve?")))
-
-        response = click.prompt("Do you approve? (y/n)", default="n")
-        return response.lower() == "y"
+@click.group()
+def agents():
+    """Manage and run agents."""
+    pass
 
 
-class CliAgentRunner:
+@agents.command(name="list")
+def list_agents():
+    """List all configured and loaded agents."""
+    click.echo("Configured agents:")
+    _agents = init_agent_registry(auto_load=True)
+    for agent_name in _agents.list_configured():
+        click.echo(f"- {agent_name}")
 
-    def __init__(self, agent: Agent, interactive: bool = True):
-        self.interactive = interactive
-        self.agent = agent
-        # self.agent._hidl = CliHumanInTheLoopController()
-
-        print("Bot initialized. Starting interaction...")
-        print(agent)
-
-    def run(self, prompt: str):
-        asyncio.run(self._run(prompt))
-
-    async def _run(self, prompt: str):
-        while prompt.lower() != "exit" and len(prompt) > 0:
-            async for msg in self.agent.prompt(prompt):
-                for part in msg.content:
-                    click.secho(f">>> [{part.type}] {part.to_text()}", fg="cyan")
-
-            if self.interactive:
-                prompt = click.prompt("> ", default="", show_default=False)
-            else:
-                break
+    click.echo("Loaded agents:")
+    for agent_name in _agents.list_loaded():
+        click.echo(f"- {agent_name}")
 
 
-class AgentsCli(BaseCli):
-
-    def __init__(self, cli: click.core.Group):
-        super().__init__(cli)
-        self.agents = init_agent_registry(auto_load=True)
-
-        @cli.group()
-        def agents():
-            """Manage and run agents."""
-            pass
-
-        @agents.command(name="list")
-        def list_agents():
-            """List all configured and loaded agents."""
-            click.echo("Configured agents:")
-            for agent_name in self.agents.list_configured():
-                click.echo(f"- {agent_name}")
-
-            click.echo("Loaded agents:")
-            for agent_name in self.agents.list_loaded():
-                click.echo(f"- {agent_name}")
-
-        @agents.command(name="ask")
-        @click.argument("prompt")
-        @click.option("name", "--name", "-n", default="default", help="Name of the agent to run.")
-        @click.option("continue_conversation", "--continue", "-c", is_flag=True,
-                      help="Continue the conversation after the initial prompt.")
-        def ask_agent(prompt: str, name: str, continue_conversation: bool):
-            """
-            Run a agent with the given name and prompt.
-
-            PROMPT  The initial prompt to start the agent with.
-            """
-            click.echo(f"Running agent '{name}' with prompt: {prompt}")
-            g_bot = self.agents.get_instance(name)
-            if not g_bot:
-                click.echo(f"Agent '{name}' not found. Please check the available agents with 'agents list'.")
-                return
-            CliAgentRunner(g_bot, interactive=continue_conversation).run(prompt)
-
-        @agents.command(name="inspect")
-        @click.argument("name")
-        def inspect_agent(name: str):
-            agent_config = self.agents.get_config(name)
-            if not agent_config:
-                self.error(f"Agent '{name}' not found. Please check the available agents with 'agents list'.")
-                return
-            self.info(f"Name: {agent_config.name}")
-            self.info(f"Description: {agent_config.description}")
-            self.info(f"Label: {agent_config.label}")
-            self.info(f"Model: {agent_config.model}")
-            self.info(f"Model Parameters: {agent_config.model_parameters}")
-            self.info(f"Tools: {agent_config.tools}")
-            self.info(f"Skills: {agent_config.skills}")
-            self.info(f"System Prompt: {agent_config.system}")
-            # print(agent_config)
+@agents.command(name="inspect")
+@click.argument("name")
+def inspect_agent(name: str):
+    _agents = init_agent_registry(auto_load=True)
+    agent_config = _agents.get_config(name)
+    if not agent_config:
+        click_error(f"Agent '{name}' not found. Please check the available agents with 'agents list'.")
+        return
+    
+    click_info(f"Name: {agent_config.name}")
+    click_info(f"Description: {agent_config.description}")
+    click_info(f"Label: {agent_config.label}")
+    click_info(f"Model: {agent_config.model}")
+    click_info(f"Model Parameters: {agent_config.model_parameters}")
+    click_info(f"Tools: {agent_config.tools}")
+    click_info(f"Skills: {agent_config.skills}")
+    click_info(f"System Prompt: {agent_config.system}")
+    # print(agent_config)

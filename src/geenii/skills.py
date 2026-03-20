@@ -5,6 +5,7 @@ from pathlib import Path
 import yaml
 
 from geenii.config import DATA_DIR
+from geenii.utils.mdfile import read_frontmatter_file
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +18,26 @@ class SkillSpec:
     #instructions: str | None = None
     metadata: dict | None = None
 
-    @property
-    def instructions(self) -> str:
+    def __init__(self, name: str, path: str):
         instructions_md_path = Path(self.path) / "SKILL.md"
         if not instructions_md_path.is_file():
-            return f"No instructions found at path '{instructions_md_path}'"
+            raise KeyError(f"No instructions found at path '{instructions_md_path}'")
 
-        _, skill_body = skill_md_read(str(instructions_md_path))
-        return skill_body
+        # read meta data on init
+        header, _ = read_frontmatter_file(str(instructions_md_path))
+
+        self.path = path
+        self.name = name
+        self.description = header.get("description")
+        self.metadata = header.get("metadata", {})
+        self._instruction_md_path = instructions_md_path
+
+    @property
+    def instructions(self) -> str:
+        # lazy load instructions
+        _, body = read_frontmatter_file(str(self._instruction_md_path))
+        return body
+
 
 class SkillRegistry:
     """
@@ -50,7 +63,7 @@ class SkillRegistry:
 
     def load(self, skill_name: str) -> SkillSpec | None:
         try:
-            skill = build_skill_spec(f"{DATA_DIR}/skills/{skill_name}")
+            skill = SkillSpec(skill_name, f"{DATA_DIR}/skills/{skill_name}")
             self.register(skill)
             return skill
         except Exception as e:
@@ -72,30 +85,30 @@ class SkillRegistry:
                 skill_md_path = Path(base_path / item / "SKILL.md")
                 if skill_md_path.is_file():
                     try:
-                        skill = build_skill_spec(Path(base_path / item))
+                        skill = SkillSpec(str(item), str(Path(base_path / item)))
                         self.register(skill)
                     except Exception as e:
                         logger.critical(f"Error while loading skill from '{item}': {str(e)}", exc_info=False)
 
 
-def build_skill_spec(skill_path: Path | str) -> SkillSpec:
-    """
-    Load a skill by name, optionally specifying the path to the skill directory.
-
-    :param skill_name: The name of the skill to load.
-    :param skill_path:  Optional path to the skill directory. If not provided, the function will attempt to locate it.
-    :return: A Skill object containing the loaded skill information.
-    """
-    skill_path = Path(skill_path).resolve()
-    if not skill_path or not skill_path.is_dir():
-        raise ValueError(f"Skill not found in path '{skill_path}'")
-
-    skill_header, skill_body = skill_md_read(str(skill_path / "SKILL.md"))
-    skill = SkillSpec(name=skill_path.name,
-                      path=str(skill_path),
-                      description=skill_header.get("description"),
-                      metadata=skill_header)
-    return skill
+# def build_skill_spec(skill_path: Path | str) -> SkillSpec:
+#     """
+#     Load a skill by name, optionally specifying the path to the skill directory.
+#
+#     :param skill_name: The name of the skill to load.
+#     :param skill_path:  Optional path to the skill directory. If not provided, the function will attempt to locate it.
+#     :return: A Skill object containing the loaded skill information.
+#     """
+#     skill_path = Path(skill_path).resolve()
+#     if not skill_path or not skill_path.is_dir():
+#         raise ValueError(f"Skill not found in path '{skill_path}'")
+#
+#     skill_header, skill_body = read_frontmatter_file(str(skill_path / "SKILL.md"))
+#     skill = SkillSpec(name=skill_path.name,
+#                       path=str(skill_path),
+#                       description=skill_header.get("description"),
+#                       metadata=skill_header)
+#     return skill
 
 
 # def skill_locate_path(skill_name: str) -> Path | None:
@@ -119,37 +132,3 @@ def build_skill_spec(skill_path: Path | str) -> SkillSpec:
 #                 return _path
 #     return None
 
-
-def skill_md_read(skill_file: str) -> tuple[dict, str]:
-    """
-    Read and parse the skill markdown file from the specified directory.
-
-    :param skill_file: The directory containing the SKILL.md file.
-    :return: A tuple containing the skill header and body content.
-    """
-    if not skill_file or not os.path.isfile(skill_file):
-        raise ValueError(f"Skill markdown file not found: '{skill_file}'")
-
-    contents = ""
-    with open(skill_file, "r") as f:
-        contents = f.read()
-
-    if not contents.startswith("---"):
-        raise ValueError("Malformed skill markdown file: missing header delimiter.")
-
-    # find the second occurrence of '---' to determine the end of the header
-    second_header_index = contents.find("---", 3)
-    if second_header_index == -1:
-        raise ValueError("Malformed skill markdown file: missing second header delimiter.")
-
-    # extract the header and body sections
-    header = contents[3:second_header_index].strip()
-    body = contents[second_header_index + 3:].strip()
-
-    # the header str is expected to be in YAML format, we can parse it into a dict
-    try:
-        header_dict = yaml.safe_load(header)
-    except yaml.YAMLError as e:
-        raise ValueError(f"Malformed skill markdown file: error parsing header YAML. {str(e)}")
-
-    return header_dict, body
