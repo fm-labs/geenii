@@ -15,5 +15,4 @@ volumes/
 .env.*
 src/tests/
 x*.py
-xaidev/
 __pycache__/

@@ -19,5 +19,3 @@ __pycache__/
 .DS_Store
 src/*.egg-info/
 src/x*.py
-src/x*.*
-src/xaidev
