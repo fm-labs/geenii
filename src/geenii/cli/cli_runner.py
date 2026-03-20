@@ -45,21 +45,3 @@ class CliAgentRunner:
                 break
 
 
-@click.command(name="agent")
-@click.argument("prompt")
-@click.option("name", "--name", "-n", default="default", help="Name of the agent to run.")
-@click.option("continue_conversation", "--continue", "-c", is_flag=True,
-              help="Continue the conversation after the initial prompt.")
-def agent_cli(prompt: str, name: str, continue_conversation: bool):
-    """
-    Run an agent with the given name and prompt.
-
-    PROMPT  The initial prompt to start the agent with.
-    """
-    click.echo(f"Running agent '{name}' with prompt: {prompt}")
-    _agents = init_agent_registry(auto_load=True)
-    g_bot = _agents.get_instance(name)
-    if not g_bot:
-        click.echo(f"Agent '{name}' not found. Please check the available agents with 'agents list'.")
-        return
-    CliAgentRunner(g_bot, interactive=continue_conversation).run(prompt)

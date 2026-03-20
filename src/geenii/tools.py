@@ -1,98 +1,41 @@
 from __future__ import annotations
 
 import asyncio
-import datetime
 from typing import Any
 
-from geenii.core.tools import geenii_tools, display_desktop_notification
+from geenii.core.tools import display_desktop_notification
 from geenii.mcp import get_mcp_config, McpClient
-from geenii.tool.registry import PythonTool, ToolRegistry, logger, ComputerTool
+from geenii.tool.registry import ToolRegistry, logger, ComputerTool
 from geenii.utils.cached import cached
-
-TOOLS: ToolRegistry | None = None
-
-
-def get_default_tool_registry() -> ToolRegistry:
-    global TOOLS
-    if TOOLS is None:
-        TOOLS = init_default_tool_registry()
-    return TOOLS
-
-
-def init_default_tool_registry():
-    registry = ToolRegistry()
-    init_builtin_tools(registry)
-    init_mcp_server_tools_sync(registry)
-    return registry
 
 
 def init_builtin_tools(registry: ToolRegistry):
-    #for name, tool in geenii_tools._tools.items():
-    #    registry.register(tool)
-
-    registry.register(PythonTool(
-        name="calculate_square_root",
-        description="Calculate the square root of a number.",
-        parameters={
-            "type": "object",
-            "properties": {
-                "number": {"type": "number", "description": "The number to calculate the square root of."}
-            },
-            "required": ["number"]
-        },
-        handler=lambda number: number ** 0.5
-    ))
-
-    registry.register(PythonTool(
-        name="get_current_datetime",
-        description="Get the current UTC system date and time in ISO 8601 format.",
-        parameters={
-            "type": "object",
-            "properties": {}
-        },
-        handler=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat()
-    ))
-
-    registry.register_function(display_desktop_notification)
-
     registry.register(ComputerTool(
         name="execute_command",
         description="Execute a shell command on the local machine and return its output.",
         parameters={
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "The shell command to execute. The command should be a single string, e.g. 'ls -la /tmp'."},
-                "skill": {"type": "string", "description": "The name of the skill that is requesting the command execution.", "nullable": True}
+                "command": {"type": "string", "description": "The shell command to execute. The command should be a single string, e.g. 'ls -la /tmp'."}
             },
-            "required": ["command", "skill"]
+            "required": ["command"]
         },
     ))
-
     registry.register(ComputerTool(
         name="execute_python",
         description="Execute a python script on the local machine and return its output.",
         parameters={
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "The python command to execute. The command should be a single string, e.g. 'python3 /path/to/script/main.py'."},
-                "skill": {"type": "string", "description": "The name of the skill that is requesting the command execution.", "nullable": True}
+                "command": {"type": "string", "description": "The python command to execute. The command should be a single string, e.g. 'python3 /path/to/script/main.py'."}
             },
-            "required": ["command", "skill"]
+            "required": ["command"]
         },
     ))
+    registry.register_function(display_desktop_notification)
+
 
 async def init_mcp_server_tools(registry: ToolRegistry):
-    # mcp_servers = {
-    #     "duckduckgo": {
-    #         "command": "docker",
-    #         "args": [
-    #             "run",
-    #             "-i",
-    #             "--rm",
-    #             "mcp/duckduckgo"
-    #         ]
-    #     }
-    # }
     mcp_config = get_mcp_config()
     if not mcp_config or "mcpServers" not in mcp_config:
         print("No MCP servers configured")

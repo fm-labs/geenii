@@ -18,7 +18,7 @@ def list_skills():
     """List all registered skills."""
     _skills = init_skills()
     for skill in _skills.skills:
-        click_success(f"- {skill}: {_skills.get(skill).description}")
+        click_success(f"- {skill}: {_skills.get(skill).description[:100]}...")
 
 
 @skills.command(name="inspect")

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import os
+
 import pydantic
 
 from geenii.agent.registry import AgentRegistry, AgentSpec, init_agent
+from geenii.ai import enumerate_providers, enumerate_models
 from geenii.chat.chat_bots import BotInterface
-from geenii.config import USER_DIR
+from geenii.config import USER_DIR, APP_VERSION, get_data_dir
 from geenii.skills import SkillRegistry
 from geenii.utils.json_util import read_json
+from geenii.utils.os_util import get_user_home_dir
+from geenii.utils.system_util import get_system_report
 
 
 def get_bot(botname: str) -> BotInterface:
@@ -61,3 +66,34 @@ def init_skills() -> SkillRegistry:
     skill_reg.register_all_from_directory(f"{USER_DIR}/skills")
     skill_reg.register_all_from_directory(f"{USER_DIR}/vendor/skills/anthropic/skills")
     return skill_reg
+
+
+def get_app_info() -> dict:
+    allowed_env_vars = ["PATH", "HOME", "USER", "USERNAME"]
+
+    ai_providers = enumerate_providers()
+    ai_models = enumerate_models()
+
+    data = dict({
+        "app": {
+            "version": APP_VERSION,
+            "cwd": os.getcwd(),
+            "user_home_dir": get_user_home_dir(),
+            "data_dir": get_data_dir()
+        },
+        "config": {
+
+        },
+        "providers": [provier.model_dump() for provier in ai_providers],
+        "models": [model.model_dump() for model in ai_models],
+    })
+
+    # add system report
+    # if not in DEV_MODE, remove the env variables from the report for security reasons
+    report = get_system_report()
+    if not os.environ.get("DEV_MODE", "0") == "1":
+        if "env" in report:
+            report["env"] = {k: v for k, v in report["env"].items() if k in allowed_env_vars}
+    data.update({"system": report})
+
+    return data

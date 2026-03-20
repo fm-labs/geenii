@@ -6,7 +6,6 @@
 bak/
 data/
 build/
-dist/
 docs/
 volumes/
 .env.local

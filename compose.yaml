@@ -1,7 +1,7 @@
 
 services:
 
-  api:
+  geenii-local:
     build:
       context: .
       dockerfile: Dockerfile-localserver
@@ -12,9 +12,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./data:/app/data
-      - "$HOME/.geenii:/home/geenii/.geenii"
+      - ./data:/data
+      - ./geenii:/home/geenii/.geenii
     environment:
       - OLLAMA_HOST=http://host.docker.internal:11434
-    env_file:
-      - "$HOME/.geenii/.env"
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
