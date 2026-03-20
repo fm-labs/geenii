@@ -59,6 +59,6 @@ ENTRYPOINT ["/usr/bin/entrypoint"]
 
 WORKDIR /home/geenii
 USER geenii
-ENV GEENII_USER_DIR=/home/geenii/.geenii
+ENV GEENII_USER_DIR=/.geenii
 ENV GEENII_DATA_DIR=/data
 CMD ["geenii", "--help"]

@@ -1,5 +1,4 @@
-
-FROM python:3.14.2-slim
+FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/src
@@ -16,12 +15,12 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV UV_LINK_MODE=copy
 
 # Create a non-root user and group and set permissions for app and home directory
-RUN groupadd -r app && useradd -r -g app app && \
-    mkdir -p /app && \
-    chown -R app:app /app && \
-    mkdir -p /home/app && \
-    chown -R app:app /home/app && \
-    usermod -a -G root app
+RUN groupadd --gid 33311 -r geenii && useradd --uid 33311 -r -g geenii geenii && \
+    mkdir -p /.geenii && \
+    chown -R geenii:geenii /.geenii && \
+    mkdir -p /home/geenii && \
+    chown -R geenii:geenii /home/geenii && \
+    usermod -a -G root geenii
 
 # Install system dependencies
 RUN apt update && apt install -yy \
@@ -53,7 +52,7 @@ COPY ./pyproject.toml ./uv.lock /app/
 RUN uv sync --no-cache-dir
 
 COPY ./src/geenii /app/src/geenii
-COPY ./src/server.py ./src/cli.py /app/src/
+COPY ./src/server.py ./src/cli.py ./src/mod.py /app/src/
 
 # Run
 USER app
