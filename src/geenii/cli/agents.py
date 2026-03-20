@@ -40,5 +40,6 @@ def inspect_agent(name: str):
     click_info(f"Model Parameters: {agent_config.model_parameters}")
     click_info(f"Tools: {agent_config.tools}")
     click_info(f"Skills: {agent_config.skills}")
-    click_info(f"System Prompt: {agent_config.system}")
+    click_info(f"System Instructions: {agent_config.system}")
+    click_info(f"Full System Instructions: {agent_config.full_instructions}")
     # print(agent_config)

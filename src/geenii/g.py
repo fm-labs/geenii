@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import pydantic
 
-from geenii.agent.registry import AgentRegistry, AgentConfig, init_agent
+from geenii.agent.registry import AgentRegistry, AgentSpec, init_agent
 from geenii.chat.chat_bots import BotInterface
+from geenii.config import USER_DIR
+from geenii.skills import SkillRegistry
 from geenii.utils.json_util import read_json
 
 
@@ -22,7 +24,7 @@ def get_bot(botname: str) -> BotInterface:
 def init_agent_registry(base_path: str = None, auto_load: bool = False) -> AgentRegistry:
     reg = AgentRegistry()
     if auto_load:
-        reg.from_config_file(base_path)
+        reg.register_all_from_directory(f"{USER_DIR}/agents")
     return reg
 
 
@@ -48,7 +50,14 @@ def init_agent_by_name(name: str) -> "Agent":
         raise ValueError(f"Agent configuration with name '{name}' not found in {file_path}.")
 
     try:
-        agent_conf = AgentConfig.model_validate(config)
+        agent_conf = AgentSpec.model_validate(config)
     except pydantic.ValidationError as e:
         raise ValueError(f"Invalid agent configuration in {file_path}: {str(e)}")
     return init_agent(agent_conf)
+
+
+def init_skills() -> SkillRegistry:
+    skill_reg = SkillRegistry()
+    skill_reg.register_all_from_directory(f"{USER_DIR}/skills")
+    skill_reg.register_all_from_directory(f"{USER_DIR}/vendor/skills/anthropic/skills")
+    return skill_reg

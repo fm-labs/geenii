@@ -3,12 +3,13 @@ import click
 
 from rich.logging import RichHandler
 
-from geenii.cli.ai import ai
-from geenii.cli.agents import agents
-from geenii.cli.chat_client import chat
-from geenii.cli.info import info
-from geenii.cli.skills import skills
-from geenii.cli.tools import tools
+from geenii.cli.ai import ai as ai_cli
+from geenii.cli.agent import agent_cli
+from geenii.cli.agents import agents as agents_cli
+from geenii.cli.chat_client import chat as chat_cli
+from geenii.cli.info import info as info_cli
+from geenii.cli.skills import skills as skills_cli
+from geenii.cli.tools import tools as tools_cli
 from geenii.config import APP_VERSION
 
 logging.basicConfig(
@@ -34,9 +35,14 @@ def cli():
     pass
 
 
-cli.add_command(info)
-cli.add_command(ai)
-cli.add_command(agents)
-cli.add_command(skills)
-cli.add_command(tools)
-#gcli.add_command(chat)
+cli.add_command(info_cli)
+cli.add_command(ai_cli)
+cli.add_command(agents_cli)
+cli.add_command(agent_cli)
+cli.add_command(skills_cli)
+cli.add_command(tools_cli)
+#cli.add_command(chat_cli)
+
+
+if __name__ == "__main__":
+    cli()

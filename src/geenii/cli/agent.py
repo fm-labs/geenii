@@ -3,7 +3,6 @@ import asyncio
 import click
 
 from geenii.agents import Agent
-from geenii.cli.agents import agents
 from geenii.g import init_agent_registry
 from geenii.hidl import HumanInTheLoopController
 
@@ -46,12 +45,12 @@ class CliAgentRunner:
                 break
 
 
-@agents.command(name="ask")
+@click.command(name="agent")
 @click.argument("prompt")
 @click.option("name", "--name", "-n", default="default", help="Name of the agent to run.")
 @click.option("continue_conversation", "--continue", "-c", is_flag=True,
               help="Continue the conversation after the initial prompt.")
-def ask_agent(prompt: str, name: str, continue_conversation: bool):
+def agent_cli(prompt: str, name: str, continue_conversation: bool):
     """
     Run an agent with the given name and prompt.
 
@@ -59,7 +58,7 @@ def ask_agent(prompt: str, name: str, continue_conversation: bool):
     """
     click.echo(f"Running agent '{name}' with prompt: {prompt}")
     _agents = init_agent_registry(auto_load=True)
-    g_bot = agents.get_instance(name)
+    g_bot = _agents.get_instance(name)
     if not g_bot:
         click.echo(f"Agent '{name}' not found. Please check the available agents with 'agents list'.")
         return

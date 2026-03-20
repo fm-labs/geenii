@@ -4,18 +4,9 @@ import shutil
 import click.core
 
 from geenii.cli.click_helper import click_success, click_error
-from geenii.config import DATA_DIR, USER_DIR
-from geenii.skills import SkillRegistry
+from geenii.config import USER_DIR
+from geenii.g import init_skills
 
-
-
-def init_skills() -> SkillRegistry:
-    skill_reg = SkillRegistry()
-    skill_reg.register_all_from_directory(f"{USER_DIR}/skills")
-    skill_reg.register_all_from_directory(f"{USER_DIR}/vendor/skills/anthropic/skills")
-    return skill_reg
-
-_skills = init_skills()
 
 @click.group()
 def skills():
@@ -25,6 +16,7 @@ def skills():
 @skills.command(name="list")
 def list_skills():
     """List all registered skills."""
+    _skills = init_skills()
     for skill in _skills.skills:
         click_success(f"- {skill}: {_skills.get(skill).description}")
 
@@ -35,9 +27,10 @@ def inspect_skill(name: str):
     """
     Show details for a specific skill.
     """
+    _skills = init_skills()
     skill = _skills.get(name)
     if skill:
-        print(f"Path: {skill.path}")
+        print(f"Path: {skill.dir_path}")
         print(f"Name: {skill.name}")
         print(f"Description: {skill.description}")
         print(f"Metadata:")

@@ -48,10 +48,10 @@ class MarkdownFile:
 
 def read_frontmatter_file(file_path: str) -> tuple[dict, str]:
     """
-    Read and parse the skill markdown file from the specified directory.
+    Read and parse the markdown file from the specified directory.
 
     :param file_path: The directory containing the SKILL.md file.
-    :return: A tuple containing the skill header and body content.
+    :return: A tuple containing the frontmatter header and body content.
     """
     if not file_path or not os.path.isfile(file_path):
         raise ValueError(f"Skill markdown file not found: '{file_path}'")
@@ -61,12 +61,12 @@ def read_frontmatter_file(file_path: str) -> tuple[dict, str]:
         contents = f.read()
 
     if not contents.startswith("---"):
-        raise ValueError("Malformed skill markdown file: missing header delimiter.")
+        raise ValueError("Malformed frontmatter markdown file: missing header delimiter.")
 
     # find the second occurrence of '---' to determine the end of the header
     second_header_index = contents.find("---", 3)
     if second_header_index == -1:
-        raise ValueError("Malformed skill markdown file: missing second header delimiter.")
+        raise ValueError("Malformed frontmatter markdown file: missing second header delimiter.")
 
     # extract the header and body sections
     header = contents[3:second_header_index].strip()
@@ -76,6 +76,6 @@ def read_frontmatter_file(file_path: str) -> tuple[dict, str]:
     try:
         header_dict = yaml.safe_load(header)
     except yaml.YAMLError as e:
-        raise ValueError(f"Malformed skill markdown file: error parsing header YAML. {str(e)}")
+        raise ValueError(f"Malformed frontmatter markdown file: error parsing header YAML. {str(e)}")
 
     return header_dict, body

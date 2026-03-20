@@ -1,70 +1,71 @@
-import os
 import logging
+import os
+from pathlib import Path
 
 import pydantic
 
-from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
 from geenii.agent.base_agent import BaseAgent
 from geenii.chat.chat_bots import BotInterface
-from geenii.config import DATA_DIR
 from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry
-from geenii.utils.json_util import read_json
+from geenii.utils.mdfile import read_frontmatter_file
 
 logger = logging.getLogger(__name__)
 
 
-
-
-
-class AgentConfig(pydantic.BaseModel):
+class AgentSpec(pydantic.BaseModel):
     """
-    BotConfig represents the configuration for a agent, including its name, model, system prompt, description, tools, and skills.
-    This can be used to define agents in JSON files and load them into Agent instances.
+    Represents the configuration for an agent, including its name, model, system prompt, description, tools, and skills.
     """
+    file_path: str | None = None # path to the spec file, used for loading additional instructions
     name: str
     model: str
-    system: str
+    system: str | None = None
     label: str | None = None
     description: str | None = None
     tools: list[str] | None = pydantic.Field(default_factory=list)
-    mcp_servers: dict[str, dict] | None = pydantic.Field(default_factory=dict)
     skills: list[str] | None = pydantic.Field(default_factory=list)
     model_parameters: dict | None = pydantic.Field(default_factory=dict)
+    mcp_servers: dict[str, dict] | None = pydantic.Field(default_factory=dict)
 
-    @property
-    def path(self):
-        """The path to the agent's directory, which can contain additional files like INSTRUCTIONS.md"""
-        return f"{DATA_DIR}/agents/{self.name}"
-
+    # @property
+    # def working_dir(self):
+    #     """The path to the agent's directory"""
+    #     return f"{USER_DIR}/agents/{self.name}/"
 
     @property
     def instructions(self) -> str:
         """
         The contents of INSTRUCTIONS.md in the agent's directory, if it exists.
-        This can be used to provide additional instructions for the agent that are appended to the system prompt.
         """
-        instructions_path = f"{self.path}/INSTRUCTIONS.md"
-        if os.path.exists(instructions_path):
-            with open(instructions_path, "r") as f:
-                return f.read()
-        return ""
+        if not self.file_path:
+            return ""
+        _, body = read_frontmatter_file(self.file_path)
+        return body
 
     @property
     def full_instructions(self) -> str:
         """
         Build the full system prompt for the agent by combining the base system prompt with any additional instructions from INSTRUCTIONS.md.
         """
-        system_prompt = self.system or DEFAULT_AGENT_SYSTEM_PROMPT
-        instructions_path = f"{self.path}/INSTRUCTIONS.md"
-        if os.path.exists(instructions_path):
-            with open(instructions_path, "r") as f:
-                instructions = f.read()
-                system_prompt += f"\n\n{instructions}"
-        return system_prompt
+        full = self.system or ""
+        if self.instructions:
+            full += "\n\n" + self.instructions
+        return full.strip()
+
+    @staticmethod
+    def from_md_file(md_path: str):
+        """
+        Load agent configuration from a markdown file with frontmatter. The frontmatter should contain the fields defined in this model.
+        """
+        header, _ = read_frontmatter_file(md_path)
+        if not isinstance(header, dict):
+            raise ValueError(f"Invalid agent configuration in {md_path}: expected frontmatter to be a dictionary.")
+        header["file_path"] = md_path
+        return AgentSpec.model_validate(header)
 
 
-def init_agent(agent_conf: AgentConfig) -> BaseAgent:
+def init_agent(agent_conf: AgentSpec) -> BaseAgent:
     tool_registry = ToolRegistry()
     # init_builtin_tools(tool_registry)
     # init_mcp_server_tools_sync(tool_registry)
@@ -72,46 +73,37 @@ def init_agent(agent_conf: AgentConfig) -> BaseAgent:
     #    tool_registry.allow_tool(tool)
     # for mcp_server_id, mcp_server_config in mcp_servers.items():
     #    tool_registry.register_mcp_server(mcp_server_id, mcp_server_config)
+
     skill_registry = SkillRegistry()
     for skill in agent_conf.skills:
         skill_registry.load(skill)
 
-    #system_prompt = agent_conf.system or DEFAULT_AGENT_SYSTEM_PROMPT
-    ## if an INSTRUCTIONS.md exist in agent's directory, we can append it to the system prompt
-    #agent_dir = f"{DATA_DIR}/agents/{agent_conf.name}"
-    #instructions_path = f"{agent_dir}/INSTRUCTIONS.md"
-    #if os.path.exists(instructions_path):
-    #    with open(instructions_path, "r") as f:
-    #        instructions = f.read()
-    #        system_prompt += f"\n\n{instructions}"
-
     agent_class_name = "geenii.agents.Agent"
-    if agent_conf.name == "default":
-        agent_class_name = "geenii.agents.RoutingAgent"
+    #if agent_conf.name == "default":
+    #    agent_class_name = "geenii.agents.RoutingAgent"
 
-    # instance from class  path string
-    agent = None
+    # instance from class path string
     try:
         module_path, class_name = agent_class_name.rsplit(".", 1)
         module = __import__(module_path, fromlist=[class_name])
         agent_class = getattr(module, class_name)
+
+        agent = agent_class(name=agent_conf.name, description=agent_conf.description,
+                            model=agent_conf.model, system_prompt=agent_conf.full_instructions,
+                            allowed_tools=set(agent_conf.tools),
+                            tool_registry=tool_registry, skill_registry=skill_registry)
+        return agent
     except Exception as e:
         logger.error(f"Error loading agent class '{agent_class_name}': {str(e)}", exc_info=e)
         raise ValueError(f"Error loading agent class '{agent_class_name}': {str(e)}")
 
-    agent = agent_class(name=agent_conf.name, description=agent_conf.description,
-                        model=agent_conf.model, system_prompt=agent_conf.full_instructions,
-                        allowed_tools=set(agent_conf.tools),
-                        tool_registry=tool_registry, skill_registry=skill_registry)
-    return agent
-
 
 class AgentRegistry:
     def __init__(self):
-        self._agent_configs: dict[str, AgentConfig] = {}
+        self._agent_configs: dict[str, AgentSpec] = {}
         self._agents: dict[str, BaseAgent] = {}
 
-    def get_config(self, name) -> AgentConfig | None:
+    def get_config(self, name) -> AgentSpec | None:
         """Get the configuration for a agent by name. Returns None if no configuration is found."""
         return self._agent_configs.get(name)
 
@@ -154,18 +146,28 @@ class AgentRegistry:
         self._agents[agent.name] = agent
         logger.info(f"Agent '{agent.name}' registered.")
 
-    def from_config_file(self, config_path: str):
+    def register_from_file(self, config_path: str):
         if os.path.exists(config_path):
-            data = read_json(config_path)
-            if not isinstance(data, list):
-                raise ValueError(
-                    f"Invalid agent configuration in {config_path}: expected a JSON list of BotConfig data.")
-            for config in data:
+            try:
+                agent_conf = AgentSpec.from_md_file(config_path)
+                self._agent_configs[agent_conf.name] = agent_conf
+                logger.info(f"Agent '{agent_conf.name}' registered from file '{config_path}'.")
+            except Exception as e:
+                logger.error(f"Error loading agent from config file '{config_path}': {str(e)}", exc_info=e)
+        else:
+            logger.warning(f"Agent configuration file not found at {config_path}. No agents loaded.")
+
+    def register_all_from_directory(self, directory: str) -> None:
+        base_path = Path(directory)
+        if not base_path.is_dir():
+            logger.warning(f"Skill directory '{directory}' does not exist or is not a directory.")
+            return
+        for item in base_path.iterdir():
+            if item.is_file() and item.name.endswith(".md"):
+                file_path = Path(base_path / item)
                 try:
-                    agent_conf = AgentConfig.model_validate(config)
+                    agent_conf = AgentSpec.from_md_file(str(file_path))
                     self._agent_configs[agent_conf.name] = agent_conf
                     logger.info(f"Agent '{agent_conf.name}' registered.")
                 except Exception as e:
                     logger.error(f"Error loading agent from config: {str(e)}", exc_info=e)
-        else:
-            logger.warning(f"Agent configuration file not found at {config_path}. No agents loaded.")

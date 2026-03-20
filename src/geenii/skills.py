@@ -1,8 +1,8 @@
 import logging
 import os
-from dataclasses import dataclass
 from pathlib import Path
-import yaml
+
+import pydantic
 
 from geenii.config import DATA_DIR
 from geenii.utils.mdfile import read_frontmatter_file
@@ -10,33 +10,37 @@ from geenii.utils.mdfile import read_frontmatter_file
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class SkillSpec:
-    path: str
+class SkillSpec(pydantic.BaseModel):
+    dir_path: str
     name: str
     description: str
     #instructions: str | None = None
-    metadata: dict | None = None
-
-    def __init__(self, name: str, path: str):
-        instructions_md_path = Path(self.path) / "SKILL.md"
-        if not instructions_md_path.is_file():
-            raise KeyError(f"No instructions found at path '{instructions_md_path}'")
-
-        # read meta data on init
-        header, _ = read_frontmatter_file(str(instructions_md_path))
-
-        self.path = path
-        self.name = name
-        self.description = header.get("description")
-        self.metadata = header.get("metadata", {})
-        self._instruction_md_path = instructions_md_path
+    metadata: dict | None = pydantic.Field(default_factory=dict)
 
     @property
     def instructions(self) -> str:
-        # lazy load instructions
-        _, body = read_frontmatter_file(str(self._instruction_md_path))
+        """
+        The contents of the body of the skill markdown file, which can contain additional instructions or information about the skill.
+        """
+        if not self.dir_path:
+            return ""
+        _, body = read_frontmatter_file(self.dir_path)
         return body
+
+    @staticmethod
+    def from_path(skill_path: str):
+        md_path = os.path.join(skill_path, "SKILL.md")
+        skill_header, skill_body = read_frontmatter_file(md_path)
+        if not skill_header or not isinstance(skill_header, dict):
+            raise ValueError(f"Malformed skill markdown file: missing or invalid header in '{md_path}'")
+        if not "name" in skill_header or "description" not in skill_header:
+            raise ValueError(f"Malformed skill markdown file: missing required 'name' or 'description' fields in header of '{md_path}'")
+        return SkillSpec(
+            dir_path=str(Path(md_path).parent),
+            name=skill_header.get("name"),
+            description=skill_header.get("description", ""),
+            metadata=skill_header
+        )
 
 
 class SkillRegistry:
@@ -63,7 +67,8 @@ class SkillRegistry:
 
     def load(self, skill_name: str) -> SkillSpec | None:
         try:
-            skill = SkillSpec(skill_name, f"{DATA_DIR}/skills/{skill_name}")
+            skill_dir = f"{DATA_DIR}/skills/{skill_name}"
+            skill = SkillSpec.from_path(skill_dir)
             self.register(skill)
             return skill
         except Exception as e:
@@ -85,7 +90,7 @@ class SkillRegistry:
                 skill_md_path = Path(base_path / item / "SKILL.md")
                 if skill_md_path.is_file():
                     try:
-                        skill = SkillSpec(str(item), str(Path(base_path / item)))
+                        skill = SkillSpec.from_path(str(skill_md_path.parent))
                         self.register(skill)
                     except Exception as e:
                         logger.critical(f"Error while loading skill from '{item}': {str(e)}", exc_info=False)
