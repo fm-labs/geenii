@@ -7,7 +7,7 @@ import logging
 import ollama
 
 from geenii import config
-from geenii.chat.chat_models import TextContent, ToolCallContent, ContentPart, ToolCallResultContent, JsonContent
+from geenii.chat_models import TextContent, ToolCallContent, ContentPart, ToolCallResultContent, JsonContent
 from geenii.config import CACHE_DIR
 from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest, AIModelInfo, \
     ModelMessage

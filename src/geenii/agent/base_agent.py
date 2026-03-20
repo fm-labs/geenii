@@ -4,8 +4,8 @@ from typing import Set, List, AsyncGenerator
 import logging
 
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT, BaseTask
-from geenii.chat.chat_bots import BotInterface
-from geenii.chat.chat_models import ContentPart, TextContent
+from geenii.bots import BotInterface
+from geenii.chat_models import ContentPart, TextContent
 from geenii.config import DEFAULT_COMPLETION_MODEL
 from geenii.datamodels import ModelMessage
 from geenii.hidl import HumanInTheLoopController, NoHumanInTheLoopController
@@ -28,6 +28,7 @@ class BaseAgent(BotInterface, abc.ABC):
         self.description = description
         self.model = model or DEFAULT_COMPLETION_MODEL
         self.system_prompt = system_prompt or DEFAULT_AGENT_SYSTEM_PROMPT
+        self.developer_prompt = ""
         self.message_history: List[ModelMessage] = []
         self.memory = memory or None
         self.context_id = context_id or None

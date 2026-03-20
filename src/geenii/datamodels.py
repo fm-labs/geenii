@@ -6,7 +6,7 @@ import pydantic
 from fastapi import UploadFile
 
 from geenii import config
-from geenii.chat.chat_models import ContentPart
+from geenii.chat_models import ContentPart
 
 
 class AIProviderInfo(pydantic.BaseModel):

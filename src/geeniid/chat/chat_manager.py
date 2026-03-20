@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import logging
 
 from geenii import config
-from geenii.chat.chat_models import ContentPart, Room, Member, ChatMessage, RoomType
+from geenii.chat_models import ContentPart, Room, Member, ChatMessage, RoomType
 
 logger = logging.getLogger(__name__)
 

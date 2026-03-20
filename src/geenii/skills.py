@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pydantic
 
-from geenii.config import DATA_DIR
+from geenii.config import DATA_DIR, USER_DIR
 from geenii.utils.mdfile import read_frontmatter_file
 
 logger = logging.getLogger(__name__)
 
 
 class SkillSpec(pydantic.BaseModel):
-    dir_path: str
+    path: str
     name: str
     description: str
     #instructions: str | None = None
@@ -22,24 +22,26 @@ class SkillSpec(pydantic.BaseModel):
         """
         The contents of the body of the skill markdown file, which can contain additional instructions or information about the skill.
         """
-        if not self.dir_path:
+        if not self.path:
             return ""
-        _, body = read_frontmatter_file(self.dir_path)
+        _, body = read_frontmatter_file(self.path + "/SKILL.md")
         return body
 
     @staticmethod
-    def from_path(skill_path: str):
-        md_path = os.path.join(skill_path, "SKILL.md")
-        skill_header, skill_body = read_frontmatter_file(md_path)
+    def from_path(skill_path: Path | str):
+        if isinstance(skill_path, str):
+            skill_path = Path(skill_path)
+        md_path = skill_path / "SKILL.md"
+        skill_header, skill_body = read_frontmatter_file(str(md_path))
         if not skill_header or not isinstance(skill_header, dict):
-            raise ValueError(f"Malformed skill markdown file: missing or invalid header in '{md_path}'")
+            raise ValueError(f"Malformed skill markdown file: missing or invalid header in '{str(md_path)}'")
         if not "name" in skill_header or "description" not in skill_header:
-            raise ValueError(f"Malformed skill markdown file: missing required 'name' or 'description' fields in header of '{md_path}'")
+            raise ValueError(f"Malformed skill markdown file: missing required 'name' or 'description' fields in header of '{str(md_path)}'")
         return SkillSpec(
-            dir_path=str(Path(md_path).parent),
+            path=str(md_path.parent),
             name=skill_header.get("name"),
             description=skill_header.get("description", ""),
-            metadata=skill_header
+            metadata=skill_header.get("metadata", {}),
         )
 
 
@@ -65,14 +67,19 @@ class SkillRegistry:
         self.skills[skill.name] = skill
         logger.info(f"Skill '{skill.name}' registered.")
 
-    def load(self, skill_name: str) -> SkillSpec | None:
-        try:
-            skill_dir = f"{DATA_DIR}/skills/{skill_name}"
-            skill = SkillSpec.from_path(skill_dir)
-            self.register(skill)
-            return skill
-        except Exception as e:
-            logger.critical(f"Error while loading skill: {str(e)}", exc_info=e)
+    def load(self, skill_names: str | list[str]) -> None:
+        if isinstance(skill_names, str):
+            skill_names = [skill.strip() for skill in skill_names.split(",")]
+        for skill_name in skill_names:
+            try:
+                skill_dir = locate_skill_path(skill_name)
+                if not skill_dir:
+                    raise KeyError(f"Skill '{skill_name}' not found.")
+                skill = SkillSpec.from_path(skill_dir)
+                self.register(skill)
+            except Exception as e:
+                logger.critical(f"Error while loading skill: {str(e)}", exc_info=False)
+                raise e
 
     def unload(self, skill_name: str) -> None:
         if skill_name in self.skills:
@@ -116,24 +123,24 @@ class SkillRegistry:
 #     return skill
 
 
-# def skill_locate_path(skill_name: str) -> Path | None:
-#     """
-#     Locate the directory containing the skill markdown file for the given skill name.
-#
-#     :param skill_name: The name of the skill to locate.
-#     :return:
-#     """
-#     base_paths = [
-#         #os.path.join(os.getcwd(), skill_name),
-#         os.path.join(DATA_DIR, "skills", skill_name)
-#     ]
-#     for path in base_paths:
-#         logger.debug(f"Searching for skill '{skill_name}' in path: {path}")
-#         _path = Path(path).absolute()
-#         if _path.is_dir():
-#             skill_md_path = _path / "SKILL.md"
-#             if skill_md_path.is_file():
-#                 logger.info(f"Found skill '{skill_name}' in path: {_path}")
-#                 return _path
-#     return None
+def locate_skill_path(skill_name: str) -> Path | None:
+    """
+    Locate the directory containing the skill markdown file for the given skill name.
+
+    :param skill_name: The name of the skill to locate.
+    :return:
+    """
+    base_paths = [
+        os.path.join(os.getcwd(), skill_name),
+        os.path.join(USER_DIR, "skills"),
+        #os.path.join(DATA_DIR, "skills")
+    ]
+    for _path in base_paths:
+        logger.info(f"Searching for skill '{skill_name}' in path: {_path}")
+
+        skill_md_path = Path(_path) / skill_name / "SKILL.md"
+        if skill_md_path.is_file():
+            logger.info(f"Found skill '{skill_name}' in path: {_path}")
+            return Path(_path) / skill_name
+    return None
 

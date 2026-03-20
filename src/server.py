@@ -10,14 +10,14 @@ from starlette.responses import JSONResponse
 
 from geenii import config
 from geenii.apps import AppRegistry
-from geenii.chat.chat_server_ctx import ChatServerState
 from geenii.config import APP_VERSION, DATA_DIR
 from geenii.core.tasks import *  # important! register any built-in tasks
 from geenii.datamodels import Problem
 from geenii.scheduler import Scheduler
+from geeniid.chat.chat_server_ctx import ChatServerState
 # from geenii.server.middleware.proxy_middleware import ProxyMiddleware
 # from geenii.server.middleware.request_logger_middleware import RequestLoggerMiddleware
-from geenii.server.router import app_router
+from geeniid.server.router import app_router
 from geenii.skills import SkillRegistry
 from geenii.supervisor import Supervisor, ProcConfig
 from geenii.tool.registry import ToolRegistry

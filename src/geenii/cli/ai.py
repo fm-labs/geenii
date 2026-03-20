@@ -3,11 +3,11 @@ from typing import List
 import click
 
 from geenii.ai import generate_completion, generate_chat_completion_deprecated
-from geenii.chat.chat_models import TextContent
+from geenii.chat_models import TextContent
 from geenii.config import DEFAULT_COMPLETION_MODEL
 from geenii.core.tools import execute_command
 from geenii.datamodels import ModelMessage
-from geenii.tool.registry import ToolRegistry, PythonTool
+from geenii.tool.registry import ToolRegistry, PythonFunctionTool
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
 
 
@@ -49,15 +49,15 @@ def chat(model, temperature, output_format, prompt):
     memory.append(ModelMessage(role="user", content=[TextContent(text="I love to eat sushi"), ]))
 
     tool_registry = ToolRegistry()
-    tool_registry.register(PythonTool(name="execute_command",
-                                      description="Execute a shell command on the user's computer and return the output.",
-                                      parameters={"command": {"type": "string",
+    tool_registry.register(PythonFunctionTool(name="execute_command",
+                                              description="Execute a shell command on the user's computer and return the output.",
+                                              parameters={"command": {"type": "string",
                                                               "description": "The shell command to execute."}},
-                                      handler=execute_command))
+                                              handler=execute_command))
     tool_registry.register(
-        PythonTool(name="get_weather", description="Get the weather from the given location.",
-                   parameters={"location": {"type": "string"}},
-                   handler=lambda x: f"The weather in {x['location']} is sunny with a high of 25°C."))
+        PythonFunctionTool(name="get_weather", description="Get the weather from the given location.",
+                           parameters={"location": {"type": "string"}},
+                           handler=lambda x: f"The weather in {x['location']} is sunny with a high of 25°C."))
 
     continue_chat = True
     while continue_chat:

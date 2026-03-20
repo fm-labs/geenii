@@ -7,13 +7,13 @@ from fastapi import APIRouter
 from fastapi.params import Depends
 
 from geenii import ai
-from geenii.chat.chat_manager import ChatManager
-from geenii.chat.chat_models import TextContent
-from geenii.chat.chat_server_routes import dep_chat_mgr
+from geeniid.chat.chat_manager import ChatManager
+from geenii.chat_models import TextContent
+from geeniid.chat.chat_server_routes import dep_chat_mgr
 from geenii.config import DATA_DIR
 from geenii.datamodels import ChatCompletionRequest, ChatCompletionResponse, CompletionErrorResponse, ModelMessage
 from geenii.memory import FileChatMemory
-from geenii.server.deps import dep_current_user, User
+from geeniid.server.deps import dep_current_user, User
 
 logger = logging.getLogger(__name__)
 

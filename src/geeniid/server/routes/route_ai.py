@@ -7,7 +7,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 
 from geenii import ai
 from geenii.ai import enumerate_models
-from geenii.chat.chat_models import TextContent
+from geenii.chat_models import TextContent
 from geenii.datamodels import CompletionErrorResponse, CompletionRequest, CompletionResponse, ChatCompletionRequest, \
     ChatCompletionResponse, ImageGenerationApiResponse, \
     ImageGenerationApiRequest, AudioGenerationApiRequest, AudioSpeechGenerationApiResponse, AudioTranscriptionApiRequest, \

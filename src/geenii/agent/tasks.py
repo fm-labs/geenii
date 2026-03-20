@@ -6,7 +6,7 @@ from typing import AsyncGenerator, Set
 from geenii.agent.base import BaseAgentTask, BaseTask, message_to_prompt
 from geenii.agent.utils import estimate_token_count
 from geenii.ai import generate_chat_completion
-from geenii.chat.chat_models import UserInteractionContent, ToolCallResultContent, ContentPart, TextContent, \
+from geenii.chat_models import UserInteractionContent, ToolCallResultContent, ContentPart, TextContent, \
     ToolCallContent, JsonContent
 from geenii.datamodels import ModelMessage, ChatCompletionRequest
 from geenii.g import init_agent_registry, init_agent_by_name

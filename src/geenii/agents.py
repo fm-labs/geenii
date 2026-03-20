@@ -1,9 +1,9 @@
 import logging
 
 from geenii.agent.base_agent import BaseAgent
-from geenii.agent.tasks import LLMTask, FindBestAgentTask, FindBestSkillTask, PlanTask
+from geenii.agent.tasks import LLMTask, FindBestAgentTask, FindBestSkillTask
 from geenii.agent.base import message_to_prompt
-from geenii.chat.chat_models import ContentPart
+from geenii.chat_models import ContentPart
 
 logger = logging.getLogger(__name__)
 

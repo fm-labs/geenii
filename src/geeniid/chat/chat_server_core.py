@@ -6,9 +6,9 @@ from collections.abc import Callable
 
 from starlette.websockets import WebSocket, WebSocketState
 
-from geenii.chat.chat_bots import BotRunner
-from geenii.chat.chat_manager import ChatManager
-from geenii.chat.chat_models import WireMessage, ChatMessage, ContentPart, SystemMessage
+from geeniid.chat.chat_bots import BotRunner
+from geeniid.chat.chat_manager import ChatManager
+from geenii.chat_models import WireMessage, ChatMessage, SystemMessage
 from geenii.core.tools import display_desktop_notification
 from geenii.datamodels import ModelMessage
 from geenii.g import get_bot

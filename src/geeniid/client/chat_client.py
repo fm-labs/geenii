@@ -28,8 +28,8 @@ import click
 import httpx
 import websockets
 
-from geenii.cli.chat_client_inputs import StdinInput, InputReader
-from geenii.chat.chat_manager import dm_room_id
+from geeniid.chat.chat_manager import dm_room_id
+from geeniid.client.chat_client_inputs import StdinInput, InputReader
 
 DEFAULT_BASE_URL = "http://localhost:33311"
 API_PREFIX = "/chat"

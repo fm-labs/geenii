@@ -6,7 +6,7 @@ import pydantic
 
 from geenii.agent.registry import AgentRegistry, AgentSpec, init_agent
 from geenii.ai import enumerate_providers, enumerate_models
-from geenii.chat.chat_bots import BotInterface
+from geenii.bots import BotInterface
 from geenii.config import USER_DIR, APP_VERSION, get_data_dir
 from geenii.skills import SkillRegistry
 from geenii.utils.json_util import read_json

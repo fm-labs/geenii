@@ -1,7 +1,7 @@
 import abc
 from typing import AsyncGenerator, Any
 
-from geenii.chat.chat_models import TextContent, ContentPart
+from geenii.chat_models import TextContent, ContentPart
 from geenii.datamodels import ModelMessage
 
 DEFAULT_AGENT_SYSTEM_PROMPT = """

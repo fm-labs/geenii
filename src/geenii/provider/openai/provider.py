@@ -8,7 +8,7 @@ import logging
 from openai import OpenAI
 
 from geenii import config
-from geenii.chat.chat_models import TextContent, ToolCallContent, JsonContent, ImageContent
+from geenii.chat_models import TextContent, ToolCallContent, JsonContent, ImageContent
 from geenii.config import CACHE_DIR
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, ChatCompletionRequest, \
     ChatCompletionResponse, AIModelInfo, AudioTranscriptionApiResponse

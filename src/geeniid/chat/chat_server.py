@@ -3,8 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from geenii.chat.chat_server_ctx import ChatServerState
-from geenii.chat.chat_server_routes import router
+from geeniid.chat.chat_server_ctx import ChatServerState
+from geeniid.chat.chat_server_routes import router
 
 logger = logging.getLogger("chat_server")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")

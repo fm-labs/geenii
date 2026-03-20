@@ -1,33 +1,13 @@
-import abc
 import logging
 from typing import AsyncGenerator
 
-from geenii.chat.chat_models import TextContent, ContentPart, ChatMessage
+from geenii.bots import BotInterface
+from geenii.chat_models import ChatMessage
 from geenii.config import DATA_DIR
 from geenii.datamodels import ModelMessage
-from geenii.hidl import HumanInTheLoopController, FileTicketHumanInTheLoopController
+from geenii.hidl import FileTicketHumanInTheLoopController
 
 logger = logging.getLogger(__name__)
-
-class BotInterface(abc.ABC):
-    """
-    Interface for bot implementations. A bot is responsible for processing
-    incoming messages, maintaining conversation state, and generating responses.
-    """
-
-    @abc.abstractmethod
-    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ModelMessage, None]:
-        """
-        Process an incoming message and generate a response.
-
-        Args:
-            message: The incoming message text or structured content parts to process
-
-        Returns:
-            An asynchronous generator that yields ContentPart objects representing the response.
-        """
-        yield ModelMessage(role="admin", content=[TextContent(text="Not implemented")])
-
 
 
 class BotRunner:

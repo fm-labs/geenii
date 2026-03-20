@@ -12,7 +12,7 @@ USER_HOME_DIR = get_user_home()
 USER_DIR = os.environ.get("GEENII_DIR", USER_HOME_DIR + "/.geenii")
 DATA_DIR = os.environ.get("GEENII_DATA_DIR", "data")
 
-dotenv.load_dotenv(DATA_DIR + "/.env", override=True, verbose=True)
+dotenv.load_dotenv(USER_DIR + "/.env", override=True, verbose=True)
 
 CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", DATA_DIR + "/cache")
 CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
@@ -79,7 +79,7 @@ def get_data_dir():
 
 
 def read_user_settings():
-    user_settings_path = os.path.join(get_data_dir(), "settings.json")
+    user_settings_path = os.path.join(get_data_dir(), "geenii.json")
     default_settings = {
         "theme": "dark",
         "notifications": True,
@@ -99,7 +99,7 @@ def read_user_settings():
 
 def write_user_settings(settings: dict):
     print(f"Saving settings: {settings}")
-    user_settings_path = os.path.join(get_data_dir(), "settings.json")
+    user_settings_path = os.path.join(get_data_dir(), "geenii.json")
     try:
         with open(user_settings_path, "w") as f:
             json.dump(settings, f, indent=4)

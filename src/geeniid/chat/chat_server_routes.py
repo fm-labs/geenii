@@ -9,11 +9,11 @@ from sse_starlette import EventSourceResponse
 from starlette.requests import HTTPConnection, Request
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from geenii.chat.chat_manager import ChatManager
-from geenii.chat.chat_models import Room, RoomCreate, Member, JoinRoom, LeaveRoom, InviteUser, ChatMessage, MessageCreate, \
+from geeniid.chat.chat_manager import ChatManager
+from geenii.chat_models import Room, RoomCreate, Member, JoinRoom, LeaveRoom, InviteUser, MessageCreate, \
     SystemMessage, ChatMessage
-from geenii.chat.chat_server_core import SseConnection, WebSocketConnection, MessageHandler, ConnectionManager
-from geenii.server.deps import dep_current_user, User
+from geeniid.chat.chat_server_core import SseConnection, WebSocketConnection, MessageHandler, ConnectionManager
+from geeniid.server.deps import dep_current_user, User
 
 logger = logging.getLogger(__name__)
 

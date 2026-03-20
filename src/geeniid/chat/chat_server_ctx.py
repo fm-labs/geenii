@@ -3,9 +3,9 @@ import os
 
 from fastapi import FastAPI
 
-from geenii.chat.chat_manager import ChatManager
-from geenii.chat.chat_server_core import ConnectionManager, MessageHandler, logger
-from geenii.chat.chat_server_ext_discord import DiscordBotConnector
+from geeniid.chat.chat_manager import ChatManager
+from geeniid.chat.chat_server_core import ConnectionManager, MessageHandler, logger
+from geeniid.chat.chat_server_ext_discord import DiscordBotConnector
 
 
 class ChatServerState:

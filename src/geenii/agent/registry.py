@@ -5,7 +5,7 @@ from pathlib import Path
 import pydantic
 
 from geenii.agent.base_agent import BaseAgent
-from geenii.chat.chat_bots import BotInterface
+from geenii.bots import BotInterface
 from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.mdfile import read_frontmatter_file

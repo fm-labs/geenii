@@ -3,10 +3,10 @@ import logging
 
 import discord
 
-from geenii.chat.chat_manager import ChatManager
-from geenii.chat.chat_models import WireMessage, ChatMessage, SystemMessage, ContentPart, TextContent, ImageContent, \
+from geeniid.chat.chat_manager import ChatManager
+from geenii.chat_models import WireMessage, ChatMessage, SystemMessage, ContentPart, TextContent, ImageContent, \
     FileContent, EmbedContent
-from geenii.chat.chat_server_core import ConnectionManager, Connection
+from geeniid.chat.chat_server_core import ConnectionManager, Connection
 
 logger = logging.getLogger(__name__)
 

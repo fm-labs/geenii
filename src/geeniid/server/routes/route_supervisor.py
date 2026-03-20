@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, Request, APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from geenii.server.deps import require_api_key
+from geeniid.server.deps import require_api_key
 from geenii.supervisor import Supervisor
 
 

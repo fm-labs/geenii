@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 import asyncio
 import inspect
 import logging
 import subprocess
-from abc import ABC, abstractmethod
+import shlex
 from typing import Any, Callable
 
 from geenii.mcp import get_mcp_client_for_server, McpClient
@@ -71,7 +72,7 @@ class Tool(ABC):
 # Python tool
 # ---------------------------------------------------------------------------
 
-class PythonTool(Tool):
+class PythonFunctionTool(Tool):
     """A tool backed by a plain Python callable."""
 
     def __init__(
@@ -100,9 +101,50 @@ class PythonTool(Tool):
         return result
 
 
+class  PythonTool(Tool):
+
+    """A ComputerTool that executes Python scripts on Unix-like systems."""
+
+    def __init__(
+        self,
+        name: str,
+        description: str = "",
+        parameters: dict | None = None,
+    ):
+        super().__init__(name, description, parameters)
+        self.type = "python"
+
+    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
+        command = args.get("command")
+        if not command:
+            raise ValueError(f"Missing 'command' argument for PythonTool {self.name!r}")
+
+        logger.info(f"Executing PythonTool command: {command}")
+
+        # expand environment variables in the command
+        command = expand_vars(command, env or {})
+
+        # run the command in a thread to avoid blocking the event loop
+        result = await asyncio.to_thread(self.run_subprocess, command, env)
+        logger.info(f"Command result: {result}")
+        return result
+
+     # helper method to run a subprocess and capture its output
+    def run_subprocess(self, command: str, env: dict[str, str] | None) -> str:
+        _command = shlex.split(command)
+        print(_command)
+        logger.info(f"Executing command: {command} with environment: {env}")
+        result = subprocess.run(_command, shell=False, capture_output=True, text=True, env=env, cwd=None)
+        logger.info(f"Return code: {result.returncode}")
+        logger.info(f"Standard output: {result.stdout}")
+        logger.info(f"Standard error: {result.stderr}")
+        return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+
+
 # ---------------------------------------------------------------------------
 # Computer tool
 # ---------------------------------------------------------------------------
+
 
 class ComputerTool(Tool):
     """A tool that executes a command on the local machine."""
@@ -120,11 +162,16 @@ class ComputerTool(Tool):
 
     async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
         command = args.get("command")
-        skill = kwargs.get("skill")
         if not command:
             raise ValueError(f"Missing 'command' argument for ComputerTool {self.name!r}")
 
+        if self.command_template is not None:
+            command = self.command_template.format(command=command, **args)
+
         logger.info(f"Executing ComputerTool command: {command}")
+
+        # expand environment variables in the command
+        command = expand_vars(command, env or {})
 
         # run the command in a thread to avoid blocking the event loop
         result = await asyncio.to_thread(self.run_subprocess, command, env)
@@ -133,8 +180,10 @@ class ComputerTool(Tool):
 
 
     def run_subprocess(self, command: str, env: dict[str, str] | None) -> str:
-        result = subprocess.run(command, shell=True, capture_output=True, text=True, env=env)
-        logger.info(f"Executed command: {command} with environment: {env}")
+        _command = shlex.split(command)
+        print(_command)
+        logger.info(f"Executing command: {command} with environment: {env}")
+        result = subprocess.run(_command, shell=False, capture_output=True, text=True, env=env, cwd=None)
         logger.info(f"Return code: {result.returncode}")
         logger.info(f"Standard output: {result.stdout}")
         logger.info(f"Standard error: {result.stderr}")
@@ -206,12 +255,12 @@ class ToolRegistry:
         name: str | None = None,
         description: str | None = None,
         parameters: dict | None = None,
-    ) -> PythonTool:
+    ) -> PythonFunctionTool:
         """Convenience: wrap a plain function as a PythonTool and register it."""
         tool_name = name or fn.__name__
         tool_desc = description or (fn.__doc__ or "").strip().split("\n")[0]
         tool_params = parameters or _params_from_signature(fn)
-        tool = PythonTool(
+        tool = PythonFunctionTool(
             name=tool_name,
             description=tool_desc,
             parameters=tool_params,
@@ -361,5 +410,9 @@ def _params_from_signature(fn: Callable[..., Any]) -> dict:
     return schema
 
 
-
-
+def expand_vars(command: str, env: dict[str, str]) -> str:
+    """Expand environment variables in a command string."""
+    for key, value in env.items():
+        command = command.replace(f"${{{key}}}", value)
+        command = command.replace(f"${key}", value)
+    return command

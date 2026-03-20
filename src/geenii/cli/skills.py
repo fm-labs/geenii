@@ -30,7 +30,7 @@ def inspect_skill(name: str):
     _skills = init_skills()
     skill = _skills.get(name)
     if skill:
-        print(f"Path: {skill.dir_path}")
+        print(f"Path: {skill.path}")
         print(f"Name: {skill.name}")
         print(f"Description: {skill.description}")
         print(f"Metadata:")
