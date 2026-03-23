@@ -72,13 +72,13 @@ jobs:
 #        uses: fm-labs/container-scan-action@v1
 #        with:
 #          image: '${{env.REGISTRY}}:${{env.IMAGE_TAG}}'
-
-      - name: Display scan results
-        run: |
-          echo "Exit code: ${{ steps.scan.outputs.exit-code }}"
-          echo "Scan output:"
-          echo "${{ steps.scan.outputs.scan-output }}"
-
+#
+#      - name: Display scan results
+#        run: |
+#          echo "Exit code: ${{ steps.scan.outputs.exit-code }}"
+#          echo "Scan output:"
+#          echo "${{ steps.scan.outputs.scan-output }}"
+#
 #      - name: Build, tag, and push image to Docker Hub
 #        uses: docker/build-push-action@v6
 #        with:
