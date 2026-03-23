@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 from geenii.core.tools import display_desktop_notification
 from geenii.mcp import get_mcp_config, McpClient
-from geenii.tool.registry import ToolRegistry, logger, ComputerTool
+from geenii.tool.registry import ToolRegistry, ComputerTool, PythonCliTool
 from geenii.utils.cached import cached
 
 
@@ -16,14 +15,14 @@ def init_builtin_tools(registry: ToolRegistry):
         parameters={
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "The shell command to execute. The command should be a single string, e.g. 'ls -la /tmp'."}
+                "command": {"type": "string", "description": "The shell command to execute. The command must be a single-line string, e.g. 'ls -la /tmp'."}
             },
             "required": ["command"]
         },
     ))
     registry.register(ComputerTool(
         name="execute_python",
-        description="Execute a python script on the local machine and return its output.",
+        description="Execute a python script and return its output.",
         parameters={
             "type": "object",
             "properties": {
@@ -85,15 +84,14 @@ def init_mcp_server_tools_sync(registry: ToolRegistry):
     loop.run_until_complete(initialize())
 
 
-async def execute_tool_call(registry: ToolRegistry, tool_name: str, args: dict[str,Any], **kwargs) -> Any:
-    """Look up and execute a tool by name and given arguments."""
-    tool = registry.get(tool_name)
-    if tool is None:
-        raise ValueError(f"Tool {tool_name!r} is not registered")
-    logger.info(f'EXECUTING TOOL "{tool_name}" with args {args}')
-    return await tool.invoke(args=args, **kwargs)
-
-
-def execute_tool_call_sync(registry: ToolRegistry, tool_name: str, args: dict[str,Any], **kwargs) -> Any:
-    """Synchronous wrapper around execute_tool_call."""
-    return asyncio.run(execute_tool_call(registry, tool_name, args, **kwargs))
+# async def execute_tool_call(registry: ToolRegistry, tool_name: str, args: dict[str,Any], **kwargs) -> Any:
+#     """Look up and execute a tool by name and given arguments."""
+#     tool = registry.get(tool_name)
+#     if tool is None:
+#         raise ValueError(f"Tool {tool_name!r} is not registered")
+#     return await tool.invoke(args=args, **kwargs)
+#
+#
+# def execute_tool_call_sync(registry: ToolRegistry, tool_name: str, args: dict[str,Any], **kwargs) -> Any:
+#     """Synchronous wrapper around execute_tool_call."""
+#     return asyncio.run(execute_tool_call(registry, tool_name, args, **kwargs))

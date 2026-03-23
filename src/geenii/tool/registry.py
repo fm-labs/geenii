@@ -101,7 +101,7 @@ class PythonFunctionTool(Tool):
         return result
 
 
-class  PythonTool(Tool):
+class  PythonCliTool(Tool):
 
     """A ComputerTool that executes Python scripts on Unix-like systems."""
 
@@ -139,6 +139,7 @@ class  PythonTool(Tool):
         logger.info(f"Standard output: {result.stdout}")
         logger.info(f"Standard error: {result.stderr}")
         return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+
 
 
 # ---------------------------------------------------------------------------
