@@ -29,10 +29,8 @@ jobs:
     environment: production
 
     steps:
-      - name: Checkout repo with submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - name: Checkout repo
+        uses: actions/checkout@v5
 
       - name: Login to Docker Hub
         uses: docker/login-action@v4
@@ -41,7 +39,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build and push arch image
         uses: docker/build-push-action@v7
