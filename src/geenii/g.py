@@ -7,7 +7,7 @@ import pydantic
 from geenii.agent.registry import AgentRegistry, AgentSpec, init_agent
 from geenii.ai import enumerate_providers, enumerate_models
 from geenii.bots import BotInterface
-from geenii.config import USER_DIR, APP_VERSION, get_data_dir
+from geenii.config import USER_DIR, APP_VERSION, get_data_dir, DATA_DIR
 from geenii.skills import SkillRegistry
 from geenii.utils.json_util import read_json
 from geenii.utils.os_util import get_user_home_dir
@@ -24,6 +24,18 @@ def get_bot(botname: str) -> BotInterface:
 
     name = botname[len("geenii:bot:"):]
     return init_agent_by_name(name)
+
+
+def makedirs_safe(path: str):
+    try:
+        os.makedirs(path, exist_ok=True)
+    except Exception as e:
+        print(f"Error creating directory {path}: {e}")
+
+def init_app_directories():
+    # ensure internal directories exist
+    makedirs_safe(f"{DATA_DIR}/logs")
+    makedirs_safe(f"{DATA_DIR}/cache")
 
 
 def init_agent_registry(base_path: str = None, auto_load: bool = False) -> AgentRegistry:

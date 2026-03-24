@@ -208,6 +208,16 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                             "arguments": json.dumps(content_item.arguments)  # OpenAI expects arguments as a JSON string
                         })
                     elif content_item.type == "tool_call_result":
+                        # check if the corresponding tool call is in the input messages, if not we need to add a placeholder for it, otherwise OpenAI Responses API will return an error "Tool call result provided for unknown tool call ID: {call_id}"
+                        if not any(m for m in input_messages if m.get("type") == "function_call" and m.get("call_id") == content_item.call_id):
+                            logger.warning(f"Tool call result with call_id {content_item.call_id} does not have a corresponding tool call in the input messages, adding a placeholder for it.")
+                            input_messages.append({
+                                "type": "function_call",
+                                "call_id": content_item.call_id,
+                                "name": content_item.name,
+                                "arguments": json.dumps(content_item.arguments)  # OpenAI expects arguments as a JSON string
+                            })
+
                         input_messages.append({
                             "type": "function_call_output",
                             "call_id": content_item.call_id,
@@ -216,6 +226,9 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                     else:
                         print(
                             f"Unsupported model message content type for openai chat completion input: {content_item.type}")
+
+        print(f"Mapped {len(messages)} input messages to {len(input_messages)} OpenAI input messages.")
+        print(input_messages)
 
         # finally add the user prompt
         prompt = request.prompt

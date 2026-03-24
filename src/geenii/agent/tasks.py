@@ -134,6 +134,9 @@ class LLMTask(BaseAgentTask):
             # until there are no more tool calls in the response
             tool_call = tool_call_contents.pop(0)
             logger.warning(f"Next tool call to process: {tool_call.name} with arguments {tool_call.arguments} and call ID {tool_call.call_id}")
+            # add the tool call to the message history before executing it, so that the tool result can be associated with the correct tool call in the message history
+            self.agent.message_history.append(ModelMessage(role="assistant", content=[tool_call]))
+
             tool_task = ToolCallTask(agent=self.agent, tool_name=tool_call.name, arguments=tool_call.arguments, call_id=tool_call.call_id)
             tool_result = None
             async for msg in tool_task.execute():
@@ -149,12 +152,12 @@ class LLMTask(BaseAgentTask):
             tools_called += 1
             if tool_result is not None:
                 # re-generate the response based on the tool result
-                tool_result_message = ModelMessage(role="assistant", content=[TextContent(text=f"Tool '{tool_call.name}' returned result: {tool_result}")])
-                self.agent.message_history.append(tool_result_message)
+                #tool_result_message = ModelMessage(role="assistant", content=[TextContent(text=f"Tool '{tool_call.name}' returned result: {tool_result}")])
+                #self.agent.message_history.append(tool_result_message)
 
                 # now we can re-generate the response based on the original prompt and the updated message history that includes the tool result
                 request.prompt = ""
-                request.messages = list(self.agent.message_history[-((tools_called*2) + 3):])  # snapshot of the updated message history
+                request.messages = list(self.agent.message_history[-10:])  # snapshot of the updated message history
                 response = await asyncio.to_thread(self._request_completion, request)
                 logger.info(f"Received model response for prompt '{prompt}' after tool call with {len(response.output)} content parts.")
             else:

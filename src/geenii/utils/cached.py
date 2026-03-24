@@ -36,6 +36,7 @@ class SqliteCacheStore:
         cache_size_kib: int = -64_000,  # negative => KiB. e.g. -64000 ~= 64MiB
         mmap_size_bytes: int = 128 * 1024 * 1024,  # 128MiB
     ):
+        print(f"Initializing SqliteCacheStore with db_path={db_path}, timeout={timeout}, busy_timeout_ms={busy_timeout_ms}, wal={wal}, synchronous={synchronous}, cache_size_kib={cache_size_kib}, mmap_size_bytes={mmap_size_bytes}")
         self.conn = sqlite3.connect(
             db_path,
             timeout=timeout,
