@@ -2,12 +2,40 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 
+from rich.logging import RichHandler
+
 from geenii.config import DATA_DIR
 
 LOG_FORMAT1 = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 LOG_FORMAT2 = "%(asctime)s - %(levelname)s - %(message)s"
 
 formatter = logging.Formatter(LOG_FORMAT1)
+
+def init_logging():
+    if os.getenv("GEENII_LOGGING") == "rich":
+        logging.basicConfig(
+            level="INFO",
+            format="%(message)s",
+            handlers=[
+                RichHandler(
+                    show_time=True,  # show timestamps
+                    omit_repeated_times=False,  # show timestamp every line
+                    show_level=True,
+                    show_path=True,  # hide file path
+                    rich_tracebacks=False,  # beautiful exception tracebacks
+                )
+            ]
+        )
+    else:
+        logging.basicConfig(
+            level=logging.INFO,
+            format=LOG_FORMAT1,
+            handlers=[
+                get_console_log_handler(),
+                get_rotating_file_log_handler("geenii")
+            ]
+        )
+
 
 def get_console_log_handler():
     console_handler = logging.StreamHandler()

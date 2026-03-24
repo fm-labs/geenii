@@ -8,10 +8,10 @@ from geenii.utils.os_util import get_user_home
 
 APP_VERSION = "0.3.1"
 
-USER_HOME_DIR = get_user_home()
-USER_DIR = os.environ.get("GEENII_DIR", USER_HOME_DIR + "/.geenii")
+USER_DIR = os.environ.get("GEENII_USER_DIR", get_user_home() + "/.geenii")
 DATA_DIR = os.environ.get("GEENII_DATA_DIR", "data")
 
+# Load environment variables from .env file in the user directory, if it exists
 dotenv.load_dotenv(USER_DIR + "/.env", override=True, verbose=True)
 
 CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", DATA_DIR + "/cache")
@@ -51,7 +51,6 @@ MONGODB_DB_NAME = os.environ.get("MONGODB_DB_NAME", "geenii_brain0")
 # Redis settings
 REDIS_URI = os.environ.get("REDIS_URI", "")
 
-
 ### Chat settings ###
 # Path to the SQLite database file for storing chat history and related data
 CHAT_DB_PATH = os.environ.get("GEENII_CHAT_DB_PATH", f"{DATA_DIR}/chat.db")
@@ -79,11 +78,12 @@ def get_data_dir():
 
 
 def read_user_settings():
-    user_settings_path = os.path.join(get_data_dir(), "geenii.json")
+    user_settings_path = os.path.join(get_user_dir(), "geenii.json")
     default_settings = {
-        "theme": "dark",
+        "theme": "system",  # options: "light", "dark", "system"
         "notifications": True,
-        "language": "en-US"
+        "language": "en-US",
+        "environment": {}
     }
     if os.path.exists(user_settings_path):
         try:
@@ -99,7 +99,7 @@ def read_user_settings():
 
 def write_user_settings(settings: dict):
     print(f"Saving settings: {settings}")
-    user_settings_path = os.path.join(get_data_dir(), "geenii.json")
+    user_settings_path = os.path.join(get_user_dir(), "geenii.json")
     try:
         with open(user_settings_path, "w") as f:
             json.dump(settings, f, indent=4)

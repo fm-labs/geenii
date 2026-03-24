@@ -1,26 +1,15 @@
 import logging
 
 import click
-from rich.logging import RichHandler
 
+from geenii.cli.info import info as info_cli
 from geenii.cli.agents import agents as agents_cli
 from geenii.cli.skills import skills as skills_cli
 from geenii.cli.tools import tools as tools_cli
 from geenii.config import APP_VERSION
+from geenii.logs import init_logging
 
-logging.basicConfig(
-    level="INFO",
-    format="%(message)s",
-    handlers=[
-        RichHandler(
-            show_time=True,  # show timestamps
-            omit_repeated_times=False,  # show timestamp every line
-            show_level=True,
-            show_path=True,  # hide file path
-            rich_tracebacks=False,  # beautiful exception tracebacks
-        )
-    ]
-)
+init_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -31,6 +20,7 @@ def geemod():
     pass
 
 
+geemod.add_command(info_cli)
 geemod.add_command(agents_cli)
 geemod.add_command(skills_cli)
 geemod.add_command(tools_cli)
