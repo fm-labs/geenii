@@ -23,24 +23,28 @@ def list_skills():
 
 @skills.command(name="inspect")
 @click.argument("name")
-def inspect_skill(name: str):
+@click.option("instructions", "--instructions", "-i", is_flag=True, help="Show the instructions for the skill.")
+def inspect_skill(name: str, instructions: bool):
     """
     Show details for a specific skill.
     """
     _skills = init_skills()
     skill = _skills.get(name)
     if skill:
-        print(f"Path: {skill.path}")
         print(f"Name: {skill.name}")
+        print(f"Path: {skill.path}")
         print(f"Description: {skill.description}")
         print(f"Metadata:")
         if skill.metadata:
             for key, value in skill.metadata.items():
                 print(f"- {key}: {value}")
+
         print(f"Instructions:")
-        print(f"---" * 13)
-        print(skill.instructions)
-        print(f"---" * 13)
+        if instructions:
+            print(f"---" * 13)
+            print(skill.instructions)
+        else:
+            print(f"Add '--instructions' to see the instructions for this skill.")
     else:
         print(f"Skill '{name}' not found.")
 

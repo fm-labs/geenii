@@ -70,12 +70,12 @@ Options:
   --help                        Show this message and exit.
 ```
 
-To manage agents, tools, MCP servers and skills, you can use the `geeniimod` CLI:
+To manage agents, tools, MCP servers and skills, you can use the `geenii` CLI:
 
 ```text
-$ geeniimod --help
+$ geenii --help
 
-Usage: geeniimod [OPTIONS] COMMAND [ARGS]...
+Usage: geenii [OPTIONS] COMMAND [ARGS]...
 
 Options:
   --version  Show the version and exit.
@@ -94,22 +94,22 @@ Here are some basic commands to help you get started:
 
 ```bash
 # Ask a simple question
-geenii "What is the capital of France?"
+geenii agent "What is the capital of France?"
 
 # Ask a different agent or model
-geenii --model "openai:gpt-4o-mini" "What is the capital of France?"
-geenii --model "ollama:qwen3:8b" "What is the capital of France?"
+geenii agent --model "openai:gpt-4o-mini" "What is the capital of France?"
+geenii agent --model "ollama:qwen3:8b" "What is the capital of France?"
 
 # Use a specific tool
-geenii --tools "websearch" "Search the web for the latest news on climate change."
+geenii agent --tools "websearch" "Search the web for the latest news on climate change."
 
 # Use a specific skill
-geenii --skills "math" "Is 33311 a prime number?"
+geenii agent --skills "math" "Is 33311 a prime number?"
 
 # Use computer tools
-geenii --tools "bash" "List all files in the current directory."
+geenii agent --tools "bash" "List all files in the current directory."
 # Use compoter tools with a specific skill
-geenii --tools "bash,applescript" --skill "macos" "Open Safari and navigate to https://www.google.com"
+geenii agent --tools "bash,applescript" --skill "macos" "Open Safari and navigate to https://www.google.com"
 ```
 
 Here are some basic commands to manage agents, tools, MCP servers and skills:
@@ -117,59 +117,59 @@ Here are some basic commands to manage agents, tools, MCP servers and skills:
 ```bash
 # Agents
 # Create/Ask a specific agent to perform a task
-geeniimod agents create "organizer" --skills "email,calendar" --system "You are an organizer assistant that can send emails to help manage my schedule."
-geenii -n "organizer" "Send an email to John Doe with the subject 'Meeting Reminder' and the body 'Don't forget about our meeting tomorrow at 10am.'"
+geenii agents create "organizer" --skills "email,calendar" --system "You are an organizer assistant that can send emails to help manage my schedule."
+geenii agent -n "organizer" "Send an email to John Doe with the subject 'Meeting Reminder' and the body 'Don't forget about our meeting tomorrow at 10am.'"
 
 # Create/Ask the default agent with a specific skill
-geeniimod agents create "math_agent" --skills "math" --system "You are a helpful assistant that can perform mathematical calculations."
-geenii -n math_agent "Is 33311 a prime number?"
+geenii agents create "math_agent" --skills "math" --system "You are a helpful assistant that can perform mathematical calculations."
+geenii agent -n math_agent "Is 33311 a prime number?"
 
 # Create/Ask agent with a specific tool and skill
-geeniimod agents create "data_analysis" --tools "python" --skills "pandas" --system "You are a data analyst assistant that can analyze sales data and provide insights."
-geenii -n "data_analysis" --input @data.csv "Analyze the sales data for the last quarter and provide insights."
+geenii agents create "data_analysis" --tools "python" --skills "pandas" --system "You are a data analyst assistant that can analyze sales data and provide insights."
+geenii agent -n "data_analysis" --input @data.csv "Analyze the sales data for the last quarter and provide insights."
 
 # Tools
 # Note: Tools are registered callable functions that an agent can use to perform specific tasks. 
 # They can be implemented in any programming language and can be registered with Geenii.
 
 # List installed tools
-geeniimod tools list
+geenii tools list
 
 # Get information about a specific tool
-geeniimod tools inspect "my_tool"
+geenii tools inspect "my_tool"
 
 # Call a tool directly from the CLI
-geeniimod tools call "my_tool" --args arg1=value1 arg2=value2
+geenii tools call "my_tool" --args arg1=value1 arg2=value2
 
 # MCP Tools
 # Note: MCP (Model-Context-Protocol) tools are a special type of tool that can interact with language models in a more structured way. 
 # Under the hood, MCP tools are registered as regular tools.
 
 # List installed MCP servers
-geeniimod mcp server list
+geenii mcp server list
 
 # Add a new MCP server
-geeniimod mcp server add "my_mcp_server" --url "http://localhost:8000"
-geeniimod mcp server add "my_local_mcp_server_stdio" --command "docker run --rm my_mcp_stdio_server_image"
+geenii mcp server add "my_mcp_server" --url "http://localhost:8000"
+geenii mcp server add "my_local_mcp_server_stdio" --command "docker run --rm my_mcp_stdio_server_image"
 
 # Get information about a specific MCP server
-geeniimod mcp server info "my_mcp_server"
+geenii mcp server info "my_mcp_server"
 
 # Skills
 # Note: Skills are reusable components, represented as a directory containing a SKILL.md file
 
 # List installed skills
-geeniimod skills list
+geenii skills list
 
 # Get information about a specific skill
-geeniimod skills inspect "my_skill"
+geenii skills inspect "my_skill"
 
 # Install a skill from a directory
-geeniimod skills install "/path/to/skills/my_skill"
+geenii skills install "/path/to/skills/my_skill"
 
 # Install a skill from a url (e.g. a folder in a GitHub repository)
 # Only install from trusted sources!!
-geeniimod skills install "https://github.com/geenii/geenii-skills/skills/mac-calendar"
+geenii skills install "https://github.com/geenii/geenii-skills/skills/mac-calendar"
 
 ```
 
@@ -223,13 +223,12 @@ docker run -it --rm --name geenii -v ${HOME}/my-shared-agent-data:rw -v $(pwd)/d
 
 ```bash
 alias xgeenii='docker run -it --rm --name geenii -v $(pwd)/data:/data -v ${HOME}/.geenii:/.geenii fmlabs/geenii:latest geenii'
-alias xgeeniimod='docker run -it --rm --name geeniimod -v $(pwd)/data:/data -v ${HOME}/.geenii:/.geenii fmlabs/geenii:latest geeniimod'
 alias xgeenii-update='docker pull docker.io/fmlabs/geenii:latest'
 
-# Now you can use containerized `geenii` and `geeniimod` commands directly in your terminal, and the data will be persisted in the `data` folder.
+# Now you can use containerized `geenii` and `geenii` commands directly in your terminal, and the data will be persisted in the `data` folder.
 xgeenii-update
 xgenii --help
-xgeeniimod --help
+xgeenii --help
 ```
 
 Replace `$(pwd)` with `${HOME}` if you want to use a global `.geenii` folder in your home directory instead of the current working directory.

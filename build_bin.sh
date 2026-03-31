@@ -11,12 +11,7 @@ uv run pyinstaller --clean --onefile --distpath ./dist/bin --workpath ./build --
   ./src/cli.py || exit 11
 
 uv run pyinstaller --clean --onefile --distpath ./dist/bin --workpath ./build --specpath ./build \
-  --copy-metadata fastmcp \
-  --name geeniimod \
-  ./src/mod.py || exit 12
-
-uv run pyinstaller --clean --onefile --distpath ./dist/bin --workpath ./build --specpath ./build \
   --name geeniid \
   --copy-metadata fastmcp \
   --collect-submodules geenii.provider \
-  ./src/server.py || exit 13
+  ./src/server.py || exit 12

@@ -9,7 +9,7 @@ elif [[ $CMD = "interactive" ]]; then
   shift
   exec geenii -c "$@"
 elif [[ $CMD = "help" ]]; then
-  echo "Usage: entrypoint.sh [run-server|help|<geenii args>]"
+  echo "Usage: entrypoint.sh [run-server|interactive|geenii|help]"
   exit 0
 fi
 

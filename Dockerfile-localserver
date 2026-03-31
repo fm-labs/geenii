@@ -52,7 +52,7 @@ COPY ./pyproject.toml ./uv.lock /app/
 RUN uv sync --no-cache-dir
 
 COPY ./src/geenii /app/src/geenii
-COPY ./src/server.py ./src/cli.py ./src/mod.py /app/src/
+COPY ./src/server.py ./src/cli.py /app/src/
 
 # Run
 USER app

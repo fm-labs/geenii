@@ -10,7 +10,7 @@ from geenii.g import init_agent_registry
 logger = logging.getLogger(__name__)
 
 
-@click.command(context_settings={"max_content_width": 130})
+@click.command(name="agent")
 @click.argument("prompt")
 @click.option("name", "--name", "-n", default="default",
               help="Name of the agent to run.")
@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
               help="Output format for the agent's responses. Options: text, json.")
 @click.option("continue_conversation", "--continue", "-c", is_flag=True,
               help="Continue the conversation after the initial prompt.")
-def geecli(prompt: str, name: str, continue_conversation: bool, skills: str, tools: str, model: str, model_parameters: str,
-           system_instructions: str, developer_instructions: str, output_format: str):
+def agent_cli(prompt: str, name: str, continue_conversation: bool, skills: str, tools: str, model: str, model_parameters: str,
+              system_instructions: str, developer_instructions: str, output_format: str):
     """
     Run an agent with the given name and initial prompt.
     Optionally override skills, tools, model, model parameters, system instructions, developer instructions, and output format.
