@@ -45,7 +45,7 @@ jobs:
           tar -czvf geenii-${{ matrix.arch_tag }}.tar.gz -C dist/bin .
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: geenii-${{ matrix.arch_tag }}
           path: geenii-${{ matrix.arch_tag }}.tar.gz
