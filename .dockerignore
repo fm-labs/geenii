@@ -7,7 +7,6 @@ bak/
 data/
 build/
 docs/
-volumes/
 .env.local
 .env.development.local
 .env.test.local

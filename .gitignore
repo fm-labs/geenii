@@ -7,11 +7,9 @@ bak/
 data/
 build/
 dist/
-volumes/
 /lib/
-.env.local
-.env.docker
 .env
+.env.local
 .env.*
 *.local
 *.bak
