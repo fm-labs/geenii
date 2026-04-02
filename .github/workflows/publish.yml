@@ -22,6 +22,12 @@ jobs:
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
             arch_tag: linux-arm64
+          - platform: darwin/amd64
+            runner: macos-latest
+            arch_tag: darwin-amd64
+          - platform: darwin/arm64
+            runner: macos-latest
+            arch_tag: darwin-arm64
 
     runs-on: ${{ matrix.runner }}
     environment: production
@@ -41,7 +47,7 @@ jobs:
       - name: Build binaries
         run: |
           ./build_bin.sh
-          # Tarball the binaries for both architectures
+          # Tarball the binaries for each architecture
           tar -czvf geenii-${{ matrix.arch_tag }}.tar.gz -C dist/bin .
 
       - name: Upload artifact
