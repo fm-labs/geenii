@@ -1,0 +1,43 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+#env:
+#  TAG_NAME: ${{ github.ref_name }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            arch_tag: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            arch_tag: arm64
+
+    runs-on: ${{ matrix.runner }}
+    environment: production
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Build binaries
+        run: |
+          ./build_bin.sh
+          # Tarball the binaries for both architectures
+          tar -czvf geenii-${{ matrix.arch_tag }}.tar.gz -C dist .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: geenii-${{ matrix.arch_tag }}
+          path: geenii-${{ matrix.arch_tag }}.tar.gz

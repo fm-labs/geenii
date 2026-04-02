@@ -227,7 +227,6 @@ alias xgeenii-update='docker pull docker.io/fmlabs/geenii:latest'
 
 # Now you can use containerized `geenii` and `geenii` commands directly in your terminal, and the data will be persisted in the `data` folder.
 xgeenii-update
-xgenii --help
 xgeenii --help
 ```
 
