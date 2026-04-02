@@ -14,7 +14,7 @@ DATA_DIR = os.environ.get("GEENII_DATA_DIR", "data")
 # Load environment variables from .env file in the user directory, if it exists
 dotenv.load_dotenv(USER_DIR + "/.env", override=True, verbose=True)
 
-CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", DATA_DIR + "/cache")
+CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", get_user_home() + "/.cache/geenii")
 CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
 
 GEENII_BIN = os.getenv("GEENII_BIN", "geenii")

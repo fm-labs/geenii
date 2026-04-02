@@ -13,7 +13,7 @@ COPY ./pyproject.toml ./uv.lock /builder/
 RUN uv sync --no-cache-dir --frozen --no-install-project --no-dev
 
 COPY ./src/geenii /builder/src/geenii
-COPY ./src/cli.py ./src/server.py /builder/src/
+COPY ./src/cli.py /builder/src/
 COPY ./build_bin.sh /builder/build_bin.sh
 RUN ls -la /builder
 RUN mkdir -p ./build && mkdir -p ./dist && \
@@ -49,12 +49,6 @@ RUN addgroup --gid 33311 -S geenii && adduser --uid 33311 -S geenii -G geenii &&
 # Binaries
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 COPY --from=builder /builder/dist/bin/geenii /usr/bin/geenii
-COPY --from=builder /builder/dist/bin/geeniid /usr/bin/geeniid
-
-# Entrypoint
-COPY ./container/entrypoint.sh /usr/bin/entrypoint
-RUN ["chmod", "+x", "/usr/bin/entrypoint"]
-ENTRYPOINT ["/usr/bin/entrypoint"]
 
 WORKDIR /home/geenii
 USER geenii

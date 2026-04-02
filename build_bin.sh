@@ -1,17 +1,11 @@
 #!/bin/bash
 
 rm -rf ./build/
-rm -rf ./dist/bin/
+rm -rf ./dist/
 mkdir -p ./build
-mkdir -p ./dist/bin
+mkdir -p ./dist/
 
-uv run pyinstaller --clean --onefile --distpath ./dist/bin --workpath ./build --specpath ./build \
+uv run pyinstaller --clean --onefile --distpath ./dist --workpath ./build --specpath ./build \
   --copy-metadata fastmcp \
   --name geenii \
-  ./src/cli.py || exit 11
-
-uv run pyinstaller --clean --onefile --distpath ./dist/bin --workpath ./build --specpath ./build \
-  --name geeniid \
-  --copy-metadata fastmcp \
-  --collect-submodules geenii.provider \
-  ./src/server.py || exit 12
+  ./src/cli.py || exit 1

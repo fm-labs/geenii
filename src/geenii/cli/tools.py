@@ -3,10 +3,11 @@ import click
 from geenii.tools import init_builtin_tools
 from geenii.tool.registry import ToolRegistry
 
-tool_registry = ToolRegistry()
-init_builtin_tools(tool_registry)
-#init_mcp_server_tools_sync(tool_registry)
-
+def _init_tool_registry():
+    tool_registry = ToolRegistry()
+    init_builtin_tools(tool_registry)
+    # init_mcp_server_tools_sync(tool_registry)
+    return tool_registry
 
 @click.group()
 def tools():
@@ -17,6 +18,7 @@ def tools():
 def list_tools():
     """List all registered tools."""
     click.echo("Listing tools...")
+    tool_registry = _init_tool_registry()
     for tool in tool_registry.list_tools():
         click.echo(f"- {tool.name}: {tool.description} ({tool.type})")
 
@@ -26,6 +28,7 @@ def inspect_tool(tool_name):
     """Show details for a specific tool."""
     click.echo(f"Showing details for tool: {tool_name}")
     try:
+        tool_registry = _init_tool_registry()
         tool = tool_registry.get(tool_name)
         click.echo(f"Name: {tool.name}")
         click.echo(f"Type: {tool.type}")
@@ -55,6 +58,7 @@ def call_tool(tool_name, **kwargs):
     kwargs = parse_args(kwargs.get("args", []))
 
     try:
+        tool_registry = _init_tool_registry()
         result = tool_registry.invoke(tool_name, **kwargs)
         print("--- Result ---")
         print(result)

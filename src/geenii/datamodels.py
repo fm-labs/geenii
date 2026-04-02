@@ -3,7 +3,6 @@ from datetime import datetime, UTC
 from typing import List, Any, Set, Literal, Optional
 
 import pydantic
-from fastapi import UploadFile
 
 from geenii import config
 from geenii.chat_models import ContentPart
@@ -141,7 +140,7 @@ class AudioSpeechGenerationApiResponse(BaseCompletionResponse):
 class AudioTranscriptionApiRequest(pydantic.BaseModel):
     model: str | None = config.DEFAULT_AUDIO_TRANSCRIPTION_MODEL
     input_file: str = None  # Path to the audio file to be transcribed
-    input_blob: UploadFile | None = None  # File(...)  # Optional audio file as blob
+    input_blob: bytes | None = None  # Audio data as bytes (alternative to input_file)
     source_lang: str | None = "en"  # Default source language
 
 

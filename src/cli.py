@@ -30,5 +30,5 @@ geecli.add_command(tools_cli)
 
 
 if __name__ == "__main__":
-    init_app_directories()
+    #init_app_directories()
     geecli()

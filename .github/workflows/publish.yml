@@ -48,7 +48,7 @@ jobs:
         run: |
           ./build_bin.sh
           # Tarball the binaries for each architecture
-          tar -czvf geenii-${{ matrix.arch_tag }}.tar.gz -C dist/bin .
+          tar -czvf geenii-${{ matrix.arch_tag }}.tar.gz -C dist .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6

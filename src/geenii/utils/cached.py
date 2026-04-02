@@ -231,6 +231,7 @@ def default_cache_key(func, args, kwargs):
 
 def default_cache_store():
     try:
+        os.makedirs(config.CACHE_DIR, exist_ok=True)
         return SqliteCacheStore(f"{config.CACHE_DIR}/cache.sqlite")
     except Exception as e:
         print(f"Error initializing SqliteCacheStore: {e}")
