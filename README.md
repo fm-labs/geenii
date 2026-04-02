@@ -1,18 +1,33 @@
 # g33n11
 
-**g33n11** (pronounced "geenii") is a self-hosted, AI-as-a-service platform that allows you to run and manage 
-large language models (LLMs) locally or remotely, build chat assistants, autonomous agents and AI workflows with ease.
+**A versatile AI agent runner platform**
+
+Opinionated abstraction layer for interaction with large language models, agents and tools.
+
+## Main Components
+
+- **CLI**: Command-line interface for managing models, agents, tools and skills.
+  - **Agent Runner**: Run agents directly from the CLI with flexible options for overriding models, tools, skills and instructions.
+  - **Agent Manager**: Create and manage agents with specific configurations for models, tools, skills and instructions.
+  - **Tool Manager**: Register and manage tools that agents can use to perform specific tasks.
+  - **MCP Server Manager**: Manage MCP servers that can be used as tools by agents to interact with language models in a more structured way.
+  - **Skill Manager**: Install and manage skills, which are reusable components that can be used by agents to perform specific tasks.
+- **Daemon**: Background service that manages the execution of agents, tools and skills, and provides an API for interaction.
+  - **Rest API**: API for programmatically managing models, agents, tools and skills, and for running agents with specific configurations.
+  - **Pluggable Chat Server**: Support for different chat server implementations, including a built-in server and integration with third-party chat platforms. (Discord, Slack)
+- **WebUI**: User-friendly web interface for managing models, agents, tools and skills.
+  - **Chat Interface**: Interact with agents in a conversational manner, with support for rich media and tool interactions.
 
 
 ## Key Features
 
-- 🔗 Use remote and local large-language-models seamlessly.
-- 🤖 Build and run your own chat assistants, autonomous agents and AI workflows with ease.
-- 🧠 Supports models from Ollama, OpenAI, HuggingFace, Local LLMs and more.
-- 🛠️ Rich toolset for assistants and agents supporting python functions and serverless functions
-- 🔌 Supports Model-Context-Protocol (MCP) server tools.
-- 🖥️ User-friendly CLI and WebUI for managing models, agents, tools and skills.
+- 🔗 Use remote and local LLMs seamlessly.
 - 🔒 Self-hosted solution for privacy and control over your AI workloads.
+- 🤖 Build and run your own chat assistants, autonomous agents and AI workflows with ease.
+- 🧠 **Multi-model** Supports models from Ollama, OpenAI, HuggingFace, Local LLMs and more.
+- 🛠️ **Tool calling** Agents can call tools to perform specific tasks, and tools can be implemented in any programming language.
+- 🔌 **Model-Context-Protocol** (MCP) server tools.
+- 🖥️ **WebUI** for managing models, agents, tools and skills.
 - 🧩 Support for Anthropic's AGENT and SKILL specification format for reusable agent components.
 
 
