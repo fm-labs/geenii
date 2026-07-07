@@ -4,7 +4,9 @@ import asyncio
 
 from geenii.core.tools import display_desktop_notification
 from geenii.mcp import get_mcp_config, McpClient
-from geenii.tool.registry import ToolRegistry, ComputerTool, PythonCliTool
+from geenii.tool.registry import ToolRegistry
+from geenii.tool.computer import ComputerTool
+from geenii.tool.python import PythonCliTool
 from geenii.utils.cached import cached
 
 
@@ -26,12 +28,33 @@ def init_builtin_tools(registry: ToolRegistry):
         parameters={
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "The python command to execute. The command should be a single string, e.g. 'python3 /path/to/script/main.py'."}
+                "command": {"type": "string", "description": "The python command to execute. The command should be a single string, e.g. 'python3 script.py'."}
             },
             "required": ["command"]
         },
     ))
     registry.register_function(display_desktop_notification)
+
+@cached(ttl=3600)
+async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
+    try:
+        mcp_client = McpClient(server_name, server_conf)
+        try:
+            tools = await mcp_client.list_tools()
+        except Exception as e:
+            # try again after a short delay in case the server is still starting up
+            print(f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds...")
+            try:
+                await asyncio.sleep(1)
+                tools = await mcp_client.list_tools()
+            except Exception as e:
+                print(f"Error listing tools from MCP server {server_name} on second attempt: {e}. Skipping this server.")
+                return []
+
+        return tools
+    except Exception as e:
+        print(f"Error retrieving tools from MCP server {server_name}: {e}")
+        return []
 
 
 async def init_mcp_server_tools(registry: ToolRegistry):
@@ -39,27 +62,6 @@ async def init_mcp_server_tools(registry: ToolRegistry):
     if not mcp_config or "mcpServers" not in mcp_config:
         print("No MCP servers configured")
         return
-
-    @cached(ttl=3600)
-    async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
-        try:
-            mcp_client = McpClient(server_name, server_conf)
-            try:
-                tools = await mcp_client.list_tools()
-            except Exception as e:
-                # try again after a short delay in case the server is still starting up
-                print(f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds...")
-                try:
-                    await asyncio.sleep(1)
-                    tools = await mcp_client.list_tools()
-                except Exception as e:
-                    print(f"Error listing tools from MCP server {server_name} on second attempt: {e}. Skipping this server.")
-                    return []
-
-            return tools
-        except Exception as e:
-            print(f"Error retrieving tools from MCP server {server_name}: {e}")
-            return []
 
     for server_name, server_conf in mcp_config["mcpServers"].items():
         try:
@@ -74,14 +76,14 @@ async def init_mcp_server_tools(registry: ToolRegistry):
             print(f"Error connecting to MCP server {server_name}: {e}")
             continue
 
-def init_mcp_server_tools_sync(registry: ToolRegistry):
-    # wrapper for the async version of init_mcp_server_tools to be used in synchronous contexts
-    #asyncio.run(init_mcp_server_tools(registry))
-    async def initialize():
-        await init_mcp_server_tools(registry)
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(initialize())
+# def init_mcp_server_tools_sync(registry: ToolRegistry):
+#     # wrapper for the async version of init_mcp_server_tools to be used in synchronous contexts
+#     #asyncio.run(init_mcp_server_tools(registry))
+#     async def initialize():
+#         await init_mcp_server_tools(registry)
+#
+#     loop = asyncio.get_event_loop()
+#     loop.run_until_complete(initialize())
 
 
 # async def execute_tool_call(registry: ToolRegistry, tool_name: str, args: dict[str,Any], **kwargs) -> Any:

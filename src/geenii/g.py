@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import os
 
-import pydantic
-
 from geenii.agent.registry import AgentRegistry, AgentSpec, init_agent
 from geenii.ai import enumerate_providers, enumerate_models
 from geenii.bots import BotInterface
-from geenii.config import USER_DIR, APP_VERSION, get_data_dir, DATA_DIR
-from geenii.skills import SkillRegistry
-from geenii.utils.json_util import read_json
+from geenii.config import GEENII_DIR, APP_VERSION, DEFAULT_COMPLETION_MODEL, \
+    CACHE_DIR
+from geenii.skills import SkillRegistry, skill_paths
 from geenii.utils.os_util import get_user_home_dir
 from geenii.utils.system_util import get_system_report
 
@@ -32,18 +30,36 @@ def makedirs_safe(path: str):
     except Exception as e:
         print(f"Error creating directory {path}: {e}")
 
-def init_app_directories():
+def make_app_directories():
     # ensure internal directories exist
-    makedirs_safe(f"{DATA_DIR}/logs")
-    makedirs_safe(f"{DATA_DIR}/cache")
+    makedirs_safe(f"{CACHE_DIR}/logs")
 
 
-def init_agent_registry(base_path: str = None, auto_load: bool = False) -> AgentRegistry:
-    reg = AgentRegistry()
-    if auto_load:
-        reg.register_all_from_directory(f"{USER_DIR}/agents")
-    return reg
+def agent_paths():
+    return [
+        f"{GEENII_DIR}/agents",
+    ]
 
+
+def init_global_agent_registry() -> AgentRegistry:
+    _agents = AgentRegistry()
+    # default
+    _agents._agent_configs.update({"default": AgentSpec(
+        name="default",
+        model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b"
+
+    )})
+    for agent_dir in agent_paths():
+        _agents.load_from_directory(agent_dir)
+    return _agents
+
+
+def locate_agent_md_file(agent_name: str) -> str|None:
+    for agent_dir in agent_paths():
+        md_file_path = f"{agent_dir}/{agent_name}.md"
+        if os.path.exists(md_file_path):
+            return md_file_path
+    return None
 
 def init_agent_by_name(name: str) -> "Agent":
     """
@@ -56,27 +72,21 @@ def init_agent_by_name(name: str) -> "Agent":
     - tools: (optional) A list of tool definitions that the agent can use
     - mcp_servers: (optional) A dictionary of MCP server configurations that the agent can connect to
     """
-    file_path = f"{USER_DIR}/agents.json"
-
-    data = read_json(file_path)
-    if not isinstance(data, list):
-        raise ValueError(f"Invalid agent configuration in {file_path}: expected a JSON list of BotConfig data.")
-
-    config = next((item for item in data if item.get("name") == name), None)
-    if config is None:
-        raise ValueError(f"Agent configuration with name '{name}' not found in {file_path}.")
+    md_file_path = locate_agent_md_file(name)
+    if md_file_path is None:
+        raise ValueError(f"Agent '{name}' not found.")
 
     try:
-        agent_conf = AgentSpec.model_validate(config)
-    except pydantic.ValidationError as e:
-        raise ValueError(f"Invalid agent configuration in {file_path}: {str(e)}")
-    return init_agent(agent_conf)
+        agent_conf = AgentSpec.from_md_file(md_file_path)
+        return init_agent(agent_conf)
+    except Exception as e:
+        raise e
 
 
-def init_skills() -> SkillRegistry:
+def init_global_skill_registry() -> SkillRegistry:
     skill_reg = SkillRegistry()
-    skill_reg.register_all_from_directory(f"{USER_DIR}/skills")
-    skill_reg.register_all_from_directory(f"{USER_DIR}/vendor/skills/anthropic/skills")
+    for skill_path in skill_paths():
+        skill_reg.register_all_from_directory(skill_path)
     return skill_reg
 
 
@@ -91,7 +101,8 @@ def get_app_info() -> dict:
             "version": APP_VERSION,
             "cwd": os.getcwd(),
             "user_home_dir": get_user_home_dir(),
-            "data_dir": get_data_dir()
+            "geenii_dir": GEENII_DIR,
+            "cache_dir": CACHE_DIR,
         },
         "config": {
 

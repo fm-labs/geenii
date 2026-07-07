@@ -54,7 +54,7 @@ def read_frontmatter_file(file_path: str) -> tuple[dict, str]:
     :return: A tuple containing the frontmatter header and body content.
     """
     if not file_path or not os.path.isfile(file_path):
-        raise ValueError(f"Skill markdown file not found: '{file_path}'")
+        raise ValueError(f"File not found: '{file_path}'")
 
     contents = ""
     with open(file_path, "r") as f:

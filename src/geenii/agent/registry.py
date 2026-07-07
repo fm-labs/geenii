@@ -8,6 +8,7 @@ from geenii.agent.base_agent import BaseAgent
 from geenii.bots import BotInterface
 from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry
+from geenii.tools import init_builtin_tools
 from geenii.utils.mdfile import read_frontmatter_file
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ class AgentSpec(pydantic.BaseModel):
     tools: list[str] | None = pydantic.Field(default_factory=list)
     skills: list[str] | None = pydantic.Field(default_factory=list)
     model_parameters: dict | None = pydantic.Field(default_factory=dict)
-    mcp_servers: dict[str, dict] | None = pydantic.Field(default_factory=dict)
+    mcp_servers: list[str] | None = pydantic.Field(default_factory=list)
 
     # @property
     # def working_dir(self):
@@ -146,28 +147,29 @@ class AgentRegistry:
         self._agents[agent.name] = agent
         logger.info(f"Agent '{agent.name}' registered.")
 
-    def register_from_file(self, config_path: str):
+    def load_from_file(self, config_path: str):
         if os.path.exists(config_path):
             try:
                 agent_conf = AgentSpec.from_md_file(config_path)
                 self._agent_configs[agent_conf.name] = agent_conf
-                logger.info(f"Agent '{agent_conf.name}' registered from file '{config_path}'.")
+                logger.info(f"Agent config '{agent_conf.name}' loaded from file '{config_path}'.")
             except Exception as e:
                 logger.error(f"Error loading agent from config file '{config_path}': {str(e)}", exc_info=e)
         else:
             logger.warning(f"Agent configuration file not found at {config_path}. No agents loaded.")
 
-    def register_all_from_directory(self, directory: str) -> None:
+    def load_from_directory(self, directory: str) -> None:
         base_path = Path(directory)
         if not base_path.is_dir():
-            logger.warning(f"Skill directory '{directory}' does not exist or is not a directory.")
+            logger.warning(f"Agent directory '{directory}' does not exist or is not a directory.")
             return
         for item in base_path.iterdir():
             if item.is_file() and item.name.endswith(".md"):
-                file_path = Path(base_path / item)
+                file_path = Path(base_path / item.name)
+                #logger.info(f"Agent MD found at '{file_path}'")
                 try:
                     agent_conf = AgentSpec.from_md_file(str(file_path))
                     self._agent_configs[agent_conf.name] = agent_conf
-                    logger.info(f"Agent '{agent_conf.name}' registered.")
+                    logger.info(f"Agent config '{agent_conf.name}' loaded from file '{file_path}'.")
                 except Exception as e:
                     logger.error(f"Error loading agent from config: {str(e)}", exc_info=e)

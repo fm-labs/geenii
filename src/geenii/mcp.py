@@ -1,12 +1,12 @@
-import asyncio
-import json
 from pathlib import Path
 
+import asyncio
+import json
 from fastmcp import Client
 from fastmcp.mcp_config import MCPConfig
 from fastmcp.prompts import Prompt
 
-from geenii.config import MCP_CONFIG_FILE, DATA_DIR
+from geenii.config import MCP_CONFIG_FILE, GEENII_DIR
 
 config = None
 client = None
@@ -63,7 +63,7 @@ def read_mcp_config_json() -> dict:
 
     :return: A dictionary containing the configuration data.
     """
-    filename = Path(DATA_DIR) / MCP_CONFIG_FILE
+    filename = Path(GEENII_DIR) / MCP_CONFIG_FILE
     try:
         with open(filename, 'r') as f:
             return json.load(f)
@@ -81,7 +81,7 @@ def write_mcp_config_json(data: dict):
 
     :param data: A dictionary containing the new configuration data.
     """
-    filename = Path(DATA_DIR) / MCP_CONFIG_FILE
+    filename = Path(GEENII_DIR) / MCP_CONFIG_FILE
     try:
         with open(filename, 'w') as f:
             json.dump(data, f, indent=4)

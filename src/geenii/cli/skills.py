@@ -4,8 +4,8 @@ import shutil
 import click.core
 
 from geenii.cli.click_helper import click_success, click_error
-from geenii.config import USER_DIR
-from geenii.g import init_skills
+from geenii.config import GEENII_DIR
+from geenii.g import init_global_skill_registry
 
 
 @click.group()
@@ -16,7 +16,7 @@ def skills():
 @skills.command(name="list")
 def list_skills():
     """List all registered skills."""
-    _skills = init_skills()
+    _skills = init_global_skill_registry()
     for skill in _skills.skills:
         click_success(f"- {skill}: {_skills.get(skill).description[:100]}...")
 
@@ -28,7 +28,7 @@ def inspect_skill(name: str, instructions: bool):
     """
     Show details for a specific skill.
     """
-    _skills = init_skills()
+    _skills = init_global_skill_registry()
     skill = _skills.get(name)
     if skill:
         print(f"Name: {skill.name}")
@@ -38,7 +38,10 @@ def inspect_skill(name: str, instructions: bool):
         if skill.metadata:
             for key, value in skill.metadata.items():
                 print(f"- {key}: {value}")
-
+        print(f"Allowed Tools:")
+        if skill.allowed_tools:
+            for t in skill.allowed_tools:
+                print(f"- {t}")
         print(f"Instructions:")
         if instructions:
             print(f"---" * 13)
@@ -56,7 +59,7 @@ def install_skill(name: str, source: str):
     """
     Install a new skill from a given source (e.g., GitHub repo, local file).
     """
-    target_dir = f"{USER_DIR}/skills/{name}"
+    target_dir = f"{GEENII_DIR}/skills/{name}"
 
     # validate source
     if not source.startswith("file://"):

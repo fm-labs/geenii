@@ -9,7 +9,7 @@ from geenii.ai import generate_chat_completion
 from geenii.chat_models import UserInteractionContent, ToolCallResultContent, ContentPart, TextContent, \
     ToolCallContent, JsonContent
 from geenii.datamodels import ModelMessage, ChatCompletionRequest
-from geenii.g import init_agent_registry, init_agent_by_name
+from geenii.g import init_global_agent_registry, init_agent_by_name
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.json_util import parse_json_safe
 
@@ -60,6 +60,7 @@ class ToolCallTask(BaseAgentTask):
             tool_env = {
                 "SKILL_NAME": selected_skill or "",
                 "SKILL_DIR": f"{self.agent.skills.get(selected_skill).path}" if selected_skill else "",
+                "SCRIPT_DIR": f"{self.agent.skills.get(selected_skill).path}/scripts" if selected_skill else "",
             }
             tool_result = await tool.invoke(args=arguments, env=tool_env)
 
@@ -280,17 +281,17 @@ class ToolFilterTask(BaseAgentTask):
         selected_tools = []
         if len(response.output) > 0:
             if isinstance(response.output[0], JsonContent):
-                parsed = response.output[0].data
-                if parsed and "tools" in parsed and isinstance(parsed["tools"], list):
-                    selected_tools = parsed["tools"]
+                output = response.output[0].data
+                if output and "tools" in output and isinstance(output["tools"], list):
+                    selected_tools = output["tools"]
                     logger.info(
-                        f"Tool filter selected tools: {selected_tools} with confidence {parsed.get('confidence', 'N/A')}")
+                        f"Tool filter selected tools: {selected_tools} with confidence {output.get('confidence', 'N/A')}")
             if isinstance(response.output[0], TextContent):
-                parsed = parse_json_safe(response.output[0].text)
-                if parsed and "tools" in parsed and isinstance(parsed["tools"], list):
-                    selected_tools = parsed["tools"]
+                output = parse_json_safe(response.output[0].text)
+                if output and "tools" in output and isinstance(output["tools"], list):
+                    selected_tools = output["tools"]
                     logger.info(
-                        f"Tool filter selected tools: {selected_tools} with confidence {parsed.get('confidence', 'N/A')}")
+                        f"Tool filter selected tools: {selected_tools} with confidence {output.get('confidence', 'N/A')}")
 
         # now update the agent's tool registry to only allow the selected tools for the next LLM response
         # self.agent.set_allowed_tools(selected_tools)
@@ -315,8 +316,6 @@ class HandoffTask(BaseAgentTask):
         self.sub._hidl = self.agent._hidl  # share the same human-in-the-loop handler
 
     async def execute(self) -> AsyncGenerator[ModelMessage, None]:
-        # This is a placeholder implementation. In a real implementation, you would look up the target agent by name,
-        # transfer the conversation context and message history to the target agent, and yield a message indicating the handoff.
         msg = ModelMessage(role="assistant",
                            content=[TextContent(text=f"Handing off conversation to {self.target_agent_name}.")])
         self.agent.message_history.append(msg)
@@ -369,7 +368,7 @@ class FindBestAgentTask(BaseAgentTask):
     def __init__(self, agent: "BaseAgent", prompt: str):
         super().__init__(agent)
         self.prompt = prompt
-        self.agent_registry = init_agent_registry(auto_load=True)
+        self.agent_registry = init_global_agent_registry()
 
     async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
         available_agents = []
@@ -396,24 +395,24 @@ class FindBestAgentTask(BaseAgentTask):
         logger.info(f"Received model response for agent selection with {len(response.output)} content parts.")
         selected_agent = None
         if len(response.output) > 0:
-            parsed = None
+            output = None
             if isinstance(response.output[0], JsonContent):
-                parsed = response.output[0].data
+                output = response.output[0].data
             if isinstance(response.output[0], TextContent):
-                parsed = parse_json_safe(response.output[0].text)
+                output = parse_json_safe(response.output[0].text)
 
-            logger.info(parsed)
-            if parsed and "agent" in parsed and isinstance(parsed["agent"], str):
-                selected_agent = parsed["agent"]
+            logger.info(output)
+            if output and "agent" in output and isinstance(output["agent"], str):
+                selected_agent = output["agent"]
                 logger.info(
-                    f"Agent selector selected agent: {selected_agent} with confidence {parsed.get('confidence', 'N/A')}. Rationale: {parsed.get('rationale', 'N/A')}")
+                    f"Agent selector selected agent: {selected_agent} with confidence {output.get('confidence', 'N/A')}. Rationale: {output.get('rationale', 'N/A')}")
 
         if selected_agent and selected_agent.strip().lower() == "none":
             selected_agent = None
 
         if selected_agent:
             yield ModelMessage(role="assistant", content=[TextContent(
-                text=f"Selected agent: {selected_agent} with confidence {parsed.get('confidence', 'N/A')}. Rationale: {parsed.get('rationale', 'N/A')}")])
+                text=f"Selected agent: {selected_agent} with confidence {output.get('confidence', 'N/A')}. Rationale: {output.get('rationale', 'N/A')}")])
             yield HandoffTask(self.agent, target_agent_name=selected_agent, prompt=self.prompt)
 
         else:

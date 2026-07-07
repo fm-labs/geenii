@@ -2,237 +2,18 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-import asyncio
 import inspect
 import logging
-import subprocess
-import shlex
 from typing import Any, Callable
 
-from geenii.mcp import get_mcp_client_for_server, McpClient
+from geenii.logs import get_rotating_file_log_handler
+from geenii.tool.common import Tool
+from geenii.tool.mcp import McpTool
+from geenii.tool.python import PythonFunctionTool
 
 logger = logging.getLogger(__name__)
+logger.addHandler(get_rotating_file_log_handler("tools"))
 
-
-# ---------------------------------------------------------------------------
-# Base
-# ---------------------------------------------------------------------------
-
-class Tool(ABC):
-    """Abstract base for all tool types."""
-
-    def __init__(self, name: str, description: str = "", parameters: dict | None = None):
-        self.type = "tool"
-        self.name = name
-        self.description = description
-        self.parameters = parameters or {}
-
-    #def __str__(self) -> str:
-    #    return self.name
-
-    #def __repr__(self) -> str:
-    #    return f"<{self.__class__.__name__} name={self.name!r}>"
-
-    @abstractmethod
-    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
-        ...
-
-    def to_definition(self) -> dict:
-        """Return an OpenAI-compatible tool definition."""
-        return {
-            "type": self.type,
-            "name": self.name,
-            "description": self.description,
-            "parameters": self.parameters,
-        }
-
-    def to_openai(self) -> dict:
-        """Return an OpenAI-compatible tool definition."""
-        return {
-            "type": "function",
-            "name": self.name,
-            "description": self.description,
-            "parameters": self.parameters,
-        }
-
-    def to_ollama(self) -> dict:
-        """Return an Ollama-compatible tool definition."""
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters,
-            },
-        }
-
-
-# ---------------------------------------------------------------------------
-# Python tool
-# ---------------------------------------------------------------------------
-
-class PythonFunctionTool(Tool):
-    """A tool backed by a plain Python callable."""
-
-    def __init__(
-        self,
-        name: str,
-        description: str = "",
-        parameters: dict | None = None,
-        handler: Callable[..., Any] | None = None,
-    ):
-        super().__init__(name, description, parameters)
-        self.type = "function"
-        self.handler = handler
-
-    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
-        if self.handler is None:
-            raise RuntimeError(f"No handler registered for tool {self.name!r}")
-
-        # support sync and async handlers
-        if inspect.iscoroutinefunction(self.handler):
-            result = await self.handler(**args)
-        else:
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, lambda: self.handler(**args))
-
-        #print(f"Tool {self.name!r} returned:", result)
-        return result
-
-
-class  PythonCliTool(Tool):
-
-    """A ComputerTool that executes Python scripts on Unix-like systems."""
-
-    def __init__(
-        self,
-        name: str,
-        description: str = "",
-        parameters: dict | None = None,
-    ):
-        super().__init__(name, description, parameters)
-        self.type = "python"
-
-    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
-        command = args.get("command")
-        if not command:
-            raise ValueError(f"Missing 'command' argument for PythonTool {self.name!r}")
-
-        logger.info(f"Executing PythonTool command: {command}")
-
-        # expand environment variables in the command
-        command = expand_vars(command, env or {})
-
-        # run the command in a thread to avoid blocking the event loop
-        result = await asyncio.to_thread(self.run_subprocess, command, env)
-        logger.info(f"Command result: {result}")
-        return result
-
-     # helper method to run a subprocess and capture its output
-    def run_subprocess(self, command: str, env: dict[str, str] | None) -> str:
-        _command = shlex.split(command)
-        print(_command)
-        logger.info(f"Executing command: {command} with environment: {env}")
-        result = subprocess.run(_command, shell=False, capture_output=True, text=True, env=env, cwd=None)
-        logger.info(f"Return code: {result.returncode}")
-        logger.info(f"Standard output: {result.stdout}")
-        logger.info(f"Standard error: {result.stderr}")
-        return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
-
-
-
-# ---------------------------------------------------------------------------
-# Computer tool
-# ---------------------------------------------------------------------------
-
-
-class ComputerTool(Tool):
-    """A tool that executes a command on the local machine."""
-
-    def __init__(
-        self,
-        name: str,
-        description: str = "",
-        parameters: dict | None = None,
-        command_template: str | None = None,
-    ):
-        super().__init__(name, description, parameters)
-        self.type = "computer"
-        self.command_template = command_template
-
-    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
-        command = args.get("command")
-        if not command:
-            raise ValueError(f"Missing 'command' argument for ComputerTool {self.name!r}")
-
-        if self.command_template is not None:
-            command = self.command_template.format(command=command, **args)
-
-        logger.info(f"Executing ComputerTool command: {command}")
-
-        # expand environment variables in the command
-        command = expand_vars(command, env or {})
-
-        # run the command in a thread to avoid blocking the event loop
-        result = await asyncio.to_thread(self.run_subprocess, command, env)
-        logger.info(f"Command result: {result}")
-        return result
-
-
-    def run_subprocess(self, command: str, env: dict[str, str] | None) -> str:
-        _command = shlex.split(command)
-        print(_command)
-        logger.info(f"Executing command: {command} with environment: {env}")
-        result = subprocess.run(_command, shell=False, capture_output=True, text=True, env=env, cwd=None)
-        logger.info(f"Return code: {result.returncode}")
-        logger.info(f"Standard output: {result.stdout}")
-        logger.info(f"Standard error: {result.stderr}")
-        return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
-
-
-class AppleScriptTool(ComputerTool):
-
-    """A ComputerTool that executes AppleScript commands on MacOS."""
-
-    def __init__(
-        self,
-        name: str,
-        description: str = "",
-        parameters: dict | None = None,
-    ):
-        super().__init__(name, description, parameters, command_template="osascript -e '{command}'")
-
-
-
-# ---------------------------------------------------------------------------
-# MCP tool
-# ---------------------------------------------------------------------------
-
-class McpTool(Tool):
-    """A tool whose execution is delegated to an MCP server."""
-
-    def __init__(
-        self,
-        name: str,
-        mcp_server_id: str,
-        description: str = "",
-        parameters: dict | None = None,
-    ):
-        super().__init__(name, description, parameters)
-        self._name = name
-        self.name = f"mcp__{mcp_server_id}__{name}"
-        self.mcp_server_id = mcp_server_id
-        self.type = "mcp_tool"
-
-    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
-        client: McpClient = get_mcp_client_for_server(self.mcp_server_id)
-        return await client.call_tool(self._name, args=args)
-
-
-# ---------------------------------------------------------------------------
-# Registry
-# ---------------------------------------------------------------------------
 
 class ToolRegistry:
     """Central registry for discovering and invoking tools by name."""
@@ -287,7 +68,7 @@ class ToolRegistry:
             tool = McpTool(
                 name=defn['name'],
                 mcp_server_id=mcp_server_id,
-                description=defn.get("description", "").strip().split("\n")[0],
+                description=defn.get("description", ""), #.strip().split("\n")[0],
                 parameters=defn.get("inputSchema", {}),
             )
             self.register(tool)
@@ -411,9 +192,3 @@ def _params_from_signature(fn: Callable[..., Any]) -> dict:
     return schema
 
 
-def expand_vars(command: str, env: dict[str, str]) -> str:
-    """Expand environment variables in a command string."""
-    for key, value in env.items():
-        command = command.replace(f"${{{key}}}", value)
-        command = command.replace(f"${key}", value)
-    return command

@@ -1,12 +1,14 @@
+import asyncio
 import click
 
-from geenii.tools import init_builtin_tools
 from geenii.tool.registry import ToolRegistry
+from geenii.tools import init_builtin_tools, init_mcp_server_tools
+
 
 def _init_tool_registry():
     tool_registry = ToolRegistry()
     init_builtin_tools(tool_registry)
-    # init_mcp_server_tools_sync(tool_registry)
+    asyncio.run(init_mcp_server_tools(tool_registry))
     return tool_registry
 
 @click.group()
@@ -20,7 +22,7 @@ def list_tools():
     click.echo("Listing tools...")
     tool_registry = _init_tool_registry()
     for tool in tool_registry.list_tools():
-        click.echo(f"- {tool.name}: {tool.description} ({tool.type})")
+        click.echo(f"- {tool.name}: {tool.short_description} ({tool.type})")
 
 @tools.command("inspect")
 @click.argument("tool_name")
@@ -32,8 +34,8 @@ def inspect_tool(tool_name):
         tool = tool_registry.get(tool_name)
         click.echo(f"Name: {tool.name}")
         click.echo(f"Type: {tool.type}")
-        click.echo(f"Description: {tool.description}")
         click.echo(f"Parameters: {tool.parameters}")
+        click.echo(f"Description: {tool.description}")
     except KeyError:
         click.echo(f"Tool {tool_name} not found.")
 

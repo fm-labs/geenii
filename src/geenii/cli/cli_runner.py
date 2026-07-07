@@ -3,8 +3,7 @@ import asyncio
 import click
 
 from geenii.agents import Agent
-from geenii.g import init_agent_registry
-from geenii.hidl import HumanInTheLoopController
+from geenii.hitl import HumanInTheLoopController
 
 
 class CliHumanInTheLoopController(HumanInTheLoopController):
@@ -23,9 +22,9 @@ class CliHumanInTheLoopController(HumanInTheLoopController):
 class CliAgentRunner:
 
     def __init__(self, agent: Agent, interactive: bool = True):
-        click.interactive = interactive
-        click.agent = agent
-        # click.agent._hidl = CliHumanInTheLoopController()
+        self.interactive = interactive
+        self.agent = agent
+        # self.agent._hidl = CliHumanInTheLoopController()
 
         print("Bot initialized. Starting interaction...")
         print(agent)
@@ -35,13 +34,11 @@ class CliAgentRunner:
 
     async def _run(self, prompt: str):
         while prompt.lower() != "exit" and len(prompt) > 0:
-            async for msg in click.agent.prompt(prompt):
+            async for msg in self.agent.prompt(prompt):
                 for part in msg.content:
                     click.secho(f">>> [{part.type}] {part.to_text()}", fg="cyan")
 
-            if click.interactive:
+            if self.interactive:
                 prompt = click.prompt("> ", default="", show_default=False)
             else:
                 break
-
-

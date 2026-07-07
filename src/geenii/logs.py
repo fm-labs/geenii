@@ -4,7 +4,7 @@ from logging.handlers import RotatingFileHandler
 
 from rich.logging import RichHandler
 
-from geenii.config import DATA_DIR
+from geenii.config import CACHE_DIR
 
 LOG_FORMAT1 = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 LOG_FORMAT2 = "%(asctime)s - %(levelname)s - %(message)s"
@@ -12,7 +12,7 @@ LOG_FORMAT2 = "%(asctime)s - %(levelname)s - %(message)s"
 formatter = logging.Formatter(LOG_FORMAT1)
 
 def init_logging():
-    if os.getenv("GEENII_LOGGING") == "rich":
+    if os.getenv("GEENII_LOGGING", "rich") == "rich":
         logging.basicConfig(
             level="INFO",
             format="%(message)s",
@@ -43,15 +43,15 @@ def get_console_log_handler():
     return console_handler
 
 def get_file_log_handler(name):
-    os.makedirs(f"{DATA_DIR}/logs", exist_ok=True)
-    file_handler = logging.FileHandler(f"{DATA_DIR}/logs/{name}.log")
+    os.makedirs(f"{CACHE_DIR}/logs", exist_ok=True)
+    file_handler = logging.FileHandler(f"{CACHE_DIR}/logs/{name}.log")
     file_handler.setFormatter(formatter)
     return file_handler
 
 def get_rotating_file_log_handler(name):
-    os.makedirs(f"{DATA_DIR}/logs", exist_ok=True)
+    os.makedirs(f"{CACHE_DIR}/logs", exist_ok=True)
     rotating_file_handler = RotatingFileHandler(
-        f"{DATA_DIR}/logs/{name}.log",
+        f"{CACHE_DIR}/logs/{name}.log",
         maxBytes=10_000_000,   # 10 MB
         backupCount=10         # keep 10 old files
     )

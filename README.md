@@ -119,7 +119,7 @@ geenii agent --model "ollama:qwen3:8b" "What is the capital of France?"
 geenii agent --tools "websearch" "Search the web for the latest news on climate change."
 
 # Use a specific skill
-geenii agent --skills "math" "Is 33311 a prime number?"
+geenii agent --skills "math" --tools execute_python "Is 33311 a prime number?"
 
 # Use computer tools
 geenii agent --tools "bash" "List all files in the current directory."
@@ -205,9 +205,9 @@ working-directory/
 │   │   └── email.md
 │   ├── skills
 │   │   └── my_skill
-│   │       └── SKILL.md
-│   ├── tools
-│   │   └── my_tool.py
+│   │       ├─── SKILL.md
+│   │       └─── scripts
+│   │              └── script.py
 │   ├── geenii.json
 │   └── mcp.json
 ├── data
@@ -260,11 +260,11 @@ docker run -it --rm --name geenii -v geenii_data:/data -v $(pwd)/.geenii:/.geeni
 ```bash
 export OLLAMA_API_KEY="your-ollama-api-key"
 docker run -it --rm --name geenii \
-  -v ${HOME}/.geenii:/.geenii:ro \
+  -v ${HOME}/.geenii:/home/geenii/.geenii:ro \
   -v $(pwd)/data:/data:rw \
   -v $(pwd):/workspace:rw \
-  -e GEENII_USER_DIR=/.geenii \
-  -e GEENII_WORKSPACE=/workspace \
+  -e GEENII_DIR=/.geenii \
+  -e GEENII_WORKING_DIR=/workspace \
   -e OLLAMA_API_KEY=${OLLAMA_API_KEY:?Variable not set} \
   -e OLLAMA_HOST=host.docker.internal \
   --add-host=host.docker.internal:host-gateway \

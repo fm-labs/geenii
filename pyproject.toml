@@ -1,8 +1,19 @@
 [project]
 name = "geenii"
 version = "0.3.1"
-description = "Hybrid AI orchestration platform for llms and agents."
+description = "A versatile AI agent toolkit"
 requires-python = ">=3.13,<4.0"
+authors = [
+  { name="fm-labs", email="code@fmlabs.dev" },
+]
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
 dependencies = [
     "anthropic>=0.59.0",
     "click>=8.3.1",
@@ -24,3 +35,33 @@ dev = [
     "redis>=7.2.1",
     "testcontainers>=4.13.3",
 ]
+
+[project.urls]
+Homepage = "https://github.com/fm-labs/geenii"
+Issues = "https://github.com/fm-labs/geenii/issues"
+
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
+
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/geenii"]
+
+
+[project.scripts]
+geenii-cli = "cli:main"
+geenii-scheduler = "geenii.scheduler:main"

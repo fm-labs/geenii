@@ -1,11 +1,10 @@
+import click
 import json
 import logging
 
-import click
-
 from geenii.agent.base_agent import BaseAgent
 from geenii.cli.cli_runner import CliAgentRunner
-from geenii.g import init_agent_registry
+from geenii.g import init_agent_by_name
 
 logger = logging.getLogger(__name__)
 
@@ -28,19 +27,22 @@ logger = logging.getLogger(__name__)
               help="Override the developer instructions specified in the agent config.")
 @click.option("output_format", "--output-format", "-f", default="text",
               help="Output format for the agent's responses. Options: text, json.")
-@click.option("continue_conversation", "--continue", "-c", is_flag=True,
+@click.option("interactive", "--interactive", "-i", is_flag=True,
               help="Continue the conversation after the initial prompt.")
-def agent_cli(prompt: str, name: str, continue_conversation: bool, skills: str, tools: str, model: str, model_parameters: str,
-              system_instructions: str, developer_instructions: str, output_format: str):
+@click.option("conv_id", "--conv-id", "-cid", default="",
+              help="Continue a previous conversation. Creates a new conversation if omitted.")
+def agent_cli(prompt: str, name: str, interactive: bool, skills: str, tools: str, model: str, model_parameters: str,
+              system_instructions: str, developer_instructions: str, output_format: str, conv_id: str):
     """
     Run an agent with the given name and initial prompt.
     Optionally override skills, tools, model, model parameters, system instructions, developer instructions, and output format.
     """
     click.echo(f"Running agent '{name}' with prompt: {prompt}")
-    _agents = init_agent_registry(auto_load=True)
-    gbot: BaseAgent = _agents.get_instance(name)
+    #_agents = init_agent_registry(auto_load=True)
+    #gbot: BaseAgent = _agents.get_instance(name)
+    gbot: BaseAgent = init_agent_by_name(name)
     if not gbot:
-        click.echo(f"Agent '{name}' not found. Please check the available agents with 'geemod agents list'.")
+        click.echo(f"Agent '{name}' not found. Please check the available agents with 'geenii agents list'.")
         return
 
     # todo Apply overrides from CLI options
@@ -66,5 +68,7 @@ def agent_cli(prompt: str, name: str, continue_conversation: bool, skills: str, 
             click.echo(f"Invalid output format '{output_format}'. Supported formats are 'text' and 'json'.")
             return
         gbot.output_format = output_format
+    #if conv_id:
+    #    gbot.conv_id = conv_id
 
-    CliAgentRunner(gbot, interactive=continue_conversation).run(prompt)
+    CliAgentRunner(gbot, interactive=interactive).run(prompt)

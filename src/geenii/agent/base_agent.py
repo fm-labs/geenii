@@ -8,7 +8,7 @@ from geenii.bots import BotInterface
 from geenii.chat_models import ContentPart, TextContent
 from geenii.config import DEFAULT_COMPLETION_MODEL
 from geenii.datamodels import ModelMessage
-from geenii.hidl import HumanInTheLoopController, NoHumanInTheLoopController
+from geenii.hitl import HumanInTheLoopController, NoHumanInTheLoopController
 from geenii.memory import ChatMemory
 from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry

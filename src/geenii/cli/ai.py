@@ -7,7 +7,8 @@ from geenii.chat_models import TextContent
 from geenii.config import DEFAULT_COMPLETION_MODEL
 from geenii.core.tools import execute_command
 from geenii.datamodels import ModelMessage
-from geenii.tool.registry import ToolRegistry, PythonFunctionTool
+from geenii.tool.registry import ToolRegistry
+from geenii.tool.python import PythonFunctionTool
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
 
 

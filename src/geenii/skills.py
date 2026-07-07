@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pydantic
 
-from geenii.config import DATA_DIR, USER_DIR
+from geenii.config import GEENII_DIR, read_user_settings, GEENII_WORKING_DIR
+from geenii.utils.os_util import get_user_home_dir
 from geenii.utils.mdfile import read_frontmatter_file
 
 logger = logging.getLogger(__name__)
@@ -14,8 +15,9 @@ class SkillSpec(pydantic.BaseModel):
     path: str
     name: str
     description: str
-    #instructions: str | None = None
+    # instructions: str | None = None
     metadata: dict | None = pydantic.Field(default_factory=dict)
+    allowed_tools: list[str] | None = pydantic.Field(default_factory=list)
 
     @property
     def instructions(self) -> str:
@@ -36,12 +38,14 @@ class SkillSpec(pydantic.BaseModel):
         if not skill_header or not isinstance(skill_header, dict):
             raise ValueError(f"Malformed skill markdown file: missing or invalid header in '{str(md_path)}'")
         if not "name" in skill_header or "description" not in skill_header:
-            raise ValueError(f"Malformed skill markdown file: missing required 'name' or 'description' fields in header of '{str(md_path)}'")
+            raise ValueError(
+                f"Malformed skill markdown file: missing required 'name' or 'description' fields in header of '{str(md_path)}'")
         return SkillSpec(
             path=str(md_path.parent),
             name=skill_header.get("name"),
             description=skill_header.get("description", ""),
             metadata=skill_header.get("metadata", {}),
+            allowed_tools=skill_header.get("allowed-tools", "").split(" "),
         )
 
 
@@ -58,20 +62,25 @@ class SkillRegistry:
 
     def names(self) -> set[str]:
         return set(self.skills.keys())
-    
+
     def register(self, skill: SkillSpec):
         if not skill or not isinstance(skill, SkillSpec):
             raise ValueError("Invalid skill object provided for registration.")
         if skill.name in self.skills:
             raise ValueError(f"Skill with name '{skill.name}' is already registered.")
         self.skills[skill.name] = skill
-        logger.info(f"Skill '{skill.name}' registered.")
+        logger.info(f"Skill '{skill.path}' registered.")
 
     def load(self, skill_names: str | list[str]) -> None:
         if isinstance(skill_names, str):
             skill_names = [skill.strip() for skill in skill_names.split(",")]
         for skill_name in skill_names:
             try:
+                skill = self.skills[skill_name] if skill_name in self.skills else None
+                if skill:
+                    logger.info(f"Skill '{skill_name}' already loaded.")
+                    continue
+
                 skill_dir = locate_skill_path(skill_name)
                 if not skill_dir:
                     raise KeyError(f"Skill '{skill_name}' not found.")
@@ -122,6 +131,22 @@ class SkillRegistry:
 #                       metadata=skill_header)
 #     return skill
 
+def skill_paths() -> list[str]:
+    skill_paths = [
+        #os.path.join(get_user_home_dir(), ".geenii", "skills"),
+        os.path.join(os.getcwd(), ".geenii", "skills"),
+        os.path.join(GEENII_WORKING_DIR, ".geenii", "skills"),
+        os.path.join(GEENII_DIR, "skills"),
+    ]
+    _settings = read_user_settings()
+    if "skill_dirs" in _settings:
+        for skill_dir in _settings["skill_dirs"]:
+            if os.path.isdir(skill_dir):
+                skill_paths.append(skill_dir)
+            else:
+                print(f"Warning: Skill directory '{skill_dir}' does not exist or is not a directory.")
+    return skill_paths
+
 
 def locate_skill_path(skill_name: str) -> Path | None:
     """
@@ -130,17 +155,10 @@ def locate_skill_path(skill_name: str) -> Path | None:
     :param skill_name: The name of the skill to locate.
     :return:
     """
-    base_paths = [
-        os.path.join(os.getcwd(), skill_name),
-        os.path.join(USER_DIR, "skills"),
-        #os.path.join(DATA_DIR, "skills")
-    ]
-    for _path in base_paths:
+    for _path in skill_paths():
         logger.info(f"Searching for skill '{skill_name}' in path: {_path}")
-
         skill_md_path = Path(_path) / skill_name / "SKILL.md"
         if skill_md_path.is_file():
             logger.info(f"Found skill '{skill_name}' in path: {_path}")
             return Path(_path) / skill_name
     return None
-

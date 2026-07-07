@@ -3,21 +3,19 @@ import os
 
 import dotenv
 
-from geenii.utils.os_util import get_user_home
-
 
 APP_VERSION = "0.3.1"
 
-USER_DIR = os.environ.get("GEENII_USER_DIR", get_user_home() + "/.geenii")
-DATA_DIR = os.environ.get("GEENII_DATA_DIR", "data")
+GEENII_WORKING_DIR = os.environ.get("GEENII_WORKING_DIR", os.getcwd())
+GEENII_DIR = os.environ.get("GEENII_DIR", os.path.join(GEENII_WORKING_DIR, ".geenii"))
 
 # Load environment variables from .env file in the user directory, if it exists
-dotenv.load_dotenv(USER_DIR + "/.env", override=True, verbose=True)
+dotenv.load_dotenv(GEENII_DIR + "/.env", override=True, verbose=True)
 
-CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", get_user_home() + "/.cache/geenii")
+CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", GEENII_DIR + "/.cache")
 CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
 
-GEENII_BIN = os.getenv("GEENII_BIN", "geenii")
+#GEENII_BIN = os.getenv("GEENII_BIN", "geenii")
 
 MCP_CONFIG_FILE="mcp.json"
 
@@ -53,37 +51,38 @@ REDIS_URI = os.environ.get("REDIS_URI", "")
 
 ### Chat settings ###
 # Path to the SQLite database file for storing chat history and related data
-CHAT_DB_PATH = os.environ.get("GEENII_CHAT_DB_PATH", f"{DATA_DIR}/chat.db")
+CHAT_DB_PATH = os.environ.get("GEENII_CHAT_DB_PATH", f"{CACHE_DIR}/chat.db")
 
 # A unique namespace UUID for generating deterministic UUIDs for DM room IDs.
 CHAT_DM_NAMESPACE =  os.environ.get("GEENII_CHAT_DM_NAMESPACE", "a7f3c2e1-4b8d-5a9f-8c3e-2d1b6f0e4a7c")
 CHAT_GROUP_NAMESPACE =  os.environ.get("GEENII_CHAT_GROUP_NAMESPACE", "b7f3c2e1-8b4d-5a9f-8c3e-2d1b6f0e4a7a")
 
 
-def get_user_dir():
-    if not os.path.exists(USER_DIR):
-        os.makedirs(USER_DIR, exist_ok=True)
-    return USER_DIR
-
-
-def get_data_dir():
-    #home_dir = get_user_home_dir()
-    #user_dir = os.path.join(home_dir, ".geenii")
-    #if not os.path.exists(user_dir):
-    #    os.makedirs(user_dir, exist_ok=True)
-    #return user_dir
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR, exist_ok=True)
-    return DATA_DIR
+# def get_user_dir():
+#     if not os.path.exists(GEENII_DIR):
+#         os.makedirs(GEENII_DIR, exist_ok=True)
+#     return GEENII_DIR
+#
+#
+# def get_data_dir():
+#     #home_dir = get_user_home_dir()
+#     #user_dir = os.path.join(home_dir, ".geenii")
+#     #if not os.path.exists(user_dir):
+#     #    os.makedirs(user_dir, exist_ok=True)
+#     #return user_dir
+#     if not os.path.exists(GEENII_DATA_DIR):
+#         os.makedirs(GEENII_DATA_DIR, exist_ok=True)
+#     return GEENII_DATA_DIR
 
 
 def read_user_settings():
-    user_settings_path = os.path.join(get_user_dir(), "geenii.json")
+    user_settings_path = os.path.join(GEENII_DIR, "geenii.json")
     default_settings = {
         "theme": "system",  # options: "light", "dark", "system"
         "notifications": True,
         "language": "en-US",
-        "environment": {}
+        "environment": {},
+        "skill_dirs": []
     }
     if os.path.exists(user_settings_path):
         try:
@@ -99,7 +98,7 @@ def read_user_settings():
 
 def write_user_settings(settings: dict):
     print(f"Saving settings: {settings}")
-    user_settings_path = os.path.join(get_user_dir(), "geenii.json")
+    user_settings_path = os.path.join(GEENII_DIR, "geenii.json")
     try:
         with open(user_settings_path, "w") as f:
             json.dump(settings, f, indent=4)

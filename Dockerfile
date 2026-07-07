@@ -52,6 +52,6 @@ COPY --from=builder /builder/dist/bin/geenii /usr/bin/geenii
 
 WORKDIR /home/geenii
 USER geenii
-ENV GEENII_USER_DIR=/.geenii
+ENV GEENII_DIR=/.geenii
 ENV GEENII_DATA_DIR=/data
 CMD ["geenii", "--help"]

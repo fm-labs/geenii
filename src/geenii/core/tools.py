@@ -1,10 +1,10 @@
+import asyncio
 import os
+import shlex
 import subprocess
 import uuid
-import asyncio
-import shlex
 
-from geenii.config import DATA_DIR
+from geenii.config import GEENII_DIR
 from geenii.sandbox import run_docker_sandbox_python
 from geenii.tool.registry import ToolRegistry
 
@@ -62,7 +62,8 @@ def execute_command(command: str, skill: str | None = None) -> str:
     working_directory = os.getcwd()
     _env = {}
     if skill:
-        skill_dir = f"{DATA_DIR}/skills/{skill}"
+        # todo lookup skill base path
+        skill_dir = f"{GEENII_DIR}/skills/{skill}"
         #if os.path.isdir(skill_dir):
         #    working_directory = skill_dir
         _env.update({"SKILL_NAME": skill, "SKILL_DIR": skill_dir})

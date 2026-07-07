@@ -1,7 +1,7 @@
 import click
 
 from geenii.cli.click_helper import click_error, click_info
-from geenii.g import init_agent_registry
+from geenii.g import init_global_agent_registry
 
 
 
@@ -15,7 +15,7 @@ def agents():
 def list_agents():
     """List all configured and loaded agents."""
     click.echo("Configured agents:")
-    _agents = init_agent_registry(auto_load=True)
+    _agents = init_global_agent_registry()
     for agent_name in _agents.list_configured():
         click.echo(f"- {agent_name}")
 
@@ -27,7 +27,7 @@ def list_agents():
 @agents.command(name="inspect")
 @click.argument("name")
 def inspect_agent(name: str):
-    _agents = init_agent_registry(auto_load=True)
+    _agents = init_global_agent_registry()
     agent_config = _agents.get_config(name)
     if not agent_config:
         click_error(f"Agent '{name}' not found. Please check the available agents with 'agents list'.")

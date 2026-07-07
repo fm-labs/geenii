@@ -1,18 +1,18 @@
-from datetime import datetime
 from pathlib import Path
-import uuid
 
 import pydantic
+import uuid
+from datetime import datetime
 
-from geenii.config import DATA_DIR
+from geenii.config import CACHE_DIR
 from geenii.datamodels import CompletionResponse, CompletionErrorResponse, \
     ChatCompletionRequest, ImageGenerationApiRequest, ImageGenerationApiResponse, \
-    AudioGenerationApiRequest, AudioSpeechGenerationApiResponse, AudioTranscriptionApiRequest, AudioTranscriptionApiResponse, \
+    AudioGenerationApiRequest, AudioSpeechGenerationApiResponse, AudioTranscriptionApiRequest, \
+    AudioTranscriptionApiResponse, \
     ModelMessage, AIModelInfo, AIProviderInfo, ChatCompletionResponse
 from geenii.provider.geenii.provider import GeeniiProvider
 from geenii.provider.interfaces import AICompletionProvider, AIProvider, AIImageGeneratorProvider, \
     AISpeechGeneratorProvider, AIAudioTranscriptionProvider, AIAudioTranslationProvider, AIChatCompletionProvider
-
 from geenii.provider.ollama.provider import OllamaAIProvider
 from geenii.provider.openai.provider import OpenAIProvider
 from geenii.tool.registry import ToolRegistry
@@ -332,7 +332,7 @@ def generate_audio_transcription(request: AudioTranscriptionApiRequest) -> Audio
 
 def _ai_log(what: str, data: dict | pydantic.BaseModel):
     date_formatted = datetime.now().strftime("%Y-%m-%d")
-    log_file = f"{DATA_DIR}/logs/ai-{date_formatted}.log"
+    log_file = f"{CACHE_DIR}/logs/ai-{date_formatted}.log"
     Path(log_file).parent.mkdir(parents=True, exist_ok=True)
     if isinstance(data, pydantic.BaseModel):
         data = data.model_dump(mode="json")
@@ -342,7 +342,7 @@ def _ai_log(what: str, data: dict | pydantic.BaseModel):
 def _ai_usage_log(provider: str, model: str, context_id: str, usage: dict):
     """Log AI usage data to a file for tracking and analysis."""
     date_formatted = datetime.now().strftime("%Y-%m")
-    log_file = f"{DATA_DIR}/logs/ai-usage-{date_formatted}.log"
+    log_file = f"{CACHE_DIR}/logs/ai-usage-{date_formatted}.log"
     Path(log_file).parent.mkdir(parents=True, exist_ok=True)
     log_entry = {
         "timestamp": datetime.now().isoformat(),

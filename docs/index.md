@@ -16,4 +16,40 @@ A minimal, but powerful, orchestration framework for agentic applications.
 - Aims for interoperability with other agent frameworks (e.g., via Agent Protocol).
 
 
+## System
 
+- Env variables
+- Secrets
+
+
+## Agents
+
+- Model
+- Model parameters
+- Memory
+- Tools
+- Skills
+- MCP servers
+- Agent Env vars
+- Agent Secrets
+
+
+## Core Tasks
+
+### LLM completion
+
+- ai_generate_completion
+- ai_generate_chat_completion
+- ai_generate_image
+- ai_generate_audio_speech
+- ai_generate_audio_transcription
+- ai_generate_translation
+
+
+
+## Skills
+
+- ai_skill_info (meta,scripts)
+- ai_skill_instructions
+- ai_skill_generate_completion
+- ai_skill_exec_script

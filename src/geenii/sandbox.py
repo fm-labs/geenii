@@ -32,7 +32,7 @@ def run_docker_subprocess(command: list[str], timeout: int = 30, env: dict | Non
         return -1, "", f"Error running command: {str(e)}"
 
 
-def run_docker_sandbox_python(base_dir: str, script_name: str = "main.py", script_args: list[str] = None,
+def run_docker_sandbox_python(app_dir: str, script_name: str = "main.py", script_args: list[str] = None,
                               mounts: list[str] = None,
                               network_mode: Literal["none", "bridge", "host"] = "none",
                               cap_add: list[str] = None,
@@ -41,7 +41,7 @@ def run_docker_sandbox_python(base_dir: str, script_name: str = "main.py", scrip
     """
     Run a Python script in a Docker sandbox.
 
-    :param base_dir: The base directory containing the script to run.
+    :param app_dir: The base directory containing the script to run.
     :param script_name: The name of the Python script to run (default: "main.py").
     :param script_args: List of additional arguments to pass to the Python script (default: None).
     :param mounts: A list of additional mount points in the format "host_path:container_path" (default: None).
@@ -53,15 +53,15 @@ def run_docker_sandbox_python(base_dir: str, script_name: str = "main.py", scrip
     :param timeout: The maximum time to allow the command to run in seconds (default: 30).
     :return: A tuple containing the exit code, stdout, and stderr.
     """
-    print(f"Running Docker sandbox with base_dir={base_dir}, script_name={script_name}, script_args={script_args},"
+    print(f"Running Docker sandbox with base_dir={app_dir}, script_name={script_name}, script_args={script_args},"
           f" mounts={mounts}, timeout={timeout}")
 
-    if not os.path.exists(base_dir):
-        raise ValueError(f"Base directory does not exist: {base_dir}")
+    if not os.path.exists(app_dir):
+        raise ValueError(f"App directory does not exist: {app_dir}")
 
     command = ["docker", "run", "--rm"]
-    # Mount the base directory as read-only and set as working directory
-    command.extend(["-v", f"{base_dir}:/app:ro"])
+    # Mount the app directory as read-only and set as working directory
+    command.extend(["-v", f"{app_dir}:/app:ro"])
     command.extend(["-w", "/app"])
 
     # Mounts

@@ -2,13 +2,14 @@ import logging
 
 import click
 
-from geenii.cli.geenii import agent_cli
+from geenii.cli.scheduler import scheduler as scheduler_cli
+from geenii.cli.agent import agent_cli
 from geenii.cli.info import info as info_cli
 from geenii.cli.agents import agents as agents_cli
 from geenii.cli.skills import skills as skills_cli
 from geenii.cli.tools import tools as tools_cli
 from geenii.config import APP_VERSION
-from geenii.g import init_app_directories
+from geenii.g import make_app_directories
 from geenii.logs import init_logging
 
 init_logging()
@@ -22,13 +23,18 @@ def geecli():
     pass
 
 
-geecli.add_command(agent_cli)
 geecli.add_command(info_cli)
+geecli.add_command(agent_cli)
 geecli.add_command(agents_cli)
-geecli.add_command(skills_cli)
 geecli.add_command(tools_cli)
+geecli.add_command(skills_cli)
+geecli.add_command(scheduler_cli)
+
+
+def main():
+    #init_app_directories()
+    geecli()
 
 
 if __name__ == "__main__":
-    #init_app_directories()
-    geecli()
+    main()

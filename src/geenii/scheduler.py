@@ -32,6 +32,8 @@ import inspect
 import json
 import logging
 import os
+import signal
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -57,11 +59,13 @@ class ScheduledTask:
     name: str
     at: datetime | None = None  # optional fixed execution time, overrides cron if set
     cron: str | None = None  # cron expression like "0 * * * *" for hourly execution
-    module: str = ""  # dot-separated module path to the function to run, e.g. "myapp.tasks.cleanup"
+    module: str = "geenii.core.tasks.run_proc"  # dot-separated module path to the function to run, e.g. "myapp.tasks.cleanup"
     run_fn: Callable[[], Any] | None = field(default=None, repr=False)
-    args: list[str] | None = None
+    cmd: list[str] | None = None
     oneshot: bool = False  # if true, the task will be removed after running once
     env: dict[str, str] | None = None
+    working_dir: Path | None = None
+    #logger: logging.Logger = logger
 
 
     def load(self) -> None:
@@ -109,7 +113,7 @@ class ScheduledTask:
             raise RuntimeError("Task function not loaded")
         logger.info("Running task '%s'", self.name)
         try:
-            fn_args = self.args or []
+            fn_args = self.cmd or []
             fn_env = self.env or {}
             if inspect.iscoroutinefunction(self.run_fn):
                 await self.run_fn(fn_args, fn_env)  # type: ignore
@@ -176,7 +180,7 @@ class Scheduler:
                 {
                     "name": task.name,
                     "module": task.module,
-                    "args": task.args,
+                    "args": task.cmd,
                     "next_run": self._schedule.get(task.name).isoformat() if self._schedule.get(task.name) else None,
                     "last_run": self._last_run.get(task.name).isoformat() if self._last_run.get(task.name) else None,
                     "oneshot": task.oneshot,
@@ -221,7 +225,7 @@ class Scheduler:
             #    at_expr = datetime.fromisoformat(at_expr).astimezone(timezone.utc)
 
             task = ScheduledTask(name=task_conf.name, at=task_conf.at, cron=task_conf.cron,
-                                 module=task_conf.module, args=task_conf.args_parsed, env=task_conf.env, )
+                                 module=task_conf.module, cmd=task_conf.args_parsed, env=task_conf.env, )
             try:
                 task.load()
             except Exception:
@@ -355,63 +359,64 @@ class Scheduler:
             await asyncio.sleep(1)
 
 
-# if __name__ == "__main__":
-#     async def hello():
-#         print("Hello from the scheduled task!")
-#         return "Hello result"
-#
-#
-#     def hello_sync():
-#         print("Hello from the scheduled task (sync)!")
-#         return "Hello sync result"
-#
-#
-#     async def run_scheduler(config_path: str = DEFAULT_CONFIG_PATH) -> None:
-#         scheduler = Scheduler()
-#         scheduler.load_config(config_path)
-#
-#         # async def shutdown_handler():
-#         #     await scheduler.stop()
-#         #     await scheduler.wait_until_stopped()
-#         #     logger.info("Scheduler shutdown complete.")
-#         #
-#         # loop = asyncio.get_running_loop()
-#         # for sig in (signal.SIGINT, signal.SIGTERM):
-#         #     loop.add_signal_handler(sig, lambda: asyncio.create_task(shutdown_handler()))
-#
-#         await scheduler.start()
-#         logger.info("Scheduler started.")
-#
-#         # dynamically add a cron tasks
-#         await scheduler.add_task(ScheduledTask(
-#             name="hello_task",
-#             cron="* * * * *",  # every 15 seconds
-#             # module="geenii.tasks.demo_tasks.hello",
-#             module="",
-#             run_fn=hello,
-#         ))
-#         await scheduler.add_task(ScheduledTask(
-#             name="hello_sync_task",
-#             cron="* * * * *",  # every minute
-#             module="",
-#             run_fn=hello_sync
-#         ))
-#         await scheduler.add_task(ScheduledTask(
-#             name="hello_sync_task2",
-#             at=datetime.now(timezone.utc) + timedelta(seconds=30),  # run once 30 seconds from now
-#             module="",
-#             run_fn=hello_sync,
-#             oneshot=True,
-#         ))
-#
-#         # sleep for a short while
-#         await asyncio.sleep(90)
-#
-#         await scheduler.stop()
-#         logger.info("Scheduler stopping.")
-#         await scheduler.wait_until_stopped()
-#         logger.info("Scheduler stopped.")
-#
-#
-#     config_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_CONFIG_PATH
-#     asyncio.run(run_scheduler(config_path))
+def main():
+
+    async def shutdown_handler():
+        logger.info("Shutting down...")
+        await scheduler.stop()
+        await scheduler.wait_until_stopped()
+        logger.info("Scheduler shutdown complete.")
+
+    async def run_scheduler(scheduler: Scheduler) -> None:
+
+        loop = asyncio.get_event_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, lambda: asyncio.create_task(shutdown_handler()))
+
+
+        await scheduler.start()
+        logger.info("Scheduler started.")
+
+        # dynamically add a cron tasks
+        # await scheduler.add_task(ScheduledTask(
+        #     name="hello_task",
+        #     cron="* * * * *",  # every 15 seconds
+        #     # module="geenii.tasks.demo_tasks.hello",
+        #     module="",
+        #     run_fn=hello,
+        # ))
+        # await scheduler.add_task(ScheduledTask(
+        #     name="hello_sync_task",
+        #     cron="* * * * *",  # every minute
+        #     module="",
+        #     run_fn=hello_sync
+        # ))
+        # await scheduler.add_task(ScheduledTask(
+        #     name="hello_sync_task2",
+        #     at=datetime.now(timezone.utc) + timedelta(seconds=30),  # run once 30 seconds from now
+        #     module="",
+        #     run_fn=hello_sync,
+        #     oneshot=True,
+        # ))
+
+        # sleep for a short while
+        #await asyncio.sleep(90)
+
+        #await scheduler.stop()
+        #logger.info("Scheduler stopping.")
+        await scheduler.wait_until_stopped()
+        logger.info("Scheduler stopped.")
+
+
+
+    config_path = sys.argv[1] if len(sys.argv) > 1 else None
+    if not config_path:
+        logger.error("No config path provided, exiting")
+        sys.exit(1)
+    scheduler = Scheduler()
+    scheduler.load_config(config_path)
+    asyncio.run(run_scheduler(scheduler))
+
+
+if __name__ == "__main__":
+    main()
