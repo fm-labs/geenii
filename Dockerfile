@@ -13,7 +13,8 @@ COPY ./pyproject.toml ./uv.lock /builder/
 RUN uv sync --no-cache-dir --frozen --no-install-project --no-dev
 
 COPY ./src/geenii /builder/src/geenii
-COPY ./src/cli.py /builder/src/
+COPY ./hooks /builder/hooks
+COPY ./README.md /builder/
 COPY ./build_bin.sh /builder/build_bin.sh
 RUN ls -la /builder
 RUN mkdir -p ./build && mkdir -p ./dist && \
@@ -41,16 +42,12 @@ RUN addgroup --gid 33311 -S geenii && adduser --uid 33311 -S geenii -G geenii &&
     mkdir -p /geenii && \
     chown -R geenii:geenii /geenii && \
     mkdir -p /home/geenii && \
-    chown -R geenii:geenii /home/geenii && \
-    mkdir -p /data && \
-    chown -R geenii:geenii /data
+    chown -R geenii:geenii /home/geenii
 
 # Binaries
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-COPY --from=builder /builder/dist/bin/geenii /usr/bin/geenii
+COPY --from=builder /builder/dist/geenii /usr/bin/geenii
 
-WORKDIR /home/geenii
+WORKDIR /workspace
 USER geenii
-ENV GEENII_DIR=/.geenii
-ENV GEENII_DATA_DIR=/data
 CMD ["geenii", "--help"]
