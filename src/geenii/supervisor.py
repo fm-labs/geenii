@@ -14,14 +14,7 @@ from typing import Any, AsyncIterator, Dict, List, Literal, Optional
 
 import pydantic
 
-from geenii.logs import get_rotating_file_log_handler
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
-logger.addHandler(get_rotating_file_log_handler("supervisor"))
 
 # ---------------------------------------------------------------------------
 # Internal state

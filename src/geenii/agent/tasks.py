@@ -595,11 +595,11 @@ AVAILABLE SKILLS:
         skills_list = self._build_skills_list()
         system_prompt = self.SYSTEM_PROMPT.replace("{{{tools_list}}}", tools_list).replace("{{{skills_list}}}", skills_list)
 
-        print("***" * 10)
-        print(system_prompt)
-        print("***" * 10)
-        print(estimate_token_count(system_prompt, 1000))
-        print("***" * 10)
+        #print("***" * 10)
+        #print(system_prompt)
+        #print("***" * 10)
+        #print(estimate_token_count(system_prompt, 1000))
+        #print("***" * 10)
 
         request = ChatCompletionRequest(
             model=self.agent.model,

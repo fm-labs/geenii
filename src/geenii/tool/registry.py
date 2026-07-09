@@ -6,13 +6,11 @@ import inspect
 import logging
 from typing import Any, Callable
 
-from geenii.logs import get_rotating_file_log_handler
 from geenii.tool.common import Tool
 from geenii.tool.mcp import McpTool
 from geenii.tool.python import PythonFunctionTool
 
 logger = logging.getLogger(__name__)
-logger.addHandler(get_rotating_file_log_handler("tools"))
 
 
 class ToolRegistry:

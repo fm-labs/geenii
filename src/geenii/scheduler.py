@@ -42,14 +42,7 @@ from typing import Any, Callable
 import pydantic
 from croniter import croniter
 
-from geenii.logs import get_rotating_file_log_handler
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
-logger.addHandler(get_rotating_file_log_handler("scheduler"))
 
 
 @dataclass
@@ -360,6 +353,8 @@ class Scheduler:
 
 
 def main():
+    from geenii.logs import init_logging
+    init_logging()
 
     async def shutdown_handler():
         logger.info("Shutting down...")

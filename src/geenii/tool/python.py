@@ -8,11 +8,9 @@ import os
 import inspect
 from typing import Callable, Any
 
-from geenii.logs import get_rotating_file_log_handler
 from geenii.tool.common import Tool, expand_vars
 
 logger = logging.getLogger(__name__)
-logger.addHandler(get_rotating_file_log_handler("tools"))
 
 
 class PythonFunctionTool(Tool):

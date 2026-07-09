@@ -8,11 +8,9 @@ import uuid
 import asyncio
 from typing import Any
 
-from geenii.logs import get_rotating_file_log_handler
 from geenii.tool.common import Tool, expand_vars
 
 logger = logging.getLogger(__name__)
-logger.addHandler(get_rotating_file_log_handler("tools"))
 
 class ComputerTool(Tool):
     """A tool that executes a command on the local machine."""
