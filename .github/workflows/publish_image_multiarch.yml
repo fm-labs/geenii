@@ -6,14 +6,32 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions: {}
+
 env:
   IMAGE_TAG: ${{ github.ref_name }}
   REPO_NAME: ${{ vars.DOCKERHUB_REPONAME }}
-  REGISTRY: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKER_NAMESPACE: ${{ secrets.DOCKERHUB_USERNAME }}
 
 jobs:
+  validate:
+    name: Validate inputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required variables
+        run: |
+          set -eu
+          : "${REPO_NAME:?DOCKERHUB_REPONAME variable is not set}"
+          : "${DOCKER_NAMESPACE:?DOCKERHUB_USERNAME secret is not set}"
+          : "${IMAGE_TAG:?github.ref_name is empty}"
+        env:
+          REPO_NAME: ${{ vars.DOCKERHUB_REPONAME }}
+          DOCKER_NAMESPACE: ${{ secrets.DOCKERHUB_USERNAME }}
+          IMAGE_TAG: ${{ github.ref_name }}
+
   build:
     name: Build ${{ matrix.platform }}
+    needs: validate
     strategy:
       fail-fast: false
       matrix:
@@ -51,14 +69,13 @@ jobs:
           provenance: true
           sbom: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.REPO_NAME }}:${{ env.IMAGE_TAG }}-${{ matrix.arch_tag }}
-            ${{ env.REGISTRY }}/${{ env.REPO_NAME }}:latest-${{ matrix.arch_tag }}
+            ${{ env.DOCKER_NAMESPACE }}/${{ env.REPO_NAME }}:${{ env.IMAGE_TAG }}-${{ matrix.arch_tag }}
           cache-from: type=gha,scope=${{ github.workflow }}-${{ matrix.arch_tag }}
           cache-to: type=gha,mode=max,scope=${{ github.workflow }}-${{ matrix.arch_tag }}
 
   manifest:
     name: Create multi-arch manifest
-    needs: build
+    needs: [validate, build]
     runs-on: ubuntu-latest
     environment: production
 
@@ -74,11 +91,21 @@ jobs:
           set -eux
 
           docker buildx imagetools create \
-            -t $REGISTRY/$REPO_NAME:$IMAGE_TAG \
-            -t $REGISTRY/$REPO_NAME:latest \
-            $REGISTRY/$REPO_NAME:$IMAGE_TAG-amd64 \
-            $REGISTRY/$REPO_NAME:$IMAGE_TAG-arm64
+            -t $DOCKER_NAMESPACE/$REPO_NAME:$IMAGE_TAG \
+            -t $DOCKER_NAMESPACE/$REPO_NAME:latest \
+            $DOCKER_NAMESPACE/$REPO_NAME:$IMAGE_TAG-amd64 \
+            $DOCKER_NAMESPACE/$REPO_NAME:$IMAGE_TAG-arm64
 
       - name: Inspect manifest
         run: |
-          docker buildx imagetools inspect $REGISTRY/$REPO_NAME:$IMAGE_TAG
+          docker buildx imagetools inspect $DOCKER_NAMESPACE/$REPO_NAME:$IMAGE_TAG
+
+  smoke-test:
+    name: Smoke test
+    needs: manifest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull and run image
+        run: |
+          set -eux
+          docker run --rm $DOCKER_NAMESPACE/$REPO_NAME:$IMAGE_TAG geenii --version
