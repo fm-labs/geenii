@@ -48,7 +48,10 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-asyncio_mode = "auto"
+#asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning:testcontainers",
+]
 
 [[tool.uv.index]]
 name = "testpypi"

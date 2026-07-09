@@ -2,8 +2,8 @@ import pytest
 from testcontainers.core.container import DockerContainer
 from testcontainers.mongodb import MongoDbContainer
 
+from test_modelstore import TestModelStore, MyModel
 from geenii.utils.modelstore import ModelStore, MongoDbModelStore
-from tests.geenii.test_modelstore import TestModelStore, MyModel
 
 
 def create_mongodb_testcontainer():
@@ -14,7 +14,6 @@ def create_mongodb_testcontainer():
 
 mongo_container = create_mongodb_testcontainer()
 
-@pytest.mark.skip(reason="MongoDB is not available")
 @pytest.fixture(scope="session")
 def mongo_db():
     # Choose a MongoDB image tag you want to pin for reproducibility
@@ -23,7 +22,6 @@ def mongo_db():
         yield mongo
 
 
-@pytest.mark.skip(reason="MongoDB is not available")
 @pytest.fixture(scope="session")
 def mongo_client(mongo_db):
     from pymongo import MongoClient
@@ -49,6 +47,7 @@ def mongo_client(mongo_db):
 
 
 
+@pytest.mark.skip(reason="MongoDB is not available")
 def test_mongodb_client(mongo_client):
     # from geenii.db.mongodb import get_mongo_client
     # os.environ["MONGODB_URI"] = mongo_db.get_connection_url()
@@ -60,6 +59,7 @@ def test_mongodb_client(mongo_client):
 
 
 
+@pytest.mark.skip(reason="MongoDB is not available")
 class TestMongoDbModelStore(TestModelStore):
 
     @pytest.fixture(autouse=True)

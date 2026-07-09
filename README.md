@@ -56,20 +56,11 @@ You can use local models with Ollama or remote models from OpenAI, Anthropic, Op
 - (Optional) Podman installed on your machine. You can download it from [Podman's official website](https://podman.io/getting-started/installation). **Experimental!**
 
 
-## Quick start with Geenii CLI
-
-To get started with `geenii`, you can use the command-line interface (CLI).
+## CLI
 
 ```text
 $ geenii --help
-
 Usage: geenii [OPTIONS] COMMAND [ARGS]...
-
-  Geenii CLI - A versatile command-line interface for AI agents, tools, and skills.
-
-Options:
-  --version  Show the version and exit.
-  --help     Show this message and exit.
 
 Commands:
   agent      Run an agent with the given name and initial prompt.
@@ -80,107 +71,104 @@ Commands:
   tools      Manage and execute tools.
 ```
 
-Run an agent directly:
+### `geenii agent` — Run an agent
+
+Run an agent directly from the command line. Override the model, tools, skills, or instructions on the fly.
 
 ```text
-$ geenii agent --help
 Usage: geenii agent [OPTIONS] PROMPT
-
-  Run an agent with the given name and initial prompt.
-  Optionally override skills, tools, model, model parameters, system
-  instructions, developer instructions, and output format.
 
 Options:
   -n, --name TEXT               Name of the agent to run.
-  -s, --skills TEXT             Comma-separated list of skills to enable for the agent.
-  -t, --tools TEXT              Comma-separated list of tools to enable for the agent.
-  -m, --model TEXT              Override the model specified in the agent config.
-  -mp, --model-parameters TEXT  Override the model parameters. Should be a JSON string.
-  -si, --system TEXT            Override the system instructions.
-  -di, --developer TEXT         Override the developer instructions.
-  -f, --output-format TEXT      Output format for the responses. Options: text, json.
+  -s, --skills TEXT             Comma-separated list of skills to enable.
+  -t, --tools TEXT              Comma-separated list of tools to enable.
+  -m, --model TEXT              Override the model (e.g. openai:gpt-4o-mini).
+  -mp, --model-parameters TEXT  Model parameters as a JSON string.
+  -si, --system TEXT            Override system instructions.
+  -di, --developer TEXT         Override developer instructions.
+  -f, --output-format TEXT      Output format: text, json.
   -i, --interactive             Continue the conversation after the initial prompt.
   -cid, --conv-id TEXT          Continue a previous conversation.
-  --help                        Show this message and exit.
 ```
-
-
-Here are some basic commands to help you get started:
 
 ```bash
 # Ask a simple question
 geenii agent "What is the capital of France?"
 
-# Ask a different agent or model
+# Use a specific model
 geenii agent --model "openai:gpt-4o-mini" "What is the capital of France?"
 geenii agent --model "ollama:qwen3:8b" "What is the capital of France?"
 
-# Use a specific tool
+# Enable tools and skills
 geenii agent --tools "websearch" "Search the web for the latest news on climate change."
-
-# Use a specific skill
 geenii agent --skills "math" --tools execute_python "Is 33311 a prime number?"
-
-# Use computer tools
-geenii agent --tools "bash" "List all files in the current directory."
-# Use computer tools with a specific skill
 geenii agent --tools "bash,applescript" --skills "macos" "Open Safari and navigate to https://www.google.com"
 ```
 
-Here are some basic commands to manage agents, tools, MCP servers and skills:
+### `geenii agents` — Manage agents
+
+Create and manage agent configurations with specific models, tools, skills and instructions.
 
 ```bash
-# Agents
-# Create/Ask a specific agent to perform a task
-geenii agents create "organizer" --skills "email,calendar" --system "You are an organizer assistant that can send emails to help manage my schedule."
-geenii agent -n "organizer" "Send an email to John Doe with the subject 'Meeting Reminder' and the body 'Don't forget about our meeting tomorrow at 10am.'"
+# List all configured agents
+geenii agents list
 
-# Create/Ask the default agent with a specific skill
-geenii agents create "math_agent" --skills "math" --system "You are a helpful assistant that can perform mathematical calculations."
-geenii agent -n math_agent "Is 33311 a prime number?"
+# Inspect an agent's configuration
+geenii agents inspect "my_agent"
 
-# Create/Ask agent with a specific tool and skill
-geenii agents create "data_analysis" --tools "python" --skills "pandas" --system "You are a data analyst assistant that can analyze sales data and provide insights."
-geenii agent -n "data_analysis" --input @data.csv "Analyze the sales data for the last quarter and provide insights."
+# Create a new agent and then run it
+geenii agents create "organizer" --skills "email,calendar" \
+  --system "You are an organizer assistant that can send emails to help manage my schedule."
+geenii agent -n "organizer" "Send an email to John with the subject 'Meeting Reminder'."
+```
 
-# Tools
-# Note: Tools are registered callable functions that an agent can use to perform specific tasks. 
-# They can be implemented in any programming language and can be registered with Geenii.
+### `geenii tools` — Manage and execute tools
 
-# List installed tools
+Tools are registered callable functions that agents can use. They can be implemented in any programming language. MCP server tools are also registered as regular tools and configured via `.geenii/mcp.json`.
+
+```bash
+# List all registered tools (including MCP tools)
 geenii tools list
 
-# Get information about a specific tool
+# Inspect a specific tool
 geenii tools inspect "my_tool"
 
-# Call a tool directly from the CLI
+# Call a tool directly
 geenii tools call "my_tool" --args arg1=value1 arg2=value2
+```
 
-# MCP Tools (planned)
-# Note: MCP (Model-Context-Protocol) tools are a special type of tool that can interact with language models in a more structured way. 
-# Under the hood, MCP tools are registered as regular tools.
-# MCP servers are currently configured via the .geenii/mcp.json file.
+### `geenii skills` — Manage skills
 
-# geenii mcp server list
-# geenii mcp server add "my_mcp_server" --url "http://localhost:8000"
-# geenii mcp server info "my_mcp_server"
+Skills are reusable instruction packages, each represented as a directory containing a `SKILL.md` file.
 
-# Skills
-# Note: Skills are reusable components, represented as a directory containing a SKILL.md file
-
+```bash
 # List installed skills
 geenii skills list
 
-# Get information about a specific skill
+# Inspect a skill
 geenii skills inspect "my_skill"
+geenii skills inspect "my_skill" --instructions
 
-# Install a skill from a directory
-geenii skills install "/path/to/skills/my_skill"
+# Install a skill from a local directory
+geenii skills install "my_skill" "file:///path/to/skills/my_skill"
+```
 
-# Install a skill from a url (e.g. a folder in a GitHub repository)
-# Only install from trusted sources!!
-geenii skills install "https://github.com/geenii/geenii-skills/skills/mac-calendar"
+### `geenii scheduler` — Manage the scheduler
 
+Schedule agents to run on a cron-based schedule. Tasks are defined in `.geenii/scheduler.json`.
+
+```bash
+geenii scheduler start
+geenii scheduler stop
+geenii scheduler status
+```
+
+### `geenii info` — Show application info
+
+Display version, configuration paths, and provider status.
+
+```bash
+geenii info
 ```
 
 
