@@ -7,5 +7,6 @@ mkdir -p ./dist/
 
 uv run pyinstaller --clean --onefile --distpath ./dist --workpath ./build --specpath ./build \
   --copy-metadata fastmcp \
+  --additional-hooks-dir=hooks \
   --name geenii \
-  ./src/cli.py || exit 1
+  ./src/geenii/cli/main.py || exit 1

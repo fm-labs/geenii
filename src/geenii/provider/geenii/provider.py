@@ -28,3 +28,6 @@ class GeeniiProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider)
 
     def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry=None) -> ChatCompletionResponse:
         raise NotImplementedError("Not implemented yet")
+
+
+ai_provider_class = GeeniiProvider

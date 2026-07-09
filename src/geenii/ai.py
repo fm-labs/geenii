@@ -1,3 +1,4 @@
+import importlib
 from pathlib import Path
 
 import pydantic
@@ -10,13 +11,8 @@ from geenii.datamodels import CompletionResponse, CompletionErrorResponse, \
     AudioGenerationApiRequest, AudioSpeechGenerationApiResponse, AudioTranscriptionApiRequest, \
     AudioTranscriptionApiResponse, \
     ModelMessage, AIModelInfo, AIProviderInfo, ChatCompletionResponse
-from geenii.provider.geenii.provider import GeeniiProvider
 from geenii.provider.interfaces import AICompletionProvider, AIProvider, AIImageGeneratorProvider, \
     AISpeechGeneratorProvider, AIAudioTranscriptionProvider, AIAudioTranslationProvider, AIChatCompletionProvider
-from geenii.provider.ollama.provider import OllamaAIProvider
-from geenii.provider.anthropic.provider import AnthropicAIProvider
-from geenii.provider.fake.provider import FakeProvider
-from geenii.provider.openai.provider import OpenAIProvider
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.cached import cached
 from geenii.utils.json_util import append_jsonl
@@ -82,6 +78,21 @@ def split_model_id(model_id: str) -> tuple[str, str]:
     raise ValueError(f"Invalid model ID format: {model_id}. Expected 'provider:model_name'.")
 
 
+def _import_provider_class(name: str) -> type:
+    """Import ``geenii.provider.<name>.provider`` and return its ``ai_provider_class``."""
+    module_path = f"geenii.provider.{name}.provider"
+    try:
+        module = importlib.import_module(module_path)
+    except ImportError as exc:
+        raise ValueError(f"Unknown provider '{name}': could not import {module_path}") from exc
+    cls = getattr(module, "ai_provider_class", None)
+    if cls is None:
+        raise ValueError(
+            f"Provider module {module_path} does not export 'ai_provider_class'"
+        )
+    return cls
+
+
 def get_ai_provider(provider: str) -> AIProviderType:
     """
     Get the AI provider instance based on the provider name.
@@ -94,38 +105,8 @@ def get_ai_provider(provider: str) -> AIProviderType:
                          f"Found unexpected ':' character in provider name. "
                          f"Did you mean to use a model ID? Use 'get_ai_provider_from_model_id' instead.")
 
-    _ai = None
-    # provider_module_name = f"geenii.provider.{provider}.provider"
-    # attr_name = "ai_provider_class"
-    # try:
-    #     module = __import__(provider_module_name, fromlist=[attr_name])
-    #     provider_class = getattr(module, attr_name, None)
-    #     if provider_class is None:
-    #         raise ImportError(f"No AIProvider subclass found in module {provider_module_name}")
-    #     _ai = provider_class()
-    # except ImportError as e:
-    #     raise ImportError(f"Could not import provider '{provider}': {str(e)}")
-
-    if provider.lower() == "geenii":
-        _ai = GeeniiProvider()
-    elif provider.lower() == "ollama":
-        _ai = OllamaAIProvider()
-    elif provider.lower() == "openai":
-        _ai = OpenAIProvider()
-    elif provider.lower() == "anthropic":
-        _ai = AnthropicAIProvider()
-    elif provider.lower() == "fake":
-        _ai = FakeProvider()
-    elif provider.lower() == "openrouter":
-        raise NotImplementedError("OpenRouter provider is not implemented yet.")
-    else:
-        raise ValueError(f"Unsupported provider: {provider}")
-
-    # check if the provider supports the requested interface
-    # the interface is the module name of the provider interface
-    #if iface is not None and not isinstance(_ai, iface):
-    #    raise RuntimeError(f"Invalid AI: {provider} provider does not support {iface.__name__} interface.")
-    return _ai
+    cls = _import_provider_class(provider.lower())
+    return cls()
 
 
 def get_ai_provider_from_model_id(model_id: str, iface = None) -> tuple[AIProviderType, str, str]:
