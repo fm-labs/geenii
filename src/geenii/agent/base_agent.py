@@ -22,7 +22,7 @@ class BaseAgent(BotInterface, abc.ABC):
     def __init__(self, name, model: str = None, system_prompt: str = None, description: str = None,
                  tool_registry: ToolRegistry = None, skill_registry: SkillRegistry = None,
                  allowed_tools: Set[str] = None,
-                 context_id: str = None, memory: ChatMemory = None, hidl: HumanInTheLoopController = None):
+                 context_id: str = None, memory: ChatMemory = None, hitl: HumanInTheLoopController = None):
 
         self.name = name
         self.description = description
@@ -38,7 +38,7 @@ class BaseAgent(BotInterface, abc.ABC):
         self._tool_registry = tool_registry or ToolRegistry()
         self._skill_registry = skill_registry or SkillRegistry()
         self._tasks: asyncio.Queue[BaseTask] = asyncio.Queue()
-        self._hidl = hidl or NoHumanInTheLoopController()
+        self._hitl = hitl or NoHumanInTheLoopController()
         self._initialized = False
 
     def __repr__(self):
@@ -125,8 +125,8 @@ class BaseAgent(BotInterface, abc.ABC):
         This method can be overridden to implement custom logic for approving or rejecting tool execution requests.
         By default, it approves all tool execution requests.
         """
-        if self._hidl:
-            return await self._hidl.request_tool_execution(tool_name, arguments, call_id)
+        if self._hitl:
+            return await self._hitl.request_tool_execution(tool_name, arguments, call_id)
         return True
 
     def load_skill(self, skill_name: str):

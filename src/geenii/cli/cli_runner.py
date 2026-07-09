@@ -24,7 +24,7 @@ class CliAgentRunner:
     def __init__(self, agent: Agent, interactive: bool = True):
         self.interactive = interactive
         self.agent = agent
-        # self.agent._hidl = CliHumanInTheLoopController()
+        # self.agent._hitl = CliHumanInTheLoopController()
 
         print("Bot initialized. Starting interaction...")
         print(agent)

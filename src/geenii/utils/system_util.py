@@ -2,7 +2,6 @@ import getpass
 import grp
 import os
 import pwd
-import shutil
 
 import psutil
 
@@ -12,7 +11,7 @@ from geenii.utils.os_util import locate_binary
 def get_memory_usage():
     try:
         tot_m, used_m, free_m = map(int, os.popen('/usr/bin/free -t -m').readlines()[-1].split()[1:])
-    except Exception as e:
+    except Exception:
         return -1, -1, -1
 
     return tot_m, used_m, free_m
@@ -42,7 +41,7 @@ def get_all_disk_usage():
 def get_disk_usage(path):
     try:
         return psutil.disk_usage(path)
-    except Exception as e:
+    except Exception:
         return None
 
 

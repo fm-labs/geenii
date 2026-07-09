@@ -35,7 +35,7 @@ def run_docker_subprocess(command: list[str], timeout: int = 30, env: dict | Non
             env=_env,
         )
         return result.returncode, result.stdout, result.stderr
-    except subprocess.TimeoutExpired as e:
+    except subprocess.TimeoutExpired:
         return -1, "", f"Command timed out after {timeout} seconds"
     except Exception as e:
         return -1, "", f"Error running command: {str(e)}"

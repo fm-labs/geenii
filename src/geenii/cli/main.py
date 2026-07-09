@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 @click.group(context_settings={"max_content_width": 130})
 @click.version_option(version=APP_VERSION)
 def geecli():
-    """Geenii CLI - A versatile command-line interface for AI agents, tools, and agents."""
+    """Geenii CLI - A versatile command-line interface for AI agents, tools, and skills."""
     pass
 
 

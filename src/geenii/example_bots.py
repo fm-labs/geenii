@@ -68,7 +68,7 @@ class SimpleBot(BotInterface):
                 yield content_part
 
         except Exception:
-            yield TextContent(text=f"Uuups, something went wrong :/")
+            yield TextContent(text="Uuups, something went wrong :/")
 
 
 class DemoAgent(Agent):

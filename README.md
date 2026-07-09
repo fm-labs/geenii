@@ -12,11 +12,7 @@ Opinionated abstraction layer for interaction with large language models, agents
   - **Tool Manager**: Register and manage tools that agents can use to perform specific tasks.
   - **MCP Server Manager**: Manage MCP servers that can be used as tools by agents to interact with language models in a more structured way.
   - **Skill Manager**: Install and manage skills, which are reusable components that can be used by agents to perform specific tasks.
-- **Daemon**: Background service that manages the execution of agents, tools and skills, and provides an API for interaction.
-  - **Rest API**: API for programmatically managing models, agents, tools and skills, and for running agents with specific configurations.
-  - **Pluggable Chat Server**: Support for different chat server implementations, including a built-in server and integration with third-party chat platforms. (Discord, Slack)
-- **WebUI**: User-friendly web interface for managing models, agents, tools and skills.
-  - **Chat Interface**: Interact with agents in a conversational manner, with support for rich media and tool interactions.
+  - **Scheduler**: Schedule and run agents on a cron-based schedule.
 
 
 ## Key Features
@@ -24,10 +20,9 @@ Opinionated abstraction layer for interaction with large language models, agents
 - 🔗 Use remote and local LLMs seamlessly.
 - 🔒 Self-hosted solution for privacy and control over your AI workloads.
 - 🤖 Build and run your own chat assistants, autonomous agents and AI workflows with ease.
-- 🧠 **Multi-model** Supports models from Ollama, OpenAI, HuggingFace, Local LLMs and more.
+- 🧠 **Multi-model** Supports models from Ollama, OpenAI, Anthropic and more.
 - 🛠️ **Tool calling** Agents can call tools to perform specific tasks, and tools can be implemented in any programming language.
 - 🔌 **Model-Context-Protocol** (MCP) server tools.
-- 🖥️ **WebUI** for managing models, agents, tools and skills.
 - 🧩 Support for Anthropic's AGENT and SKILL specification format for reusable agent components.
 
 
@@ -67,9 +62,32 @@ To get started with `geenii`, you can use the command-line interface (CLI).
 
 ```text
 $ geenii --help
-Usage: geenii [OPTIONS] PROMPT
 
-  Run an agent with the given name and initial prompt. Optionally override skills, tools, model, model parameters, system
+Usage: geenii [OPTIONS] COMMAND [ARGS]...
+
+  Geenii CLI - A versatile command-line interface for AI agents, tools, and skills.
+
+Options:
+  --version  Show the version and exit.
+  --help     Show this message and exit.
+
+Commands:
+  agent      Run an agent with the given name and initial prompt.
+  agents     Manage agents.
+  info       Show application info and configuration.
+  scheduler  Manage the scheduler.
+  skills     Manage skills.
+  tools      Manage and execute tools.
+```
+
+Run an agent directly:
+
+```text
+$ geenii agent --help
+Usage: geenii agent [OPTIONS] PROMPT
+
+  Run an agent with the given name and initial prompt.
+  Optionally override skills, tools, model, model parameters, system
   instructions, developer instructions, and output format.
 
 Options:
@@ -77,31 +95,13 @@ Options:
   -s, --skills TEXT             Comma-separated list of skills to enable for the agent.
   -t, --tools TEXT              Comma-separated list of tools to enable for the agent.
   -m, --model TEXT              Override the model specified in the agent config.
-  -mp, --model-parameters TEXT  Override the model parameters specified in the agent config. Should be a JSON string.
-  -si, --system TEXT            Override the system instructions specified in the agent config.
-  -di, --developer TEXT         Override the developer instructions specified in the agent config.
+  -mp, --model-parameters TEXT  Override the model parameters. Should be a JSON string.
+  -si, --system TEXT            Override the system instructions.
+  -di, --developer TEXT         Override the developer instructions.
   -f, --output-format TEXT      Output format for the responses. Options: text, json.
-  -c, --continue                Continue the conversation after the initial prompt.
+  -i, --interactive             Continue the conversation after the initial prompt.
+  -cid, --conv-id TEXT          Continue a previous conversation.
   --help                        Show this message and exit.
-```
-
-To manage agents, tools, MCP servers and skills, you can use the `geenii` CLI:
-
-```text
-$ geenii --help
-
-Usage: geenii [OPTIONS] COMMAND [ARGS]...
-
-Options:
-  --version  Show the version and exit.
-  --help     Show this message and exit.
-
-Commands:
-  agents  Manage agents.
-  skills  Manage skills.
-  tools   Manage and execute tools.
-  mcp     Manage MCP servers.
-  models  Manage models.
 ```
 
 
@@ -123,8 +123,8 @@ geenii agent --skills "math" --tools execute_python "Is 33311 a prime number?"
 
 # Use computer tools
 geenii agent --tools "bash" "List all files in the current directory."
-# Use compoter tools with a specific skill
-geenii agent --tools "bash,applescript" --skill "macos" "Open Safari and navigate to https://www.google.com"
+# Use computer tools with a specific skill
+geenii agent --tools "bash,applescript" --skills "macos" "Open Safari and navigate to https://www.google.com"
 ```
 
 Here are some basic commands to manage agents, tools, MCP servers and skills:
@@ -156,19 +156,14 @@ geenii tools inspect "my_tool"
 # Call a tool directly from the CLI
 geenii tools call "my_tool" --args arg1=value1 arg2=value2
 
-# MCP Tools
+# MCP Tools (planned)
 # Note: MCP (Model-Context-Protocol) tools are a special type of tool that can interact with language models in a more structured way. 
 # Under the hood, MCP tools are registered as regular tools.
+# MCP servers are currently configured via the .geenii/mcp.json file.
 
-# List installed MCP servers
-geenii mcp server list
-
-# Add a new MCP server
-geenii mcp server add "my_mcp_server" --url "http://localhost:8000"
-geenii mcp server add "my_local_mcp_server_stdio" --command "docker run --rm my_mcp_stdio_server_image"
-
-# Get information about a specific MCP server
-geenii mcp server info "my_mcp_server"
+# geenii mcp server list
+# geenii mcp server add "my_mcp_server" --url "http://localhost:8000"
+# geenii mcp server info "my_mcp_server"
 
 # Skills
 # Note: Skills are reusable components, represented as a directory containing a SKILL.md file
@@ -200,19 +195,26 @@ The typical folder structure would look like this:
 
 ```text
 working-directory/
-├── .geenii
-│   ├── agents
+├── .geenii/
+│   ├── agents/              # Agent definitions (one .md file per agent)
 │   │   └── email.md
-│   ├── skills
-│   │   └── my_skill
-│   │       ├─── SKILL.md
-│   │       └─── scripts
-│   │              └── script.py
-│   ├── geenii.json
-│   └── mcp.json
-├── data
+│   ├── skills/              # Skill definitions (one directory per skill)
+│   │   └── my_skill/
+│   │       ├── SKILL.md     # Skill metadata and instructions
+│   │       └── scripts/     # Optional scripts used by the skill
+│   │           └── script.py
+│   ├── .env                 # Environment variables (API keys, etc.)
+│   ├── geenii.json          # User settings (theme, language, skill_dirs, etc.)
+│   ├── mcp.json             # MCP server configurations
+│   └── scheduler.json       # Scheduled agent tasks
+├── data/
 │   └── (data generated by agents, tools or skills will be stored here)
 ```
+
+Geenii looks for a `.geenii` directory in the current working directory
+(`GEENII_WORKING_DIR`) and in `~/.geenii` (user-global). Settings and
+definitions from both locations are merged, with the working directory taking
+precedence.
 
 ```bash
 # Pull the latest image
@@ -234,7 +236,7 @@ cd working-directory
 docker run -it --rm --name geenii -v ${HOME}/my-shared-agent-data:rw -v $(pwd)/data:/data -v $(pwd)/.geenii:/.geenii fmlabs/geenii:latest
 ```
 
-**Tipp:** Create an alias in your shell configuration file (e.g. `.bashrc` or `.zshrc`) to easily run the container from anywhere in your terminal:
+**Tip:** Create an alias in your shell configuration file (e.g. `.bashrc` or `.zshrc`) to easily run the container from anywhere in your terminal:
 
 ```bash
 alias xgeenii='docker run -it --rm --name geenii -v $(pwd)/data:/data -v ${HOME}/.geenii:/.geenii fmlabs/geenii:latest geenii'

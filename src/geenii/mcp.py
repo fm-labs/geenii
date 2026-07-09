@@ -8,8 +8,12 @@ from fastmcp.prompts import Prompt
 
 from geenii.config import MCP_CONFIG_FILE, GEENII_DIR
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 config = None
-client = None
+_client_cache: dict[str, "McpClient"] = {}
 
 
 def get_mcp_config(reload: bool = False):
@@ -44,16 +48,22 @@ def get_mcp_config_for_server(server_name: str) -> dict | None:
 
 def get_mcp_client_for_server(server_name: str) -> "McpClient":
     """
-    Get an MCP client for a specific server.
+    Get a cached MCP client for a specific server. Reuses existing clients
+    so that connections/handshakes are not repeated on every tool call.
 
     :param server_name: The name of the MCP server.
     :return: An MCP Client instance for the specified server.
     """
+    if server_name in _client_cache:
+        return _client_cache[server_name]
+
     server_config = get_mcp_config_for_server(server_name)
     if server_config is None:
         raise ValueError(f"MCP server '{server_name}' not found in configuration.")
 
     mcp_client = McpClient(server_name, server_config)
+    _client_cache[server_name] = mcp_client
+    logger.info(f"Created and cached MCP client for server '{server_name}'")
     return mcp_client
 
 
@@ -98,34 +108,44 @@ class McpClient:
         self.server_config = server_config
         self.client = Client(transport=MCPConfig(mcpServers={server_name: server_config}))
         self._info = None
+        self._connected = False
+
+    async def _ensure_connected(self):
+        """Ensure the client connection is open, reusing an existing one if available."""
+        if not self._connected:
+            await self.client.__aenter__()
+            self._connected = True
+            logger.info(f"Opened persistent MCP connection for '{self.server_name}'")
+
+    async def close(self):
+        """Close the persistent connection."""
+        if self._connected:
+            try:
+                await self.client.__aexit__(None, None, None)
+            except Exception:
+                pass
+            self._connected = False
+            self._info = None
+            logger.info(f"Closed MCP connection for '{self.server_name}'")
 
     async def get_info(self) -> dict:
-
         if self._info is not None:
             return self._info
 
-        async with self.client:
-            try:
-                # initialize_result = await client.initialize_result
-                tools = await self.client.list_tools()
-                resources = await self.client.list_resources()
-                prompts: list[Prompt] = await self.client.list_prompts()
+        await self._ensure_connected()
+        tools = await self.client.list_tools()
+        resources = await self.client.list_resources()
+        prompts: list[Prompt] = await self.client.list_prompts()
 
-                info_dict = {
-                    "name": self.server_name,
-                    "status": "connected",
-                    # "message": f"Connected to MCP server '{server_name}' successfully.",
-                    # "initialize_result": initialize_result.model_dump(),
-                    "tools": [tool.model_dump() for tool in tools],
-                    "resources": [res.model_dump() for res in resources],
-                    "prompts": [prompt.model_dump() for prompt in prompts],
-                }
-                print(info_dict)
-                #return MCPServerInfo(**info_dict)
-                self._info = info_dict
-                return info_dict
-            except Exception as e:
-                raise
+        info_dict = {
+            "name": self.server_name,
+            "status": "connected",
+            "tools": [tool.model_dump() for tool in tools],
+            "resources": [res.model_dump() for res in resources],
+            "prompts": [prompt.model_dump() for prompt in prompts],
+        }
+        self._info = info_dict
+        return info_dict
 
     async def list_tools(self):
         info = await self.get_info()
@@ -140,23 +160,13 @@ class McpClient:
         return info["prompts"]
 
     def list_tools_sync(self):
-        # This is a synchronous wrapper around the asynchronous list_tools method.
-        #loop = asyncio.get_event_loop()
-        #return loop.run_until_complete(self.list_tools())
         return asyncio.run(self.list_tools())
 
     async def call_tool(self, tool_name: str, args: dict) -> any:
-        async with self.client:
-            try:
-                #result = await self.client.call_tool(tool_name, arguments=args)
-                result = await self.client.call_tool_mcp(tool_name, arguments=args)
-                print("Tool call result:", result)
-                return result
-            except Exception as e:
-                raise
+        await self._ensure_connected()
+        result = await self.client.call_tool_mcp(tool_name, arguments=args)
+        logger.info(f"Tool call result for '{tool_name}' on '{self.server_name}': {result}")
+        return result
 
     def call_tool_sync(self, tool_name: str, args: dict) -> any:
-        print(f"Calling tool {tool_name} with args {args} on MCP server {self.server_name}")
-        import asyncio
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(self.call_tool(tool_name, args))
+        return asyncio.run(self.call_tool(tool_name, args))

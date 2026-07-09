@@ -1,6 +1,7 @@
 """
 Process supervisor
 """
+from __future__ import annotations
 
 import asyncio
 import json
@@ -10,6 +11,8 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, List, Literal, Optional
+
+import pydantic
 
 from geenii.logs import get_rotating_file_log_handler
 
@@ -32,6 +35,12 @@ class ProcConfig:
     env: Optional[Dict[str, str]] = None   # extra vars; merged into os.environ at spawn time
     cwd: Optional[str] = None
     capture_output: bool = True
+
+
+class UpdateProcRequest(pydantic.BaseModel):
+    restart: Optional[bool] = None
+    env: Optional[Dict[str, str]] = None
+    cwd: Optional[str] = None
 
 
 @dataclass

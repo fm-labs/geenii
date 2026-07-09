@@ -23,7 +23,7 @@ class HumanInTheLoopController(abc.ABC):
 
 class NoHumanInTheLoopController(HumanInTheLoopController):
     """
-    H.I.D.L handler that automatically approves all tool execution requests without any human intervention.
+    HITL handler that automatically approves all tool execution requests without any human intervention.
     """
     async def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
         return True
@@ -31,7 +31,7 @@ class NoHumanInTheLoopController(HumanInTheLoopController):
 
 class FileTicketHumanInTheLoopController(HumanInTheLoopController):
     """
-    H.I.D.L handler that creates a file-based ticket for each tool execution request and waits for a human to approve it by creating an approval file.
+    HITL handler that creates a file-based ticket for each tool execution request and waits for a human to approve it by creating an approval file.
     - When a tool execution request is received, it creates a ticket file in a specified directory
         with the tool name, arguments, and call ID.
     - It then waits for an approval file to be created with the same call ID, which indicates that a human has approved the request.
@@ -56,7 +56,7 @@ class FileTicketHumanInTheLoopController(HumanInTheLoopController):
                 "timestamp": time.time(),
             }, f, indent=2)
 
-        print(f"Created H.I.D.L ticket for tool '{tool_name}' with call ID '{call_id}'. Waiting for approval...")
+        print(f"Created HITL ticket for tool '{tool_name}' with call ID '{call_id}'. Waiting for approval...")
 
         # Wait for the approval file to be created
         start_time = time.time()
@@ -83,7 +83,7 @@ class FileTicketHumanInTheLoopController(HumanInTheLoopController):
 
 class HttpPollHumanInTheLoopController(HumanInTheLoopController):
     """
-    H.I.D.L handler that polls an HTTP endpoint for approving or rejecting tool execution requests.
+    HITL handler that polls an HTTP endpoint for approving or rejecting tool execution requests.
     - When a tool execution request is received, an HTTP POST request is sent to a specified approval endpoint with the tool name, arguments, and call ID.
     - The endpoint is expected to return a JSON response with an "approved" field
     - The handler waits for the response and returns True if approved, or False if rejected or if a timeout occurs.

@@ -6,7 +6,6 @@ from geenii.core.tools import display_desktop_notification
 from geenii.mcp import get_mcp_config, McpClient
 from geenii.tool.registry import ToolRegistry
 from geenii.tool.computer import ComputerTool
-from geenii.tool.python import PythonCliTool
 from geenii.utils.cached import cached
 
 

@@ -37,7 +37,7 @@ class SkillSpec(pydantic.BaseModel):
         skill_header, skill_body = read_frontmatter_file(str(md_path))
         if not skill_header or not isinstance(skill_header, dict):
             raise ValueError(f"Malformed skill markdown file: missing or invalid header in '{str(md_path)}'")
-        if not "name" in skill_header or "description" not in skill_header:
+        if "name" not in skill_header or "description" not in skill_header:
             raise ValueError(
                 f"Malformed skill markdown file: missing required 'name' or 'description' fields in header of '{str(md_path)}'")
         return SkillSpec(

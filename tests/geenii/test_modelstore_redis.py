@@ -1,5 +1,4 @@
 import pytest
-import redis
 from testcontainers.redis import RedisContainer
 
 from geenii.utils.redis import get_redis_client

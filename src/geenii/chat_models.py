@@ -53,8 +53,8 @@ class ToolCallContent(BaseContent):
     name: str
     arguments: dict | None = None
     call_id: str | None = None  # Unique call ID
-    require_approval: bool = False  # True, if HIDL approval is required before executing the tool
-    approval_id: str | None = None  # Unique approval ID for HIDL, if require_approval is True
+    require_approval: bool = False  # True, if HITL approval is required before executing the tool
+    approval_id: str | None = None  # Unique approval ID for HITL, if require_approval is True
 
     def to_text(self) -> str:
         args_str = ", ".join(f"{k}={v!r}" for k, v in (self.arguments or {}).items())

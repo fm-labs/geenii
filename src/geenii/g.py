@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
 
 from geenii.agent.registry import AgentRegistry, AgentSpec, init_agent
+
+if TYPE_CHECKING:
+    from geenii.agent.base_agent import BaseAgent
 from geenii.ai import enumerate_providers, enumerate_models
 from geenii.bots import BotInterface
 from geenii.config import GEENII_DIR, APP_VERSION, DEFAULT_COMPLETION_MODEL, \
@@ -64,17 +68,8 @@ def locate_agent_md_file(agent_name: str) -> str|None:
             return md_file_path
     return None
 
-def init_agent_by_name(name: str) -> "Agent":
-    """
-    Load a agent configuration from a JSON file and create a Agent instance.
-    The JSON file should contain the following fields:
-    - name: The name of the agent
-    - model: (optional) The AI model to use for this agent
-    - system: (optional) The system prompt to use for this agent
-    - description: (optional) A description of the agent's purpose and capabilities
-    - tools: (optional) A list of tool definitions that the agent can use
-    - mcp_servers: (optional) A dictionary of MCP server configurations that the agent can connect to
-    """
+def init_agent_by_name(name: str) -> BaseAgent:
+    """Load an agent configuration from a markdown file and create an Agent instance."""
     md_file_path = locate_agent_md_file(name)
     if md_file_path is None:
         raise ValueError(f"Agent '{name}' not found.")
@@ -110,7 +105,7 @@ def get_app_info() -> dict:
         "config": {
 
         },
-        "providers": [provier.model_dump() for provier in ai_providers],
+        "providers": [provider.model_dump() for provider in ai_providers],
         "models": [model.model_dump() for model in ai_models],
     })
 

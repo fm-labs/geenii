@@ -253,7 +253,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         max_tool_calls = model_params.get('max_tool_calls', self.DEFAULT_MAX_TOOL_CALLS)
 
         # call OpenAI Responses API
-        logger.info(f"OPENAI: Generate completion response with %d input messages:", len(input_messages))
+        logger.info("OPENAI: Generate completion response with %d input messages:", len(input_messages))
         time_start = time.time()
         model_result = self.client.responses.create(
             model=model,

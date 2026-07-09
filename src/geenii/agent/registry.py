@@ -8,7 +8,6 @@ from geenii.agent.base_agent import BaseAgent
 from geenii.bots import BotInterface
 from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry
-from geenii.tools import init_builtin_tools
 from geenii.utils.mdfile import read_frontmatter_file
 
 logger = logging.getLogger(__name__)

@@ -1,5 +1,10 @@
+from __future__ import annotations
+
 import abc
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from geenii.agent.base_agent import BaseAgent
 
 from geenii.chat_models import TextContent, ContentPart
 from geenii.datamodels import ModelMessage
@@ -35,7 +40,7 @@ class BaseTask(abc.ABC):
         """
         The run method should be implemented by subclasses to perform the task's work and yield messages or other content as needed.
         """
-        yield ModelMessage(role="assistant", content=[TextContent(text=f"Not implemented.")])
+        yield ModelMessage(role="assistant", content=[TextContent(text="Not implemented.")])
 
 
 class BaseAgentTask(BaseTask, abc.ABC):

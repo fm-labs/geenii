@@ -1,9 +1,8 @@
 import abc
-from typing import List
 
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, AudioTranscriptionApiResponse, \
     AudioSpeechGenerationApiResponse, AudioTranslationApiResponse, ChatCompletionResponse, ChatCompletionRequest, \
-    AIModelInfo, AudioTranscriptionApiRequest
+    AIModelInfo
 
 
 class AIProvider(abc.ABC):

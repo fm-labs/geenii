@@ -4,7 +4,6 @@ import shlex
 import subprocess
 import uuid
 
-from geenii.config import GEENII_DIR
 from geenii.sandbox import run_docker_sandbox_python
 from geenii.skills import locate_skill_path
 from geenii.tool.registry import ToolRegistry
@@ -79,7 +78,7 @@ def execute_command(command: str, skill: str | None = None) -> str:
     use_supervisor = os.environ.get("USE_SUPERVISOR", "false").lower()  == "true"
     async def run_with_supervisor(cmd, env, cwd):
         #supervisor = g.SUPERVISOR
-        name = f"execute-command-{uuid.uuid4().hex}"
+        _name = f"execute-command-{uuid.uuid4().hex}"
         #await supervisor.ensure(name, ProcConfig(name=name,cmd=cmd, env=env, cwd=cwd, restart=False))
         #await supervisor.run(cmd=cmd, env=env, cwd=cwd)
         print(f">Supervisor command return code: {result.returncode}")

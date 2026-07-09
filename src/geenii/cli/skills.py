@@ -34,20 +34,20 @@ def inspect_skill(name: str, instructions: bool):
         print(f"Name: {skill.name}")
         print(f"Path: {skill.path}")
         print(f"Description: {skill.description}")
-        print(f"Metadata:")
+        print("Metadata:")
         if skill.metadata:
             for key, value in skill.metadata.items():
                 print(f"- {key}: {value}")
-        print(f"Allowed Tools:")
+        print("Allowed Tools:")
         if skill.allowed_tools:
             for t in skill.allowed_tools:
                 print(f"- {t}")
-        print(f"Instructions:")
+        print("Instructions:")
         if instructions:
-            print(f"---" * 13)
+            print("---" * 13)
             print(skill.instructions)
         else:
-            print(f"Add '--instructions' to see the instructions for this skill.")
+            print("Add '--instructions' to see the instructions for this skill.")
     else:
         print(f"Skill '{name}' not found.")
 

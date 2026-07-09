@@ -1,7 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 from datetime import datetime
-from typing import AsyncGenerator, Set
+from typing import AsyncGenerator, Set, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from geenii.agent.base_agent import BaseAgent
 
 from geenii.agent.base import BaseAgentTask, BaseTask, message_to_prompt
 from geenii.agent.utils import estimate_token_count
@@ -128,8 +133,8 @@ class LLMTask(BaseAgentTask):
                 break  # no tool calls, we can proceed without re-generating the response.
 
             if tools_called >= self.MAX_TOOL_CALLS:
-                logger.error(f"Too many tool calls detected in the response. Stopping further processing to avoid infinite loops.")
-                yield ModelMessage(role="assistant", content=[TextContent(text=f"Error: Too many tool calls detected in the response. Stopping further processing.")])
+                logger.error("Too many tool calls detected in the response. Stopping further processing to avoid infinite loops.")
+                yield ModelMessage(role="assistant", content=[TextContent(text="Error: Too many tool calls detected in the response. Stopping further processing.")])
                 break
 
             # execute *all* tool calls in the response (the model may return several parallel
@@ -309,7 +314,7 @@ class HandoffTask(BaseAgentTask):
         if not sub:
             raise ValueError(f"Target agent '{target_agent_name}' not found for handoff.")
         self.sub = sub
-        self.sub._hidl = self.agent._hidl  # share the same human-in-the-loop handler
+        self.sub._hitl = self.agent._hitl  # share the same human-in-the-loop handler
 
     async def execute(self) -> AsyncGenerator[ModelMessage, None]:
         msg = ModelMessage(role="assistant",
@@ -374,7 +379,7 @@ class FindBestAgentTask(BaseAgentTask):
             description = agent.description or "No description available."
             tools = ", ".join(agent.tools) if agent.tools else "No tools"
             skills = ", ".join(agent.skills) if agent.skills else "No special skills"
-            agent_info = f"{agent.name}: {description} using Tools: {tools}"
+            agent_info = f"{agent.name}: {description} using Tools: {tools}, Skills: {skills}"
             available_agents.append(agent_info)
         agents_str = "\n - ".join(available_agents)
 
@@ -412,7 +417,7 @@ class FindBestAgentTask(BaseAgentTask):
             yield HandoffTask(self.agent, target_agent_name=selected_agent, prompt=self.prompt)
 
         else:
-            yield ModelMessage(role="assistant", content=[TextContent(text=f"No suitable agent found. Trying to process the prompt with the current agent.")])
+            yield ModelMessage(role="assistant", content=[TextContent(text="No suitable agent found. Trying to process the prompt with the current agent.")])
             yield LLMTask(self.agent, message=self.prompt)  # fallback to processing the prompt with the current agent
 
 
@@ -521,7 +526,7 @@ class FindBestSkillTask(BaseAgentTask):
                 yield ModelMessage(role="assistant", content=[TextContent(
                     text=f"Selected skill: {selected_skill} with confidence {parsed.get('confidence', 'N/A')}. Rationale: {parsed.get('rationale', 'N/A')}")])
             else:
-                yield ModelMessage(role="assistant", content=[TextContent(text=f"No suitable skill found. Trying to process the prompt without a special skill.")])
+                yield ModelMessage(role="assistant", content=[TextContent(text="No suitable skill found. Trying to process the prompt without a special skill.")])
             self.agent.selected_skill = selected_skill
 
 

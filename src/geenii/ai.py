@@ -14,6 +14,8 @@ from geenii.provider.geenii.provider import GeeniiProvider
 from geenii.provider.interfaces import AICompletionProvider, AIProvider, AIImageGeneratorProvider, \
     AISpeechGeneratorProvider, AIAudioTranscriptionProvider, AIAudioTranslationProvider, AIChatCompletionProvider
 from geenii.provider.ollama.provider import OllamaAIProvider
+from geenii.provider.anthropic.provider import AnthropicAIProvider
+from geenii.provider.fake.provider import FakeProvider
 from geenii.provider.openai.provider import OpenAIProvider
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.cached import cached
@@ -22,7 +24,7 @@ from geenii.utils.json_util import append_jsonl
 type AIProviderType = AICompletionProvider | AIImageGeneratorProvider | AISpeechGeneratorProvider \
                       | AIAudioTranscriptionProvider | AIAudioTranslationProvider | AIProvider
 
-SUPPORTED_PROVIDERS = ["geenii", "ollama", "openai"]  # "anthropic", "openrouter", "whisper", "huggingface"
+SUPPORTED_PROVIDERS = ["geenii", "ollama", "openai", "anthropic"]
 
 
 #@cached(ttl=3600)
@@ -65,22 +67,7 @@ def enumerate_models() -> list[AIModelInfo]:
     return models
 
 
-def split_model(model_id: str) -> tuple[str, str]:
-    """
-    Split the model_id string into provider and model name.
-    The model string should be in the format "provider:model_name".
-
-    :param model_id: The model identifier string.
-    :return: The provider and model name as a tuple.
-    """
-    if ":" in model_id:
-        parts = model_id.split(":", 1)
-        if len(parts) == 2:
-            return parts[0].strip(), parts[1].strip()
-    raise ValueError("Invalid model")
-
-
-def map_model_id(model_id: str) -> tuple[str, str]:
+def split_model_id(model_id: str) -> tuple[str, str]:
     """
     Map a model ID in the format "provider/model_name" to its provider and model name components.
 
@@ -126,7 +113,9 @@ def get_ai_provider(provider: str) -> AIProviderType:
     elif provider.lower() == "openai":
         _ai = OpenAIProvider()
     elif provider.lower() == "anthropic":
-        raise NotImplementedError("Anthropic provider is not implemented yet.")
+        _ai = AnthropicAIProvider()
+    elif provider.lower() == "fake":
+        _ai = FakeProvider()
     elif provider.lower() == "openrouter":
         raise NotImplementedError("OpenRouter provider is not implemented yet.")
     else:
@@ -146,7 +135,7 @@ def get_ai_provider_from_model_id(model_id: str, iface = None) -> tuple[AIProvid
     :param model_id: The model ID in the format "provider/model_name".
     :return: A tuple containing the AIProvider instance, provider name, and model name.
     """
-    provider_name, model_name = map_model_id(model_id)
+    provider_name, model_name = split_model_id(model_id)
     ai_provider = get_ai_provider(provider_name)
     return ai_provider, provider_name, model_name
 
