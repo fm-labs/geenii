@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
 
 from geenii.agent.base import BaseAgentTask, BaseTask, message_to_prompt
-from geenii.agent.utils import estimate_token_count
 from geenii.ai import generate_chat_completion
 from geenii.chat_models import UserInteractionContent, ToolCallResultContent, ContentPart, TextContent, \
     ToolCallContent, JsonContent
