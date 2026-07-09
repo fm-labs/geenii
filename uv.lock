@@ -459,7 +459,6 @@ dependencies = [
 dev = [
     { name = "pyinstaller" },
     { name = "pytest" },
-    { name = "redis" },
     { name = "ruff" },
     { name = "testcontainers" },
 ]
@@ -485,7 +484,6 @@ requires-dist = [
 dev = [
     { name = "pyinstaller", specifier = ">=6.17.0" },
     { name = "pytest", specifier = ">=9.0.2" },
-    { name = "redis", specifier = ">=7.2.1" },
     { name = "ruff", specifier = ">=0.15.21" },
     { name = "testcontainers", specifier = ">=4.13.3" },
 ]
