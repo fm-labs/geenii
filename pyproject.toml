@@ -55,13 +55,9 @@ explicit = true
 
 
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/geenii"]
 
-
 [project.scripts]
-geenii-cli = "cli:main"
+geenii = "geenii.cli.main:main"
 geenii-scheduler = "geenii.scheduler:main"

@@ -22,6 +22,6 @@ class McpTool(Tool):
         self.mcp_server_id = mcp_server_id
         self.type = "mcp_tool"
 
-    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
+    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
         client: McpClient = get_mcp_client_for_server(self.mcp_server_id)
         return await client.call_tool(self._mcp_fn_name, args=args)

@@ -28,7 +28,7 @@ class ComputerTool(Tool):
         self.type = "computer"
         self.command_template = command_template
 
-    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
+    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
         command = args.get("command")
         if not command:
             raise ValueError(f"Missing 'command' argument for ComputerTool {self.name!r}")
@@ -54,7 +54,8 @@ class ComputerTool(Tool):
         print(_command)
 
         _env = os.environ.copy()
-        _env.update(env)
+        if env:
+            _env.update(env)
         _result = subprocess.run(_command, shell=False, capture_output=True, text=True, env=_env, cwd=None)
         logger.info(f"[{subprocess_id}] Return code: {_result.returncode}")
         logger.info(f"[{subprocess_id}] Standard output: {_result.stdout}")

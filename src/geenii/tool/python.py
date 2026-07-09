@@ -4,6 +4,7 @@ import logging
 import subprocess
 import shlex
 import asyncio
+import os
 import inspect
 from typing import Callable, Any
 
@@ -28,7 +29,7 @@ class PythonFunctionTool(Tool):
         self.type = "function"
         self.handler = handler
 
-    async def invoke(self, args: dict[str, Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
+    async def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
         if self.handler is None:
             raise RuntimeError(f"No handler registered for tool {self.name!r}")
 
@@ -55,7 +56,7 @@ class PythonCliTool(Tool):
         super().__init__(name, description, parameters)
         self.type = "python"
 
-    async def invoke(self, args: dict[str, Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
+    async def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
         command = args.get("command")
         if not command:
             raise ValueError(f"Missing 'command' argument for PythonTool {self.name!r}")
@@ -76,7 +77,10 @@ class PythonCliTool(Tool):
         _command = shlex.split(command)
         print(_command)
 
-        _result = subprocess.run(_command, shell=False, capture_output=True, text=True, env=env, cwd=None)
+        _env = os.environ.copy()
+        if env:
+            _env.update(env)
+        _result = subprocess.run(_command, shell=False, capture_output=True, text=True, env=_env, cwd=None)
         logger.info(f"Return code: {_result.returncode}")
         logger.info(f"Standard output: {_result.stdout}")
         logger.info(f"Standard error: {_result.stderr}")

@@ -21,7 +21,7 @@ class Tool(ABC):
     #    return f"<{self.__class__.__name__} name={self.name!r}>"
 
     @abstractmethod
-    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None, **kwargs: Any) -> Any:
+    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
         ...
 
     @property

@@ -187,7 +187,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         #     })
 
         # message history
-        logger.info(f"Input messages provided {len(request.messages)}")
+        logger.info(f"Input messages provided {len(request.messages) if request.messages else 0}")
         print(request.messages)
         if request.messages:
             input_messages.extend(model_messages_to_ollama_format(request.messages))
@@ -198,7 +198,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 'role': 'user',
                 'content': request.prompt,
             })
-        elif not request.prompt and len(request.messages) < 1:
+        elif not request.prompt and (not request.messages or len(request.messages) < 1):
             raise ValueError("At least a prompt or some messages must be provided for chat completion.")
 
         try:

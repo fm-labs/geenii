@@ -45,7 +45,7 @@ class SkillSpec(pydantic.BaseModel):
             name=skill_header.get("name"),
             description=skill_header.get("description", ""),
             metadata=skill_header.get("metadata", {}),
-            allowed_tools=skill_header.get("allowed-tools", "").split(" "),
+            allowed_tools=[t for t in skill_header.get("allowed-tools", "").split(" ") if t],
         )
 
 

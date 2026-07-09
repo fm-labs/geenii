@@ -71,7 +71,7 @@ class BaseCompletionResponse(pydantic.BaseModel):
     # output: List[dict] | None = None
     # output_text: str | None = None
     error: str | None = None
-    model_result: dict = None
+    model_result: dict | None = None
 
 class CompletionResponse(BaseCompletionResponse):
     # prompt: str

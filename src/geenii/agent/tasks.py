@@ -101,13 +101,14 @@ class LLMTask(BaseAgentTask):
                                         tools=allowed_tools,
                                         context_id=self.agent.context_id
                                         )
-        response = await asyncio.to_thread(self._request_completion, request)
-        logger.info(f"Received model response for prompt '{prompt}' with {len(response.output)} content parts.")
-
-        # add user request to message history
+        # add user request to message history *before* the completion so ordering is correct
         if prompt and len(prompt.strip()) > 0:
             user_message = ModelMessage(role="user", content=[TextContent(text=prompt)])
             self.agent.message_history.append(user_message)
+            input_messages.append(user_message)
+
+        response = await asyncio.to_thread(self._request_completion, request)
+        logger.info(f"Received model response for prompt '{prompt}' with {len(response.output)} content parts.")
 
         # add model response to message history
         bot_message = ModelMessage(role="assistant", content=response.output)
@@ -126,55 +127,50 @@ class LLMTask(BaseAgentTask):
                     logger.info("No tool calls detected in the model response. Proceeding to yield the final response.")
                 break  # no tool calls, we can proceed without re-generating the response.
 
-            if tools_called > self.MAX_TOOL_CALLS:
+            if tools_called >= self.MAX_TOOL_CALLS:
                 logger.error(f"Too many tool calls detected in the response. Stopping further processing to avoid infinite loops.")
                 yield ModelMessage(role="assistant", content=[TextContent(text=f"Error: Too many tool calls detected in the response. Stopping further processing.")])
                 break
 
-            # handle the first tool call in the response and then re-generate the response based on the tool result,
-            # until there are no more tool calls in the response
-            tool_call = tool_call_contents.pop(0)
-            logger.warning(f"Next tool call to process: {tool_call.name} with arguments {tool_call.arguments} and call ID {tool_call.call_id}")
-            # add the tool call to the message history before executing it, so that the tool result can be associated with the correct tool call in the message history
-            self.agent.message_history.append(ModelMessage(role="assistant", content=[tool_call]))
+            # execute *all* tool calls in the response (the model may return several parallel
+            # tool calls in a single response) before re-generating based on their results.
+            tool_call_failed = False
+            for tool_call in tool_call_contents:
+                logger.warning(f"Next tool call to process: {tool_call.name} with arguments {tool_call.arguments} and call ID {tool_call.call_id}")
+                # add the tool call to the message history before executing it, so that the tool result can be associated with the correct tool call in the message history
+                self.agent.message_history.append(ModelMessage(role="assistant", content=[tool_call]))
 
-            tool_task = ToolCallTask(agent=self.agent, tool_name=tool_call.name, arguments=tool_call.arguments, call_id=tool_call.call_id)
-            tool_result = None
-            async for msg in tool_task.execute():
-                if isinstance(msg, ModelMessage) and isinstance(msg.content[0], ToolCallResultContent):
-                    tool_result = msg.content[0].result
-                    # add the tool result to the message history so that it can be used as context for the next response generation
-                    self.agent.message_history.append(msg)
-                else:
-                    # if the tool task yields any other messages (e.g. user interaction requests), we yield them immediately
-                    # todo: add to message history as well?
-                    yield msg
+                tool_task = ToolCallTask(agent=self.agent, tool_name=tool_call.name, arguments=tool_call.arguments, call_id=tool_call.call_id)
+                tool_result = None
+                async for msg in tool_task.execute():
+                    if isinstance(msg, ModelMessage) and isinstance(msg.content[0], ToolCallResultContent):
+                        tool_result = msg.content[0].result
+                        # add the tool result to the message history so that it can be used as context for the next response generation
+                        self.agent.message_history.append(msg)
+                    else:
+                        # if the tool task yields any other messages (e.g. user interaction requests), we yield them immediately
+                        # todo: add to message history as well?
+                        yield msg
 
-            tools_called += 1
-            if tool_result is not None:
-                # re-generate the response based on the tool result
-                #tool_result_message = ModelMessage(role="assistant", content=[TextContent(text=f"Tool '{tool_call.name}' returned result: {tool_result}")])
-                #self.agent.message_history.append(tool_result_message)
+                tools_called += 1
+                if tool_result is None:
+                    logger.error(f"Tool call {tool_call.name} did not return a valid result. Skipping re-generation of the response.")
+                    yield ModelMessage(role="assistant", content=[TextContent(text=f"Tool '{tool_call.name}' did not return a valid result.")])
+                    tool_call_failed = True
+                    break  # if a tool call did not return a valid result, we stop the process to avoid infinite loops
 
-                # now we can re-generate the response based on the original prompt and the updated message history that includes the tool result
-                request.prompt = ""
-                request.messages = list(self.agent.message_history[-10:])  # snapshot of the updated message history
-                response = await asyncio.to_thread(self._request_completion, request)
-                logger.info(f"Received model response for prompt '{prompt}' after tool call with {len(response.output)} content parts.")
-            else:
-                logger.error(f"Tool call {tool_call.name} did not return a valid result. Skipping re-generation of the response.")
-                yield ModelMessage(role="assistant", content=[TextContent(text=f"Tool '{tool_call.name}' did not return a valid result.")])
-                break  # if the tool call did not return a valid result, we stop the process to avoid infinite loops
+            if tool_call_failed:
+                break
 
-        # if there were tool calls, trigger a follow-up action,
-        # to ask the LLM for the next step based on the tool results.
+            # now that every tool call has been executed, re-generate the response based on the
+            # original prompt and the updated message history that includes all tool results
+            request.prompt = ""
+            request.messages = list(self.agent.message_history[-10:])  # snapshot of the updated message history
+            response = await asyncio.to_thread(self._request_completion, request)
+            logger.info(f"Received model response for prompt '{prompt}' after tool calls with {len(response.output)} content parts.")
+
         if tools_called > 0:
-            logger.info(
-                f"{tools_called} tool calls were made in the response. Enqueuing follow-up task to process tool results.")
-            #await self.agent.enqueue_task(FinalizeTask(self.agent))
-            await self.agent.enqueue_task(LLMTask(self.agent,
-                          message="Based on the tool results, continue processing the original prompt and provide the next response.",
-                          allowed_tools=allowed_tools))
+            logger.info(f"{tools_called} tool calls were made in the response.")
 
     def _request_completion(self, request):
         response = generate_chat_completion(request=request, tool_registry=self.agent.tools, )
@@ -231,7 +227,7 @@ class ToolFilterTask(BaseAgentTask):
 
     SYSTEM_PROMPT = """
     You are an AI tool orchestrator. Given a user prompt you must:
-    1. Select the best-fit agent(s) from the provided list.
+    1. Select the best-fit tool(s) from the provided list.
     2. Produce a short execution plan.
 
     Always respond with valid JSON in exactly this shape:
@@ -544,6 +540,7 @@ You are an expert planner agent. Your task is to create a clear, step-by-step pl
 Workflow:
 1. Break down the task into clear, sequential steps.
 2. For each step, explicitly mention the skill to be used to accomplish that step. The steps MUST be in the list of skills available to the agent. If no special skill is required for a step, use "None" or leave empty.
+3. For each step, mention any tools that may be needed to accomplish it.
 4. Ensure the plan is actionable and can be executed step by step.
 5. Always respond with a structured plan in JSON format with the following shape:
 {
@@ -557,6 +554,9 @@ Workflow:
 }
 
 If the task is simple and does not require multiple steps, return a plan with a single step that describes the action to be taken.
+
+AVAILABLE TOOLS:
+{{{tools_list}}}
 
 AVAILABLE SKILLS:
 {{{skills_list}}}
