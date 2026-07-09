@@ -47,14 +47,19 @@ jobs:
       - name: Build binaries
         run: |
           ./build_bin.sh
-          # Tarball the binaries for each architecture
-          tar -czvf geenii-${{ matrix.arch_tag }}.tar.gz -C dist .
-          # Generate SHA-256 hash
-          sha256sum geenii-${{ matrix.arch_tag }}.tar.gz > geenii-${{ matrix.arch_tag }}.tar.gz.sha256
-          
+          cp README.md LICENSE dist/
+          TARBALL="geenii-${{ matrix.arch_tag }}.tar.gz"
+          tar -czvf "$TARBALL" -C dist .
+          if command -v sha256sum &>/dev/null; then
+            sha256sum "$TARBALL" > "$TARBALL.sha256"
+          else
+            shasum -a 256 "$TARBALL" > "$TARBALL.sha256"
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
           name: geenii-${{ matrix.arch_tag }}
-          path: geenii-${{ matrix.arch_tag }}.tar.gz
+          path: |
+            geenii-${{ matrix.arch_tag }}.tar.gz
+            geenii-${{ matrix.arch_tag }}.tar.gz.sha256
