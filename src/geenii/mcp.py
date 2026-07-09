@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import asyncio
 import json
 from fastmcp import Client
 from fastmcp.mcp_config import MCPConfig
@@ -159,14 +158,8 @@ class McpClient:
         info = await self.get_info()
         return info["prompts"]
 
-    def list_tools_sync(self):
-        return asyncio.run(self.list_tools())
-
     async def call_tool(self, tool_name: str, args: dict) -> any:
         await self._ensure_connected()
         result = await self.client.call_tool_mcp(tool_name, arguments=args)
         logger.info(f"Tool call result for '{tool_name}' on '{self.server_name}': {result}")
         return result
-
-    def call_tool_sync(self, tool_name: str, args: dict) -> any:
-        return asyncio.run(self.call_tool(tool_name, args))
