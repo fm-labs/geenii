@@ -31,7 +31,6 @@ RUN apk add --no-cache \
     nodejs \
     npm \
     docker-cli \
-    docker-compose \
     openssl \
     openssh-client \
     && rm -rf /var/cache/apk/* \

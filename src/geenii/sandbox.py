@@ -3,6 +3,8 @@ import os
 import time
 from typing import Literal
 
+from geenii.config import CACHE_DIR
+
 SANDBOX_PYTHON3_BASEIMAGE = "python:3.13-slim"
 
 def run_docker_subprocess(command: list[str], timeout: int = 30, env: dict | None = None) -> tuple[int, str, str]:
@@ -16,6 +18,13 @@ def run_docker_subprocess(command: list[str], timeout: int = 30, env: dict | Non
     Returns:
         tuple[int, str, str]: A tuple containing the exit code, stdout, and stderr.
     """
+    print("RUN COMMAND:", command)
+    print("COMMAND ENV", env)
+
+    _env = os.environ.copy()
+    if env is not None:
+        _env.update(env)
+
     try:
         result = subprocess.run(
             command,
@@ -23,7 +32,7 @@ def run_docker_subprocess(command: list[str], timeout: int = 30, env: dict | Non
             stderr=subprocess.PIPE,
             text=True,
             timeout=timeout,
-            env=env,
+            env=_env,
         )
         return result.returncode, result.stdout, result.stderr
     except subprocess.TimeoutExpired as e:
@@ -32,12 +41,90 @@ def run_docker_subprocess(command: list[str], timeout: int = 30, env: dict | Non
         return -1, "", f"Error running command: {str(e)}"
 
 
+def build_sandbox_container(sandbox_id: str, app_dir: str, env: dict | None = None, runtime="bash") -> str:
+    """
+    Build a docker image from base python image + installing deps defined in pyproject.toml file.
+
+    :param sandbox_id:
+    :param app_dir:
+    :param env:
+    :return:
+    """
+    #sandbox_docker_file = os.path.join(app_dir, "sandbox.Dockerfile")
+    sandbox_docker_file = os.path.join(CACHE_DIR, "sandboxes", sandbox_id + ".Dockerfile")
+    os.makedirs(os.path.join(CACHE_DIR, "sandboxes"), exist_ok=True)
+    overwrite = True
+    image_name = "geenii-sandbox-" + runtime + "-" + sandbox_id
+
+    # PYTHON
+    if runtime == "python":
+        dockerfile_str = """
+FROM python:3.13-alpine
+
+# Disable python output buffering
+ENV PYTHONUNBUFFER=true
+
+WORKDIR /app
+"""
+        if os.path.exists(os.path.join(app_dir, "requirements.txt")):
+            dockerfile_str += """
+# Install python dependencies
+COPY ./requirements.txt ./
+RUN pip3 install -r ./requirements.txt
+    """
+
+        if os.path.exists(os.path.join(app_dir, "pyproject.toml")):
+            dockerfile_str += """
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Install python dependencies
+COPY ./pyproject.toml ./uv.lock ./
+RUN uv sync --no-cache-dir --frozen --no-install-project --no-dev
+    """
+
+    # NODEJS
+    elif runtime == "node":
+        dockerfile_str = """
+FROM node:latest
+WORKDIR /app
+"""
+
+    # BASH
+    elif runtime == "bash":
+        dockerfile_str = """
+FROM bash:latest
+WORKDIR /app
+"""
+
+    else:
+        raise ValueError(f"Unknown runtime: {runtime}")
+
+
+    if not os.path.isfile(sandbox_docker_file) or overwrite:
+        with open(sandbox_docker_file, "w") as f:
+            f.write(dockerfile_str)
+
+    command = ["docker", "build", "-t", image_name, "-f", sandbox_docker_file, app_dir]
+    print(f"Running command: {' '.join(command)}")
+    start_time = time.time()
+    rc, stdout, stderr = run_docker_subprocess(command, timeout=3600, env=env)
+    end_time = time.time()
+    print(f"Command finished in {end_time - start_time:.8f} seconds with exit code {rc}")
+    if rc != 0:
+        print(stdout)
+        print(stderr)
+        raise ValueError(f"Error building docker image: {image_name}")
+    return image_name
+
+
 def run_docker_sandbox_python(app_dir: str, script_name: str = "main.py", script_args: list[str] = None,
                               mounts: list[str] = None,
                               network_mode: Literal["none", "bridge", "host"] = "none",
                               cap_add: list[str] = None,
                               cpu_limit: float = 0.5, mem_limit: str = "256m", pid_limit: int = 100,
-                              timeout: int = 30, env: dict | None = None) -> tuple[int, str, str]:
+                              timeout: int = 30, env: dict | None = None,
+                              sandbox_id: str = None) -> tuple[int, str, str]:
     """
     Run a Python script in a Docker sandbox.
 
@@ -59,7 +146,16 @@ def run_docker_sandbox_python(app_dir: str, script_name: str = "main.py", script
     if not os.path.exists(app_dir):
         raise ValueError(f"App directory does not exist: {app_dir}")
 
+    if sandbox_id is None:
+        sandbox_id = app_dir.replace("\\", "/").replace("/", "-").lower()
+
+    #image_name = SANDBOX_PYTHON3_BASEIMAGE
+    image_name = build_sandbox_container(sandbox_id, app_dir, env=env, runtime="python")
+    #container_name = image_name.replace(":", "_")
+    container_name = "geenii-sandbox-" + sandbox_id
+
     command = ["docker", "run", "--rm"]
+    command.extend(["--name", container_name])
     # Mount the app directory as read-only and set as working directory
     command.extend(["-v", f"{app_dir}:/app:ro"])
     command.extend(["-w", "/app"])
@@ -118,15 +214,23 @@ def run_docker_sandbox_python(app_dir: str, script_name: str = "main.py", script
     # OOM killer: --oom-kill-disable prevents the container from being killed by the OOM killer, but use with caution as it may lead to resource exhaustion.
     # command.append("--oom-kill-disable")
 
+    # Add gateway host
+    command.extend(["--add-host", "host.docker.internal:host-gateway"])
+
+    # Add environment vars
+    if env is not None:
+        for k,v in env.items():
+            command.extend(["-e", f"{k}={v}"])
+
     # python image and command
-    command.append(SANDBOX_PYTHON3_BASEIMAGE)
+    command.append(image_name)
     command.extend(["python3", script_name])
     if script_args:
         command.extend(script_args)
 
     print(f"Running command: {' '.join(command)}")
     start_time = time.time()
-    result = run_docker_subprocess(command, timeout=timeout, env=env)
+    result = run_docker_subprocess(command, timeout=timeout)
     end_time = time.time()
     print(f"Command finished in {end_time - start_time:.8f} seconds with exit code {result[0]}")
     return result

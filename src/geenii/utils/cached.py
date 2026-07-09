@@ -238,14 +238,12 @@ def default_cache_store():
         print("Falling back to InMemoryCacheStore (non-persistent, not shared across processes)")
         return InMemoryCacheStore()
 
-def cached(ttl=None, cachekey=None, store=None):
+CACHE_STORE = default_cache_store()
+
+def cached(ttl=None, cachekey=None):
     """
     store must provide: store.read_cache(key), store.write_cache(key, value, ttl=None)
     """
-
-    if store is None:
-        #raise ValueError("cached(..., store=...) is required")
-        store = default_cache_store()
 
     def decorator(func):
         is_async = inspect.iscoroutinefunction(func)
@@ -263,13 +261,13 @@ def cached(ttl=None, cachekey=None, store=None):
                 key = make_key(args, kwargs)
                 cache_disabled = config.CACHE_DISABLED
                 if not cache_disabled:
-                    v = store.read_cache(key)
+                    v = CACHE_STORE.read_cache(key)
                     if v is not None:
                         print(f"Cache hit for {func.__name__} with key {key!r}")
                         return v
                 result = await func(*args, **kwargs)
                 print(f"Caching result of {func.__name__} with key {key!r} and ttl {ttl}")
-                store.write_cache(key, result, ttl=ttl)
+                CACHE_STORE.write_cache(key, result, ttl=ttl)
                 return result
             return async_wrapper
 
@@ -278,13 +276,13 @@ def cached(ttl=None, cachekey=None, store=None):
             key = make_key(args, kwargs)
             cache_disabled = config.CACHE_DISABLED
             if not cache_disabled:
-                v = store.read_cache(key)
+                v = CACHE_STORE.read_cache(key)
                 if v is not None:
                     print(f"Cache hit for {func.__name__} with key {key!r}")
                     return v
             result = func(*args, **kwargs)
             print(f"Caching result of {func.__name__} with key {key!r} and ttl {ttl}")
-            store.write_cache(key, result, ttl=ttl)
+            CACHE_STORE.write_cache(key, result, ttl=ttl)
             return result
 
         return sync_wrapper

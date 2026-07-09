@@ -6,7 +6,7 @@ from geenii.agent.registry import AgentRegistry, AgentSpec, init_agent
 from geenii.ai import enumerate_providers, enumerate_models
 from geenii.bots import BotInterface
 from geenii.config import GEENII_DIR, APP_VERSION, DEFAULT_COMPLETION_MODEL, \
-    CACHE_DIR
+    CACHE_DIR, GEENII_WORKING_DIR
 from geenii.skills import SkillRegistry, skill_paths
 from geenii.utils.os_util import get_user_home_dir
 from geenii.utils.system_util import get_system_report
@@ -32,11 +32,14 @@ def makedirs_safe(path: str):
 
 def make_app_directories():
     # ensure internal directories exist
+    makedirs_safe(f"{CACHE_DIR}")
     makedirs_safe(f"{CACHE_DIR}/logs")
 
 
 def agent_paths():
     return [
+        f"{get_user_home_dir()}/.geenii/agents",
+        f"{GEENII_WORKING_DIR}/.geenii/agents",
         f"{GEENII_DIR}/agents",
     ]
 

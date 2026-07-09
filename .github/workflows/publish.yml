@@ -49,6 +49,9 @@ jobs:
           ./build_bin.sh
           # Tarball the binaries for each architecture
           tar -czvf geenii-${{ matrix.arch_tag }}.tar.gz -C dist .
+          # Generate SHA-256 hash
+          sha256sum geenii-${{ matrix.arch_tag }}.tar.gz > geenii-${{ matrix.arch_tag }}.tar.gz.sha256
+          
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6

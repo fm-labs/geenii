@@ -1,15 +1,13 @@
+import click
 import logging
 
-import click
-
-from geenii.cli.scheduler import scheduler as scheduler_cli
 from geenii.cli.agent import agent_cli
-from geenii.cli.info import info as info_cli
 from geenii.cli.agents import agents as agents_cli
+from geenii.cli.info import info as info_cli
+from geenii.cli.scheduler import scheduler as scheduler_cli
 from geenii.cli.skills import skills as skills_cli
 from geenii.cli.tools import tools as tools_cli
 from geenii.config import APP_VERSION
-from geenii.g import make_app_directories
 from geenii.logs import init_logging
 
 init_logging()

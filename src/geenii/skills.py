@@ -133,8 +133,7 @@ class SkillRegistry:
 
 def skill_paths() -> list[str]:
     skill_paths = [
-        #os.path.join(get_user_home_dir(), ".geenii", "skills"),
-        os.path.join(os.getcwd(), ".geenii", "skills"),
+        os.path.join(get_user_home_dir(), ".geenii", "skills"),
         os.path.join(GEENII_WORKING_DIR, ".geenii", "skills"),
         os.path.join(GEENII_DIR, "skills"),
     ]

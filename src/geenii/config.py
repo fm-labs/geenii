@@ -1,18 +1,22 @@
+from os.path import realpath
+
 import json
 import os
 
 import dotenv
 
+from geenii.utils.os_util import get_user_home_dir
 
 APP_VERSION = "0.3.1"
 
-GEENII_WORKING_DIR = os.environ.get("GEENII_WORKING_DIR", os.getcwd())
-GEENII_DIR = os.environ.get("GEENII_DIR", os.path.join(GEENII_WORKING_DIR, ".geenii"))
+GEENII_WORKING_DIR = realpath(os.environ.get("GEENII_WORKING_DIR", os.getcwd()))
+GEENII_DIR = realpath(os.environ.get("GEENII_DIR", os.path.join(GEENII_WORKING_DIR, ".geenii")))
 
 # Load environment variables from .env file in the user directory, if it exists
+dotenv.load_dotenv(GEENII_WORKING_DIR + "/.env", override=True, verbose=True)
 dotenv.load_dotenv(GEENII_DIR + "/.env", override=True, verbose=True)
 
-CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", GEENII_DIR + "/.cache")
+CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", get_user_home_dir() + "/.geenii/.cache")
 CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
 
 #GEENII_BIN = os.getenv("GEENII_BIN", "geenii")

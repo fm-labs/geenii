@@ -1,55 +1,48 @@
-# geenii documentation
+# Geenii Documentation
 
-A minimal, but powerful, orchestration framework for agentic applications.
+A minimal but powerful orchestration framework for agentic applications.
 
+Geenii takes a **local-first, privacy-first** approach to AI workloads: a
+unified API over local and remote LLM providers, agents defined as plain
+markdown files, tool calling (including MCP servers), reusable skills, and a
+scheduler for autonomous runs — all self-hosted, driven from the CLI.
 
-## Abstract
+## Contents
 
-- **Local-first and Privacy-first** approach to AI workloads.
-- Provide a **unified API** for accessing different LLM providers and models.
-- Enable easy switching between **local and remote models**.
-- Facilitate building AI applications and agents that can leverage multiple models.
-- Offer a **self-hosted solution for privacy and control** over AI workloads.
-- Enable developers to build and deploy **AI applications without relying on cloud providers**.
-- Focus on modularity and extensibility to support new models and providers easily.
-- **Focus on MCP integration for maximum tooling and orchestration capabilities**.
-- Aims for interoperability with other agent frameworks (e.g., via Agent Protocol).
+Start here:
 
+- **[Architecture](architecture.md)** — components, package layout, and the
+  life of a prompt from CLI to model to tool call.
+- **[Configuration](configuration.md)** — the `.geenii/` directory, environment
+  variables, `geenii.json`, `mcp.json`, logs, and caches.
 
-## System
+Core components:
 
-- Env variables
-- Secrets
+- **[Agents](agents.md)** — defining agents in markdown, the task-queue
+  runtime, routing/handoff, memory, and human-in-the-loop approval.
+- **[Skills](skills.md)** — the `SKILL.md` format, discovery, selection, and
+  how skill instructions and scripts reach the model.
+- **[Tools](tools.md)** — tool types, built-ins, MCP server tools, registering
+  your own, and how tool calling works.
+- **[Providers & Models](providers.md)** — the `provider:model` addressing
+  scheme, provider interfaces, what each provider supports, and how to add one.
+- **[CLI Reference](cli.md)** — every command and option that exists today.
+- **[Scheduler](scheduler.md)** — running agents on a cron schedule.
 
+For contributors:
 
-## Agents
+- **[Developer Guide](developer.md)** — running from sources, tests, tooling.
 
-- Model
-- Model parameters
-- Memory
-- Tools
-- Skills
-- MCP servers
-- Agent Env vars
-- Agent Secrets
+## Quick orientation
 
+```bash
+geenii info                          # providers, models, environment
+geenii agent "Hello, who are you?"   # run the default agent
+geenii agents list                   # what agents are configured
+geenii tools list                    # what tools are available
+geenii skills list                   # what skills are installed
+```
 
-## Core Tasks
-
-### LLM completion
-
-- ai_generate_completion
-- ai_generate_chat_completion
-- ai_generate_image
-- ai_generate_audio_speech
-- ai_generate_audio_transcription
-- ai_generate_translation
-
-
-
-## Skills
-
-- ai_skill_info (meta,scripts)
-- ai_skill_instructions
-- ai_skill_generate_completion
-- ai_skill_exec_script
+Agents, skills, and MCP servers are configured in the `.geenii/` directory of
+your working directory — see [configuration.md](configuration.md) for the
+layout.

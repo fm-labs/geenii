@@ -6,6 +6,7 @@ import uuid
 
 from geenii.config import GEENII_DIR
 from geenii.sandbox import run_docker_sandbox_python
+from geenii.skills import locate_skill_path
 from geenii.tool.registry import ToolRegistry
 
 geenii_tools = ToolRegistry()
@@ -62,8 +63,7 @@ def execute_command(command: str, skill: str | None = None) -> str:
     working_directory = os.getcwd()
     _env = {}
     if skill:
-        # todo lookup skill base path
-        skill_dir = f"{GEENII_DIR}/skills/{skill}"
+        skill_dir = locate_skill_path(skill)
         #if os.path.isdir(skill_dir):
         #    working_directory = skill_dir
         _env.update({"SKILL_NAME": skill, "SKILL_DIR": skill_dir})
