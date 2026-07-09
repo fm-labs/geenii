@@ -66,6 +66,7 @@ Commands:
   agent      Run an agent with the given name and initial prompt.
   agents     Manage agents.
   info       Show application info and configuration.
+  mcp        Manage MCP servers and tools.
   scheduler  Manage the scheduler.
   skills     Manage skills.
   tools      Manage and execute tools.
@@ -135,6 +136,27 @@ geenii tools inspect "my_tool"
 
 # Call a tool directly
 geenii tools call "my_tool" --args arg1=value1 arg2=value2
+```
+
+### `geenii mcp` — Manage MCP servers and tools
+
+Manage MCP (Model Context Protocol) servers and their tools. Servers are configured in `.geenii/mcp.json`.
+
+```bash
+# List all configured MCP servers
+geenii mcp server list
+
+# Show a server's configuration
+geenii mcp server show "duckduckgo"
+
+# List tools provided by a server
+geenii mcp server tools "duckduckgo"
+
+# Execute a tool on a server
+geenii mcp server tool_exec "duckduckgo" "search" -a query="python testcontainers"
+
+# Execute a tool with JSON arguments
+geenii mcp server tool_exec "duckduckgo" "search" -j '{"query": "python testcontainers", "max_results": 5}'
 ```
 
 ### `geenii skills` — Manage skills
