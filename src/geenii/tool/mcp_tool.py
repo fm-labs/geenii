@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from geenii.mcp import McpClient, get_mcp_client_for_server
+from geenii.mcp_helper import McpClient, get_mcp_client_for_server
 from geenii.tool.common import Tool
 
 

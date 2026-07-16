@@ -7,7 +7,7 @@ import logging
 from typing import Any, Callable
 
 from geenii.tool.common import Tool
-from geenii.tool.mcp import McpTool
+from geenii.tool.mcp_tool import McpTool
 from geenii.tool.python import PythonFunctionTool
 
 logger = logging.getLogger(__name__)

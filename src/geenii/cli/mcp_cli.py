@@ -3,7 +3,7 @@ import json
 
 import click
 
-from geenii.mcp import get_mcp_config, get_mcp_config_for_server, get_mcp_client_for_server
+from geenii.mcp_helper import get_mcp_config, get_mcp_config_for_server, get_mcp_client_for_server
 
 
 @click.group()

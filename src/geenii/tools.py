@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from geenii.core.tools import display_desktop_notification
-from geenii.mcp import get_mcp_config, McpClient
+from geenii.mcp_helper import get_mcp_config, McpClient
 from geenii.tool.registry import ToolRegistry
 from geenii.tool.computer import ComputerTool
 from geenii.utils.cached import cached
