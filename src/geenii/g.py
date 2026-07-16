@@ -92,7 +92,6 @@ def get_app_info() -> dict:
     allowed_env_vars = ["PATH", "HOME", "USER", "USERNAME"]
 
     ai_providers = enumerate_providers()
-    ai_models = enumerate_models()
 
     data = dict({
         "app": {
@@ -100,13 +99,10 @@ def get_app_info() -> dict:
             "cwd": os.getcwd(),
             "user_home_dir": get_user_home_dir(),
             "geenii_dir": GEENII_DIR,
+            "geenii_working_dir": GEENII_WORKING_DIR,
             "cache_dir": CACHE_DIR,
         },
-        "config": {
-
-        },
         "providers": [provider.model_dump() for provider in ai_providers],
-        "models": [model.model_dump() for model in ai_models],
     })
 
     # add system report

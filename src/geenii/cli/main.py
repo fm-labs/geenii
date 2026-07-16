@@ -4,6 +4,7 @@ import logging
 from geenii.cli.agent_cli import agent_cli
 from geenii.cli.agents_cli import agents as agents_cli
 from geenii.cli.info_cli import info as info_cli
+from geenii.cli.models_cli import models as models_cli
 from geenii.cli.mcp_cli import mcp as mcp_cli
 from geenii.cli.scheduler_cli import scheduler as scheduler_cli
 from geenii.cli.skills_cli import skills as skills_cli
@@ -25,6 +26,7 @@ def geecli():
 geecli.add_command(info_cli)
 geecli.add_command(agent_cli)
 geecli.add_command(agents_cli)
+geecli.add_command(models_cli)
 geecli.add_command(mcp_cli)
 geecli.add_command(tools_cli)
 geecli.add_command(skills_cli)

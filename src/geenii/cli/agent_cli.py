@@ -1,3 +1,5 @@
+import sys
+
 import click
 import json
 import logging
@@ -10,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 @click.command(name="agent")
-@click.argument("prompt")
+@click.argument("prompt", required=False)
 @click.option("name", "--name", "-n", default="default",
               help="Name of the agent to run.")
 @click.option("skills", "--skills", "-s", default="",
@@ -37,6 +39,15 @@ def agent_cli(prompt: str, name: str, interactive: bool, skills: str, tools: str
     Run an agent with the given name and initial prompt.
     Optionally override skills, tools, model, model parameters, system instructions, developer instructions, and output format.
     """
+    if not sys.stdin.isatty():
+        stdin_str = click.get_text_stream("stdin").read()
+        click.echo("stdin: " + stdin_str)
+        prompt = stdin_str
+
+    if len(prompt) == 0:
+        click.echo("Please provide a prompt.")
+        return
+
     click.echo(f"Running agent '{name}' with prompt: {prompt}")
     #_agents = init_agent_registry(auto_load=True)
     #gbot: BaseAgent = _agents.get_instance(name)
