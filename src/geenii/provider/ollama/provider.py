@@ -188,7 +188,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
 
         # message history
         logger.info(f"Input messages provided {len(request.messages) if request.messages else 0}")
-        print(request.messages)
+        #print(request.messages)
         if request.messages:
             input_messages.extend(model_messages_to_ollama_format(request.messages))
 
@@ -236,7 +236,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 # logprobs=None,
                 # top_logprobs=None,
             )
-            print("Model Response:", model_result)
+            #print("Model Response:", model_result)
 
             # Check if the response contains a message with content and tool calls
             message = model_result.get('message', default={})

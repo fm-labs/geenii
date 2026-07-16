@@ -82,6 +82,24 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
         elif not input_messages:
             raise ValueError("At least a prompt or some messages must be provided for chat completion.")
 
+        # OUTPUT
+        output_format = request.output_format
+        output_schema = request.output_schema
+
+        output_config = {}
+        if output_schema is not None:
+            output_config["format"] = {"schema": output_schema, "type": "json_schema"}
+        elif output_format == "json" and output_schema is None:
+            output_schema = {
+                "type": "object",
+                "properties": {
+                    "result": {"type": "string"},
+                },
+                "additionalProperties": True,
+            }
+            output_config["format"] = {"schema": output_schema, "type": "json_schema"}
+
+
         model_params = request.model_parameters or {}
         temperature = model_params.get("temperature", request.temperature) or self.DEFAULT_TEMPERATURE
         max_tokens = model_params.get("max_tokens", request.max_tokens) or self.DEFAULT_MAX_TOKENS
@@ -94,7 +112,10 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
                 messages=input_messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                output_config=output_config,
             )
+            print(create_kwargs)
+
             if system_prompt:
                 create_kwargs["system"] = system_prompt
             if anthropic_tools:
@@ -103,7 +124,6 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
             model_result = self.client.messages.create(**create_kwargs)
 
             output_parts: List[ContentPart] = []
-            output_format = request.output_format
 
             for block in model_result.content:
                 if block.type == "text":

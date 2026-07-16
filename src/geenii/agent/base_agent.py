@@ -22,6 +22,7 @@ class BaseAgent(BotInterface, abc.ABC):
     def __init__(self, name, model: str = None, system_prompt: str = None, description: str = None,
                  tool_registry: ToolRegistry = None, skill_registry: SkillRegistry = None,
                  allowed_tools: Set[str] = None,
+                 mcp_servers: Set[str] = None,
                  context_id: str = None, memory: ChatMemory = None, hitl: HumanInTheLoopController = None):
 
         self.name = name
@@ -33,6 +34,7 @@ class BaseAgent(BotInterface, abc.ABC):
         self.memory = memory or None
         self.context_id = context_id or None
         self.allowed_tools: Set[str] = allowed_tools or set()
+        self.mcp_servers: Set[str] = mcp_servers or set()
         self.selected_skill: str | None = None
 
         self._tool_registry = tool_registry or ToolRegistry()
@@ -43,6 +45,24 @@ class BaseAgent(BotInterface, abc.ABC):
 
     def __repr__(self):
         return f"Agent(name={self.name}, context_id={self.context_id}, model={self.model}, tools={self.allowed_tools}, skills={self.skills.names()})"
+
+    def about_me(self):
+        """Returns information about the agent, and it's configured tools and skills"""
+        desc = ""
+        desc += f"Name: {self.name}\n"
+        desc += f"Description: {self.description}\n"
+        desc += f"Model: {self.model}\n"
+        desc += f"System prompt: {self.system_prompt}\n"
+        desc += f"Developer: {self.developer_prompt}\n"
+
+        desc += "Available tools:\n"
+        for tool in self.tools.list_tools():
+            desc += f"Tool: {tool.name} - {tool.description}\n"
+
+        desc += "Skills:\n"
+        for skill in self.skills.skills.items():
+            desc += f"Skill: {skill.name} - {skill.description}\n"
+        return desc
 
     @property
     def tools(self) -> ToolRegistry:
@@ -58,7 +78,21 @@ class BaseAgent(BotInterface, abc.ABC):
             return
 
         init_builtin_tools(self._tool_registry)
-        await init_mcp_server_tools(self._tool_registry)
+        if self.mcp_servers:
+            await init_mcp_server_tools(self._tool_registry, self.mcp_servers)
+
+        #self._tool_registry.register_function(self.about_me, name="about_me")
+        #self.allowed_tools.add("about_me")
+
+        # check if all allowed tools are available
+        _allowed_tools = set()
+        for tool_name in self.allowed_tools:
+            if not self.tools.has(tool_name):
+                logging.warning(f"Tool {tool_name} not found in tools registry")
+                continue
+            _allowed_tools.add(tool_name)
+        self.allowed_tools = _allowed_tools
+
         self._initialized = True
 
     async def enqueue_task(self, task: BaseTask):
@@ -143,3 +177,7 @@ class BaseAgent(BotInterface, abc.ABC):
         logger.warning(
             f"Using deprecated method Agent.unload_skill(). Use 'Agent.skills.unload({skill_name})' instead.")
         self.skills.unload(skill_name)
+
+    def add_to_history(self, msg: ModelMessage):
+        self.message_history.append(msg)
+        #todo self.memory.append(msg)

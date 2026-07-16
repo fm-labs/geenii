@@ -7,7 +7,7 @@ from geenii.agent.registry import AgentRegistry, AgentSpec, init_agent
 
 if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
-from geenii.ai import enumerate_providers, enumerate_models
+from geenii.ai import enumerate_providers
 from geenii.bots import BotInterface
 from geenii.config import GEENII_DIR, APP_VERSION, DEFAULT_COMPLETION_MODEL, \
     CACHE_DIR, GEENII_WORKING_DIR
@@ -56,7 +56,7 @@ def init_global_agent_registry() -> AgentRegistry:
         model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b"
 
     )})
-    for agent_dir in agent_paths():
+    for agent_dir in set(agent_paths()):
         _agents.load_from_directory(agent_dir)
     return _agents
 

@@ -17,9 +17,9 @@ class Agent(BaseAgent):
 
 
 class RoutingAgent(BaseAgent):
+
+    def __init__(self, name: str, **kwargs):
+        super().__init__(name, **kwargs)
+
     async def _handle_prompt(self, message: str | list[ContentPart]):
         await self.enqueue_task(FindBestAgentTask(self, prompt=message_to_prompt(message)))
-        #await self.enqueue_task(PlanTask(self, prompt=message_to_prompt(message)))
-
-
-

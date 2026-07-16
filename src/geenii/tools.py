@@ -56,13 +56,16 @@ async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
         return []
 
 
-async def init_mcp_server_tools(registry: ToolRegistry):
+async def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] = None):
     mcp_config = get_mcp_config()
     if not mcp_config or "mcpServers" not in mcp_config:
         print("No MCP servers configured")
         return
 
     for server_name, server_conf in mcp_config["mcpServers"].items():
+        if server_names is not None and server_name not in server_names:
+            continue
+
         try:
             mcp_tools = await read_mcp_server_tools(server_name, server_conf)
 

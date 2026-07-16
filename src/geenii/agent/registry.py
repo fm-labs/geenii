@@ -27,6 +27,7 @@ class AgentSpec(pydantic.BaseModel):
     skills: list[str] | None = pydantic.Field(default_factory=list)
     model_parameters: dict | None = pydantic.Field(default_factory=dict)
     mcp_servers: list[str] | None = pydantic.Field(default_factory=list)
+    class_name: str | None = None
 
     # @property
     # def working_dir(self):
@@ -79,8 +80,8 @@ def init_agent(agent_conf: AgentSpec) -> BaseAgent:
         skill_registry.load(skill)
 
     agent_class_name = "geenii.agents.Agent"
-    #if agent_conf.name == "default":
-    #    agent_class_name = "geenii.agents.RoutingAgent"
+    if agent_conf.class_name is not None:
+        agent_class_name = agent_conf.class_name
 
     # instance from class path string
     try:
@@ -90,7 +91,7 @@ def init_agent(agent_conf: AgentSpec) -> BaseAgent:
 
         agent = agent_class(name=agent_conf.name, description=agent_conf.description,
                             model=agent_conf.model, system_prompt=agent_conf.full_instructions,
-                            allowed_tools=set(agent_conf.tools),
+                            allowed_tools=set(agent_conf.tools), mcp_servers=agent_conf.mcp_servers,
                             tool_registry=tool_registry, skill_registry=skill_registry)
         return agent
     except Exception as e:

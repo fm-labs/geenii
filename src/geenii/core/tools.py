@@ -177,16 +177,21 @@ def display_desktop_notification(message: str, title: str = "Message from Geenii
     :param title: The title of the notification.
     :return: A message indicating that the notification has been sent.
     """
-    #command = f"""osascript -e 'display notification "{message}" with title "{title}"'"""
-    command = """osascript -e 'display dialog "%s" with title "%s" buttons {"OK"} giving up after 60'""" % (message, title)
-    print(">Displaying desktop notification with command:", command)
-    result = subprocess.run(command, shell=True, capture_output=True, text=True)
-    print(f">Executed notification command: {command}")
-    print(f">Return code: {result.returncode}")
-    print(f">Standard output: {result.stdout}")
-    print(f">Standard error: {result.stderr}")
+    def _escape_applescript(s: str) -> str:
+        return (s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+                .replace("\r", "\\r").replace("\t", "\\t"))
 
-    return f"Notification sent: {title} - {message}" if result.returncode == 0 else f"Failed to send notification: {result.stderr.strip()}"
+    script = (
+        f'display dialog "{_escape_applescript(message)}"'
+        f' with title "{_escape_applescript(title)}"'
+        f' buttons {{"OK"}} giving up after 60'
+    )
+    result = subprocess.run(
+        ["osascript", "-e", script], capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        return f"Failed to send notification: {result.stderr.strip()}"
+    return f"Notification sent: {title} - {message}"
 
 
 @geenii_tools.tool()
