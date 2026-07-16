@@ -1,4 +1,4 @@
-FROM python:3.13-alpine AS builder
+FROM python:3.14-alpine AS builder
 WORKDIR /builder
 
 # Install build dependencies for pyinstaller
@@ -14,24 +14,33 @@ COPY ./pyproject.toml ./uv.lock /builder/
 RUN uv sync --no-cache-dir --frozen --no-install-project
 
 COPY ./src/geenii /builder/src/geenii
-COPY ./hooks /builder/hooks
 COPY ./README.md /builder/
-COPY ./build_bin.sh /builder/build_bin.sh
-RUN ls -la /builder
+
+# build using pyinstaller
+COPY ./hooks /builder/hooks
+#COPY ./build_bin.sh /builder/build_bin.sh
 #RUN mkdir -p ./build && mkdir -p ./dist && \
 #    chmod +x /builder/build_bin.sh && \
-#    bash /builder/build_bin.sh
-RUN uv run pip install "patchelf==0.17.2.1" zstandard ordered-set
-RUN uv run python -m nuitka \
-    --include-package=geenii \
-    --include-package=mcp \
-    --include-package=fastmcp \
-    --include-distribution-metadata=fastmcp \
-    --standalone \
-    --onefile \
-    --output-filename=geenii \
-    --output-dir=dist \
-    ./src/geenii/cli/main.py
+#    bash /builder/build_bin.sh \
+RUN mkdir -p ./build && mkdir -p ./dist && \
+    uv run pyinstaller --clean --onedir --distpath ./dist --workpath ./build --specpath ./build \
+  --copy-metadata fastmcp \
+  --additional-hooks-dir=hooks \
+  --name geenii \
+  ./src/geenii/cli/main.py || exit 1
+
+## build using nuitka
+#RUN uv run pip install "patchelf==0.17.2.1" zstandard ordered-set
+#RUN uv run python -m nuitka \
+#    --include-package=geenii \
+#    --include-package=mcp \
+#    --include-package=fastmcp \
+#    --include-distribution-metadata=fastmcp \
+#    --standalone \
+#    --onefile \
+#    --output-filename=geenii \
+#    --output-dir=dist \
+#    ./src/geenii/cli/main.py
 
 FROM python:3.14-alpine
 
