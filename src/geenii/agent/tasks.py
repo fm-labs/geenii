@@ -750,161 +750,161 @@ class FindBestSkillTask(BaseAgentTask):
             self.agent.selected_skill = selected_skill
 
 
-class PlanTask(BaseAgentTask):
-    """
-    Task to create a multi-step plan for a complex task that requires multiple steps, skills or tool calls.
-    Based on the current message and context, the agent should break down the task into a clear, step-by-step plan.
-    Uses the agents tools and skills information to determine if any steps require specific tools or skills and includes that information in the plan.
-    Returns a structured plan that can be executed step by step, with explicit mentions of any required tools or skills for each step.
-    The output should be in a structured format that can be easily parsed and executed
-    """
-
-    SYSTEM_PROMPT = """
-You are an expert planner agent. Your task is to create a clear, step-by-step plan to accomplish a complex task based on the user's request and the conversation context.
-
-Workflow:
-1. Break down the task into clear, sequential steps.
-2. For each step, explicitly mention the skill to be used to accomplish that step. The steps MUST be in the list of skills available to the agent. If no special skill is required for a step, use "None" or leave empty.
-3. For each step, mention any tools that may be needed to accomplish it.
-4. Ensure the plan is actionable and can be executed step by step.
-5. Always respond with a structured plan in JSON format with the following shape:
-{
-  "plan": [
-    {
-      "step": "<description of the step>",
-      "skill": "<skill_name>"  // optional name of the required skill for this step, can be "None" or empty if no special skill is needed
-    },
-    ...
-  ]
-}
-
-If the task is simple and does not require multiple steps, return a plan with a single step that describes the action to be taken.
-
-AVAILABLE TOOLS:
-{{{tools_list}}}
-
-AVAILABLE SKILLS:
-{{{skills_list}}}
-""".strip()
-
-    def __init__(self, agent: "BaseAgent", prompt: str):
-        super().__init__(agent)
-        self.prompt = prompt
-
-    def _build_tools_list(self) -> str:
-        if not self.agent.tools or len(self.agent.tools.list_tool_names()) == 0:
-            return "No tools available."
-
-        enabled_tools_list = []
-        for tool_name in self.agent.tools.list_tool_names():
-            if tool_name in self.agent.allowed_tools:
-                enabled_tools_list.append(
-                    f"- {tool_name}: {self.agent.tools.get(tool_name).description} (enabled)"
-                )
-            else:
-                # enabled_tools_list.append(f"- {tool_name}: {self.agent.tools.get(tool_name).description} (disabled)")
-                pass  # skip disabled tools in the list to avoid confusion
-        return "\n".join(enabled_tools_list)
-
-    def _build_skills_list(self) -> str:
-        if not self.agent.skills or len(self.agent.skills.names()) == 0:
-            return "No skills available."
-        return "\n".join(
-            [
-                f"- {skill_name}: {self.agent.skills.get(skill_name).description}"
-                for skill_name in self.agent.skills.names()
-            ]
-        )
-
-    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
-        tools_list = self._build_tools_list()
-        skills_list = self._build_skills_list()
-        system_prompt = self.SYSTEM_PROMPT.replace(
-            "{{{tools_list}}}", tools_list
-        ).replace("{{{skills_list}}}", skills_list)
-
-        # print("***" * 10)
-        # print(system_prompt)
-        # print("***" * 10)
-        # print(estimate_token_count(system_prompt, 1000))
-        # print("***" * 10)
-
-        request = ChatCompletionRequest(
-            model=self.agent.model,
-            model_parameters={"temperature": 0.1, "max_tokens": 1024},
-            system=[system_prompt],
-            prompt=self.prompt,
-            messages=[],
-            output_format="json",
-            output_schema={
-                "type": "object",
-                "properties": {
-                    "plan": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "step": {"type": "string"},
-                                "skill": {"type": "string"},
-                            },
-                            "required": ["step"],
-                            "additionalProperties": False,
-                        },
-                    }
-                },
-                "required": ["plan"],
-                "additionalProperties": False,
-            },
-        )
-        response = await asyncio.to_thread(generate_chat_completion, request)
-        logger.info(
-            f"Received model response for plan generation with {len(response.output)} content parts."
-        )
-
-        if len(response.output) > 0:
-            if isinstance(response.output[0], JsonContent):
-                parsed = response.output[0].data
-                if parsed and "plan" in parsed and isinstance(parsed["plan"], list):
-                    plan = parsed["plan"]
-                    # yield ModelMessage(role="assistant", content=[JsonContent(data={"plan": plan})])
-                    # self.agent.add_to_history(ModelMessage(role="assistant", content=[JsonContent(data={"plan": plan})]))
-
-                    # execute the plan step by step, yielding messages for each step and handling any required skills or tools
-                    for idx, item in enumerate(plan):
-                        step_description = item.get("step", "")
-                        suggested_skills = []
-                        skill = item.get("skill", None)
-                        if skill and skill.lower() != "none":
-                            suggested_skills.append(skill.lower())
-
-                        yield ModelMessage(
-                            role="assistant",
-                            content=[
-                                TextContent(
-                                    text=f"Step {idx + 1}: {step_description} (suggested skill: {skill})"
-                                )
-                            ],
-                        )
-
-                        # nevertheless, try to find the best skill, but we add the suggested skill as a hint in the prompt for the FindBestSkillTask
-                        yield FindBestSkillTask(
-                            self.agent,
-                            prompt=f"For the following step in the plan: '{step_description}', select the best skill to accomplish this step from the available skills.",
-                            suggested=suggested_skills,
-                        )
-                        yield LLMTask(
-                            self.agent,
-                            message=f"Execute the step: '{step_description}' using the selected skill.",
-                        )
-                        # todo tool suggestions for LLMTask
-
-                else:
-                    logger.error("PlanTask: Invalid plan format in model response.")
-            else:
-                logger.error("PlanTask: Expected JSON content in model response.")
-        else:
-            logger.error("PlanTask: No content in model response.")
-
+# class PlanTask(BaseAgentTask):
+#     """
+#     Task to create a multi-step plan for a complex task that requires multiple steps, skills or tool calls.
+#     Based on the current message and context, the agent should break down the task into a clear, step-by-step plan.
+#     Uses the agents tools and skills information to determine if any steps require specific tools or skills and includes that information in the plan.
+#     Returns a structured plan that can be executed step by step, with explicit mentions of any required tools or skills for each step.
+#     The output should be in a structured format that can be easily parsed and executed
+#     """
+#
+#     SYSTEM_PROMPT = """
+# You are an expert planner agent. Your task is to create a clear, step-by-step plan to accomplish a complex task based on the user's request and the conversation context.
+#
+# Workflow:
+# 1. Break down the task into clear, sequential steps.
+# 2. For each step, explicitly mention the skill to be used to accomplish that step. The steps MUST be in the list of skills available to the agent. If no special skill is required for a step, use "None" or leave empty.
+# 3. For each step, mention any tools that may be needed to accomplish it.
+# 4. Ensure the plan is actionable and can be executed step by step.
+# 5. Always respond with a structured plan in JSON format with the following shape:
+# {
+#   "plan": [
+#     {
+#       "step": "<description of the step>",
+#       "skill": "<skill_name>"  // optional name of the required skill for this step, can be "None" or empty if no special skill is needed
+#     },
+#     ...
+#   ]
+# }
+#
+# If the task is simple and does not require multiple steps, return a plan with a single step that describes the action to be taken.
+#
+# AVAILABLE TOOLS:
+# {{{tools_list}}}
+#
+# AVAILABLE SKILLS:
+# {{{skills_list}}}
+# """.strip()
+#
+#     def __init__(self, agent: "BaseAgent", prompt: str):
+#         super().__init__(agent)
+#         self.prompt = prompt
+#
+#     def _build_tools_list(self) -> str:
+#         if not self.agent.tools or len(self.agent.tools.list_tool_names()) == 0:
+#             return "No tools available."
+#
+#         enabled_tools_list = []
+#         for tool_name in self.agent.tools.list_tool_names():
+#             if tool_name in self.agent.allowed_tools:
+#                 enabled_tools_list.append(
+#                     f"- {tool_name}: {self.agent.tools.get(tool_name).description} (enabled)"
+#                 )
+#             else:
+#                 # enabled_tools_list.append(f"- {tool_name}: {self.agent.tools.get(tool_name).description} (disabled)")
+#                 pass  # skip disabled tools in the list to avoid confusion
+#         return "\n".join(enabled_tools_list)
+#
+#     def _build_skills_list(self) -> str:
+#         if not self.agent.skills or len(self.agent.skills.names()) == 0:
+#             return "No skills available."
+#         return "\n".join(
+#             [
+#                 f"- {skill_name}: {self.agent.skills.get(skill_name).description}"
+#                 for skill_name in self.agent.skills.names()
+#             ]
+#         )
+#
+#     async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+#         tools_list = self._build_tools_list()
+#         skills_list = self._build_skills_list()
+#         system_prompt = self.SYSTEM_PROMPT.replace(
+#             "{{{tools_list}}}", tools_list
+#         ).replace("{{{skills_list}}}", skills_list)
+#
+#         # print("***" * 10)
+#         # print(system_prompt)
+#         # print("***" * 10)
+#         # print(estimate_token_count(system_prompt, 1000))
+#         # print("***" * 10)
+#
+#         request = ChatCompletionRequest(
+#             model=self.agent.model,
+#             model_parameters={"temperature": 0.1, "max_tokens": 1024},
+#             system=[system_prompt],
+#             prompt=self.prompt,
+#             messages=[],
+#             output_format="json",
+#             output_schema={
+#                 "type": "object",
+#                 "properties": {
+#                     "plan": {
+#                         "type": "array",
+#                         "items": {
+#                             "type": "object",
+#                             "properties": {
+#                                 "step": {"type": "string"},
+#                                 "skill": {"type": "string"},
+#                             },
+#                             "required": ["step"],
+#                             "additionalProperties": False,
+#                         },
+#                     }
+#                 },
+#                 "required": ["plan"],
+#                 "additionalProperties": False,
+#             },
+#         )
+#         response = await asyncio.to_thread(generate_chat_completion, request)
+#         logger.info(
+#             f"Received model response for plan generation with {len(response.output)} content parts."
+#         )
+#
+#         if len(response.output) > 0:
+#             if isinstance(response.output[0], JsonContent):
+#                 parsed = response.output[0].data
+#                 if parsed and "plan" in parsed and isinstance(parsed["plan"], list):
+#                     plan = parsed["plan"]
+#                     # yield ModelMessage(role="assistant", content=[JsonContent(data={"plan": plan})])
+#                     # self.agent.add_to_history(ModelMessage(role="assistant", content=[JsonContent(data={"plan": plan})]))
+#
+#                     # execute the plan step by step, yielding messages for each step and handling any required skills or tools
+#                     for idx, item in enumerate(plan):
+#                         step_description = item.get("step", "")
+#                         suggested_skills = []
+#                         skill = item.get("skill", None)
+#                         if skill and skill.lower() != "none":
+#                             suggested_skills.append(skill.lower())
+#
+#                         yield ModelMessage(
+#                             role="assistant",
+#                             content=[
+#                                 TextContent(
+#                                     text=f"Step {idx + 1}: {step_description} (suggested skill: {skill})"
+#                                 )
+#                             ],
+#                         )
+#
+#                         # nevertheless, try to find the best skill, but we add the suggested skill as a hint in the prompt for the FindBestSkillTask
+#                         yield FindBestSkillTask(
+#                             self.agent,
+#                             prompt=f"For the following step in the plan: '{step_description}', select the best skill to accomplish this step from the available skills.",
+#                             suggested=suggested_skills,
+#                         )
+#                         yield LLMTask(
+#                             self.agent,
+#                             message=f"Execute the step: '{step_description}' using the selected skill.",
+#                         )
+#                         # todo tool suggestions for LLMTask
+#
+#                 else:
+#                     logger.error("PlanTask: Invalid plan format in model response.")
+#             else:
+#                 logger.error("PlanTask: Expected JSON content in model response.")
+#         else:
+#             logger.error("PlanTask: No content in model response.")
+#
 
 # class AnonymousTask(BaseTask):
 #     def __init__(self, fn: Callable[[], AsyncGenerator[ModelMessage, None]]):
