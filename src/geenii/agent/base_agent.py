@@ -51,25 +51,28 @@ class BaseAgent(BotInterface, abc.ABC):
         self._tasks: asyncio.Queue[BaseTask] = asyncio.Queue()
         self._hitl = hitl or NoHumanInTheLoopController()
 
-        self.__init_memory()
+        self._init_memory()
         self._initialized = False
 
     def __repr__(self):
         return f"Agent(name={self.name}, context_id={self.context_id}, model={self.model}, tools={self.allowed_tools}, skills={self.skills.names()})"
 
-    def __init_memory(self):
+    def _init_memory(self):
         if self.memory is not None:
             return
+        self.memory = self._create_memory(self.context_id)
+
+    def _create_memory(self, context_id: str) -> ChatMemory:
         if GEENII_MEMORY_ENGINE == "file":
-            base_dir = os.path.join(CACHE_DIR, "agents", self.name, f"memory.{self.context_id}.jsonl")
-            os.makedirs(os.path.dirname(base_dir), exist_ok=True)
-            self.memory = FileChatMemory(base_dir)
+            path = os.path.join(CACHE_DIR, "agents", self.name, f"memory.{context_id}.jsonl")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            return FileChatMemory(path)
         elif GEENII_MEMORY_ENGINE == "sqlite":
-            db_path = os.path.join(CACHE_DIR, "agents", self.name, f"memory.{self.context_id}.db")
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
-            self.memory = SqliteChatMemory(db_path)
+            path = os.path.join(CACHE_DIR, "agents", self.name, f"memory.{context_id}.db")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            return SqliteChatMemory(path)
         else:
-            self.memory = ShortTermChatMemory()
+            return ShortTermChatMemory()
 
 
     async def _initialize(self):
