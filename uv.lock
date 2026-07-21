@@ -482,7 +482,7 @@ server = [
 
 [[package]]
 name = "geenii"
-version = "0.3.2rc3"
+version = "0.3.2rc5"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },

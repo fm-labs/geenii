@@ -7,7 +7,7 @@ import dotenv
 
 from geenii.utils.os_util import get_user_home_dir
 
-APP_VERSION = "0.3.2-rc.4"
+APP_VERSION = "0.3.2-rc.5"
 
 GEENII_WORKING_DIR = realpath(os.environ.get("GEENII_WORKING_DIR", os.getcwd()))
 GEENII_DIR = realpath(os.environ.get("GEENII_DIR", os.path.join(GEENII_WORKING_DIR, ".geenii")))
