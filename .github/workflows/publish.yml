@@ -42,9 +42,21 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      - name: Build binaries
+#      - name: Build
+#        run: |
+#          ./build_bin.sh
+#          cp README.md LICENSE dist/
+#          TARBALL="geenii-${{ matrix.arch_tag }}.tar.gz"
+#          tar -czvf "$TARBALL" -C dist .
+#          if command -v sha256sum &>/dev/null; then
+#            sha256sum "$TARBALL" > "$TARBALL.sha256"
+#          else
+#            shasum -a 256 "$TARBALL" > "$TARBALL.sha256"
+#          fi
+
+      - name: Build
         run: |
-          ./build_bin.sh
+          ./build_od.sh
           cp README.md LICENSE dist/
           TARBALL="geenii-${{ matrix.arch_tag }}.tar.gz"
           tar -czvf "$TARBALL" -C dist .
