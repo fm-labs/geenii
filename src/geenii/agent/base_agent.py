@@ -77,27 +77,7 @@ class BaseAgent(BotInterface, abc.ABC):
 
     async def _initialize(self):
         """Initialize the agent by loading built-in tools, MCP server tools, and any tools from loaded skills."""
-        if self._initialized:
-            return
-
-        # init_builtin_tools(self._tool_registry)
-        # init_process_tools(self._tool_registry)
-        # if self.mcp_servers:
-        #     await init_mcp_server_tools(self._tool_registry, self.mcp_servers)
-        #
-        # #self._tool_registry.register_function(self.about_me, name="about_me")
-        # #self.allowed_tools.add("about_me")
-        #
-        # # check if all allowed tools are available
-        # _allowed_tools = set()
-        # for tool_name in self.allowed_tools:
-        #     if not self.tools.has(tool_name):
-        #         logging.warning(f"Tool {tool_name} not found in tools registry")
-        #         continue
-        #     _allowed_tools.add(tool_name)
-        # self.allowed_tools = _allowed_tools
-
-        self._initialized = True
+        pass
 
     def to_dict(self) -> dict:
         return {
@@ -260,3 +240,17 @@ def _agent_log(agent_name: str, context_id: str, event_name: str, data: dict | p
         data = data.model_dump(mode="json")
     append_jsonl(log_file, {"agent": agent_name, "context_id": context_id, "event": event_name,
                             "data": data, "timestamp": datetime.now().timestamp()})
+
+
+def restore_last_context_id(name: str):
+    file_path = f"{CACHE_DIR}/agents/{name}/last_context_id"
+    with open(file_path, "r") as f:
+        last_context_id = int(f.read())
+    if last_context_id is not None:
+        return last_context_id
+
+
+def dump_last_context_id(name: str, context_id):
+    file_path = f"{CACHE_DIR}/agents/{name}/last_context_id"
+    with open(file_path, "w") as f:
+        f.write(str(context_id))
