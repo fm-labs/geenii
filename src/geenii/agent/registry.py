@@ -1,7 +1,7 @@
-import logging
-import os
 from pathlib import Path
 
+import logging
+import os
 import pydantic
 
 from geenii.agent.base_agent import BaseAgent
@@ -28,7 +28,8 @@ class AgentSpec(pydantic.BaseModel):
     model_parameters: dict | None = pydantic.Field(default_factory=dict)
     mcp_servers: list[str] | None = pydantic.Field(default_factory=list)
     class_name: str | None = None
-    sandbox: str | None = None
+    #sandbox: str | None = None
+    #memory: Literal["short", "file", "sqlite"] | None = None
 
     # @property
     # def working_dir(self):
@@ -67,7 +68,7 @@ class AgentSpec(pydantic.BaseModel):
         return AgentSpec.model_validate(header)
 
 
-def init_agent(agent_conf: AgentSpec) -> BaseAgent:
+def init_agent(agent_conf: AgentSpec, context_id: str = None) -> BaseAgent:
     # todo check model provider configuration
     # todo check model availability
 
@@ -96,7 +97,8 @@ def init_agent(agent_conf: AgentSpec) -> BaseAgent:
         agent = agent_class(name=agent_conf.name, description=agent_conf.description,
                             model=agent_conf.model, system_prompt=agent_conf.full_instructions,
                             allowed_tools=set(agent_conf.tools), mcp_servers=agent_conf.mcp_servers,
-                            tool_registry=tool_registry, skill_registry=skill_registry)
+                            tool_registry=tool_registry, skill_registry=skill_registry,
+                            context_id=context_id)
         return agent
     except Exception as e:
         logger.error(f"Error loading agent class '{agent_class_name}': {str(e)}", exc_info=e)

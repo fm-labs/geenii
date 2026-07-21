@@ -69,21 +69,21 @@ def locate_agent_md_file(agent_name: str) -> str|None:
             return md_file_path
     return None
 
-def init_agent_by_name(name: str) -> BaseAgent:
+def init_agent_by_name(name: str, context_id: str | None = None) -> BaseAgent:
     """Load an agent configuration from a markdown file and create an Agent instance."""
     md_file_path = locate_agent_md_file(name)
     if md_file_path is None:
         if name == "default":
-            return init_default_agent()
+            return init_fallback_agent()
         raise ValueError(f"Agent '{name}' not found.")
 
     try:
         agent_conf = AgentSpec.from_md_file(md_file_path)
-        return init_agent(agent_conf)
+        return init_agent(agent_conf, context_id=context_id)
     except Exception as e:
         raise e
 
-def init_default_agent() -> BaseAgent:
+def init_fallback_agent(context_id: str | None = None) -> BaseAgent:
     try:
         agent_conf = AgentSpec(
             name="default",
@@ -91,7 +91,7 @@ def init_default_agent() -> BaseAgent:
             model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
             system=DEFAULT_AGENT_SYSTEM_PROMPT,
         )
-        return init_agent(agent_conf)
+        return init_agent(agent_conf, context_id=context_id)
     except Exception as e:
         raise e
 

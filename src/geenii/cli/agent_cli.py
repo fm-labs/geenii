@@ -29,12 +29,12 @@ logger = logging.getLogger(__name__)
               help="Override the developer instructions specified in the agent config.")
 @click.option("output_format", "--output-format", "-f", default="text",
               help="Output format for the agent's responses. Options: text, json.")
+@click.option("context_id", "--context", "-c", default="",
+              help="Continue a previous conversation. Creates a new conversation if omitted.")
 @click.option("interactive", "--interactive", "-i", is_flag=True,
               help="Continue the conversation after the initial prompt.")
-@click.option("conv_id", "--conv-id", "-cid", default="",
-              help="Continue a previous conversation. Creates a new conversation if omitted.")
 def agent_cli(prompt: str, name: str, interactive: bool, skills: str, tools: str, model: str, model_parameters: str,
-              system_instructions: str, developer_instructions: str, output_format: str, conv_id: str):
+              system_instructions: str, developer_instructions: str, output_format: str, context_id: str):
     """
     Run an agent with the given name and initial prompt.
     Optionally override skills, tools, model, model parameters, system instructions, developer instructions, and output format.
@@ -51,12 +51,12 @@ def agent_cli(prompt: str, name: str, interactive: bool, skills: str, tools: str
             prompt = click.prompt(text="Please enter a prompt", type=str, default="No prompt")
 
     agent_run(prompt=prompt, name=name, interactive=interactive, skills=skills, tools=tools, model=model, model_parameters=model_parameters,
-              system_instructions=system_instructions, developer_instructions=developer_instructions, output_format=output_format, conv_id=conv_id)
+              system_instructions=system_instructions, developer_instructions=developer_instructions, output_format=output_format, context_id=context_id)
 
 
 def agent_run(prompt: str = "", name: str = "default", interactive: bool = False, skills: str = "", tools: str = "", model: str = "",
               model_parameters: str = "", system_instructions: str = "", developer_instructions: str = "",
-              output_format: str = "text", conv_id: str = None):
+              output_format: str = "text", context_id: str = None):
     click.echo(f"Running agent '{name}' with prompt: {prompt}")
     #_agents = init_agent_registry(auto_load=True)
     #gbot: BaseAgent = _agents.get_instance(name)
@@ -99,8 +99,8 @@ def agent_run(prompt: str = "", name: str = "default", interactive: bool = False
             click.echo(f"Invalid output format '{output_format}'. Supported formats are 'text' and 'json'.")
             return
         gbot.output_format = output_format
-    #if conv_id:
-    #    gbot.conv_id = conv_id
+    if context_id:
+        gbot.context_id = context_id
 
     logger.info(f"Agent '{name}' loaded. {repr(gbot)}")
     CliAgentRunner(gbot, interactive=interactive).run(prompt)

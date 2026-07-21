@@ -1,21 +1,26 @@
-import time
-import uuid
+import os
 from pathlib import Path
 
 import abc
 import asyncio
 import logging
 import pydantic
+import uuid
 from datetime import datetime
 from typing import Set, List, AsyncGenerator
 
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT, BaseTask
 from geenii.bots import BotInterface
 from geenii.chat_models import ContentPart, TextContent
-from geenii.config import DEFAULT_COMPLETION_MODEL, CACHE_DIR
+from geenii.config import DEFAULT_COMPLETION_MODEL, CACHE_DIR, GEENII_MEMORY_ENGINE
 from geenii.datamodels import ModelMessage
 from geenii.hitl import HumanInTheLoopController, NoHumanInTheLoopController
-from geenii.memory import ChatMemory
+from geenii.memory import (
+    ChatMemory,
+    ShortTermChatMemory,
+    FileChatMemory,
+    SqliteChatMemory,
+)
 from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.json_util import append_jsonl
@@ -35,9 +40,8 @@ class BaseAgent(BotInterface, abc.ABC):
         self.model = model or DEFAULT_COMPLETION_MODEL
         self.system_prompt = system_prompt or DEFAULT_AGENT_SYSTEM_PROMPT
         self.developer_prompt = ""
-        self.message_history: List[ModelMessage] = []
-        self.memory = memory or None
         self.context_id = context_id or uuid.uuid4().hex
+        self.memory = memory or None
         self.allowed_tools: Set[str] = allowed_tools or set()
         self.mcp_servers: Set[str] = mcp_servers or set()
         self.selected_skill: str | None = None
@@ -46,10 +50,51 @@ class BaseAgent(BotInterface, abc.ABC):
         self._skill_registry = skill_registry or SkillRegistry()
         self._tasks: asyncio.Queue[BaseTask] = asyncio.Queue()
         self._hitl = hitl or NoHumanInTheLoopController()
+
+        self.__init_memory()
         self._initialized = False
 
     def __repr__(self):
         return f"Agent(name={self.name}, context_id={self.context_id}, model={self.model}, tools={self.allowed_tools}, skills={self.skills.names()})"
+
+    def __init_memory(self):
+        if self.memory is not None:
+            return
+        if GEENII_MEMORY_ENGINE == "file":
+            base_dir = os.path.join(CACHE_DIR, "agents", self.name, f"memory.{self.context_id}.jsonl")
+            os.makedirs(os.path.dirname(base_dir), exist_ok=True)
+            self.memory = FileChatMemory(base_dir)
+        elif GEENII_MEMORY_ENGINE == "sqlite":
+            db_path = os.path.join(CACHE_DIR, "agents", self.name, f"memory.{self.context_id}.db")
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+            self.memory = SqliteChatMemory(db_path)
+        else:
+            self.memory = ShortTermChatMemory()
+
+
+    async def _initialize(self):
+        """Initialize the agent by loading built-in tools, MCP server tools, and any tools from loaded skills."""
+        if self._initialized:
+            return
+
+        # init_builtin_tools(self._tool_registry)
+        # init_process_tools(self._tool_registry)
+        # if self.mcp_servers:
+        #     await init_mcp_server_tools(self._tool_registry, self.mcp_servers)
+        #
+        # #self._tool_registry.register_function(self.about_me, name="about_me")
+        # #self.allowed_tools.add("about_me")
+        #
+        # # check if all allowed tools are available
+        # _allowed_tools = set()
+        # for tool_name in self.allowed_tools:
+        #     if not self.tools.has(tool_name):
+        #         logging.warning(f"Tool {tool_name} not found in tools registry")
+        #         continue
+        #     _allowed_tools.add(tool_name)
+        # self.allowed_tools = _allowed_tools
+
+        self._initialized = True
 
     def to_dict(self) -> dict:
         return {
@@ -94,30 +139,6 @@ class BaseAgent(BotInterface, abc.ABC):
     @property
     def skills(self) -> SkillRegistry:
         return self._skill_registry
-
-    async def _initialize(self):
-        """Initialize the agent by loading built-in tools, MCP server tools, and any tools from loaded skills."""
-        if self._initialized:
-            return
-
-        # init_builtin_tools(self._tool_registry)
-        # init_process_tools(self._tool_registry)
-        # if self.mcp_servers:
-        #     await init_mcp_server_tools(self._tool_registry, self.mcp_servers)
-        #
-        # #self._tool_registry.register_function(self.about_me, name="about_me")
-        # #self.allowed_tools.add("about_me")
-        #
-        # # check if all allowed tools are available
-        # _allowed_tools = set()
-        # for tool_name in self.allowed_tools:
-        #     if not self.tools.has(tool_name):
-        #         logging.warning(f"Tool {tool_name} not found in tools registry")
-        #         continue
-        #     _allowed_tools.add(tool_name)
-        # self.allowed_tools = _allowed_tools
-
-        self._initialized = True
 
     async def enqueue_task(self, task: BaseTask):
         """Enqueue a task to be processed by the agent."""
@@ -218,9 +239,12 @@ class BaseAgent(BotInterface, abc.ABC):
         _agent_log(self.name, self.context_id, "agent.unload_skill", {"skill_name": skill_name})
         self.skills.unload(skill_name)
 
+    @property
+    def message_history(self) -> List[ModelMessage]:
+        return self.memory.messages
+
     def add_to_history(self, msg: ModelMessage):
-        self.message_history.append(msg)
-        #todo self.memory.append(msg)
+        self.memory.append(msg)
 
 
 

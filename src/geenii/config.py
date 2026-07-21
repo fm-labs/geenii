@@ -21,6 +21,8 @@ CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "tr
 
 #GEENII_BIN = os.getenv("GEENII_BIN", "geenii")
 
+GEENII_MEMORY_ENGINE = "file"
+
 MCP_CONFIG_FILE="mcp.json"
 
 # Completion models
