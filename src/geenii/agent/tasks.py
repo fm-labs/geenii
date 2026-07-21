@@ -121,7 +121,7 @@ class LLMTask(BaseAgentTask):
     """Generate LLM chat completion response in the current context. Handles tool calls"""
 
     MAX_TOOL_CALLS = 10  # to prevent infinite loops of tool calls
-    MAX_MESSAGE_HISTORY = 20
+    MAX_MESSAGE_HISTORY = 30 # hard history item count cap
     MAX_RECURSION = 10
 
     def __init__(
@@ -145,7 +145,7 @@ class LLMTask(BaseAgentTask):
         # print(full_system_prompt)
         prompt = message_to_prompt(self.message)
         allowed_tools = self.allowed_tools
-        # message history (max 10 messages)
+        # message history (last MAX_MESSAGE_HISTORY messages)
         input_messages = list(self.agent.message_history[-self.MAX_MESSAGE_HISTORY:])
 
         # run sync task in thread pool to avoid blocking the event loop while waiting for the response
@@ -912,10 +912,78 @@ class FindBestSkillTask(BaseAgentTask):
 #             logger.error("PlanTask: No content in model response.")
 #
 
-# class AnonymousTask(BaseTask):
-#     def __init__(self, fn: Callable[[], AsyncGenerator[ModelMessage, None]]):
-#         self.fn = fn
-#
-#     async def run(self) -> AsyncGenerator[ModelMessage, None]:
-#         async for msg in self.fn():
-#             yield msg
+class MemoryCompactionTask(BaseAgentTask):
+    """Compact the agent's memory by summarising the full conversation history
+    into a handover summary, then rotating to a fresh memory context."""
+
+    SYSTEM_PROMPT = """You are a conversation summariser. You will receive the full message history of a conversation between a user and an AI assistant (including tool calls and their results).
+
+Produce a concise **handover summary** that a successor assistant can use to continue the conversation seamlessly. The summary must include:
+- The user's goals and any standing instructions.
+- Key decisions made and their rationale.
+- Important facts, entities, and values mentioned.
+- The current state of any ongoing task (what is done, what remains).
+- Any unresolved questions or open issues.
+
+Write in second person ("the user asked …", "you answered …") so the summary reads as a briefing for the next assistant turn. Be concise but do not drop information that would cause the successor to ask the user to repeat themselves."""
+
+    def __init__(self, agent: "BaseAgent"):
+        super().__init__(agent)
+
+    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+        full_history = list(self.agent.message_history)
+        if not full_history:
+            logger.info("MemoryCompactionTask: nothing to compact.")
+            return
+
+        history_text = self._render_history(full_history)
+
+        request = ChatCompletionRequest(
+            model=self.agent.model,
+            system=[self.SYSTEM_PROMPT],
+            prompt=f"Summarise the following conversation:\n\n{history_text}",
+            messages=[],
+        )
+        response = await asyncio.to_thread(generate_chat_completion, request)
+
+        summary_text = ""
+        if response.output:
+            summary_text = "\n".join(
+                part.to_text() for part in response.output if hasattr(part, "to_text")
+            )
+
+        if not summary_text.strip():
+            logger.warning("MemoryCompactionTask: LLM returned empty summary; skipping rotation.")
+            return
+
+        generation = self._next_generation(self.agent.context_id)
+        new_context_id = f"{self.agent.context_id}-{generation}"
+        new_memory = self.agent._create_memory(new_context_id)
+
+        summary_message = ModelMessage(
+            role="assistant",
+            content=[TextContent(text=f"[Handover summary from context {self.agent.context_id}]\n\n{summary_text}")],
+        )
+        new_memory.append(summary_message)
+
+        self.agent.context_id = new_context_id
+        self.agent.memory = new_memory
+
+        logger.info(f"MemoryCompactionTask: rotated to context {new_context_id} with {len(full_history)} messages compacted.")
+        yield summary_message
+
+    @staticmethod
+    def _next_generation(context_id: str) -> int:
+        parts = context_id.rsplit("-", 1)
+        if len(parts) == 2 and parts[1].isdigit():
+            return int(parts[1]) + 1
+        return 1
+
+    @staticmethod
+    def _render_history(messages: list[ModelMessage]) -> str:
+        lines = []
+        for msg in messages:
+            text = msg.to_text()
+            if text.strip():
+                lines.append(f"[{msg.role}]: {text}")
+        return "\n".join(lines)
