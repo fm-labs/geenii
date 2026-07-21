@@ -85,7 +85,7 @@ def main() -> None:
 
     shas = {}
     for variant in ["darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64"]:
-        sha_url = f"{base_url}/geenii-{variant}.tar.gz.sha256"
+        sha_url = f"{base_url}/geenii-{variant}-{args.tag}.tar.gz.sha256"
         print(f"Fetching {sha_url} ...", file=sys.stderr)
         shas[variant] = fetch_sha256(sha_url)
 
