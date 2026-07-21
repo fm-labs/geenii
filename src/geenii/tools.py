@@ -3,11 +3,10 @@ from __future__ import annotations
 import asyncio
 
 from geenii.core.tools import init_core_tools
-from geenii.core.process_tools import init_process_tools
 from geenii.mcp_helper import get_mcp_config, McpClient
 from geenii.pm.process_manager_client import ProcessManagerClient
-from geenii.tool.registry import ToolRegistry
 from geenii.tool.computer import ComputerTool
+from geenii.tool.registry import ToolRegistry
 from geenii.utils.cached import cached
 
 _pm_client = ProcessManagerClient()
@@ -36,7 +35,34 @@ def init_builtin_tools(registry: ToolRegistry):
             "required": ["command"]
         },
     ))
-    #registry.register_function(display_desktop_notification)
+    # registry.register(SandboxTool(
+    #     name="sandbox_python",
+    #     description="Execute a Python command inside a sandboxed Docker container. "
+    #                 "The container runs with no network, read-only filesystem, dropped capabilities, "
+    #                 "and strict resource limits. Requires a skill to be selected (SKILL_DIR is used as the app directory).",
+    #     parameters={
+    #         "type": "object",
+    #         "properties": {
+    #             "command": {"type": "string", "description": "The command to run inside the container, e.g. 'python3 scripts/fetch.py --format json'."}
+    #         },
+    #         "required": ["command"]
+    #     },
+    #     runtime="python",
+    # ))
+    # registry.register(SandboxTool(
+    #     name="sandbox_bash",
+    #     description="Execute a shell command inside a sandboxed Docker container. "
+    #                 "The container runs with no network, read-only filesystem, dropped capabilities, "
+    #                 "and strict resource limits. Requires a skill to be selected (SKILL_DIR is used as the app directory).",
+    #     parameters={
+    #         "type": "object",
+    #         "properties": {
+    #             "command": {"type": "string", "description": "The shell command to run inside the container, e.g. 'ls -la /app'."}
+    #         },
+    #         "required": ["command"]
+    #     },
+    #     runtime="bash",
+    # ))
     init_core_tools(registry)
     #init_process_tools(registry, _pm_client)
 

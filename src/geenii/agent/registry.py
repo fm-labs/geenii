@@ -28,6 +28,7 @@ class AgentSpec(pydantic.BaseModel):
     model_parameters: dict | None = pydantic.Field(default_factory=dict)
     mcp_servers: list[str] | None = pydantic.Field(default_factory=list)
     class_name: str | None = None
+    sandbox: str | None = None
 
     # @property
     # def working_dir(self):
