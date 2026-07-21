@@ -227,8 +227,8 @@ class LLMTask(BaseAgentTask):
             # tool calls in a single response) before re-generating based on their results.
             tool_call_failed = False
             for tool_call in tool_call_contents:
-                logger.warning(
-                    f"Next tool call to process: {tool_call.name} with arguments {tool_call.arguments} and call ID {tool_call.call_id}"
+                logger.debug(
+                    f"Next tool call to process: {tool_call.name} and call ID {tool_call.call_id}"
                 )
                 # add the tool call to the message history before executing it, so that the tool result can be associated with the correct tool call in the message history
                 self.agent.add_to_history(
@@ -289,7 +289,7 @@ class LLMTask(BaseAgentTask):
                 #request.tools = set()
                 response2 = await asyncio.to_thread(self._request_completion, request)
                 logger.info(
-                    f"Received model response after tool calls with {len(response2.output)} content parts."
+                    f"Received model response after {tools_called} tool calls with {len(response2.output)} content parts."
                 )
 
                 # recursively handle response with tool calls
@@ -297,8 +297,8 @@ class LLMTask(BaseAgentTask):
                    yield msg
             break
 
-        if tools_called > 0:
-            logger.info(f"{tools_called} tool calls were made in the response.")
+        #if tools_called > 0:
+        #    logger.info(f"{tools_called} tool calls were made in the response.")
 
 
     def _request_completion(self, request):

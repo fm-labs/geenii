@@ -1,14 +1,33 @@
 from pathlib import Path
 
 import subprocess
+import logging
 
 from geenii import config
 from geenii.tool.registry import ToolRegistry
 
-def is_file_in_working_dir(file_path: str) -> bool:
+logger = logging.getLogger(__name__)
+
+def is_file_in_allowed_dirs(file_path: str|Path) -> bool:
+    dirs = [
+        config.GEENII_WORKING_DIR,
+    ]
+
+    user_settings = config.read_user_settings()
+    if "allowed_dirs" in user_settings and isinstance(user_settings["allowed_dirs"], list):
+        user_allowed_dirs = user_settings["allowed_dirs"]
+        dirs.extend(user_allowed_dirs)
+
+    for _dir in dirs:
+        if is_file_in_allowed_dir(file_path, wd=_dir):
+            return True
+    return False
+
+def is_file_in_allowed_dir(file_path: str|Path, wd: str) -> bool:
     """Return True if file_path resolves to a location inside the working dir."""
     try:
-        wd = Path(config.GEENII_WORKING_DIR).resolve(strict=False)
+        logger.debug(f"check is_file_in_working_dir file_path={file_path} wd={wd}")
+        wd = Path(wd).resolve(strict=False)
         target = Path(file_path).resolve(strict=False)
     except (OSError, ValueError):
         # null bytes, embedded NULs, unresolvable paths, symlink loops
@@ -39,9 +58,12 @@ def init_core_tools(tool_registry: ToolRegistry) -> None:
         :param file_path: The path to the file to read.
         :return: The contents of the file as a string.
         """
-        if not is_file_in_working_dir(file_path):
+        file_path = Path(file_path).resolve(strict=False).absolute()
+        if not is_file_in_allowed_dirs(file_path):
+            logger.critical(f"SECURITY ALERT! Attempting to read file from {file_path}. wd={config.GEENII_WORKING_DIR}")
             return "You are not allowed to read this file."
 
+        logger.warning(f"file_read: {file_path}")
         with open(file_path, "r") as f:
             return f.read()
 
@@ -54,9 +76,12 @@ def init_core_tools(tool_registry: ToolRegistry) -> None:
         :param file_path: The path to the file to write to.
         :param contents: The contents to write to the file.
         """
-        if not is_file_in_working_dir(file_path):
+        file_path = Path(file_path).resolve(strict=False).absolute()
+        if not is_file_in_allowed_dirs(file_path):
+            logger.critical(f"SECURITY ALERT! Attempting to write to {file_path}. wd={config.GEENII_WORKING_DIR}")
             return "You are not allowed to write this file."
 
+        logger.warning(f"file_write: {file_path}")
         with open(file_path, "w") as f:
             f.write(contents)
 
