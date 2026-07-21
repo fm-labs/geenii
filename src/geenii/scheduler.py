@@ -50,19 +50,19 @@ class ScheduledTask:
     """A single scheduled task."""
 
     name: str
-    at: datetime | None = None  # optional fixed execution time, overrides cron if set
-    cron: str | None = None  # cron expression like "0 * * * *" for hourly execution
-    module: str = "geenii.core.tasks.run_proc"  # dot-separated module path to the function to run, e.g. "myapp.tasks.cleanup"
-    run_fn: Callable[[], Any] | None = field(default=None, repr=False)
+    at: datetime | None = None
+    cron: str | None = None
     cmd: list[str] | None = None
-    oneshot: bool = False  # if true, the task will be removed after running once
+    module: str = ""
+    run_fn: Callable[[], Any] | None = field(default=None, repr=False)
+    oneshot: bool = False
+    enabled: bool = True
     env: dict[str, str] | None = None
     working_dir: Path | None = None
-    #logger: logging.Logger = logger
 
 
     def load(self) -> None:
-        """Import the module and resolve the function. The last part of the module path is the function name."""
+        """Validate schedule and resolve execution target (cmd or module)."""
         if self.at and self.cron:
             raise ValueError("Task schedule cannot have both 'at' and 'cron' defined")
         elif not self.at and not self.cron:
@@ -71,23 +71,28 @@ class ScheduledTask:
             logger.warning("Task scheduled with 'at' will be treated as oneshot")
             self.oneshot = True
 
-        if self.run_fn is None:
-            if self.module:
-                parts = self.module.split(".")
-                if len(parts) < 2:
-                    raise ValueError(f"Module path '{self.module}' must include at least one dot to separate module and function")
-                module_name = ".".join(parts[:-1])
-                fn_name = parts[-1]
+        if self.cmd:
+            return
 
-                mod = importlib.import_module(module_name)
-                fn = getattr(mod, fn_name, None)
-                if fn is None or not callable(fn):
-                    raise AttributeError(
-                        f"Module '{self.module}' does not export a callable '{fn_name}' function"
-                    )
-                self.run_fn = fn
-            else:
-                raise ValueError("No module specified for task and run_fn is not set")
+        if self.run_fn is not None:
+            return
+
+        if self.module:
+            parts = self.module.split(".")
+            if len(parts) < 2:
+                raise ValueError(f"Module path '{self.module}' must include at least one dot to separate module and function")
+            module_name = ".".join(parts[:-1])
+            fn_name = parts[-1]
+
+            mod = importlib.import_module(module_name)
+            fn = getattr(mod, fn_name, None)
+            if fn is None or not callable(fn):
+                raise AttributeError(
+                    f"Module '{self.module}' does not export a callable '{fn_name}' function"
+                )
+            self.run_fn = fn
+        else:
+            raise ValueError("Task must have 'cmd', 'module', or 'run_fn' set")
 
     def next_run(self, after: datetime | None = None) -> datetime:
         """Return the next execution time as a UTC datetime."""
@@ -101,21 +106,41 @@ class ScheduledTask:
         raise ValueError(f"Task '{self.name}' has no valid schedule (missing 'at' or 'cron')")
 
     async def run(self) -> None:
-        """Run the task function, catching exceptions."""
-        if self.run_fn is None:
-            raise RuntimeError("Task function not loaded")
+        """Run the task as a subprocess (cmd) or Python callable (run_fn)."""
         logger.info("Running task '%s'", self.name)
         try:
-            fn_args = self.cmd or []
-            fn_env = self.env or {}
-            if inspect.iscoroutinefunction(self.run_fn):
-                await self.run_fn(fn_args, fn_env)  # type: ignore
+            if self.cmd:
+                await self._run_cmd()
+            elif self.run_fn is not None:
+                if inspect.iscoroutinefunction(self.run_fn):
+                    await self.run_fn()
+                else:
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(None, self.run_fn)
             else:
-                loop = asyncio.get_running_loop()
-                await loop.run_in_executor(None, self.run_fn, fn_args, fn_env)  # type: ignore
+                raise RuntimeError("Task has no cmd or run_fn")
             logger.info("Task '%s' completed successfully", self.name)
         except Exception:
             logger.exception("Task '%s' failed", self.name)
+
+    async def _run_cmd(self) -> None:
+        expanded = [os.path.expandvars(arg) for arg in self.cmd]
+        merged_env = {**os.environ, **(self.env or {})}
+        logger.info("Task '%s' executing: %s", self.name, expanded)
+        proc = await asyncio.create_subprocess_exec(
+            *expanded,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=merged_env,
+            cwd=str(self.working_dir) if self.working_dir else None,
+        )
+        stdout, stderr = await proc.communicate()
+        if stdout:
+            logger.info("Task '%s' stdout: %s", self.name, stdout.decode(errors="replace").rstrip())
+        if stderr:
+            logger.warning("Task '%s' stderr: %s", self.name, stderr.decode(errors="replace").rstrip())
+        if proc.returncode != 0:
+            raise RuntimeError(f"Command exited with code {proc.returncode}")
 
 
 class SchedulerConfig(pydantic.BaseModel):
@@ -126,27 +151,11 @@ class SchedulerConfig(pydantic.BaseModel):
     name: str
     at: datetime | None = None
     cron: str | None = None
-    module: str = ""
     cmd: list[str] | None = None
-    args: list[str] | None = None
+    module: str = ""
     env: dict[str, str] | None = None
-    enabled: bool = False
+    enabled: bool = True
     oneshot: bool = False
-
-    @property
-    def args_parsed(self) -> list[str]:
-        """Replace all environment variable placeholders in args with their values from env."""
-        if not self.args:
-            return []
-        #env = self.env or {}
-        parsed_args = []
-        for arg in self.args:
-            #for key, value in env.items():
-            #    placeholder = f"${{{key}}}"
-            #    arg = arg.replace(placeholder, value)
-            arg = os.path.expandvars(arg)
-            parsed_args.append(arg)
-        return parsed_args
 
 
 class Scheduler:
@@ -172,12 +181,11 @@ class Scheduler:
             "tasks": [
                 {
                     "name": task.name,
-                    "module": task.module,
-                    "args": task.cmd,
+                    "cmd": task.cmd,
                     "next_run": self._schedule.get(task.name).isoformat() if self._schedule.get(task.name) else None,
                     "last_run": self._last_run.get(task.name).isoformat() if self._last_run.get(task.name) else None,
                     "oneshot": task.oneshot,
-                    #"enabled": task.enabled,
+                    "enabled": task.enabled,
                 }
                 for task in self.tasks
             ],
@@ -210,26 +218,30 @@ class Scheduler:
                 logger.error("Invalid task configuration in %s: %s — skipping entry: %s", config_path, str(e), entry)
                 continue
 
+            if not task_conf.enabled:
+                logger.info("Task '%s' is disabled — skipping", task_conf.name)
+                continue
+
             if task_conf.cron and not croniter.is_valid(task_conf.cron):
                 logger.error("Invalid cron expression '%s' for task '%s' — skipping", task_conf.cron, task_conf.name)
                 continue
 
-            #if at_expr:
-            #    at_expr = datetime.fromisoformat(at_expr).astimezone(timezone.utc)
-
-            task = ScheduledTask(name=task_conf.name, at=task_conf.at, cron=task_conf.cron,
-                                 module=task_conf.module, cmd=task_conf.args_parsed, env=task_conf.env, )
+            task = ScheduledTask(
+                name=task_conf.name, at=task_conf.at, cron=task_conf.cron,
+                cmd=task_conf.cmd, module=task_conf.module,
+                env=task_conf.env, enabled=task_conf.enabled,
+                oneshot=task_conf.oneshot,
+            )
             try:
                 task.load()
             except Exception:
-                logger.exception("Failed to load module '%s' for task '%s' — skipping",
-                                 task_conf.module, task_conf.name)
+                logger.exception("Failed to load task '%s' — skipping", task_conf.name)
                 continue
 
             logger.info(
-                "Loaded task '%s' (module=%s, cron=%s, next=%s)",
+                "Loaded task '%s' (cmd=%s, cron=%s, next=%s)",
                 task.name,
-                task.module,
+                task.cmd,
                 task.cron,
                 task.next_run(),
             )

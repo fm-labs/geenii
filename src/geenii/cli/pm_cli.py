@@ -1,7 +1,10 @@
+import asyncio
 import json
+
 import click
 
 from geenii.pm.process_manager_client import ProcessManagerClient
+from geenii.pm.process_manager_service import ProcessManagerService
 
 
 def _client(ctx) -> ProcessManagerClient:
@@ -35,9 +38,6 @@ def ping(ctx):
 @click.option("--socket", "-s", default=None, help="Path to the Unix socket to listen on.")
 def serve(socket):
     """Start the process manager service."""
-    from geenii.pm.process_manager_service import ProcessManagerService
-    import asyncio
-
     service = ProcessManagerService(socket) if socket else ProcessManagerService()
     click.echo(f"Starting process manager on {service.socket_path}")
     asyncio.run(service.serve_forever())
