@@ -23,6 +23,8 @@ CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "tr
 
 GEENII_MEMORY_ENGINE = "file"
 
+FERNET_SECRET_KEY = os.environ.get("FERNET_SECRET_KEY", "")
+
 MCP_CONFIG_FILE="mcp.json"
 
 # Completion models
@@ -55,13 +57,13 @@ MONGODB_DB_NAME = os.environ.get("MONGODB_DB_NAME", "geenii_brain0")
 # Redis settings
 REDIS_URI = os.environ.get("REDIS_URI", "")
 
-### Chat settings ###
-# Path to the SQLite database file for storing chat history and related data
-CHAT_DB_PATH = os.environ.get("GEENII_CHAT_DB_PATH", f"{CACHE_DIR}/chat.db")
-
-# A unique namespace UUID for generating deterministic UUIDs for DM room IDs.
-CHAT_DM_NAMESPACE =  os.environ.get("GEENII_CHAT_DM_NAMESPACE", "a7f3c2e1-4b8d-5a9f-8c3e-2d1b6f0e4a7c")
-CHAT_GROUP_NAMESPACE =  os.environ.get("GEENII_CHAT_GROUP_NAMESPACE", "b7f3c2e1-8b4d-5a9f-8c3e-2d1b6f0e4a7a")
+# ### Chat settings ###
+# # Path to the SQLite database file for storing chat history and related data
+# CHAT_DB_PATH = os.environ.get("GEENII_CHAT_DB_PATH", f"{CACHE_DIR}/chat.db")
+#
+# # A unique namespace UUID for generating deterministic UUIDs for DM room IDs.
+# CHAT_DM_NAMESPACE =  os.environ.get("GEENII_CHAT_DM_NAMESPACE", "a7f3c2e1-4b8d-5a9f-8c3e-2d1b6f0e4a7c")
+# CHAT_GROUP_NAMESPACE =  os.environ.get("GEENII_CHAT_GROUP_NAMESPACE", "b7f3c2e1-8b4d-5a9f-8c3e-2d1b6f0e4a7a")
 
 
 # def get_user_dir():
