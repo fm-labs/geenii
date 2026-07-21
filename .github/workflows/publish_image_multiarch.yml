@@ -108,4 +108,4 @@ jobs:
       - name: Pull and run image
         run: |
           set -eux
-          docker run --rm $DOCKER_NAMESPACE/$REPO_NAME:$IMAGE_TAG geenii --version
+          docker run --rm $DOCKER_NAMESPACE/$REPO_NAME:$IMAGE_TAG --version
