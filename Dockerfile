@@ -18,16 +18,18 @@ COPY ./README.md /builder/
 
 # build using pyinstaller
 COPY ./hooks /builder/hooks
-#COPY ./build_bin.sh /builder/build_bin.sh
-#RUN mkdir -p ./build && mkdir -p ./dist && \
-#    chmod +x /builder/build_bin.sh && \
-#    bash /builder/build_bin.sh \
+#COPY ./build_bin.sh /builder/build.sh
+COPY ./build_od.sh /builder/build.sh
 RUN mkdir -p ./build && mkdir -p ./dist && \
-    uv run pyinstaller --clean --onedir --distpath ./dist --workpath ./build --specpath ./build \
-  --copy-metadata fastmcp \
-  --additional-hooks-dir=hooks \
-  --name geenii \
-  ./src/geenii/cli/main.py || exit 1
+    chmod +x /builder/build.sh && \
+    bash /builder/build.sh
+
+#RUN mkdir -p ./build && mkdir -p ./dist && \
+#    uv run pyinstaller --clean --onedir --distpath ./dist --workpath ./build --specpath ./build \
+#  --copy-metadata fastmcp \
+#  --additional-hooks-dir=hooks \
+#  --name geenii \
+#  ./src/geenii/cli/main.py || exit 1
 
 ## build using nuitka
 #RUN uv run pip install "patchelf==0.17.2.1" zstandard ordered-set
@@ -66,8 +68,14 @@ RUN addgroup --gid 33311 -S geenii && adduser --uid 33311 -S geenii -G geenii &&
 
 # Binaries
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-COPY --from=builder /builder/dist/geenii /usr/bin/geenii
+#COPY --from=builder /builder/dist/geenii /usr/bin/geenii
+COPY --from=builder /builder/dist/geenii /opt/geenii
+RUN chmod +x /opt/geenii/geenii && ln -sf /opt/geenii/geenii /usr/bin/geenii
+
+COPY ./container/entrypoint.sh /usr/bin/entrypoint
+RUN chmod +x /usr/bin/entrypoint
+ENTRYPOINT ["/usr/bin/entrypoint"]
 
 WORKDIR /workspace
 USER geenii
-CMD ["geenii", "--help"]
+CMD ["--help"]
