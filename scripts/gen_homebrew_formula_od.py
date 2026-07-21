@@ -21,7 +21,7 @@ class {class_name} < Formula
 
   on_macos do
     if Hardware::CPU.intel?
-      url "{base_url}/geenii-darwin-amd64.tar.gz"
+      url "{base_url}/geenii-darwin-amd64-{tag}.tar.gz"
       sha256 "{sha_darwin_amd64}"
 
       def install
@@ -30,7 +30,7 @@ class {class_name} < Formula
       end
     end
     if Hardware::CPU.arm?
-      url "{base_url}/geenii-darwin-arm64.tar.gz"
+      url "{base_url}/geenii-darwin-arm64-{tag}.tar.gz"
       sha256 "{sha_darwin_arm64}"
 
       def install
@@ -43,7 +43,7 @@ class {class_name} < Formula
   on_linux do
     if Hardware::CPU.intel?
       if Hardware::CPU.is_64_bit?
-        url "{base_url}/geenii-linux-amd64.tar.gz"
+        url "{base_url}/geenii-linux-amd64-{tag}.tar.gz"
         sha256 "{sha_linux_amd64}"
 
         def install
@@ -54,7 +54,7 @@ class {class_name} < Formula
     end
     if Hardware::CPU.arm?
       if Hardware::CPU.is_64_bit?
-        url "{base_url}/geenii-linux-arm64.tar.gz"
+        url "{base_url}/geenii-linux-arm64-{tag}.tar.gz"
         sha256 "{sha_linux_arm64}"
 
         def install
@@ -99,6 +99,7 @@ def main() -> None:
         homepage=homepage,
         version=version,
         base_url=base_url,
+        tag=args.tag,
         sha_darwin_amd64=shas["darwin-amd64"],
         sha_darwin_arm64=shas["darwin-arm64"],
         sha_linux_amd64=shas["linux-amd64"],
