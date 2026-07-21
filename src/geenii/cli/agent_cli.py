@@ -41,13 +41,21 @@ def agent_cli(prompt: str, name: str, interactive: bool, skills: str, tools: str
     """
     if not sys.stdin.isatty():
         stdin_str = click.get_text_stream("stdin").read()
-        click.echo("stdin: " + stdin_str)
-        prompt = stdin_str
+        if stdin_str is not None and len(stdin_str) > 0:
+            click.echo("stdin: " + stdin_str)
+            prompt = stdin_str
 
-    if len(prompt) == 0:
-        click.echo("Please provide a prompt.")
-        return
+    if prompt is None or len(prompt) < 1:
+        #click.echo("Please provide a prompt.")
+        #return
+        prompt = click.prompt(text="Please enter a prompt", type=str, default="No prompt")
 
+    agent_run(prompt=prompt, name=name, interactive=interactive, skills=skills, tools=tools, model=model, model_parameters=model_parameters,
+              system_instructions=system_instructions, developer_instructions=developer_instructions, output_format=output_format, conv_id=conv_id)
+
+
+def agent_run(prompt: str, name: str, interactive: bool, skills: str, tools: str, model: str, model_parameters: str,
+              system_instructions: str, developer_instructions: str, output_format: str, conv_id: str):
     click.echo(f"Running agent '{name}' with prompt: {prompt}")
     #_agents = init_agent_registry(auto_load=True)
     #gbot: BaseAgent = _agents.get_instance(name)
