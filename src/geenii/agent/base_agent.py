@@ -1,27 +1,33 @@
+import time
+import uuid
+from pathlib import Path
+
 import abc
 import asyncio
-from typing import Set, List, AsyncGenerator
 import logging
+import pydantic
+from datetime import datetime
+from typing import Set, List, AsyncGenerator
 
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT, BaseTask
 from geenii.bots import BotInterface
 from geenii.chat_models import ContentPart, TextContent
-from geenii.config import DEFAULT_COMPLETION_MODEL
+from geenii.config import DEFAULT_COMPLETION_MODEL, CACHE_DIR
 from geenii.datamodels import ModelMessage
 from geenii.hitl import HumanInTheLoopController, NoHumanInTheLoopController
 from geenii.memory import ChatMemory
 from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry
+from geenii.utils.json_util import append_jsonl
 
 logger = logging.getLogger(__name__)
 
 class BaseAgent(BotInterface, abc.ABC):
-    MAX_TASKS = 10  # maximum number of tasks to process in the queue to prevent infinite loops
+    MAX_TASKS = 15  # maximum number of tasks to process in the queue to prevent infinite loops
 
     def __init__(self, name, model: str = None, system_prompt: str = None, description: str = None,
                  tool_registry: ToolRegistry = None, skill_registry: SkillRegistry = None,
-                 allowed_tools: Set[str] = None,
-                 mcp_servers: Set[str] = None,
+                 allowed_tools: Set[str] = None, mcp_servers: Set[str] = None,
                  context_id: str = None, memory: ChatMemory = None, hitl: HumanInTheLoopController = None):
 
         self.name = name
@@ -31,7 +37,7 @@ class BaseAgent(BotInterface, abc.ABC):
         self.developer_prompt = ""
         self.message_history: List[ModelMessage] = []
         self.memory = memory or None
-        self.context_id = context_id or None
+        self.context_id = context_id or uuid.uuid4().hex
         self.allowed_tools: Set[str] = allowed_tools or set()
         self.mcp_servers: Set[str] = mcp_servers or set()
         self.selected_skill: str | None = None
@@ -44,6 +50,24 @@ class BaseAgent(BotInterface, abc.ABC):
 
     def __repr__(self):
         return f"Agent(name={self.name}, context_id={self.context_id}, model={self.model}, tools={self.allowed_tools}, skills={self.skills.names()})"
+
+    def to_dict(self) -> dict:
+        return {
+            "context_id": self.context_id,
+            "name": self.name,
+            "description": self.description,
+            "model": self.model,
+            "system_prompt": self.system_prompt,
+            "developer_prompt": self.developer_prompt,
+            #"message_history": self.message_history,
+            "message_count": len(self.message_history),
+            "allowed_tools": list(self.allowed_tools),
+            "mcp_servers": list(self.mcp_servers),
+            "selected_skill": self.selected_skill,
+            "hitl_class": self._hitl.__class__.__name__,
+            "skills": list(self.skills.names()),
+            "tools": list(self.tools.list_tool_names())
+        }
 
     def about_me(self):
         """Returns information about the agent, and it's configured tools and skills"""
@@ -105,6 +129,8 @@ class BaseAgent(BotInterface, abc.ABC):
         # await self._tasks.put(LLMTask(self, message=message))
         # await self._tasks.put(FindBestAgentTask(self, prompt=message_to_prompt(message)))
         await self._initialize()
+        _agent_log(self.name, self.context_id,"agent.init", self.to_dict())
+        _agent_log(self.name, self.context_id, "agent.prompt", {"message": message})
         await self._handle_prompt(message)
 
         # process the queue and yield messages
@@ -125,17 +151,25 @@ class BaseAgent(BotInterface, abc.ABC):
         Exits when the queue is empty.
         """
         i = 0
-        while self._tasks.qsize() > 0 and i < self.MAX_TASKS:
-            task = await self._tasks.get()
+        while self._tasks.qsize() > 0:
             i += 1
-            logger.info(f"Task #{i} {task.__class__.__name__} started. Queue size: {self._tasks.qsize()}")
             try:
+                if i >= self.MAX_TASKS:
+                    raise RuntimeError(f"Maximum number of tasks reached: {self.MAX_TASKS}")
+
+                task = await self._tasks.get()
+                logger.info(
+                    f"Task #{i}/{self._tasks.qsize()} {task.__class__.__name__} started."
+                )
+                _agent_log(self.name, self.context_id, "agent.task", {"i": i, "task": task.__class__.__name__})
                 if isinstance(task, BaseTask):
                     async for result in task.execute():
                         # parse task results
                         if result is None:
                             continue
                         if isinstance(result, ModelMessage):
+                            #_agent_log(self.name, "agent.task_result", {"i": i, "task": result.__class__.__name__, "result": result})
+                            _agent_log(self.name, self.context_id, "agent.task_result", result)
                             yield result
                         elif isinstance(result, BaseTask):
                             # if the task yields another task, we enqueue it
@@ -155,11 +189,14 @@ class BaseAgent(BotInterface, abc.ABC):
             finally:
                 self._tasks.task_done()
 
+
     async def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
         """
         This method can be overridden to implement custom logic for approving or rejecting tool execution requests.
         By default, it approves all tool execution requests.
         """
+        _agent_log(self.name, self.context_id, "agent.request_tool_execution",
+                   {"tool_name": tool_name, "arguments": arguments, "call_id": call_id})
         if self._hitl:
             return await self._hitl.request_tool_execution(tool_name, arguments, call_id)
         return True
@@ -169,6 +206,7 @@ class BaseAgent(BotInterface, abc.ABC):
         Load a skill by name and add its tools to the agent's available tools.
         """
         logger.warning(f"Using deprecated method Agent.load_skill(). Use 'Agent.skills.load({skill_name})' instead.")
+        _agent_log(self.name, self.context_id, "agent.load_skill", {"skill_name": skill_name})
         self.skills.load(skill_name)
 
     def unload_skill(self, skill_name: str):
@@ -177,8 +215,21 @@ class BaseAgent(BotInterface, abc.ABC):
         """
         logger.warning(
             f"Using deprecated method Agent.unload_skill(). Use 'Agent.skills.unload({skill_name})' instead.")
+        _agent_log(self.name, self.context_id, "agent.unload_skill", {"skill_name": skill_name})
         self.skills.unload(skill_name)
 
     def add_to_history(self, msg: ModelMessage):
         self.message_history.append(msg)
         #todo self.memory.append(msg)
+
+
+
+def _agent_log(agent_name: str, context_id: str, event_name: str, data: dict | pydantic.BaseModel):
+    date_formatted = datetime.now().strftime("%Y-%m-%d")
+    #log_file = f"{CACHE_DIR}/logs/{agent_name}/logs/{agent_name}-{date_formatted}.log"
+    log_file = f"{CACHE_DIR}/logs/{agent_name}-{date_formatted}.log"
+    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(data, pydantic.BaseModel):
+        data = data.model_dump(mode="json")
+    append_jsonl(log_file, {"agent": agent_name, "context_id": context_id, "event": event_name,
+                            "data": data, "timestamp": datetime.now().timestamp()})
