@@ -41,6 +41,10 @@ class ToolCallTask(BaseAgentTask):
         call_id = self.call_id
         selected_skill = self.agent.selected_skill
 
+        tool = self.agent.tools.get(tool_name)
+        if tool is None:
+            raise ValueError(f"Tool {tool_name!r} is not registered")
+
         # yield a message, requesting approval for the tool call before executing it
         tool_usage_request_message = ModelMessage(
             role="assistant",
@@ -81,23 +85,19 @@ class ToolCallTask(BaseAgentTask):
         logger.info(f"Calling tool {tool_name} with arguments {arguments}")
         try:
             # tool_result = await execute_tool_call(self.agent.tools, tool_name=tool_name, args=arguments)
-            tool = self.agent.tools.get(tool_name)
-            if tool is None:
-                raise ValueError(f"Tool {tool_name!r} is not registered")
-            # logger.info(f'EXECUTING TOOL "{tool_name}" with args {arguments}')
 
-            tool_env = {
-                "SKILL_NAME": selected_skill or "",
-                "SKILL_DIR": f"{self.agent.skills.get(selected_skill).path}"
-                if selected_skill
-                else "",
-                "SCRIPT_DIR": f"{self.agent.skills.get(selected_skill).path}/scripts"
-                if selected_skill
-                else "",
-            }
+            tool_env = {}
+            if selected_skill:
+                tool_env.update(
+                    {
+                        "SKILL_NAME": selected_skill,
+                        "SKILL_DIR": f"{self.agent.skills.get(selected_skill).path}",
+                        "SCRIPT_DIR": f"{self.agent.skills.get(selected_skill).path}/scripts",
+                    }
+                )
             tool_result = await tool.invoke(args=arguments, env=tool_env)
 
-            logger.info(f"Tool {tool_name} returned result: {tool_result}")
+            logger.debug(f"Tool {tool_name} returned result: {tool_result}")
         except Exception as e:
             logger.exception(f"Error executing tool {tool_name}", exc_info=e)
             tool_result = {"error": str(e)}

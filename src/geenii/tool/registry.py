@@ -26,7 +26,7 @@ class ToolRegistry:
         if tool.name in self._tools:
             raise ValueError(f"Tool {tool.name!r} is already registered")
         self._tools[tool.name] = tool
-        logger.info("registered tool %r (%s)", tool.name, tool.__class__.__name__)
+        logger.info("Registered tool %r (%s)", tool.name, tool.__class__.__name__)
 
     def register_function(
         self,
@@ -91,7 +91,7 @@ class ToolRegistry:
         """
 
         def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
-            logger.info(f"Registering tool {name or fn.__name__!r} from function {fn.__module__}.{fn.__qualname__}")
+            logger.debug(f"Registering tool {name or fn.__name__!r} via fn decorator {fn.__module__}.{fn.__qualname__}")
             self.register_function(fn, name=name, description=description, parameters=parameters)
             return fn
 

@@ -5,11 +5,11 @@ import click
 from geenii.ai import generate_completion, generate_chat_completion_deprecated
 from geenii.chat_models import TextContent
 from geenii.config import DEFAULT_COMPLETION_MODEL
-from geenii.core.tools import execute_command
 from geenii.datamodels import ModelMessage
 from geenii.tool.registry import ToolRegistry
 from geenii.tool.python import PythonFunctionTool
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
+from geenii.tools import init_builtin_tools
 
 
 @click.group()
@@ -50,11 +50,8 @@ def chat(model, temperature, output_format, prompt):
     memory.append(ModelMessage(role="user", content=[TextContent(text="I love to eat sushi"), ]))
 
     tool_registry = ToolRegistry()
-    tool_registry.register(PythonFunctionTool(name="execute_command",
-                                              description="Execute a shell command on the user's computer and return the output.",
-                                              parameters={"command": {"type": "string",
-                                                              "description": "The shell command to execute."}},
-                                              handler=execute_command))
+    init_builtin_tools(tool_registry)
+    
     tool_registry.register(
         PythonFunctionTool(name="get_weather", description="Get the weather from the given location.",
                            parameters={"location": {"type": "string"}},
@@ -72,7 +69,7 @@ def chat(model, temperature, output_format, prompt):
                                                        system=DEFAULT_AGENT_SYSTEM_PROMPT,
                                                        messages=memory,
                                                        tool_registry=tool_registry,
-                                                       tools={"get_weather", "execute_command"},
+                                                       tools={"get_weather", "bash"},
                                                        temperature=temperature,
                                                        output_format=output_format)
         # print the assistant response

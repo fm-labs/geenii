@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from geenii.core.tools import display_desktop_notification
+from geenii.core.tools import init_core_tools
 from geenii.mcp_helper import get_mcp_config, McpClient
 from geenii.tool.registry import ToolRegistry
 from geenii.tool.computer import ComputerTool
@@ -11,7 +11,7 @@ from geenii.utils.cached import cached
 
 def init_builtin_tools(registry: ToolRegistry):
     registry.register(ComputerTool(
-        name="execute_command",
+        name="bash",
         description="Execute a shell command on the local machine and return its output.",
         parameters={
             "type": "object",
@@ -22,17 +22,18 @@ def init_builtin_tools(registry: ToolRegistry):
         },
     ))
     registry.register(ComputerTool(
-        name="execute_python",
+        name="python",
         description="Execute a python script and return its output.",
         parameters={
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "The python command to execute. The command should be a single string, e.g. 'python3 script.py'."}
+                "command": {"type": "string", "description": "The python command to execute without the binary name, e.g. '-m mymodule script.py'."}
             },
             "required": ["command"]
         },
     ))
-    registry.register_function(display_desktop_notification)
+    #registry.register_function(display_desktop_notification)
+    init_core_tools(registry)
 
 @cached(ttl=3600)
 async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:

@@ -41,23 +41,22 @@ class ComputerTool(Tool):
 
         # run the command in a thread to avoid blocking the event loop
         result = await asyncio.to_thread(self.run_subprocess, command, env)
-        logger.info(f"Command result: {result}")
+        #logger.debug(f"Command result: {result}")
         return result
 
 
     def run_subprocess(self, command: str, env: dict[str, str] | None) -> str:
         subprocess_id = uuid.uuid4().hex[:8]
-        logger.info(f"[{subprocess_id}] Spawn subprocess with command={command} environment={env}")
         _command = shlex.split(command)
-        print(_command)
+        logger.info(f"Subpress [{subprocess_id}] Spawning command={_command} environment={env}")
 
         _env = os.environ.copy()
         if env:
             _env.update(env)
         _result = subprocess.run(_command, shell=False, capture_output=True, text=True, env=_env, cwd=None)
-        logger.info(f"[{subprocess_id}] Return code: {_result.returncode}")
-        logger.info(f"[{subprocess_id}] Standard output: {_result.stdout}")
-        logger.info(f"[{subprocess_id}] Standard error: {_result.stderr}")
+        logger.info(f"Subprocess [{subprocess_id}] Return code: {_result.returncode}")
+        logger.info(f"Subprocess [{subprocess_id}] Standard output: {_result.stdout}")
+        logger.info(f"Subprocess [{subprocess_id}] Standard error: {_result.stderr}")
         _output = _result.stdout.strip()
         if _result.returncode != 0:
             _output += f"EXITED WITH NON-ZERO EXIT CODE: { _result.returncode}" + _result.stderr.strip()

@@ -47,7 +47,7 @@ class SimpleBot(BotInterface):
         try:
             model_id = "ollama:qwen3:8b"
             system_prompt = "You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer."
-            tools = {"get_weather", "execute_command", "file_read"}
+            tools = {"get_weather", "bash", "file_read"}
 
             if isinstance(message, str):
                 prompt = message
