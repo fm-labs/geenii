@@ -3,10 +3,14 @@ from __future__ import annotations
 import asyncio
 
 from geenii.core.tools import init_core_tools
+from geenii.core.process_tools import init_process_tools
 from geenii.mcp_helper import get_mcp_config, McpClient
+from geenii.pm.process_manager_client import ProcessManagerClient
 from geenii.tool.registry import ToolRegistry
 from geenii.tool.computer import ComputerTool
 from geenii.utils.cached import cached
+
+_pm_client = ProcessManagerClient()
 
 
 def init_builtin_tools(registry: ToolRegistry):
@@ -34,6 +38,7 @@ def init_builtin_tools(registry: ToolRegistry):
     ))
     #registry.register_function(display_desktop_notification)
     init_core_tools(registry)
+    #init_process_tools(registry, _pm_client)
 
 @cached(ttl=3600)
 async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:

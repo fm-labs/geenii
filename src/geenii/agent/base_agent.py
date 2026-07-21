@@ -12,7 +12,6 @@ from geenii.hitl import HumanInTheLoopController, NoHumanInTheLoopController
 from geenii.memory import ChatMemory
 from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry
-from geenii.tools import init_builtin_tools, init_mcp_server_tools
 
 logger = logging.getLogger(__name__)
 
@@ -77,21 +76,22 @@ class BaseAgent(BotInterface, abc.ABC):
         if self._initialized:
             return
 
-        init_builtin_tools(self._tool_registry)
-        if self.mcp_servers:
-            await init_mcp_server_tools(self._tool_registry, self.mcp_servers)
-
-        #self._tool_registry.register_function(self.about_me, name="about_me")
-        #self.allowed_tools.add("about_me")
-
-        # check if all allowed tools are available
-        _allowed_tools = set()
-        for tool_name in self.allowed_tools:
-            if not self.tools.has(tool_name):
-                logging.warning(f"Tool {tool_name} not found in tools registry")
-                continue
-            _allowed_tools.add(tool_name)
-        self.allowed_tools = _allowed_tools
+        # init_builtin_tools(self._tool_registry)
+        # init_process_tools(self._tool_registry)
+        # if self.mcp_servers:
+        #     await init_mcp_server_tools(self._tool_registry, self.mcp_servers)
+        #
+        # #self._tool_registry.register_function(self.about_me, name="about_me")
+        # #self.allowed_tools.add("about_me")
+        #
+        # # check if all allowed tools are available
+        # _allowed_tools = set()
+        # for tool_name in self.allowed_tools:
+        #     if not self.tools.has(tool_name):
+        #         logging.warning(f"Tool {tool_name} not found in tools registry")
+        #         continue
+        #     _allowed_tools.add(tool_name)
+        # self.allowed_tools = _allowed_tools
 
         self._initialized = True
 

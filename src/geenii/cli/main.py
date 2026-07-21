@@ -1,16 +1,19 @@
-import click
 import logging
+import os
+
+import click
 
 from geenii.cli.agent_cli import agent_cli, agent_run
 from geenii.cli.agents_cli import agents as agents_cli
 from geenii.cli.info_cli import info as info_cli
 from geenii.cli.models_cli import models as models_cli
 from geenii.cli.mcp_cli import mcp as mcp_cli
+from geenii.cli.pm_cli import pm as pm_cli
 from geenii.cli.scheduler_cli import scheduler as scheduler_cli
 from geenii.cli.skills_cli import skills as skills_cli
 from geenii.cli.tools_cli import tools as tools_cli
 from geenii import config
-from geenii.config import APP_VERSION
+from geenii.config import APP_VERSION, CACHE_DIR
 from geenii.logs import init_logging
 
 init_logging()
@@ -99,11 +102,13 @@ geecli.add_command(models_cli)
 geecli.add_command(mcp_cli)
 geecli.add_command(tools_cli)
 geecli.add_command(skills_cli)
+geecli.add_command(pm_cli)
 geecli.add_command(scheduler_cli)
 
 
 def main():
     #init_app_directories()
+    os.makedirs(CACHE_DIR, exist_ok=True)
     geecli()
 
 
