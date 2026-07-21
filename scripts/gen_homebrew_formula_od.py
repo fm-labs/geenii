@@ -26,7 +26,7 @@ class {class_name} < Formula
 
       def install
         libexec.install Dir["*"]
-        bin.install_symlink libexec/"geenii"
+        bin.install_symlink libexec/"geenii"/"geenii"
       end
     end
     if Hardware::CPU.arm?
@@ -35,7 +35,7 @@ class {class_name} < Formula
 
       def install
         libexec.install Dir["*"]
-        bin.install_symlink libexec/"geenii"
+        bin.install_symlink libexec/"geenii"/"geenii"
       end
     end
   end
@@ -48,7 +48,7 @@ class {class_name} < Formula
 
         def install
           libexec.install Dir["*"]
-          bin.install_symlink libexec/"geenii"
+          bin.install_symlink libexec/"geenii"/"geenii"
         end
       end
     end
@@ -59,7 +59,7 @@ class {class_name} < Formula
 
         def install
           libexec.install Dir["*"]
-          bin.install_symlink libexec/"geenii"
+          bin.install_symlink libexec/"geenii"/"geenii"
         end
       end
     end
