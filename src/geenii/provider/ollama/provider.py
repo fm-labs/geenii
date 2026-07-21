@@ -163,7 +163,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             openai_tools = [tool_def for tool_def in tool_defs if tool_def['name'] in tools]
             # print("Mapped OpenAI tools:", openai_tools)
             ollama_tools = [map_openai_tool_to_ollama(tool_def) for tool_def in openai_tools]
-            logger.info(
+            logger.debug(
                 f"Mapped {len(openai_tools)} tools to Ollama format, {[tool['function']['name'] for tool in ollama_tools]}")
             # print("Mapped tools:", ollama_tools)
 
@@ -187,7 +187,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         #     })
 
         # message history
-        logger.info(f"Input messages provided {len(request.messages) if request.messages else 0}")
+        logger.debug(f"Input messages provided {len(request.messages) if request.messages else 0}")
         #print(request.messages)
         if request.messages:
             input_messages.extend(model_messages_to_ollama_format(request.messages))
@@ -202,7 +202,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             raise ValueError("At least a prompt or some messages must be provided for chat completion.")
 
         try:
-            logger.info(input_messages)
+            logger.debug(input_messages)
             output_format = request.output_format or None
             output_schema = request.output_schema or None
 
@@ -255,13 +255,13 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             # Thinking process
             thinking_content = message.get('thinking', None)
             if thinking_content:
-                logger.info("Thinking content found in the model response.")
+                logger.debug("Thinking content found in the model response.")
                 # output_parts.append(TextContent(text=f"[Thinking]: {thinking_content}"))
 
             # TEXT contents
             content = message.get('content')
             if content:
-                logger.info("Text Content found in the message len=%d", len(content))
+                logger.debug("Text Content found in the message len=%d", len(content))
                 _out_part = TextContent(text=content)
                 if output_format == 'json':
                     try:
@@ -273,7 +273,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                     # Optimistic JSON parsing
                     # If the content looks like JSON, try to parse it
                     if isinstance(content, str) and content.strip().startswith("{") and content.strip().endswith("}"):
-                        logger.info("Looks like the content is JSON, trying to parse it.")
+                        logger.debug("Looks like the content is JSON, trying to parse it.")
                         try:
                             json_data = json.loads(content)
                             _out_part = JsonContent(data=json_data)
@@ -285,7 +285,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             # IMAGE content
             images = message.get('images', [])
             if images:
-                logger.info(f"{len(images)} image(s) found in the message.")
+                logger.debug(f"{len(images)} image(s) found in the message.")
                 for image in images:
                     output_parts.append(TextContent(text="[Image content not supported yet]"))
                     # todo output_parts.append(ImageContent(image=image))
@@ -304,7 +304,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                     arguments = function.get('arguments', {})
                     call_id = 'xcall_' + uuid.uuid4().hex  # Reference ID for this function call
                     output_parts.append(ToolCallContent(name=name, arguments=arguments, call_id=call_id))
-                    logger.info(f"Tool call requested: {name} with arguments {arguments} and call_id {call_id}")
+                    logger.debug(f"Tool call requested: {name} with arguments {arguments} and call_id {call_id}")
 
             # Usage and performance metrics
             usage = {
@@ -319,7 +319,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             logger.info(
                 f"Tokens used in this chat completion: {usage['total_tokens']}, processing time: {usage['total_duration']} ms")
 
-            logger.info("OLLAMA: Chat completion generated with %d output parts", len(output_parts))
+            logger.debug("OLLAMA: Chat completion generated with %d output parts", len(output_parts))
             # todo remove prompt from response
             response = ChatCompletionResponse(
                 id=uuid.uuid4().hex,

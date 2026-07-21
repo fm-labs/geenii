@@ -165,7 +165,7 @@ class LLMTask(BaseAgentTask):
 
         response = await asyncio.to_thread(self._request_completion, request)
         logger.info(
-            f"Received model response for prompt '{prompt}' with {len(response.output)} content parts."
+            f"Received model response with {len(response.output)} content parts."
         )
 
         # yield all message from parse_response
@@ -195,18 +195,19 @@ class LLMTask(BaseAgentTask):
                 for content in response.output
                 if isinstance(content, ToolCallContent)
             ]
-            logger.warning(
-                f"Detected {len(tool_call_contents)} tool calls in the model response."
-            )
             if len(tool_call_contents) < 1:
                 if tools_called == 0:
-                    logger.info(
+                    logger.debug(
                         "No tool calls detected in the model response. Proceeding to yield the final response."
                     )
 
                 bot_message = ModelMessage(role="assistant", content=response.output)
                 yield bot_message
                 break  # no tool calls, we can proceed without re-generating the response.
+
+            logger.debug(
+                f"Detected {len(tool_call_contents)} tool calls in the model response."
+            )
 
             if tools_called >= self.MAX_TOOL_CALLS:
                 logger.error(
@@ -288,7 +289,7 @@ class LLMTask(BaseAgentTask):
                 #request.tools = set()
                 response2 = await asyncio.to_thread(self._request_completion, request)
                 logger.info(
-                    f"Received model response for prompt '{prompt}' after tool calls with {len(response2.output)} content parts."
+                    f"Received model response after tool calls with {len(response2.output)} content parts."
                 )
 
                 # recursively handle response with tool calls

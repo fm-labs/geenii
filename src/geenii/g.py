@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
+from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
 from geenii.agent.registry import AgentRegistry, AgentSpec, init_agent
 
 if TYPE_CHECKING:
@@ -72,6 +73,8 @@ def init_agent_by_name(name: str) -> BaseAgent:
     """Load an agent configuration from a markdown file and create an Agent instance."""
     md_file_path = locate_agent_md_file(name)
     if md_file_path is None:
+        if name == "default":
+            return init_default_agent()
         raise ValueError(f"Agent '{name}' not found.")
 
     try:
@@ -80,6 +83,17 @@ def init_agent_by_name(name: str) -> BaseAgent:
     except Exception as e:
         raise e
 
+def init_default_agent() -> BaseAgent:
+    try:
+        agent_conf = AgentSpec(
+            name="default",
+            class_name="geenii.agents.RoutingAgent",
+            model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
+            system=DEFAULT_AGENT_SYSTEM_PROMPT,
+        )
+        return init_agent(agent_conf)
+    except Exception as e:
+        raise e
 
 def init_global_skill_registry() -> SkillRegistry:
     skill_reg = SkillRegistry()

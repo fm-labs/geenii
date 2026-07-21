@@ -67,6 +67,9 @@ class AgentSpec(pydantic.BaseModel):
 
 
 def init_agent(agent_conf: AgentSpec) -> BaseAgent:
+    # todo check model provider configuration
+    # todo check model availability
+
     tool_registry = ToolRegistry()
     # init_builtin_tools(tool_registry)
     # init_mcp_server_tools_sync(tool_registry)
