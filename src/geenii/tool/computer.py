@@ -8,6 +8,7 @@ import uuid
 import asyncio
 from typing import Any
 
+from geenii import config
 from geenii.tool.common import Tool, expand_vars
 
 logger = logging.getLogger(__name__)
@@ -39,21 +40,23 @@ class ComputerTool(Tool):
         # expand environment variables in the command
         command = expand_vars(command, env or {})
 
+        working_dir = config.GEENII_WORKING_DIR
+
         # run the command in a thread to avoid blocking the event loop
-        result = await asyncio.to_thread(self.run_subprocess, command, env)
+        result = await asyncio.to_thread(self.run_subprocess, command, env, working_dir)
         #logger.debug(f"Command result: {result}")
         return result
 
 
-    def run_subprocess(self, command: str, env: dict[str, str] | None) -> str:
+    def run_subprocess(self, command: str, env: dict[str, str] | None, cwd=None) -> str:
         subprocess_id = uuid.uuid4().hex[:8]
         _command = shlex.split(command)
-        logger.info(f"Subpress [{subprocess_id}] Spawning command={_command} environment={env}")
+        logger.info(f"Subprocess [{subprocess_id}] Spawning command={_command} environment={env} cwd={cwd}")
 
         _env = os.environ.copy()
         if env:
             _env.update(env)
-        _result = subprocess.run(_command, shell=False, capture_output=True, text=True, env=_env, cwd=None)
+        _result = subprocess.run(command, shell=True, capture_output=True, text=True, env=_env, cwd=cwd)
         logger.info(f"Subprocess [{subprocess_id}] Return code: {_result.returncode}")
         logger.info(f"Subprocess [{subprocess_id}] Standard output: {_result.stdout}")
         logger.info(f"Subprocess [{subprocess_id}] Standard error: {_result.stderr}")
