@@ -55,13 +55,10 @@ jobs:
 #          fi
 
       - name: Build
-        env:
-          TAG: ${{ github.ref_name }}
         run: |
           ./build_od.sh
           cp README.md LICENSE dist/
-          
-          TARBALL="geenii-${{ matrix.arch_tag }}-$TAG.tar.gz"
+          TARBALL="geenii-${{ matrix.arch_tag }}-${{ github.ref_name }}.tar.gz"
           tar -czvf "$TARBALL" -C dist .
           if command -v sha256sum &>/dev/null; then
             sha256sum "$TARBALL" > "$TARBALL.sha256"
@@ -74,8 +71,8 @@ jobs:
         with:
           name: geenii-${{ matrix.arch_tag }}
           path: |
-            geenii-${{ matrix.arch_tag }}-$TAG.tar.gz
-            geenii-${{ matrix.arch_tag }}-$TAG.tar.gz.sha256
+            geenii-${{ matrix.arch_tag }}-${{ github.ref_name }}.tar.gz
+            geenii-${{ matrix.arch_tag }}-${{ github.ref_name }}.tar.gz.sha256
 
   release:
     name: Create GitHub Release
