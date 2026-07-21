@@ -120,7 +120,9 @@ class ToolCallTask(BaseAgentTask):
 class LLMTask(BaseAgentTask):
     """Generate LLM chat completion response in the current context. Handles tool calls"""
 
-    MAX_TOOL_CALLS = 5  # to prevent infinite loops of tool calls
+    MAX_TOOL_CALLS = 10  # to prevent infinite loops of tool calls
+    MAX_MESSAGE_HISTORY = 20
+    MAX_RECURSION = 10
 
     def __init__(
         self,
@@ -144,7 +146,7 @@ class LLMTask(BaseAgentTask):
         prompt = message_to_prompt(self.message)
         allowed_tools = self.allowed_tools
         # message history (max 10 messages)
-        input_messages = list(self.agent.message_history[-10:])
+        input_messages = list(self.agent.message_history[-self.MAX_MESSAGE_HISTORY:])
 
         # run sync task in thread pool to avoid blocking the event loop while waiting for the response
         request = ChatCompletionRequest(
@@ -182,9 +184,9 @@ class LLMTask(BaseAgentTask):
         #print("_handle_response_with_tool_calls", response.output)
 
         # recursion breaker
-        if i >= 10:
+        if i >= self.MAX_RECURSION:
             logger.warning(
-                "Too many tool calls detected in the model response."
+                "Too many tool call recursion detected."
             )
             bot_message = ModelMessage(role="assistant", content=response.output)
             yield bot_message
@@ -282,12 +284,12 @@ class LLMTask(BaseAgentTask):
             if tools_called > 0:
                 # now that every tool call has been executed, re-generate the response based on the
                 # original prompt and the updated message history that includes all tool results
-                request.prompt = ("Original prompt: " + request.prompt
-                                  + "Based on the tool call results proceed with the request.")
+                #request.prompt = ("Original prompt: " + request.prompt
+                #                  + "Based on the tool call results proceed with the request.")
                 # snapshot of the updated message history
                 # todo dynamically adjust the history window or use compaction
                 request.messages = list(
-                    self.agent.message_history[-10:]
+                    self.agent.message_history[-self.MAX_MESSAGE_HISTORY:]
                 )
                 #request.tools = set()
                 response2 = await asyncio.to_thread(self._request_completion, request)
