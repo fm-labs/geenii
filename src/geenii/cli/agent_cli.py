@@ -46,19 +46,30 @@ def agent_cli(prompt: str, name: str, interactive: bool, skills: str, tools: str
             prompt = stdin_str
 
     if prompt is None or len(prompt) < 1:
-        #click.echo("Please provide a prompt.")
-        #return
-        prompt = click.prompt(text="Please enter a prompt", type=str, default="No prompt")
+        prompt = ""
+        if interactive:
+            prompt = click.prompt(text="Please enter a prompt", type=str, default="No prompt")
 
     agent_run(prompt=prompt, name=name, interactive=interactive, skills=skills, tools=tools, model=model, model_parameters=model_parameters,
               system_instructions=system_instructions, developer_instructions=developer_instructions, output_format=output_format, conv_id=conv_id)
 
 
-def agent_run(prompt: str, name: str, interactive: bool, skills: str, tools: str, model: str, model_parameters: str,
-              system_instructions: str, developer_instructions: str, output_format: str, conv_id: str):
+def agent_run(prompt: str = "", name: str = "default", interactive: bool = False, skills: str = "", tools: str = "", model: str = "",
+              model_parameters: str = "", system_instructions: str = "", developer_instructions: str = "",
+              output_format: str = "text", conv_id: str = None):
     click.echo(f"Running agent '{name}' with prompt: {prompt}")
     #_agents = init_agent_registry(auto_load=True)
     #gbot: BaseAgent = _agents.get_instance(name)
+
+    # if prompt is not None:
+    #     prompt = prompt.strip()
+    #     if prompt.startswith("@"):
+    #         prompt = prompt[1:]
+    #         agent_name, prompt = prompt.split(" ", maxsplit=1)
+    #         if agent_name != name:
+    #             click.echo(f"Overriding agent '{name}' to '{agent_name}'")
+    #             name = agent_name
+
     gbot: BaseAgent = init_agent_by_name(name)
     if not gbot:
         click.echo(f"Agent '{name}' not found. Please check the available agents with 'geenii agents list'.")
@@ -79,6 +90,7 @@ def agent_run(prompt: str, name: str, interactive: bool, skills: str, tools: str
         gbot.developer_prompt = developer_instructions
     if tools:
         tool_names = [tool.strip() for tool in tools.split(",")]
+        click.echo(f"Tool names: {tool_names}")
         gbot.allowed_tools = set(tool_names)
     if skills:
         gbot.skills.load(skills)
@@ -90,4 +102,5 @@ def agent_run(prompt: str, name: str, interactive: bool, skills: str, tools: str
     #if conv_id:
     #    gbot.conv_id = conv_id
 
+    logger.info(f"Agent '{name}' loaded. {repr(gbot)}")
     CliAgentRunner(gbot, interactive=interactive).run(prompt)

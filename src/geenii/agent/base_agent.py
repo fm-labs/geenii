@@ -111,6 +111,7 @@ class BaseAgent(BotInterface, abc.ABC):
         async for msg in self._process_queue():
             yield msg
 
+
     @abc.abstractmethod
     async def _handle_prompt(self, message: str | list[ContentPart]):
         """Handle an incoming prompt message by enqueuing an LLM task to generate a response."""

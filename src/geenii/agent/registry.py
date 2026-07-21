@@ -155,7 +155,7 @@ class AgentRegistry:
             try:
                 agent_conf = AgentSpec.from_md_file(config_path)
                 self._agent_configs[agent_conf.name] = agent_conf
-                logger.info(f"Agent config '{agent_conf.name}' loaded from file '{config_path}'.")
+                logger.debug(f"Agent config '{agent_conf.name}' loaded from file '{config_path}'.")
             except Exception as e:
                 logger.error(f"Error loading agent from config file '{config_path}': {str(e)}", exc_info=e)
         else:
@@ -169,10 +169,10 @@ class AgentRegistry:
         for item in base_path.iterdir():
             if item.is_file() and item.name.endswith(".md"):
                 file_path = Path(base_path / item.name)
-                #logger.info(f"Agent MD found at '{file_path}'")
+                #logger.debug(f"Agent MD found at '{file_path}'")
                 try:
                     agent_conf = AgentSpec.from_md_file(str(file_path))
                     self._agent_configs[agent_conf.name] = agent_conf
-                    logger.info(f"Agent config '{agent_conf.name}' loaded from file '{file_path}'.")
+                    logger.debug(f"Agent config '{agent_conf.name}' loaded from file '{file_path}'.")
                 except Exception as e:
                     logger.error(f"Error loading agent from config: {str(e)}", exc_info=e)
