@@ -96,7 +96,7 @@ geenii agent "What is the capital of France?"
 geenii agent -m "openai:gpt-4o-mini" "What is the capital of France?"
 
 # tools + skill
-geenii agent -t "execute_command" -s "macos" "List all files in my Downloads folder"
+geenii agent -t "bash" -s "macos" "List all files in my Downloads folder"
 
 # a configured agent, interactively
 geenii agent -n fm4-track-checker -i "What's playing right now?"

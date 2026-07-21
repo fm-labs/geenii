@@ -17,7 +17,7 @@ model: ollama:qwen3:8b
 skills:
   - fm4-skills
 tools:
-  - execute_python
+  - python
   - display_desktop_notification
 ---
 

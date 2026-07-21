@@ -17,6 +17,7 @@ All tools subclass `Tool` (`geenii/tool/common.py`), which carries `name`,
 | `ComputerTool` | `computer` | Runs a shell command via `subprocess` (no shell interpretation; the command string is `shlex`-split). Supports an optional `command_template` |
 | `AppleScriptTool` | `computer` | `ComputerTool` with an `osascript -e '{command}'` template (macOS) |
 | `PythonCliTool` | `python` | Like `ComputerTool`, intended for running Python scripts |
+| `SandboxTool` | `sandbox` | Runs a command inside a Docker container with security hardening (see [sandbox.md](sandbox.md)) |
 | `McpTool` | `mcp_tool` | Forwards the call to an MCP server via fastmcp |
 
 `Tool` also provides definition mappers: `to_definition()` (internal/OpenAI
@@ -28,13 +29,15 @@ Registered by `init_builtin_tools()` (`geenii/tools.py`) on every agent:
 
 | Name | Type | Description |
 |---|---|---|
-| `execute_command` | ComputerTool | Run a single-line shell command on the local machine |
-| `execute_python` | ComputerTool | Run a python command line (e.g. `python3 script.py`) — note: this executes an arbitrary command, same mechanics as `execute_command` |
+| `bash` | ComputerTool | Run a single-line shell command on the local machine |
+| `python` | ComputerTool | Run a python command line (e.g. `python3 script.py`) — note: this executes an arbitrary command, same mechanics as `bash` |
+| `sandbox_python` | SandboxTool | Run a Python command in a Docker sandbox (requires a selected skill) |
+| `sandbox_bash` | SandboxTool | Run a shell command in a Docker sandbox (requires a selected skill) |
 | `display_desktop_notification` | PythonFunctionTool | Show a desktop notification (from `geenii/core/tools.py`) |
 
 `geenii/core/tools.py` additionally defines a module-level `geenii_tools`
 registry with decorator-registered utilities (`file_exists`, `file_read`,
-`file_write`, `execute_command`); apart from `display_desktop_notification`
+`file_write`, `bash`); apart from `display_desktop_notification`
 these are not wired into agents yet.
 
 ### Command execution details
@@ -48,7 +51,8 @@ these are not wired into agents yet.
   code are appended.
 - There is no allowlist/sandboxing policy yet; the HITL controller (see
   [agents.md](agents.md)) is the only gate. `geenii/sandbox.py` contains Docker
-  sandbox helpers that are not yet wired in.
+  sandbox helpers that are not yet wired into the tool pipeline — see
+  [sandbox.md](sandbox.md) for the full design and integration roadmap.
 
 ## MCP tools
 

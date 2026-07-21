@@ -8,6 +8,7 @@ It is organized around a small set of concepts:
 | **Provider** | Adapter for an LLM backend (Ollama, OpenAI, ...) | [providers.md](providers.md) |
 | **Agent** | A named configuration (model + instructions + tools + skills) plus a runtime that processes prompts through a task queue | [agents.md](agents.md) |
 | **Tool** | A callable the model can invoke: a Python function, a shell command, or an MCP server tool | [tools.md](tools.md) |
+| **Sandbox** | Docker-based isolation for running untrusted code in a container with restricted capabilities and resource limits | [sandbox.md](sandbox.md) |
 | **Skill** | A directory with a `SKILL.md` (Anthropic skill format) whose instructions are injected into the system prompt | [skills.md](skills.md) |
 | **Scheduler** | Cron-style runner that executes tasks (typically agent runs) from a JSON config | [scheduler.md](scheduler.md) |
 

@@ -102,7 +102,7 @@ geenii agent --model "ollama:qwen3:8b" "What is the capital of France?"
 
 # Enable tools and skills
 geenii agent --tools "websearch" "Search the web for the latest news on climate change."
-geenii agent --skills "math" --tools execute_python "Is 33311 a prime number?"
+geenii agent --skills "math" --tools python "Is 33311 a prime number?"
 geenii agent --tools "bash,applescript" --skills "macos" "Open Safari and navigate to https://www.google.com"
 ```
 

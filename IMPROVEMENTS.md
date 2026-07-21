@@ -83,10 +83,10 @@ roughly ordered by priority within each group. File references point at the rele
 - [ ] **`model_parameters`, `developer_prompt`, `output_format` overrides set attributes that
   `BaseAgent` doesn't define/use** — e.g. `gbot.model_parameters = ...` in the CLI has no
   effect on requests (`src/geenii/cli/agent.py`, `src/geenii/agent/base_agent.py`).
-- [ ] **Duplicate tool definitions** — `execute_command`/`execute_python` exist both as
+- [ ] **Duplicate tool definitions** — `bash`/`python` exist both as
   `ComputerTool`s in `src/geenii/tools.py` and as decorated functions in
   `src/geenii/core/tools.py` (separate registry). Consolidate into one module; note
-  `execute_python` is currently just a shell executor with a misleading name.
+  `python` is currently just a shell executor with a misleading name.
 - [x] **Duplicate helpers** — `split_model()` and `map_model_id()` are identical
   (`src/geenii/ai.py`, ~line 68-95). Keep one.
 - [ ] **`FindBestSkillTask` runs before every prompt** — even for agents without skills it costs
@@ -142,13 +142,13 @@ roughly ordered by priority within each group. File references point at the rele
 
 ## 7. Security & safety
 
-- [ ] **`execute_command` runs arbitrary shell commands with no policy** — the allowlist idea is
+- [ ] **`bash` runs arbitrary shell commands with no policy** — the allowlist idea is
   sketched but commented out (`src/geenii/core/tools.py`). Implement a tool-usage policy
   (allowlist/denylist, working-dir confinement) and default the HITL controller to a
   confirming implementation in interactive CLI runs (`CliHumanInTheLoopController` exists but
   is commented out in `src/geenii/cli/cli_runner.py`).
 - [ ] **Docker sandbox exists but is unused** — `src/geenii/sandbox.py` /
-  `run_docker_sandbox_python` could back `execute_python` for real isolation.
+  `run_docker_sandbox_python` could back `python` for real isolation.
 - [ ] **AI request/response logs may contain sensitive data** — `_ai_log()` writes full requests
   (incl. system prompts, tool results) to `CACHE_DIR/logs`; make this opt-in or redact.
 - [ ] **Skill install from URLs** — README promises `skills install <url>`; when implemented,

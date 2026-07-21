@@ -21,7 +21,7 @@ my-skill/
 ---
 name: fm4-skills
 description: Retrieve live track and show information from the FM4 radio station.
-allowed-tools: execute_python execute_command
+allowed-tools: python bash
 ---
 
 # FM4 skills
@@ -66,7 +66,7 @@ registering a duplicate name raises an error.
 3. **Prompt injection** — the selected skill's description and full `SKILL.md`
    body are appended to the system prompt of the subsequent `LLMTask`.
 4. **Script execution** — skills typically instruct the model to run their
-   scripts through the `execute_command` / `execute_python` tools. When a skill
+   scripts through the `bash` / `python` tools. When a skill
    is selected, tool invocations receive these variables (expanded inside the
    command string):
 
