@@ -49,6 +49,8 @@ Internals for contributors and library consumers.
   layout, request lifecycle, caching, and concurrency model.
 - **[Agents](developer-guide/agents.md)** — agent runtime, task queue, HITL
   controllers, and programmatic API.
+- **[Messages & Content Parts](developer-guide/messages.md)** — internal
+  message formats, content part types, and per-provider wire mappings.
 - **[Providers & Models](developer-guide/providers.md)** — provider interfaces,
   implemented providers, request/response models, and how to add a provider.
 - **[Tools](developer-guide/tools.md)** — tool types, built-ins, MCP server
@@ -59,3 +61,5 @@ Internals for contributors and library consumers.
   security model, SandboxTool API.
 - **[Memory](developer-guide/memory.md)** — ChatMemory abstraction and
   persistence implementations.
+- **[Building](developer-guide/building.md)** — dev setup, linting, testing,
+  build targets (wheel, PyInstaller, Docker), CI/CD, and releases.
