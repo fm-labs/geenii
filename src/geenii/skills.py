@@ -1,5 +1,6 @@
 import logging
 import os
+from functools import cached_property
 from pathlib import Path
 
 import pydantic
@@ -12,22 +13,20 @@ logger = logging.getLogger(__name__)
 
 
 class SkillSpec(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(ignored_types=(cached_property,))
+
     path: str
     name: str
     description: str
-    # instructions: str | None = None
     metadata: dict | None = pydantic.Field(default_factory=dict)
     allowed_tools: list[str] | None = pydantic.Field(default_factory=list)
 
-    @property
+    @cached_property
     def instructions(self) -> str:
-        """
-        The contents of the body of the skill markdown file, which can contain additional instructions or information about the skill.
-        """
         if not self.path:
             return ""
         _, body = read_frontmatter_file(self.path + "/SKILL.md")
-        return body
+        return body or ""
 
     @staticmethod
     def from_path(skill_path: Path | str):
