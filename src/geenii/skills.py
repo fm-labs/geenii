@@ -82,7 +82,9 @@ class SkillRegistry:
 
                 skill_dir = locate_skill_path(skill_name)
                 if not skill_dir:
-                    raise KeyError(f"Skill '{skill_name}' not found.")
+                    #raise KeyError(f"Skill '{skill_name}' not found.")
+                    logger.warning(f"Skill '{skill_name}' does not exist or is not a directory.")
+                    continue
                 skill = SkillSpec.from_path(skill_dir)
                 self.register(skill)
             except Exception as e:
