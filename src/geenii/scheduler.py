@@ -1,29 +1,26 @@
 """
-Simple cron-style task scheduler.
+Simple task scheduler.
 
-Reads task definitions from a JSON config file. Each task specifies a cron
-expression and a dot-separated Python module path to a function to execute.
+Reads task definitions from a JSON config file. Each task specifies an
+interval (cron expression or fixed datetime) and a command to execute.
 
-The scheduler runs in an asyncio event loop, calculates the next execution time for each task,
-and executes them at the scheduled times.
-
-Tasks can be added or removed at runtime. Thread-safe execution and error handling ensure the scheduler remains stable even if tasks fail.
-
-Config file format (tasks.json):
+Config file format (scheduler.json):
     {
         "tasks": [
             {
-                "name": "cleanup",
-                "cron": "0 * * * *",
-                "module": "geenii.tasks.cleanup",
-                "args": ["--force"],
-                "env": {"ENV_VAR": "value"},
-                "oneshot": false
+                "enabled": true,
+                "name": "geenii_cleanup",
+                "interval": "cron:0 * * * *",
+                "cmd": ["$GEENII_BIN", "tasks", "exec", "cleanup"],
+                "env": {"CLEANUP_DRY_RUN": "true"}
             }
         ]
     }
-"""
 
+Interval formats:
+    "cron:EXPRESSION"   – recurring cron schedule, e.g. "cron:*/5 * * * *"
+    "at:DATETIME"       – one-shot execution at an ISO datetime, e.g. "at:2026-07-21T18:00:00Z"
+"""
 from __future__ import annotations
 
 import asyncio
@@ -45,65 +42,67 @@ from croniter import croniter
 logger = logging.getLogger(__name__)
 
 
+def parse_interval(interval: str) -> tuple[str, str]:
+    """Parse an interval string into (kind, value). Raises ValueError on bad format."""
+    if interval.startswith("cron:"):
+        expr = interval[5:].strip()
+        if not croniter.is_valid(expr):
+            raise ValueError(f"Invalid cron expression: {expr}")
+        return "cron", expr
+    elif interval.startswith("at:"):
+        dt_str = interval[3:].strip()
+        datetime.fromisoformat(dt_str)
+        return "at", dt_str
+    else:
+        raise ValueError(f"Invalid interval format: {interval!r}. Must start with 'cron:' or 'at:'")
+
+
 @dataclass
 class ScheduledTask:
     """A single scheduled task."""
 
     name: str
-    at: datetime | None = None
-    cron: str | None = None
+    interval: str
     cmd: list[str] | None = None
     module: str = ""
     run_fn: Callable[[], Any] | None = field(default=None, repr=False)
-    oneshot: bool = False
     enabled: bool = True
     env: dict[str, str] | None = None
     working_dir: Path | None = None
 
-
     def load(self) -> None:
-        """Validate schedule and resolve execution target (cmd or module)."""
-        if self.at and self.cron:
-            raise ValueError("Task schedule cannot have both 'at' and 'cron' defined")
-        elif not self.at and not self.cron:
-            raise ValueError(f"Task '{self.name}' must have either 'at' or 'cron' defined")
-        elif self.at and self.oneshot is False:
-            logger.warning("Task scheduled with 'at' will be treated as oneshot")
-            self.oneshot = True
+        """Validate interval and resolve execution target (cmd or module)."""
+        parse_interval(self.interval)
 
         if self.cmd:
             return
-
         if self.run_fn is not None:
             return
-
         if self.module:
             parts = self.module.split(".")
             if len(parts) < 2:
-                raise ValueError(f"Module path '{self.module}' must include at least one dot to separate module and function")
+                raise ValueError(f"Module path '{self.module}' must include at least one dot")
             module_name = ".".join(parts[:-1])
             fn_name = parts[-1]
-
             mod = importlib.import_module(module_name)
             fn = getattr(mod, fn_name, None)
             if fn is None or not callable(fn):
-                raise AttributeError(
-                    f"Module '{self.module}' does not export a callable '{fn_name}' function"
-                )
+                raise AttributeError(f"Module '{self.module}' does not export a callable '{fn_name}'")
             self.run_fn = fn
         else:
             raise ValueError("Task must have 'cmd', 'module', or 'run_fn' set")
 
+    @property
+    def is_oneshot(self) -> bool:
+        return self.interval.startswith("at:")
+
     def next_run(self, after: datetime | None = None) -> datetime:
         """Return the next execution time as a UTC datetime."""
-        if self.at is not None:
-            return self.at.astimezone(timezone.utc)
-
-        if self.cron is not None:
-            base = after or datetime.now(timezone.utc)
-            return croniter(self.cron, base).get_next(datetime).replace(tzinfo=timezone.utc)
-
-        raise ValueError(f"Task '{self.name}' has no valid schedule (missing 'at' or 'cron')")
+        kind, value = parse_interval(self.interval)
+        if kind == "at":
+            return datetime.fromisoformat(value).astimezone(timezone.utc)
+        base = after or datetime.now(timezone.utc)
+        return croniter(value, base).get_next(datetime).replace(tzinfo=timezone.utc)
 
     async def run(self) -> None:
         """Run the task as a subprocess (cmd) or Python callable (run_fn)."""
@@ -144,35 +143,30 @@ class ScheduledTask:
 
 
 class SchedulerConfig(pydantic.BaseModel):
-    model_config = {
-        "extra": "allow"
-    }
+    model_config = {"extra": "allow"}
 
     name: str
-    at: datetime | None = None
-    cron: str | None = None
+    interval: str
     cmd: list[str] | None = None
     module: str = ""
     env: dict[str, str] | None = None
     enabled: bool = True
-    oneshot: bool = False
 
 
 class Scheduler:
-    """Reads tasks from a config file and runs them on their cron schedule."""
+    """Reads tasks from a config file and runs them on schedule."""
 
     def __init__(self) -> None:
         self.tasks: list[ScheduledTask] = []
-        self._stop_event = asyncio.Event() # event to signal the scheduler loop to stop
-        self._task: asyncio.Task | None = None # asyncio task for the scheduler loop
-        self._lock: asyncio.Lock = asyncio.Lock() # lock to protect access to tasks list
-        self._schedule: dict[str, datetime] = {} # pre-calculated next run times for tasks
-        self._last_run: dict[str, datetime] = {} # track last run times for tasks
-        self._running_tasks: set[asyncio.Task] = set() # track currently running tasks
+        self._stop_event = asyncio.Event()
+        self._task: asyncio.Task | None = None
+        self._lock: asyncio.Lock = asyncio.Lock()
+        self._schedule: dict[str, datetime] = {}
+        self._last_run: dict[str, datetime] = {}
+        self._running_tasks: set[asyncio.Task] = set()
 
     @property
     def status(self):
-        """Return a summary of the scheduler status."""
         return {
             "num_tasks": len(self.tasks),
             "running_tasks": len(self._running_tasks),
@@ -181,10 +175,10 @@ class Scheduler:
             "tasks": [
                 {
                     "name": task.name,
+                    "interval": task.interval,
                     "cmd": task.cmd,
                     "next_run": self._schedule.get(task.name).isoformat() if self._schedule.get(task.name) else None,
                     "last_run": self._last_run.get(task.name).isoformat() if self._last_run.get(task.name) else None,
-                    "oneshot": task.oneshot,
                     "enabled": task.enabled,
                 }
                 for task in self.tasks
@@ -194,7 +188,6 @@ class Scheduler:
     # -- configuration --------------------------------------------------------
 
     def load_config(self, config_path: str | Path) -> None:
-        """Parse the JSON config and import each task module."""
         config_path = Path(config_path) if config_path else None
         if config_path is None:
             logger.error("No config path provided, cannot load tasks")
@@ -222,15 +215,10 @@ class Scheduler:
                 logger.info("Task '%s' is disabled — skipping", task_conf.name)
                 continue
 
-            if task_conf.cron and not croniter.is_valid(task_conf.cron):
-                logger.error("Invalid cron expression '%s' for task '%s' — skipping", task_conf.cron, task_conf.name)
-                continue
-
             task = ScheduledTask(
-                name=task_conf.name, at=task_conf.at, cron=task_conf.cron,
+                name=task_conf.name, interval=task_conf.interval,
                 cmd=task_conf.cmd, module=task_conf.module,
                 env=task_conf.env, enabled=task_conf.enabled,
-                oneshot=task_conf.oneshot,
             )
             try:
                 task.load()
@@ -239,11 +227,8 @@ class Scheduler:
                 continue
 
             logger.info(
-                "Loaded task '%s' (cmd=%s, cron=%s, next=%s)",
-                task.name,
-                task.cmd,
-                task.cron,
-                task.next_run(),
+                "Loaded task '%s' (interval=%s, cmd=%s, next=%s)",
+                task.name, task.interval, task.cmd, task.next_run(),
             )
             self.tasks.append(task)
 
@@ -255,12 +240,10 @@ class Scheduler:
         self._task = asyncio.create_task(self._run())
 
     async def stop(self) -> None:
-        """Signal the scheduler loop to exit."""
         if self._stop_event.is_set():
             logger.warning("Scheduler stop() called but it's already stopping")
             return
-
-        logger.info("Scheduler stopping…")
+        logger.info("Scheduler stopping...")
         self._stop_event.set()
         if self._task:
             self._task.cancel()
@@ -268,7 +251,6 @@ class Scheduler:
             t.cancel()
 
     async def wait_until_stopped(self) -> None:
-        """Wait for the scheduler loop to finish after stop() is called."""
         if self._task:
             try:
                 logger.info("Waiting for scheduler to stop...")
@@ -277,49 +259,33 @@ class Scheduler:
                 pass
             except Exception as e:
                 logger.exception("Scheduler main task exited with error %s", e)
-
         if self._running_tasks:
             logger.info("Waiting for %d running task(s) to finish...", len(self._running_tasks))
             await asyncio.gather(*self._running_tasks, return_exceptions=True)
         logger.info("Scheduler stopped.")
 
-
     # -- tasks api ------------------------------------------------------------
 
     async def add_task(self, task: ScheduledTask) -> None:
-        """Add a new task to the scheduler at runtime."""
         async with self._lock:
             task.load()
             self.tasks.append(task)
-            logger.info(
-                "Added task '%s' (module=%s, at=%s, cron=%s, next=%s)",
-                task.name,
-                task.module,
-                task.at,
-                task.cron,
-                task.next_run(),
-            )
+            logger.info("Added task '%s' (interval=%s, next=%s)", task.name, task.interval, task.next_run())
             self._schedule[task.name] = task.next_run(after=datetime.now(timezone.utc))
 
     async def remove_task(self, task_name: str) -> None:
-        """Remove a task by name."""
         async with self._lock:
             _task = next((t for t in self.tasks if t.name == task_name), None)
             if _task:
                 self.tasks.remove(_task)
                 logger.info("Removed task '%s'", task_name)
-            if task_name in self._schedule:
-                self._schedule.pop(task_name, None)
-                logger.info("Removed schedule for '%s'", task_name)
-
+            self._schedule.pop(task_name, None)
 
     # -- main loop ------------------------------------------------------------
 
     async def _run(self) -> None:
-        """Block and run the scheduling loop until stopped."""
         logger.info("Scheduler started with %d task(s)", len(self.tasks))
 
-        # Pre-calculate next run times.
         self._schedule.update({
             task.name: task.next_run(after=None) for task in self.tasks
         })
@@ -327,7 +293,7 @@ class Scheduler:
         def _handle_task_result(t: asyncio.Task) -> None:
             self._running_tasks.discard(t)
             if not t.cancelled() and t.exception():
-                logger.error("Task '%s' raised an exception", task.name, exc_info=t.exception())
+                logger.error("Task raised an exception", exc_info=t.exception())
 
         while not self._stop_event.is_set():
             now = datetime.now(timezone.utc)
@@ -338,17 +304,15 @@ class Scheduler:
                     if next_time is None:
                         next_time = task.next_run(after=now)
                         self._schedule[task.name] = next_time
-                        logger.info("Added schedule for task '%s', next run at %s", task.name, next_time)
 
-                    #logger.info("Checking task '%s': now=%s, next_run=%s", task.name, now, next_time)
                     if now >= next_time:
                         logger.info("Task '%s' is due: now=%s, offset=%s", task.name, now, now - next_time)
                         _t = asyncio.create_task(task.run())
                         self._running_tasks.add(_t)
                         _t.add_done_callback(_handle_task_result)
 
-                        if task.oneshot:
-                            logger.info("Task '%s' is oneshot, marked for removal", task.name)
+                        if task.is_oneshot:
+                            logger.info("Task '%s' is oneshot (at:), marked for removal", task.name)
                             removals.append(task)
                         else:
                             self._last_run[task.name] = now
@@ -358,9 +322,8 @@ class Scheduler:
                     self.tasks.remove(task)
                     self._schedule.pop(task.name, None)
                     self._last_run.pop(task.name, None)
-                    logger.info("Removed task '%s'", task.name)
+                    logger.info("Removed oneshot task '%s'", task.name)
 
-            # Sleep in short intervals so we can react to stop quickly.
             await asyncio.sleep(1)
 
 
@@ -375,46 +338,14 @@ def main():
         logger.info("Scheduler shutdown complete.")
 
     async def run_scheduler(scheduler: Scheduler) -> None:
-
         loop = asyncio.get_event_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, lambda: asyncio.create_task(shutdown_handler()))
 
-
         await scheduler.start()
         logger.info("Scheduler started.")
-
-        # dynamically add a cron tasks
-        # await scheduler.add_task(ScheduledTask(
-        #     name="hello_task",
-        #     cron="* * * * *",  # every 15 seconds
-        #     # module="geenii.tasks.demo_tasks.hello",
-        #     module="",
-        #     run_fn=hello,
-        # ))
-        # await scheduler.add_task(ScheduledTask(
-        #     name="hello_sync_task",
-        #     cron="* * * * *",  # every minute
-        #     module="",
-        #     run_fn=hello_sync
-        # ))
-        # await scheduler.add_task(ScheduledTask(
-        #     name="hello_sync_task2",
-        #     at=datetime.now(timezone.utc) + timedelta(seconds=30),  # run once 30 seconds from now
-        #     module="",
-        #     run_fn=hello_sync,
-        #     oneshot=True,
-        # ))
-
-        # sleep for a short while
-        #await asyncio.sleep(90)
-
-        #await scheduler.stop()
-        #logger.info("Scheduler stopping.")
         await scheduler.wait_until_stopped()
         logger.info("Scheduler stopped.")
-
-
 
     config_path = sys.argv[1] if len(sys.argv) > 1 else None
     if not config_path:

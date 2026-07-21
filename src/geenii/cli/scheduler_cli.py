@@ -4,12 +4,11 @@ import os
 import sys
 
 import click
-from croniter import croniter
 from rich.console import Console
 from rich.table import Table
 
 from geenii.config import GEENII_DIR
-from geenii.scheduler import Scheduler, main as scheduler_main
+from geenii.scheduler import Scheduler, parse_interval, main as scheduler_main
 
 console = Console()
 
@@ -27,7 +26,7 @@ def scheduler():
 @click.option("--config", "-c", default=DEFAULT_CONFIG_PATH,
               help="Path to scheduler config JSON file.", show_default=True)
 def start_scheduler(config):
-    """Start the scheduler and run tasks on their cron schedules."""
+    """Start the scheduler and run tasks on their schedules."""
     sched = Scheduler()
     sched.load_config(config)
 
@@ -55,20 +54,19 @@ def status_scheduler(config):
 
     table = Table(title=f"Scheduler Tasks ({config})")
     table.add_column("Name", style="cyan")
-    table.add_column("Schedule", style="green")
+    table.add_column("Interval", style="green")
     table.add_column("Command", style="magenta")
     table.add_column("Next Run", style="yellow")
     table.add_column("Flags", style="dim")
 
     for task in sched.tasks:
         next_run = task.next_run()
-        schedule = task.cron or (task.at.isoformat() if task.at else "?")
-        cmd = " ".join(task.cmd) if task.cmd else ""
+        cmd = " ".join(task.cmd) if task.cmd else task.module
         flags = " ".join(f for f in [
-            "oneshot" if task.oneshot else "",
+            "oneshot" if task.is_oneshot else "",
             "env" if task.env else "",
         ] if f)
-        table.add_row(task.name, schedule, cmd, next_run.isoformat(), flags)
+        table.add_row(task.name, task.interval, cmd, next_run.isoformat(), flags)
 
     console.print(table)
 
@@ -92,32 +90,36 @@ def list_tasks(config):
 
     for t in tasks:
         name = t.get("name", "?")
-        schedule = t.get("cron", "") or t.get("at", "") or "?"
+        interval = t.get("interval", "?")
         cmd = " ".join(t["cmd"]) if t.get("cmd") else ""
         enabled = t.get("enabled", True)
         flag = "" if enabled else " (disabled)"
-        click.echo(f"  {name:<20} {schedule:<20} {cmd}{flag}")
+        click.echo(f"  {name:<20} {interval:<25} {cmd}{flag}")
 
 
 @scheduler.command(name="add")
 @click.argument("name")
 @click.argument("cmd", nargs=-1, required=True)
-@click.option("--cron", "-c", default=None, help="Cron expression, e.g. '*/5 * * * *'.")
-@click.option("--at", default=None, help="Fixed execution time (ISO format).")
+@click.option("--interval", "-i", required=True,
+              help="Schedule: 'cron:EXPRESSION' or 'at:DATETIME'.")
 @click.option("--env", "-e", multiple=True, help="Environment variable in KEY=VALUE format.")
 @click.option("--disabled", is_flag=True, help="Add the task in disabled state.")
-@click.option("--oneshot", is_flag=True, help="Run the task only once, then remove it.")
 @click.option("--config", default=DEFAULT_CONFIG_PATH,
               help="Path to scheduler config JSON file.", show_default=True)
-def add_task(name, cmd, cron, at, env, disabled, oneshot, config):
+def add_task(name, cmd, interval, env, disabled, config):
     """Add a task to the scheduler config.
 
-    NAME is the task identifier. CMD is the command to run (all remaining arguments).
+    NAME is the task identifier. CMD is the command to run (remaining arguments).
 
-    Example: geenii scheduler add my_task echo hello --cron '*/5 * * * *'
+    \b
+    Examples:
+      geenii scheduler add cleanup echo cleanup --interval 'cron:0 * * * *'
+      geenii scheduler add oneshot echo done --interval 'at:2026-07-21T18:00:00Z'
     """
-    if not cron and not at:
-        click.echo("Error: provide either --cron or --at.")
+    try:
+        parse_interval(interval)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}")
         raise SystemExit(1)
 
     data = {"tasks": []}
@@ -130,19 +132,12 @@ def add_task(name, cmd, cron, at, env, disabled, oneshot, config):
             click.echo(f"Error: task '{name}' already exists.")
             raise SystemExit(1)
 
-    if cron and not croniter.is_valid(cron):
-        click.echo(f"Error: invalid cron expression '{cron}'.")
-        raise SystemExit(1)
-
     task_entry = {
         "enabled": not disabled,
         "name": name,
+        "interval": interval,
         "cmd": list(cmd),
     }
-    if cron:
-        task_entry["cron"] = cron
-    if at:
-        task_entry["at"] = at
     if env:
         env_dict = {}
         for pair in env:
@@ -152,8 +147,6 @@ def add_task(name, cmd, cron, at, env, disabled, oneshot, config):
             k, v = pair.split("=", 1)
             env_dict[k] = v
         task_entry["env"] = env_dict
-    if oneshot:
-        task_entry["oneshot"] = True
 
     data.setdefault("tasks", []).append(task_entry)
 
