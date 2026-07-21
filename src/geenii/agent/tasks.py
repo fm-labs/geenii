@@ -182,7 +182,10 @@ class LLMTask(BaseAgentTask):
         #print("_handle_response_with_tool_calls", response.output)
 
         # recursion breaker
-        if i >= 2:
+        if i >= 10:
+            logger.warning(
+                "Too many tool calls detected in the model response."
+            )
             bot_message = ModelMessage(role="assistant", content=response.output)
             yield bot_message
             return
