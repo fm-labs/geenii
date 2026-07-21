@@ -70,8 +70,8 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
             anthropic_tools = [_to_anthropic_tool(td) for td in matching]
             logger.info(f"Mapped {len(anthropic_tools)} tools to Anthropic format")
 
-        # SYSTEM PROMPT
-        system_prompt = "\n\n".join(request.system) if request.system else ""
+        # SYSTEM PROMPT — pass as list of text blocks so the API can cache static parts
+        system_blocks = _build_system_blocks(request.system) if request.system else []
 
         # MESSAGES
         input_messages = []
@@ -116,8 +116,8 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
             )
             print(create_kwargs)
 
-            if system_prompt:
-                create_kwargs["system"] = system_prompt
+            if system_blocks:
+                create_kwargs["system"] = system_blocks
             if anthropic_tools:
                 create_kwargs["tools"] = anthropic_tools
 
@@ -150,12 +150,16 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
                     ))
                     logger.info(f"Tool call requested: {block.name} with call_id {block.id}")
 
+            cache_creation = getattr(model_result.usage, "cache_creation_input_tokens", 0) or 0
+            cache_read = getattr(model_result.usage, "cache_read_input_tokens", 0) or 0
             usage = {
                 "input_tokens": model_result.usage.input_tokens,
                 "output_tokens": model_result.usage.output_tokens,
                 "total_tokens": model_result.usage.input_tokens + model_result.usage.output_tokens,
+                "cache_creation_input_tokens": cache_creation,
+                "cache_read_input_tokens": cache_read,
             }
-            logger.info(f"Tokens used: {usage['total_tokens']}")
+            logger.info(f"Tokens used: {usage['total_tokens']} (cache write: {cache_creation}, cache read: {cache_read})")
 
             response = ChatCompletionResponse(
                 id=model_result.id,
@@ -171,6 +175,19 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
         except Exception as e:
             logger.error("ANTHROPIC: Error generating chat completion: %s", str(e))
             raise
+
+
+def _build_system_blocks(system_parts: list[str]) -> list[dict]:
+    """Convert system prompt parts to Anthropic text blocks with cache_control on the first (static) block."""
+    blocks = []
+    for i, text in enumerate(system_parts):
+        if not text:
+            continue
+        block = {"type": "text", "text": text}
+        if i == 0:
+            block["cache_control"] = {"type": "ephemeral"}
+        blocks.append(block)
+    return blocks
 
 
 def _to_anthropic_tool(tool_def: dict) -> dict:
