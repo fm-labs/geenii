@@ -12,7 +12,7 @@ It is organized around a small set of concepts:
 | **Skill** | A directory with a `SKILL.md` (Anthropic skill format) whose instructions are injected into the system prompt | [skills.md](skills.md) |
 | **Scheduler** | Cron-style runner that executes tasks (typically agent runs) from a JSON config | [scheduler.md](scheduler.md) |
 
-All user-facing configuration lives in a `.geenii/` directory; see [configuration.md](configuration.md).
+All user-facing configuration lives in a `.geenii/` directory; see [Configuration](../user-guide/configuration.md).
 
 ## Package layout
 

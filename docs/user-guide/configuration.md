@@ -74,7 +74,7 @@ Read by `config.read_user_settings()`. Recognized keys and their defaults:
 ```
 
 - **`skill_dirs`** — extra directories to search for skills, appended to the
-  default skill search paths (see [skills.md](skills.md)). This is the only
+  default skill search paths (see [skills.md](../developer-guide/skills.md)). This is the only
   key the core library consumes today.
 - `theme`, `notifications`, `language`, `environment` are reserved for the
   UI/server. Example configs in the wild may contain additional keys
@@ -106,7 +106,7 @@ Standard `mcpServers` map, passed to [fastmcp](https://github.com/jlowin/fastmcp
 
 At agent initialization every configured server is contacted and its tools are
 registered under the name `mcp__<server>__<tool>` (results cached for 1 hour).
-See [tools.md](tools.md).
+See [tools.md](../developer-guide/tools.md).
 
 ## `scheduler.json` — scheduled tasks
 

@@ -1,49 +1,8 @@
-# Agents
+# Agents — Internals
 
-An agent is a named configuration — model, instructions, tools, skills — plus a
-runtime that processes prompts through an internal task queue.
-
-## Defining an agent
-
-Agents are markdown files with YAML frontmatter in `$GEENII_DIR/agents/<name>.md`.
-The frontmatter is validated against `AgentSpec` (`geenii/agent/registry.py`);
-the markdown body is appended to the system instructions.
-
-```markdown
----
-name: fm4-track-checker
-description: Get information about the current music track playing on FM4
-model: ollama:qwen3:8b
-skills:
-  - fm4-skills
-tools:
-  - python
-  - display_desktop_notification
----
-
-# Usage instructions
-
-1. Fetch data using the scripts provided by the 'fm4-skills' skill.
-2. Extract artist and track name.
-3. Notify the user with 'display_desktop_notification'.
-```
-
-### `AgentSpec` fields
-
-| Field | Type | Meaning |
-|---|---|---|
-| `name` | str, required | Agent name; must match how you address it (`-n <name>`) |
-| `model` | str, required | Model ID as `provider:model` (see [providers.md](providers.md)) |
-| `description` | str | Shown in listings; also used by `FindBestAgentTask` to route between agents |
-| `label` | str | Display label |
-| `system` | str | Base system prompt (the markdown body is appended to it) |
-| `tools` | list[str] | Tool names the agent is allowed to call (see [tools.md](tools.md)) |
-| `skills` | list[str] | Skill names to load into the agent's skill registry |
-| `model_parameters` | dict | Reserved; not currently applied to requests |
-| `mcp_servers` | list[str] | Reserved; currently all configured MCP servers are loaded regardless |
-
-A built-in `default` agent (model = `DEFAULT_COMPLETION_MODEL`) always exists;
-placing a `default.md` in the agents directory overrides it.
+This document covers the agent runtime, task queue, HITL system, and
+programmatic API. For defining and configuring agents, see the
+[user guide](../user-guide/agents.md).
 
 ## Runtime model
 
@@ -62,7 +21,7 @@ discovers all MCP server tools into the agent's tool registry. Which of those
 the model may actually call is controlled by `allowed_tools` (from the spec's
 `tools` list or the CLI `--tools` override).
 
-### The task queue
+## The task queue
 
 A prompt is processed by draining the queue (`_process_queue`), bounded by
 `BaseAgent.MAX_TASKS = 10` per prompt. Tasks are `BaseTask` subclasses whose
@@ -73,7 +32,7 @@ A prompt is processed by draining the queue (`_process_queue`), bounded by
 
 Errors in a task are caught and surfaced as an assistant error message.
 
-### Built-in tasks (`geenii/agent/tasks.py`)
+## Built-in tasks (`geenii/agent/tasks.py`)
 
 | Task | Purpose |
 |---|---|
@@ -85,7 +44,7 @@ Errors in a task are caught and surfaced as an assistant error message.
 | `PlanTask` | Experimental: asks the model for a step-by-step plan (each step optionally tagged with a skill), then enqueues a `FindBestSkillTask` + `LLMTask` pair per step. Not part of the default pipeline. |
 | `ToolFilterTask` | Experimental: LLM-based pre-selection of relevant tools. Not part of the default pipeline. |
 
-### System prompt assembly
+## System prompt assembly
 
 For each `LLMTask` the system prompt is a list of parts:
 
@@ -103,7 +62,7 @@ entries. History is not persisted between CLI runs.
 `geenii/memory.py` provides a `ChatMemory` abstraction with `ShortTermChatMemory`
 (in-memory) and `FileChatMemory` (JSONL append/restore) implementations. A
 `memory` parameter exists on `BaseAgent`, but it is not yet used by the runtime —
-persistent conversations (`--conv-id`) are not functional yet.
+persistent conversations (`--context`) are not functional yet.
 
 ## Human-in-the-loop (HITL)
 

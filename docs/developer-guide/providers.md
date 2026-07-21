@@ -13,7 +13,7 @@ anthropic:claude-opus-4-6
 `geenii/ai.py` is the dispatch layer: it splits the model ID, instantiates the
 provider, and forwards the request. `generate_chat_completion()` additionally
 assigns a `context_id`, logs the request/response, and records token usage
-(see [configuration.md](configuration.md) for log locations).
+(see [Configuration](../user-guide/configuration.md) for log locations).
 
 ## Provider interfaces
 

@@ -50,14 +50,14 @@ these are not wired into agents yet.
 - stdout is returned to the model; on a non-zero exit code, stderr and the exit
   code are appended.
 - There is no allowlist/sandboxing policy yet; the HITL controller (see
-  [agents.md](agents.md)) is the only gate. `geenii/sandbox.py` contains Docker
+  [agents.md](../agents.md)) is the only gate. `geenii/sandbox.py` contains Docker
   sandbox helpers that are not yet wired into the tool pipeline — see
   [sandbox.md](sandbox.md) for the full design and integration roadmap.
 
 ## MCP tools
 
 MCP servers are declared in `$GEENII_DIR/mcp.json` (see
-[configuration.md](configuration.md)). During agent initialization
+[configuration.md](../user-guide/configuration.md)). During agent initialization
 (`init_mcp_server_tools`):
 
 1. Each server is contacted through `McpClient` (a fastmcp wrapper) and its

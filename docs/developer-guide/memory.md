@@ -134,13 +134,36 @@ session. It does not use `ChatMemory` or the agent memory system.
 executions, results) for observability but are not loaded back as
 conversation context.
 
+## Memory compaction
+
+When the conversation history grows too large, `MemoryCompactionTask`
+(`geenii/agent/tasks.py`) compacts it:
+
+1. Renders the **full** message history into a text transcript.
+2. Sends it to the LLM with a system prompt that asks for a concise
+   handover summary (goals, decisions, facts, task state, open issues).
+3. Derives a new `context_id` by appending a generation counter
+   (`<original_id>-1`, then `<original_id>-2`, etc.).
+4. Creates a **new** memory instance (via `agent._create_memory()`) keyed
+   to the new `context_id`.
+5. Seeds the new memory with a single assistant message containing the
+   summary, prefixed with `[Handover summary from context <old_id>]`.
+6. Swaps `agent.context_id` and `agent.memory` to the new instances.
+
+The old memory file/database is left on disk for auditability. Subsequent
+messages are written to the new memory only.
+
+The task can be enqueued manually or (in future) triggered automatically
+when the history exceeds a threshold.
+
 ## Known gaps
 
 1. **Tool results not always in history** — `ToolCallTask` has the
    `add_to_history()` call commented out for tool results.
 2. **No token-aware truncation** — the hard cap of 20 messages ignores
    message size.
-3. **No summarisation / compaction** — noted as a TODO in `tasks.py`.
+3. **No automatic compaction trigger** — `MemoryCompactionTask` exists but
+   must be enqueued manually; there is no threshold-based auto-trigger yet.
 4. **No cross-agent context transfer** — `HandoffTask` has a commented-out
    line for copying history to a sub-agent.
 5. **Constants not configurable** — `MAX_MESSAGE_HISTORY` and related limits
