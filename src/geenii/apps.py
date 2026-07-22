@@ -1,10 +1,8 @@
 import os
-import json
 import signal
 import logging
 import subprocess
 from enum import Enum
-from typing import Literal
 
 import pydantic
 

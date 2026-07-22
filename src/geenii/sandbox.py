@@ -310,7 +310,6 @@ class BashSandbox(Sandbox):
         )
 
     def command(self) -> list[str]:
-        import shlex
         if self._shell_command:
             return ["bash", "-c", self._shell_command]
         cmd = ["bash", self._script_name]
