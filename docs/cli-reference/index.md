@@ -31,6 +31,13 @@ geenii
 ├── agents
 │   ├── list                      # configured + loaded agents
 │   └── inspect NAME              # full agent configuration
+├── apps
+│   ├── list                      # discovered apps with type
+│   ├── info NAME                 # app details (type, status, port, path)
+│   ├── start NAME [-p PORT]      # launch an app
+│   ├── stop NAME                 # stop a running app
+│   ├── init NAME [-t TYPE]       # generate manifest.json for one app
+│   └── init-all                  # batch-generate manifests
 ├── models
 │   └── list                      # available models (filterable)
 ├── mcp
@@ -69,6 +76,7 @@ geenii
 
 - [agent](agent.md) — run an agent with a prompt
 - [agents](agents.md) — list and inspect configured agents
+- [apps](apps.md) — manage GeeApps (micro applications)
 - [info](info.md) — show version and system information
 - [models](models.md) — list available models
 - [mcp](mcp.md) — manage MCP servers and tools

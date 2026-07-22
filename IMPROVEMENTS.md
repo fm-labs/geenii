@@ -77,7 +77,7 @@ roughly ordered by priority within each group. File references point at the rele
 - [ ] **Message-history management** — history is capped at a hardcoded `[-10:]` slice in
   `LLMTask`; the `ChatMemory` abstraction exists (`src/geenii/memory.py`) but `BaseAgent`
   never uses it. Wire memory into the agent and make the window/token budget configurable.
-- [ ] **`--conv-id` / `--continue` CLI options are dead** — accepted but commented out /
+- [x] **`--conv-id` / `--continue` CLI options are dead** — accepted but commented out /
   unimplemented (`src/geenii/cli/agent.py`). Implement conversation persistence via
   `FileChatMemory` or remove the flags.
 - [ ] **`model_parameters`, `developer_prompt`, `output_format` overrides set attributes that
