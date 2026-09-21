@@ -51,17 +51,21 @@ class Agent(BaseAgent):
         :param message:
         :return:
         """
-        print("MESSAGE", message)
+        logger.debug("Handling macros for message: %s", message)
         if isinstance(message, str):
             if message.startswith("/"):
                 message = message[1:]
-                cmd, message = message.split(" ", maxsplit=1)
-                print("CMD MAKRO", cmd, message)
+                parts = message.split(" ", maxsplit=1)
+                cmd = parts[0]
+                message = parts[1] if len(parts) > 1 else ""
+                logger.debug("Command macro: cmd=%s message=%s", cmd, message)
                 # enqueue command task
             elif message.startswith("@"):
                 message = message[1:]
-                agent_name, message = message.split(" ", maxsplit=1)
-                print("AGENT MAKRO", agent_name, message)
+                parts = message.split(" ", maxsplit=1)
+                agent_name = parts[0]
+                message = parts[1] if len(parts) > 1 else ""
+                logger.debug("Agent macro: agent=%s message=%s", agent_name, message)
                 # enqueue a subagent
                 await self.enqueue_task(HandoffTask(agent=self, target_agent_name=agent_name, prompt=message))
                 return True # signal to stop message handling
@@ -104,7 +108,7 @@ class ProcessingAgent(Agent):
             return
 
         init_builtin_tools(self._tool_registry)
-        init_process_tools(self._tool_registry, self._pmc)
+        init_process_tools(self._tool_registry, self._pm)
         if self.mcp_servers:
             await init_mcp_server_tools(self._tool_registry, self.mcp_servers)
 

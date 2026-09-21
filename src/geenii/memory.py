@@ -102,32 +102,30 @@ class FileChatMemory(ChatMemory):
 class SqliteChatMemory(ChatMemory):
     """SQLite-based implementation of chat memory."""
 
-    def __init__(self, db_path: str) -> None:
+    def __init__(self, db_path: str, restore: bool = True) -> None:
         super().__init__()
         self.db_path = Path(db_path).resolve()
-
-    @property
-    def db(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn = sqlite3.connect(self.db_path)
+        self._conn.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, content TEXT)")
+        self._conn.commit()
+        if restore:
+            self._read()
 
     def _read(self) -> None:
-        with self.db as conn:
-            cursor = conn.cursor()
-            cursor.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, content TEXT)")
-            cursor.execute("SELECT role, content FROM messages ORDER BY id")
-            rows = cursor.fetchall()
-            for role, content in rows:
-                message = ModelMessage(role=role, content=json.loads(content))
-                self._messages.append(message)
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT role, content FROM messages ORDER BY id")
+        rows = cursor.fetchall()
+        for role, content in rows:
+            message = ModelMessage(role=role, content=json.loads(content))
+            self._messages.append(message)
 
     def _insert(self, message: ModelMessage) -> None:
-        with self.db as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO messages (role, content) VALUES (?, ?)", (message.role, json.dumps(message.content)))
+        self._conn.execute("INSERT INTO messages (role, content) VALUES (?, ?)", (message.role, json.dumps(message.content)))
+        self._conn.commit()
 
     def _write(self) -> None:
-        with self.db as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM messages")
-            for message in self._messages:
-                cursor.execute("INSERT INTO messages (role, content) VALUES (?, ?)", (message.role, json.dumps(message.content)))
+        self._conn.execute("DELETE FROM messages")
+        for message in self._messages:
+            self._conn.execute("INSERT INTO messages (role, content) VALUES (?, ?)", (message.role, json.dumps(message.content)))
+        self._conn.commit()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 from datetime import datetime
 from typing import AsyncGenerator, Set, TYPE_CHECKING
@@ -548,8 +549,7 @@ class FindBestAgentTask(BaseAgentTask):
         agent_names = [a.name for a in self.agent_registry._agent_configs.values() if a.name != "default"] + ["NONE"]
         agents_str += "\n\nValid agent names:\n" + ", ".join(agent_names)
 
-        # inject agent names as schema enums
-        output_schema = self.OUTPUT_SCHEMA
+        output_schema = copy.deepcopy(self.OUTPUT_SCHEMA)
         output_schema["properties"]["agent"] = {"type": "string", "enum": agent_names}
 
         request = ChatCompletionRequest(

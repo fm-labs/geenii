@@ -111,8 +111,8 @@ class BaseAgent(BotInterface, abc.ABC):
             desc += f"Tool: {tool.name} - {tool.description}\n"
 
         desc += "Skills:\n"
-        for skill in self.skills.skills.items():
-            desc += f"Skill: {skill.name} - {skill.description}\n"
+        for name, skill in self.skills.skills.items():
+            desc += f"Skill: {name} - {skill.description}\n"
         return desc
 
     @property
@@ -244,10 +244,13 @@ def _agent_log(agent_name: str, context_id: str, event_name: str, data: dict | p
 
 def restore_last_context_id(name: str):
     file_path = f"{CACHE_DIR}/agents/{name}/last_context_id"
-    with open(file_path, "r") as f:
-        last_context_id = int(f.read())
-    if last_context_id is not None:
-        return last_context_id
+    try:
+        with open(file_path, "r") as f:
+            last_context_id = f.read().strip()
+        if last_context_id:
+            return last_context_id
+    except FileNotFoundError:
+        return None
 
 
 def dump_last_context_id(name: str, context_id):
