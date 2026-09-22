@@ -40,7 +40,7 @@ class ToolCallTask(BaseAgentTask):
         tool_name = self.tool_name
         arguments = self.arguments
         call_id = self.call_id
-        selected_skill = self.agent.selected_skill
+        active_skills = self.agent.active_skills
 
         tool = self.agent.tools.get(tool_name)
         if tool is None:
@@ -88,14 +88,11 @@ class ToolCallTask(BaseAgentTask):
             # tool_result = await execute_tool_call(self.agent.tools, tool_name=tool_name, args=arguments)
 
             tool_env = {}
-            if selected_skill:
-                tool_env.update(
-                    {
-                        "SKILL_NAME": selected_skill,
-                        "SKILL_DIR": f"{self.agent.skills.get(selected_skill).path}",
-                        "SCRIPT_DIR": f"{self.agent.skills.get(selected_skill).path}/scripts",
-                    }
-                )
+            if active_skills:
+                tool_env["SKILL_NAME"] = ",".join(active_skills)
+                first_skill = self.agent.skills.get(active_skills[0])
+                if first_skill:
+                    tool_env["SKILL_DIR"] = first_skill.path
             tool_result = await tool.invoke(args=arguments, env=tool_env)
 
             logger.debug(f"Tool {tool_name} returned result: {tool_result}")
@@ -141,11 +138,31 @@ class LLMTask(BaseAgentTask):
         self.output_format = output_format
         self.output_schema = output_schema
 
+    def _compute_effective_tools(self) -> set[str]:
+        base_tools = set(self.agent.allowed_tools)
+        if not self.agent.active_skills:
+            return base_tools
+
+        skill_tools = set()
+        all_skills_unrestricted = True
+        for skill_name in self.agent.active_skills:
+            skill = self.agent.skills.get(skill_name)
+            if skill and skill.allowed_tools:
+                all_skills_unrestricted = False
+                skill_tools.update(skill.allowed_tools)
+
+        if all_skills_unrestricted:
+            return base_tools
+
+        effective = base_tools & skill_tools
+        if not effective:
+            logger.warning("Skill allowed_tools intersection with agent tools is empty — no tools available for this request.")
+        return effective
+
     async def execute(self) -> AsyncGenerator[ModelMessage, None]:
         full_system_prompt = self._build_system_prompt()
-        # print(full_system_prompt)
         prompt = message_to_prompt(self.message)
-        allowed_tools = self.allowed_tools
+        allowed_tools = self.allowed_tools if self.allowed_tools else self._compute_effective_tools()
         # message history (last MAX_MESSAGE_HISTORY messages)
         input_messages = list(self.agent.message_history[-self.MAX_MESSAGE_HISTORY:])
 
@@ -340,16 +357,14 @@ class LLMTask(BaseAgentTask):
         :return:
         """
         skills_prompts = []
-        if not self.agent.skills or len(self.agent.skills.names()) == 0:
+        if not self.agent.active_skills:
             return skills_prompts
-        # for skill_name in self.agent.skills.list_skill_names():
-        if self.agent.selected_skill:
-            skill_name = self.agent.selected_skill
+        for skill_name in self.agent.active_skills:
             skill = self.agent.skills.get(skill_name)
             if skill:
-                skills_prompt = f"You have a special skill named {skill_name}:\n"
-                skills_prompt += f"{skill.description}\n"
-                skills_prompt += f"Skill Instructions:\n{skill.instructions}\n\n"
+                skills_prompt = f"## Skill: {skill_name}\n"
+                skills_prompt += f"{skill.description}\n\n"
+                skills_prompt += f"Instructions:\n{skill.instructions}\n"
                 skills_prompts.append(skills_prompt)
         return skills_prompts
 
@@ -673,25 +688,37 @@ class FindBestSkillTask(BaseAgentTask):
         self.prompt = prompt
         self.suggested = suggested  # pre-selected skills
 
+    def _activate_skills(self, skill_names: list[str]):
+        from geenii.skills import register_skill_scripts
+        self.agent.active_skills = skill_names
+        for skill_name in skill_names:
+            skill = self.agent.skills.get(skill_name)
+            if skill:
+                registered = register_skill_scripts(skill, self.agent.tools)
+                self.agent.allowed_tools.update(registered)
+
     async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
 
         if len(self.agent.skills.skills) == 0:
-            # yield ModelMessage(role="assistant", content=[TextContent(text=f"No skills are currently loaded. Trying to process the prompt without a special skill.")])
             logger.info("No skills available.")
             return
 
         elif len(self.agent.skills.skills) == 1:
             selected_skill = self.agent.skills.names().pop()
-            # yield ModelMessage(role="assistant", content=[TextContent(
-            #    text=f"Only one skill available. Selected skill: {selected_skill}.")])
-            self.agent.selected_skill = selected_skill
+            self._activate_skills([selected_skill])
             logger.info("Selected skill the only skill: %s", selected_skill)
             return
 
         if self.suggested and len(self.suggested) == 1:
             selected_skill = self.suggested[0]
-            self.agent.selected_skill = selected_skill
+            self._activate_skills([selected_skill])
             logger.info("Selected skill from pre-selection: %s", selected_skill)
+            return
+
+        triggered = self.agent.skills.match_triggers(self.prompt)
+        if triggered:
+            self._activate_skills(triggered)
+            logger.info("Skills activated via triggers: %s", triggered)
             return
 
         available_skills = []
@@ -753,7 +780,7 @@ class FindBestSkillTask(BaseAgentTask):
                         )
                     ],
                 )
-            self.agent.selected_skill = selected_skill
+            self._activate_skills([selected_skill] if selected_skill else [])
 
 
 # class PlanTask(BaseAgentTask):

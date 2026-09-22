@@ -2,15 +2,16 @@
 
 A skill is a reusable, self-contained capability packaged as a directory with a
 `SKILL.md` file — following Anthropic's skill specification format. Skills add
-domain knowledge and helper scripts to an agent by injecting instructions into
-its system prompt; they do not add code paths of their own.
+domain knowledge, tool scoping, and executable scripts to an agent by injecting
+instructions into its system prompt and optionally registering script-backed
+tools.
 
 ## Anatomy of a skill
 
 ```
 my-skill/
 ├── SKILL.md            # required: frontmatter + instructions
-├── scripts/            # convention: helper scripts the instructions refer to
+├── scripts/            # optional: executable scripts auto-registered as tools
 │   └── fetch_data.py
 └── references/         # convention: extra docs the instructions may point to
 ```
@@ -22,13 +23,12 @@ my-skill/
 name: fm4-skills
 description: Retrieve live track and show information from the FM4 radio station.
 allowed-tools: python bash
+triggers: fm4, radio, track
 ---
 
 # FM4 skills
 
-To get the currently playing track, run:
-
-    python3 $SCRIPT_DIR/fm4.py current-track
+You can retrieve live FM4 data using the `fm4-skills__fm4` tool.
 ```
 
 ### Frontmatter fields (`SkillSpec`, `geenii/skills.py`)
@@ -36,9 +36,10 @@ To get the currently playing track, run:
 | Field | Required | Meaning |
 |---|---|---|
 | `name` | yes | Skill name; must match the directory name for discovery |
-| `description` | yes | One-liner used for listings and LLM-based skill selection |
+| `description` | yes | One-liner used for listings and skill selection |
 | `metadata` | no | Free-form dict |
-| `allowed-tools` | no | Space-separated tool names (parsed but not currently enforced) |
+| `allowed-tools` | no | Space-separated tool names. When set, the agent's available tools are narrowed to the intersection of `agent.allowed_tools` and the union of all active skills' `allowed-tools`. Skills that omit this field inherit the full agent tool set. |
+| `triggers` | no | Comma- or space-separated keywords for deterministic skill activation. Matched with word boundaries against the user prompt (case-insensitive). When triggers match, the LLM selection call is skipped entirely. |
 
 The body is the instruction text. It is loaded lazily from disk each time it is
 needed, so edits take effect without restarting.
@@ -59,24 +60,49 @@ registering a duplicate name raises an error.
 
 1. **Loading** — an agent's `skills` list (or the CLI `--skills` override)
    loads each named skill into the agent's `SkillRegistry`.
-2. **Selection** — on every prompt, `FindBestSkillTask` picks at most one
-   skill as `agent.selected_skill`: with a single loaded skill it is selected
-   automatically; with several, a small LLM call (JSON output) chooses; the
-   model may also answer "NONE".
-3. **Prompt injection** — the selected skill's description and full `SKILL.md`
-   body are appended to the system prompt of the subsequent `LLMTask`.
-4. **Script execution** — skills typically instruct the model to run their
-   scripts through the `bash` / `python` tools. When a skill
-   is selected, tool invocations receive these variables (expanded inside the
-   command string):
+2. **Selection** — on every prompt, `FindBestSkillTask` activates one or more
+   skills on `agent.active_skills`. The selection follows a priority cascade:
+   - **Single skill**: auto-selected, no LLM call.
+   - **Pre-selected** (`suggested` parameter): used directly.
+   - **Trigger match**: each skill's `triggers` keywords are matched against
+     the prompt with word-boundary regex. Multiple skills can match
+     simultaneously. No LLM call needed.
+   - **LLM fallback**: a small LLM call (JSON output, temperature 0.1)
+     chooses the best skill when no triggers match. The model may also
+     answer "NONE".
+3. **Prompt injection** — each active skill's description and full `SKILL.md`
+   body are appended to the system prompt of the subsequent `LLMTask`,
+   delimited by `## Skill: <name>` headers.
+4. **Tool scoping** — `LLMTask` computes the effective tool set as
+   `agent.allowed_tools ∩ union(skill.allowed_tools for each active skill)`.
+   If no active skill declares `allowed-tools`, the full agent tool set is
+   used. An empty intersection logs a warning.
+5. **Script tools** — when a skill is activated, any executable files in its
+   `scripts/` directory are automatically registered as tools named
+   `{skill_name}__{script_stem}` (e.g. `fm4-skills__fm4`). These appear in
+   the agent's tool registry and are added to `allowed_tools`, so the model
+   can invoke them like any other tool. Scripts receive JSON on stdin and
+   return output on stdout. See [tools.md](tools.md) for the `ScriptTool`
+   class details.
 
-| Variable | Value |
-|---|---|
-| `SKILL_NAME` | Name of the selected skill |
-| `SKILL_DIR` | Absolute path of the skill directory |
-| `SCRIPT_DIR` | `$SKILL_DIR/scripts` |
+Tool invocations also receive a `SKILL_NAME` environment variable containing
+the comma-separated names of all active skills.
 
-Only one skill is active per prompt; there is no multi-skill composition yet.
+## Multi-skill composition
+
+Multiple skills can be active simultaneously. This happens when:
+
+- **Trigger matching** activates several skills whose keywords all appear in
+  the prompt.
+- **Pre-selection** passes multiple skill names.
+
+When multiple skills are active:
+
+- All their instructions are included in the system prompt (each under its
+  own `## Skill: <name>` section).
+- Tool scoping is the union of all active skills' `allowed-tools`,
+  intersected with the agent's base tool set.
+- Script tools from all active skills are registered.
 
 ## CLI
 

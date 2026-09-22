@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from functools import cached_property
 from pathlib import Path
 
@@ -20,6 +21,7 @@ class SkillSpec(pydantic.BaseModel):
     description: str
     metadata: dict | None = pydantic.Field(default_factory=dict)
     allowed_tools: list[str] | None = pydantic.Field(default_factory=list)
+    triggers: list[str] = pydantic.Field(default_factory=list)
 
     @cached_property
     def instructions(self) -> str:
@@ -39,12 +41,19 @@ class SkillSpec(pydantic.BaseModel):
         if "name" not in skill_header or "description" not in skill_header:
             raise ValueError(
                 f"Malformed skill markdown file: missing required 'name' or 'description' fields in header of '{str(md_path)}'")
+        raw_triggers = skill_header.get("triggers", "")
+        if isinstance(raw_triggers, list):
+            triggers = [t.strip().lower() for t in raw_triggers if t.strip()]
+        else:
+            triggers = [t.strip().lower() for t in re.split(r'[,\s]+', str(raw_triggers)) if t.strip()]
+
         return SkillSpec(
             path=str(md_path.parent),
             name=skill_header.get("name"),
             description=skill_header.get("description", ""),
             metadata=skill_header.get("metadata", {}),
             allowed_tools=[t for t in skill_header.get("allowed-tools", "").split(" ") if t],
+            triggers=triggers,
         )
 
 
@@ -90,6 +99,17 @@ class SkillRegistry:
             except Exception as e:
                 logger.critical(f"Error while loading skill: {str(e)}", exc_info=False)
                 raise e
+
+    def match_triggers(self, prompt: str) -> list[str]:
+        """Return skill names whose triggers match words in the prompt (case-insensitive, word-boundary)."""
+        prompt_lower = prompt.lower()
+        matched = []
+        for name, skill in self.skills.items():
+            for trigger in skill.triggers:
+                if re.search(r'\b' + re.escape(trigger) + r'\b', prompt_lower):
+                    matched.append(name)
+                    break
+        return matched
 
     def unload(self, skill_name: str) -> None:
         if skill_name in self.skills:
@@ -162,3 +182,40 @@ def locate_skill_path(skill_name: str) -> Path | None:
             logger.info(f"Found skill '{skill_name}' in path: {_path}")
             return Path(_path) / skill_name
     return None
+
+
+def register_skill_scripts(skill: SkillSpec, tool_registry) -> list[str]:
+    """Discover executable scripts in a skill's scripts/ directory and register them as tools.
+
+    Each script becomes a tool named '{skill_name}__{script_stem}'.
+    Returns the list of registered tool names.
+    """
+    from geenii.tool.script import ScriptTool
+
+    scripts_dir = Path(skill.path) / "scripts"
+    if not scripts_dir.is_dir():
+        return []
+
+    skill_base = Path(skill.path).resolve()
+    registered = []
+    for script in sorted(scripts_dir.iterdir()):
+        if not script.is_file() or not os.access(str(script), os.X_OK):
+            continue
+        resolved = script.resolve()
+        if not str(resolved).startswith(str(skill_base)):
+            logger.warning("Skipping script outside skill directory: %s", script)
+            continue
+        tool_name = f"{skill.name}__{script.stem}"
+        if tool_registry.has(tool_name):
+            logger.info("Script tool %s already registered, skipping.", tool_name)
+            continue
+        tool = ScriptTool(
+            name=tool_name,
+            description=f"Script from skill '{skill.name}': {script.stem}",
+            script_path=str(resolved),
+            parameters={"type": "object", "properties": {"args": {"type": "object"}}},
+        )
+        tool_registry.register(tool)
+        registered.append(tool_name)
+        logger.info("Registered script tool: %s", tool_name)
+    return registered

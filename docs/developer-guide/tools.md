@@ -19,6 +19,7 @@ All tools subclass `Tool` (`geenii/tool/common.py`), which carries `name`,
 | `PythonCliTool` | `python` | Like `ComputerTool`, intended for running Python scripts |
 | `SandboxTool` | `sandbox` | Runs a command inside a Docker container with security hardening (see [sandbox.md](sandbox.md)) |
 | `McpTool` | `mcp_tool` | Forwards the call to an MCP server via fastmcp |
+| `ScriptTool` | `function` | Runs an executable script from a skill's `scripts/` directory. JSON is passed on stdin; stdout is returned. Auto-registered when a skill is activated, named `{skill}__{script_stem}`. See [skills.md](skills.md). |
 
 `Tool` also provides definition mappers: `to_definition()` (internal/OpenAI
 style), `to_openai()`, and `to_ollama()` — providers pick the one they need.
@@ -45,8 +46,8 @@ these are not wired into agents yet.
 - The command string is split with `shlex` and executed **without** a shell —
   pipes, redirects, and `&&` do not work.
 - `${VAR}` / `$VAR` placeholders in the command are expanded from the tool
-  invocation env (notably `SKILL_NAME`, `SKILL_DIR`, `SCRIPT_DIR` when a skill
-  is selected — see [skills.md](skills.md)).
+  invocation env (notably `SKILL_NAME` — the comma-separated list of active
+  skill names — see [skills.md](skills.md)).
 - stdout is returned to the model; on a non-zero exit code, stderr and the exit
   code are appended.
 - There is no allowlist/sandboxing policy yet; the HITL controller (see

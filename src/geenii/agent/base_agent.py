@@ -44,7 +44,7 @@ class BaseAgent(BotInterface, abc.ABC):
         self.memory = memory or None
         self.allowed_tools: Set[str] = allowed_tools or set()
         self.mcp_servers: Set[str] = mcp_servers or set()
-        self.selected_skill: str | None = None
+        self.active_skills: list[str] = []
 
         self._tool_registry = tool_registry or ToolRegistry()
         self._skill_registry = skill_registry or SkillRegistry()
@@ -91,7 +91,7 @@ class BaseAgent(BotInterface, abc.ABC):
             "message_count": len(self.message_history),
             "allowed_tools": list(self.allowed_tools),
             "mcp_servers": list(self.mcp_servers),
-            "selected_skill": self.selected_skill,
+            "active_skills": list(self.active_skills),
             "hitl_class": self._hitl.__class__.__name__,
             "skills": list(self.skills.names()),
             "tools": list(self.tools.list_tool_names())

@@ -144,7 +144,7 @@ through Docker.
 When the model invokes `sandbox_python` (or `sandbox_bash`):
 
 1. `SandboxTool.invoke()` reads `SKILL_DIR` from the tool env (set automatically
-   by `ToolCallTask` when a skill is selected).
+   by `ToolCallTask` to the first active skill's directory).
 2. It calls `build_sandbox_container()` with the skill directory as the app dir,
    installing any `requirements.txt` or `pyproject.toml` dependencies.
 3. It runs the command inside the container with all the security controls from
@@ -153,7 +153,7 @@ When the model invokes `sandbox_python` (or `sandbox_bash`):
    stderr are returned.
 
 If Docker is not installed, `invoke()` raises `RuntimeError` immediately. If
-no skill is selected (no `SKILL_DIR` in env), it raises `ValueError` — the
+no skill is active (no `SKILL_DIR` in env), it raises `ValueError` — the
 sandbox needs a directory to mount.
 
 ### Agent spec example
