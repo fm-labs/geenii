@@ -8,19 +8,19 @@ how each AI provider maps them to and from its wire format.
 Every message carries a list of `ContentPart` objects. The `type` field is the
 discriminator.
 
-| Type | Class | Key fields | Purpose |
-|---|---|---|---|
-| `text` | `TextContent` | `text` | Plain text |
-| `json` | `JsonContent` | `data` (dict/list) | Structured data (promoted from text by optimistic JSON parsing) |
-| `image` | `ImageContent` | `url`, `base64`, `alt` | Image attachment |
-| `audio` | `AudioContent` | `url`, `duration` | Audio attachment |
-| `file` | `FileContent` | `url`, `filename`, `content_type`, `size` | File attachment |
-| `embed` | `EmbedContent` | `title`, `description`, `url`, `thumbnail_url`, `video_url` | Rich embed |
-| `tool_call` | `ToolCallContent` | `name`, `arguments`, `call_id`, `require_approval`, `approval_id` | Model requests a tool invocation |
-| `tool_call_result` | `ToolCallResultContent` | `call_id`, `name`, `arguments`, `result`, `error` | Result returned to the model after tool execution |
-| `function` | `FunctionCallContent` | `name`, `arguments`, `result` | Legacy function call (not used by the agent runtime) |
-| `confirmation` | `UserConfirmationContent` | `confirmation_id`, `text`, `confirmed` | HITL approval request/response |
-| `interaction` | `UserInteractionContent` | `interaction_id`, `interaction_type`, `text`, `choices`, `choice` | Generic user interaction |
+| Type               | Class                     | Key fields                                                        | Purpose                                                         |
+|--------------------|---------------------------|-------------------------------------------------------------------|-----------------------------------------------------------------|
+| `text`             | `TextContent`             | `text`                                                            | Plain text                                                      |
+| `json`             | `JsonContent`             | `data` (dict/list)                                                | Structured data (promoted from text by optimistic JSON parsing) |
+| `image`            | `ImageContent`            | `url`, `base64`, `alt`                                            | Image attachment                                                |
+| `audio`            | `AudioContent`            | `url`, `duration`                                                 | Audio attachment                                                |
+| `file`             | `FileContent`             | `url`, `filename`, `content_type`, `size`                         | File attachment                                                 |
+| `embed`            | `EmbedContent`            | `title`, `description`, `url`, `thumbnail_url`, `video_url`       | Rich embed                                                      |
+| `tool_call`        | `ToolCallContent`         | `name`, `arguments`, `call_id`, `require_approval`, `approval_id` | Model requests a tool invocation                                |
+| `tool_call_result` | `ToolCallResultContent`   | `call_id`, `name`, `arguments`, `result`, `error`                 | Result returned to the model after tool execution               |
+| `function`         | `FunctionCallContent`     | `name`, `arguments`, `result`                                     | Legacy function call (not used by the agent runtime)            |
+| `confirmation`     | `UserConfirmationContent` | `confirmation_id`, `text`, `confirmed`                            | HITL approval request/response                                  |
+| `interaction`      | `UserInteractionContent`  | `interaction_id`, `interaction_type`, `text`, `choices`, `choice` | Generic user interaction                                        |
 
 The union type `ContentPart` is a Pydantic discriminated union over the `type`
 field. Every content part has a `.to_text()` method for serialization.
@@ -44,31 +44,31 @@ This is the canonical message format used throughout the agent runtime: in
 
 ### ChatCompletionRequest
 
-| Field | Type | Description |
-|---|---|---|
-| `prompt` | str | The user's current prompt |
-| `model` | str | Model ID as `provider:model` |
-| `system` | list[str] | System prompt parts |
-| `messages` | list[ModelMessage] | Conversation history |
-| `tools` | set[str] | Tool names the model may call |
-| `output_format` | str | `"json"`, `"auto"`, or None |
-| `output_schema` | dict | JSON schema for structured output |
-| `model_parameters` | dict | Provider-specific overrides (`temperature`, `max_tokens`, etc.) |
-| `context_id` | str | Conversation context identifier |
-| `temperature` | float | Sampling temperature |
-| `top_p` | float | Nucleus sampling |
-| `max_tokens` | int | Max tokens to generate |
+| Field              | Type               | Description                                                     |
+|--------------------|--------------------|-----------------------------------------------------------------|
+| `prompt`           | str                | The user's current prompt                                       |
+| `model`            | str                | Model ID as `provider:model`                                    |
+| `system`           | list[str]          | System prompt parts                                             |
+| `messages`         | list[ModelMessage] | Conversation history                                            |
+| `tools`            | set[str]           | Tool names the model may call                                   |
+| `output_format`    | str                | `"json"`, `"auto"`, or None                                     |
+| `output_schema`    | dict               | JSON schema for structured output                               |
+| `model_parameters` | dict               | Provider-specific overrides (`temperature`, `max_tokens`, etc.) |
+| `context_id`       | str                | Conversation context identifier                                 |
+| `temperature`      | float              | Sampling temperature                                            |
+| `top_p`            | float              | Nucleus sampling                                                |
+| `max_tokens`       | int                | Max tokens to generate                                          |
 
 ### ChatCompletionResponse
 
-| Field | Type | Description |
-|---|---|---|
-| `output` | list[ContentPart] | Parsed response parts |
-| `output_text` | str | Aggregated text output |
-| `reasoning_output` | str | Thinking/reasoning content (if available) |
-| `usage` | dict | Token counts and timing |
-| `model_result` | dict | Raw provider response |
-| `context_id` | str | Conversation context identifier |
+| Field              | Type              | Description                               |
+|--------------------|-------------------|-------------------------------------------|
+| `output`           | list[ContentPart] | Parsed response parts                     |
+| `output_text`      | str               | Aggregated text output                    |
+| `reasoning_output` | str               | Thinking/reasoning content (if available) |
+| `usage`            | dict              | Token counts and timing                   |
+| `model_result`     | dict              | Raw provider response                     |
+| `context_id`       | str               | Conversation context identifier           |
 
 ## Provider mappings
 
@@ -79,13 +79,13 @@ format. The tables below show how each content part type maps.
 
 Message history is converted by `model_messages_to_ollama_format()`.
 
-| ContentPart | Ollama wire format |
-|---|---|
-| `TextContent` | `{"role": <role>, "content": <text>}` |
-| `JsonContent` | `{"role": <role>, "content": json.dumps(data)}` |
-| `ToolCallContent` | `{"role": "tool", "tool_calls": [{"function": {"name": ..., "arguments": ...}}], "content": ...}` |
-| `ToolCallResultContent` | `{"role": "tool", "content": "Tool call result: ..."}` |
-| Other types | `{"role": <role>, "content": "[<type>] <to_text()>"}` |
+| ContentPart             | Ollama wire format                                                                                |
+|-------------------------|---------------------------------------------------------------------------------------------------|
+| `TextContent`           | `{"role": <role>, "content": <text>}`                                                             |
+| `JsonContent`           | `{"role": <role>, "content": json.dumps(data)}`                                                   |
+| `ToolCallContent`       | `{"role": "tool", "tool_calls": [{"function": {"name": ..., "arguments": ...}}], "content": ...}` |
+| `ToolCallResultContent` | `{"role": "tool", "content": "Tool call result: ..."}`                                            |
+| Other types             | `{"role": <role>, "content": "[<type>] <to_text()>"}`                                             |
 
 **System prompt:** Each part becomes a separate `{"role": "system", "content": ...}` message at the start.
 
@@ -101,12 +101,12 @@ Message history is converted by `model_messages_to_ollama_format()`.
 
 Uses the OpenAI Responses API (`client.responses.create`).
 
-| ContentPart | OpenAI wire format |
-|---|---|
-| `TextContent` | `{"role": <role>, "content": <text>}` |
-| `JsonContent` | `{"role": <role>, "content": json.dumps(data)}` |
-| `ToolCallContent` | `{"type": "function_call", "call_id": ..., "name": ..., "arguments": json.dumps(...)}` |
-| `ToolCallResultContent` | `{"type": "function_call_output", "call_id": ..., "output": <result>}` |
+| ContentPart             | OpenAI wire format                                                                     |
+|-------------------------|----------------------------------------------------------------------------------------|
+| `TextContent`           | `{"role": <role>, "content": <text>}`                                                  |
+| `JsonContent`           | `{"role": <role>, "content": json.dumps(data)}`                                        |
+| `ToolCallContent`       | `{"type": "function_call", "call_id": ..., "name": ..., "arguments": json.dumps(...)}` |
+| `ToolCallResultContent` | `{"type": "function_call_output", "call_id": ..., "output": <result>}`                 |
 
 If a `ToolCallResultContent` appears without a preceding `ToolCallContent` for
 the same `call_id`, a placeholder `function_call` entry is injected to satisfy
@@ -130,13 +130,13 @@ the API.
 
 Uses the Messages API (`client.messages.create`).
 
-| ContentPart | Anthropic wire format |
-|---|---|
-| `TextContent` | `{"role": <role>, "content": <text>}` |
-| `JsonContent` | `{"role": <role>, "content": json.dumps(data)}` |
-| `ToolCallContent` | `{"role": "assistant", "content": [{"type": "tool_use", "id": <call_id>, "name": ..., "input": ...}]}` |
+| ContentPart             | Anthropic wire format                                                                                      |
+|-------------------------|------------------------------------------------------------------------------------------------------------|
+| `TextContent`           | `{"role": <role>, "content": <text>}`                                                                      |
+| `JsonContent`           | `{"role": <role>, "content": json.dumps(data)}`                                                            |
+| `ToolCallContent`       | `{"role": "assistant", "content": [{"type": "tool_use", "id": <call_id>, "name": ..., "input": ...}]}`     |
 | `ToolCallResultContent` | `{"role": "user", "content": [{"type": "tool_result", "tool_use_id": <call_id>, "content": str(result)}]}` |
-| Other types | `{"role": <role>, "content": <to_text()>}` |
+| Other types             | `{"role": <role>, "content": <to_text()>}`                                                                 |
 
 System-role messages in history are **skipped** (system prompt is passed separately).
 

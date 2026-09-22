@@ -10,6 +10,7 @@ from geenii.agent.tasks import (
 from geenii.agent.base import message_to_prompt
 from geenii.chat_models import ContentPart
 from geenii.pm.process_manager_client import ProcessManagerClient
+from geenii.skills import register_skill_scripts
 from geenii.tools import init_builtin_tools, init_mcp_server_tools
 from geenii.core.process_tools import init_process_tools
 
@@ -18,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 class Agent(BaseAgent):
     """Default Agent"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     async def _initialize(self):
         """Initialize the agent by loading built-in tools, MCP server tools, and any tools from loaded skills."""
@@ -36,7 +40,7 @@ class Agent(BaseAgent):
         for tool_name in self.allowed_tools:
             if not self.tools.has(tool_name):
                 logging.warning(f"Tool {tool_name} not found in tools registry")
-                continue
+                #continue
             _allowed_tools.add(tool_name)
         self.allowed_tools = _allowed_tools
 
@@ -85,8 +89,8 @@ class Agent(BaseAgent):
 class RoutingAgent(Agent):
     """Routing Agent"""
 
-    def __init__(self, name: str, **kwargs):
-        super().__init__(name, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     async def _handle_prompt(self, message: str | list[ContentPart]):
         if await self._handle_makros(message):

@@ -223,4 +223,3 @@ class Member(BaseModel):
     status: str
     joined_at: str
 
-

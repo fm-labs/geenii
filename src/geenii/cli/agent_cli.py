@@ -170,7 +170,7 @@ def agent_run(
     context_id: str = None,
 ):
 
-    click.echo(f"Running agent '{name}' with prompt: {prompt}")
+    click.echo(f"Running agent '{name}' (Context {context_id}) with prompt: {prompt}")
     # _agents = init_agent_registry(auto_load=True)
     # gbot: BaseAgent = _agents.get_instance(name)
 
@@ -208,7 +208,9 @@ def agent_run(
         click.echo(f"Tool names: {tool_names}")
         gbot.allowed_tools = set(tool_names)
     if skills:
-        gbot.skills.load(skills)
+        skill_names = [skill.strip() for skill in skills.split(",")]
+        for skill_name in skill_names:
+            gbot.skills.load(skill_name)
     if output_format:
         if output_format not in ["text", "json"]:
             click.echo(

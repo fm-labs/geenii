@@ -6,7 +6,7 @@ import pydantic
 
 from geenii.agent.base_agent import BaseAgent
 from geenii.bots import BotInterface
-from geenii.skills import SkillRegistry
+from geenii.skills import SkillRegistry, register_skill_scripts
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.mdfile import read_frontmatter_file
 
@@ -68,7 +68,7 @@ class AgentSpec(pydantic.BaseModel):
         return AgentSpec.model_validate(header)
 
 
-def init_agent(agent_conf: AgentSpec, context_id: str = None) -> BaseAgent:
+def init_agent(agent_conf: AgentSpec, context_id: str | None = None) -> BaseAgent:
     # todo check model provider configuration
     # todo check model availability
 
@@ -81,8 +81,12 @@ def init_agent(agent_conf: AgentSpec, context_id: str = None) -> BaseAgent:
     #    tool_registry.register_mcp_server(mcp_server_id, mcp_server_config)
 
     skill_registry = SkillRegistry()
-    for skill in agent_conf.skills:
-        skill_registry.load(skill)
+    if agent_conf.skills is not None:
+        for skill in agent_conf.skills:
+            logger.info(f"Adding skill '{skill}' to agent '{agent_conf.name}'.")
+            skill_spec = skill_registry.load(skill)
+            if skill_spec:
+                register_skill_scripts(skill_spec, tool_registry)
 
     agent_class_name = "geenii.agents.Agent"
     if agent_conf.class_name is not None:
@@ -94,6 +98,7 @@ def init_agent(agent_conf: AgentSpec, context_id: str = None) -> BaseAgent:
         module = __import__(module_path, fromlist=[class_name])
         agent_class = getattr(module, class_name)
 
+        logger.info(f"Loading agent '{agent_conf.name}' with class '{agent_conf.class_name}' and Context '{context_id}'.")
         agent = agent_class(name=agent_conf.name, description=agent_conf.description,
                             model=agent_conf.model, system_prompt=agent_conf.full_instructions,
                             allowed_tools=set(agent_conf.tools), mcp_servers=agent_conf.mcp_servers,

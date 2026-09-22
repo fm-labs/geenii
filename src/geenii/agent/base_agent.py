@@ -40,7 +40,7 @@ class BaseAgent(BotInterface, abc.ABC):
         self.model = model or DEFAULT_COMPLETION_MODEL
         self.system_prompt = system_prompt or DEFAULT_AGENT_SYSTEM_PROMPT
         self.developer_prompt = ""
-        self.context_id = context_id or uuid.uuid4().hex
+        self.context_id = context_id or uuid.uuid7().hex
         self.memory = memory or None
         self.allowed_tools: Set[str] = allowed_tools or set()
         self.mcp_servers: Set[str] = mcp_servers or set()
@@ -51,6 +51,7 @@ class BaseAgent(BotInterface, abc.ABC):
         self._tasks: asyncio.Queue[BaseTask] = asyncio.Queue()
         self._hitl = hitl or NoHumanInTheLoopController()
 
+        logger.info(f"Context ID: {self.context_id} ({context_id})")
         self._init_memory()
         self._initialized = False
 

@@ -6,6 +6,7 @@ import logging
 import os
 import subprocess
 from pathlib import Path
+import shlex
 from typing import Any
 
 from geenii.tool.common import Tool
@@ -22,15 +23,21 @@ class ScriptTool(Tool):
         self.script_path = script_path
 
     async def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
-        input_json = json.dumps(args)
+        #input_json = json.dumps(args)
+        arg_str = args.get("args")
+        cmd = [self.script_path]
+        if arg_str:
+            cmd.extend(shlex.split(arg_str))
+        print("ScriptTool CMD", cmd)
+
         _env = os.environ.copy()
         if env:
             _env.update(env)
 
         result = await asyncio.to_thread(
             subprocess.run,
-            [self.script_path],
-            input=input_json,
+            cmd,
+            #input=input_json,
             capture_output=True,
             text=True,
             env=_env,

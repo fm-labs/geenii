@@ -79,26 +79,24 @@ class SkillRegistry:
         self.skills[skill.name] = skill
         logger.info(f"Skill '{skill.path}' registered.")
 
-    def load(self, skill_names: str | list[str]) -> None:
-        if isinstance(skill_names, str):
-            skill_names = [skill.strip() for skill in skill_names.split(",")]
-        for skill_name in skill_names:
-            try:
-                skill = self.skills[skill_name] if skill_name in self.skills else None
-                if skill:
-                    logger.info(f"Skill '{skill_name}' already loaded.")
-                    continue
+    def load(self, skill_name: str) -> SkillSpec | None:
+        try:
+            skill = self.skills[skill_name] if skill_name in self.skills else None
+            if skill:
+                logger.info(f"Skill '{skill_name}' already loaded.")
+                return skill
 
-                skill_dir = locate_skill_path(skill_name)
-                if not skill_dir:
-                    #raise KeyError(f"Skill '{skill_name}' not found.")
-                    logger.warning(f"Skill '{skill_name}' does not exist or is not a directory.")
-                    continue
-                skill = SkillSpec.from_path(skill_dir)
-                self.register(skill)
-            except Exception as e:
-                logger.critical(f"Error while loading skill: {str(e)}", exc_info=False)
-                raise e
+            skill_dir = locate_skill_path(skill_name)
+            if not skill_dir:
+                #raise KeyError(f"Skill '{skill_name}' not found.")
+                logger.warning(f"Skill '{skill_name}' does not exist or is not a directory.")
+                return None
+            skill = SkillSpec.from_path(skill_dir)
+            self.register(skill)
+            return skill
+        except Exception as e:
+            logger.critical(f"Error while loading skill: {str(e)}", exc_info=False)
+            raise e
 
     def match_triggers(self, prompt: str) -> list[str]:
         """Return skill names whose triggers match words in the prompt (case-insensitive, word-boundary)."""
@@ -153,19 +151,23 @@ class SkillRegistry:
 #     return skill
 
 def skill_paths() -> list[str]:
-    skill_paths = [
-        os.path.join(get_user_home_dir(), ".geenii", "skills"),
+    _skill_paths = [
+        #os.path.join(GEENII_DIR, "skills"),
         os.path.join(GEENII_WORKING_DIR, ".geenii", "skills"),
-        os.path.join(GEENII_DIR, "skills"),
+        os.path.join(get_user_home_dir(), ".geenii", "skills"),
     ]
     _settings = read_user_settings()
     if "skill_dirs" in _settings:
         for skill_dir in _settings["skill_dirs"]:
             if os.path.isdir(skill_dir):
-                skill_paths.append(skill_dir)
+                _skill_paths.append(skill_dir)
             else:
                 print(f"Warning: Skill directory '{skill_dir}' does not exist or is not a directory.")
-    return skill_paths
+
+
+    # remove duplicates
+    _skill_paths = list(dict.fromkeys(_skill_paths))
+    return _skill_paths
 
 
 def locate_skill_path(skill_name: str) -> Path | None:
@@ -193,13 +195,16 @@ def register_skill_scripts(skill: SkillSpec, tool_registry) -> list[str]:
     from geenii.tool.script import ScriptTool
 
     scripts_dir = Path(skill.path) / "scripts"
+    logger.info("Registering scripts in skill directory: %s", scripts_dir)
     if not scripts_dir.is_dir():
         return []
 
     skill_base = Path(skill.path).resolve()
     registered = []
     for script in sorted(scripts_dir.iterdir()):
+        logger.info(f"Registering script '{script.stem}' in skill directory: {script}")
         if not script.is_file() or not os.access(str(script), os.X_OK):
+            logger.warning("Script is not executable: %s", script)
             continue
         resolved = script.resolve()
         if not str(resolved).startswith(str(skill_base)):
@@ -213,7 +218,7 @@ def register_skill_scripts(skill: SkillSpec, tool_registry) -> list[str]:
             name=tool_name,
             description=f"Script from skill '{skill.name}': {script.stem}",
             script_path=str(resolved),
-            parameters={"type": "object", "properties": {"args": {"type": "object"}}},
+            parameters={"type": "object", "properties": {"args": {"type": "string", "description": "The tool arguments"}}},
         )
         tool_registry.register(tool)
         registered.append(tool_name)

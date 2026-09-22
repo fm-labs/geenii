@@ -169,6 +169,7 @@ class LLMTask(BaseAgentTask):
         # run sync task in thread pool to avoid blocking the event loop while waiting for the response
         request = ChatCompletionRequest(
             prompt=prompt,
+            temperature=0.0,
             model=self.agent.model,
             system=full_system_prompt,
             messages=input_messages,

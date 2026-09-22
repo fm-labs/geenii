@@ -163,9 +163,9 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             openai_tools = [tool_def for tool_def in tool_defs if tool_def['name'] in tools]
             # print("Mapped OpenAI tools:", openai_tools)
             ollama_tools = [map_openai_tool_to_ollama(tool_def) for tool_def in openai_tools]
-            logger.debug(
+            logger.info(
                 f"Mapped {len(openai_tools)} tools to Ollama format, {[tool['function']['name'] for tool in ollama_tools]}")
-            # print("Mapped tools:", ollama_tools)
+            print("Mapped tools:", ollama_tools)
 
         # messages that will be sent to the Ollama API in the format expected by the API
         input_messages = []

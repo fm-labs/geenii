@@ -20,15 +20,15 @@ assigns a `context_id`, logs the request/response, and records token usage
 `geenii/provider/interfaces.py` defines one base plus one interface per
 capability; a provider implements whichever subset it supports:
 
-| Interface | Method |
-|---|---|
-| `AIProvider` | `is_configured()`, `get_capabilities()`, `get_models()` |
-| `AICompletionProvider` | `generate_completion(model, prompt, **kwargs)` |
-| `AIChatCompletionProvider` | `generate_chat_completion(request, tool_registry)` — the one the agent runtime uses |
-| `AIImageGeneratorProvider` | `generate_image(model, prompt, **kwargs)` |
-| `AISpeechGeneratorProvider` | `generate_speech(model, text, **kwargs)` |
-| `AIAudioTranscriptionProvider` | `generate_audio_transcription(model, audio, **kwargs)` |
-| `AIAudioTranslationProvider` | `generate_audio_translation(model, audio, target_language, **kwargs)` |
+| Interface                      | Method                                                                              |
+|--------------------------------|-------------------------------------------------------------------------------------|
+| `AIProvider`                   | `is_configured()`, `get_capabilities()`, `get_models()`                             |
+| `AICompletionProvider`         | `generate_completion(model, prompt, **kwargs)`                                      |
+| `AIChatCompletionProvider`     | `generate_chat_completion(request, tool_registry)` — the one the agent runtime uses |
+| `AIImageGeneratorProvider`     | `generate_image(model, prompt, **kwargs)`                                           |
+| `AISpeechGeneratorProvider`    | `generate_speech(model, text, **kwargs)`                                            |
+| `AIAudioTranscriptionProvider` | `generate_audio_transcription(model, audio, **kwargs)`                              |
+| `AIAudioTranslationProvider`   | `generate_audio_translation(model, audio, target_language, **kwargs)`               |
 
 All provider calls are synchronous; the agent runtime wraps them in
 `asyncio.to_thread`.

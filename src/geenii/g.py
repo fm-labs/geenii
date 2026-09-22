@@ -43,9 +43,9 @@ def make_app_directories():
 
 def agent_paths():
     return [
-        f"{get_user_home_dir()}/.geenii/agents",
         f"{GEENII_WORKING_DIR}/.geenii/agents",
-        f"{GEENII_DIR}/agents",
+        #f"{GEENII_DIR}/agents",
+        f"{get_user_home_dir()}/.geenii/agents",
     ]
 
 
@@ -74,10 +74,11 @@ def init_agent_by_name(name: str, context_id: str | None = None) -> BaseAgent:
     md_file_path = locate_agent_md_file(name)
     if md_file_path is None:
         if name == "default":
-            return init_fallback_agent()
+            return init_fallback_agent(context_id=context_id)
         raise ValueError(f"Agent '{name}' not found.")
 
     try:
+        print(f"Loading agent '{name}' (Context {context_id})")
         agent_conf = AgentSpec.from_md_file(md_file_path)
         return init_agent(agent_conf, context_id=context_id)
     except Exception as e:
@@ -98,6 +99,7 @@ def init_fallback_agent(context_id: str | None = None) -> BaseAgent:
 def init_global_skill_registry() -> SkillRegistry:
     skill_reg = SkillRegistry()
     for skill_path in skill_paths():
+        print("Loading skills from", skill_path)
         skill_reg.register_all_from_directory(skill_path)
     return skill_reg
 
