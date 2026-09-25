@@ -346,7 +346,7 @@ class LLMTask(BaseAgentTask):
                 request.messages = list(
                     self.agent.message_history[-self.MAX_MESSAGE_HISTORY:]
                 )
-                #request.tools = set()
+                request.prompt = ""  # already in history; re-sending it after the tool result makes the model ask again
                 response2 = await asyncio.to_thread(self._request_completion, request)
                 logger.info(
                     f"Received model response after {tools_called} tool calls with {len(response2.output)} content parts."

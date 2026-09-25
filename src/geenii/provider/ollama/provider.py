@@ -496,6 +496,7 @@ def model_messages_to_ollama_format(messages: List[ModelMessage]) -> List[dict]:
                     # print(f"Adding message with role {role} and tool call result content: {content_item.result}")
                     _message = {
                         'role': 'tool',
+                        'tool_name': content_item.name,
                         'content': f"Tool call result: {str(content_item.result)}",
                     }
                 else:
