@@ -142,12 +142,12 @@ class _RunningProcess:
 class ProcessManager:
     """Manage background subprocesses with file-backed output capture (asyncio)."""
 
-    def __init__(self, processes_dir: str = PROCESSES_DIR) -> None:
-        self._processes_dir = processes_dir
+    def __init__(self, processes_dir: Optional[str] = None) -> None:
+        # Resolved at call time, so the module default can be redirected (e.g. in tests)
+        self._processes_dir = processes_dir or PROCESSES_DIR
         self._procs: Dict[str, _RunningProcess] = {}
         # Serializes the check-and-register part of start() across awaits
         self._start_lock = asyncio.Lock()
-        self._reconcile_orphans()
 
     def _make_pid(self) -> str:
         return uuid.uuid4().hex[:12]
@@ -173,10 +173,17 @@ class ProcessManager:
         with open(meta_path, "r") as f:
             return json.load(f)
 
-    def _reconcile_orphans(self) -> None:
-        """Mark processes left 'running' on disk by a previous manager instance as orphaned."""
+    def recover(self) -> List[str]:
+        """Mark processes left 'running' on disk by a previous manager instance as orphaned.
+
+        Call once when the owning service starts (the daemon does). Not done in
+        __init__: other short-lived instances sharing the directory (e.g. a
+        local `geenii scheduler run`) must not touch the daemon's live records.
+        Returns the IDs marked as orphaned.
+        """
+        orphaned: List[str] = []
         if not os.path.isdir(self._processes_dir):
-            return
+            return orphaned
         for name in os.listdir(self._processes_dir):
             if not _PID_RE.match(name):
                 continue
@@ -188,9 +195,11 @@ class ProcessManager:
                 info.state = ProcessState.ORPHANED
                 info.error = "process manager exited while the process was running; final state unknown"
                 self._write_meta(info)
+                orphaned.append(name)
                 logger.warning(f"Marked process {name} (system pid {info.system_pid}) as orphaned")
             except Exception as exc:
                 logger.error(f"Could not reconcile process directory {name}: {exc}")
+        return orphaned
 
     # ------------------------------------------------------------------
     # Core API
@@ -288,6 +297,22 @@ class ProcessManager:
             raise ValueError(f"Invalid stream {stream!r}: must be 'stdout' or 'stderr'")
         log_file = os.path.join(self._proc_path(pid), f"{stream}.log")
         return await asyncio.to_thread(self._read_log, pid, stream, log_file, tail)
+
+    async def wait(self, pid: str, timeout: Optional[float] = None) -> ProcessInfo:
+        """
+        Wait until a process has finished and return its final ProcessInfo.
+
+        Returns immediately for processes that already finished (or are orphaned).
+        Cancelling the wait does not affect the process.
+
+        :param timeout: Maximum seconds to wait; raises asyncio.TimeoutError when exceeded.
+        """
+        validate_pid(pid)
+        rp = self._procs.get(pid)
+        if rp is not None and rp.waiter is not None:
+            await asyncio.wait_for(asyncio.shield(rp.waiter), timeout=timeout)
+            return rp.info
+        return await self.status(pid)
 
     async def kill(self, pid: str, *, force: bool = False) -> ProcessInfo:
         """

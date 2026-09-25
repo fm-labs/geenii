@@ -40,6 +40,7 @@ Issues = "https://github.com/fm-labs/geenii/issues"
 [project.scripts]
 geenii = "geenii.cli.main:main"
 geenii-scheduler = "geenii.scheduler:main"
+geenii-daemon = "geenii.daemon.server:main"
 
 [dependency-groups]
 dev = [

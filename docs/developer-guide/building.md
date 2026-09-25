@@ -172,4 +172,5 @@ Defined in `pyproject.toml` under `[project.scripts]`:
 | Console script | Module | Purpose |
 |---|---|---|
 | `geenii` | `geenii.cli.main:main` | Main CLI |
-| `geenii-scheduler` | `geenii.scheduler:main` | Standalone scheduler process |
+| `geenii-daemon` | `geenii.daemon.server:main` | The geenii daemon (process manager, scheduler, supervisor) |
+| `geenii-scheduler` | `geenii.scheduler:main` | Alias: runs the daemon with the given scheduler config |

@@ -44,8 +44,8 @@ geenii models list                   # available models
 geenii tools list                    # registered tools
 geenii skills list                   # installed skills
 geenii mcp server list               # MCP servers
-geenii scheduler start               # start the task scheduler
-geenii pm serve                      # start the process manager
+geenii daemon start                  # process manager + scheduler + supervisor
+geenii daemon status                 # is it running, what does it host
 ```
 
 See the [Cheatsheet](docs/cheatsheet.md) for more commands.

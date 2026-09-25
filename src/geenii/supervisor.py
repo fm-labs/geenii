@@ -1,16 +1,34 @@
 """
-Process supervisor
+Process supervisor.
+
+Services can be declared in a JSON file (services.json), which the geenii
+daemon applies at startup and on reload:
+
+    {
+        "services": [
+            {
+                "name": "web",
+                "cmd": ["python", "-m", "http.server", "8000"],
+                "restart": true,
+                "env": {"PYTHONUNBUFFERED": "1"},
+                "cwd": "~/site",
+                "enabled": true
+            }
+        ]
+    }
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import os
 import time
 import uuid
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import partial
+from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Literal, Optional
 
 import pydantic
@@ -41,6 +59,58 @@ class ProcConfig:
     env: Optional[Dict[str, str]] = None   # extra vars; merged into os.environ at spawn time
     cwd: Optional[str] = None
     capture_output: bool = True
+
+
+class ServiceConfig(pydantic.BaseModel):
+    """One entry of a services config file."""
+    model_config = {"extra": "allow"}
+
+    name: str = pydantic.Field(min_length=1)
+    cmd: List[str] = pydantic.Field(min_length=1)
+    restart: bool = True
+    env: Optional[Dict[str, str]] = None
+    cwd: Optional[str] = None
+    capture_output: bool = True
+    enabled: bool = True
+
+
+def read_services(config_path: str | Path) -> List[ProcConfig]:
+    """Parse the enabled services of a services config file.
+
+    `$VAR` in cmd and cwd is expanded from the daemon's environment, and `~`
+    in cwd. Invalid entries, disabled services and duplicate names are logged
+    and skipped. Raises FileNotFoundError / ValueError for a missing or
+    unparsable file.
+    """
+    config_path = Path(config_path)
+    data = json.loads(config_path.read_text())
+    if not isinstance(data, dict):
+        raise ValueError(f"{config_path}: expected a JSON object with a 'services' list")
+
+    services: List[ProcConfig] = []
+    names: set[str] = set()
+    for entry in data.get("services", []):
+        try:
+            conf = ServiceConfig.model_validate(entry)
+        except pydantic.ValidationError as e:
+            logger.error("Invalid service in %s: %s — skipping entry: %s", config_path, e, entry)
+            continue
+        if not conf.enabled:
+            logger.info("Service '%s' is disabled — skipping", conf.name)
+            continue
+        if conf.name in names:
+            logger.error("Duplicate service name '%s' in %s — skipping", conf.name, config_path)
+            continue
+        names.add(conf.name)
+        services.append(ProcConfig(
+            name=conf.name,
+            cmd=[os.path.expandvars(arg) for arg in conf.cmd],
+            restart=conf.restart,
+            env=conf.env,
+            cwd=os.path.expanduser(os.path.expandvars(conf.cwd)) if conf.cwd else None,
+            capture_output=conf.capture_output,
+        ))
+    return services
 
 
 class UpdateProcRequest(pydantic.BaseModel):
@@ -151,6 +221,8 @@ class Supervisor:
         self._backoff: Dict[str, float] = {}
         # Names of finished one-shot run() jobs, oldest first; evicted ones lose their LogBus
         self._run_history: deque[str] = deque()
+        # Services declared in the config file, as last applied (copies; see apply_services)
+        self._configured: Dict[str, ProcConfig] = {}
 
     def is_active(self) -> bool:
         # True if a process is running or any watcher tasks are active; used for graceful shutdowns
@@ -276,6 +348,39 @@ class Supervisor:
             self._backoff[name] = BACKOFF_INITIAL
             self._ensure_watcher_locked(name)
 
+    async def apply_services(self, services: List[ProcConfig]) -> Dict[str, List[str]]:
+        """Make the config-file services match `services` (the file's current content).
+
+        - new services, and file services not currently desired (e.g. stopped
+          via the API), are started;
+        - services removed from the file are stopped;
+        - services whose definition changed are updated and restarted now.
+        Services added through the API (ensure) and not in the file are untouched.
+        """
+        new = {c.name: c for c in services}
+        old = self._configured
+        started, stopped, restarted = [], [], []
+
+        for name in sorted(set(old) - set(new)):
+            await self.stop_process(name, disable_restart=True)
+            stopped.append(name)
+
+        for name, cfg in new.items():
+            if name not in self._configs:
+                await self.ensure(name, replace(cfg))
+                started.append(name)
+            elif name not in old or old[name] != cfg:
+                # Changed in the file (or an API-defined service now declared in the file)
+                await self.ensure(name, replace(cfg))
+                await self.restart_process(name)
+                restarted.append(name)
+
+        # Snapshot copies: ensure() stores its own object, which update_config() mutates
+        self._configured = {name: replace(cfg) for name, cfg in new.items()}
+        changes = {"started": sorted(started), "stopped": stopped, "restarted": sorted(restarted)}
+        logger.info("Applied services config: %s", changes)
+        return changes
+
     async def update_config(self, name: str, req: "UpdateProcRequest") -> None:
         async with self._lock:
             cfg = self._configs.get(name)
@@ -293,6 +398,7 @@ class Supervisor:
         out: Dict[str, Any] = {"desired": {}, "running": {}, "watchers": {}}
         for name, cfg in self._configs.items():
             out["desired"][name] = {
+                "source": "config" if name in self._configured else "api",
                 "cmd": cfg.cmd,
                 "restart": cfg.restart,
                 "cwd": cfg.cwd,

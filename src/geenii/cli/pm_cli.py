@@ -1,11 +1,10 @@
-import asyncio
 import json
 import shlex
 
 import click
 
+from geenii.daemon.client import SOCKET_ENV_VARS
 from geenii.pm.process_manager_client import ProcessManagerClient
-from geenii.pm.process_manager_service import ProcessManagerService
 
 
 def _client(ctx) -> ProcessManagerClient:
@@ -14,8 +13,8 @@ def _client(ctx) -> ProcessManagerClient:
 
 
 @click.group()
-@click.option("--socket", "-s", default=None, envvar="GEENII_PM_SOCKET",
-              help="Path to the process manager Unix socket.")
+@click.option("--socket", "-s", default=None, envvar=list(SOCKET_ENV_VARS),
+              help="Path to the geenii daemon's Unix socket.")
 @click.pass_context
 def pm(ctx, socket):
     """Manage background processes."""
@@ -26,22 +25,23 @@ def pm(ctx, socket):
 @pm.command()
 @click.pass_context
 def ping(ctx):
-    """Check if the process manager service is running."""
+    """Check if the geenii daemon (which hosts the process manager) is running."""
     client = _client(ctx)
     if client.is_available():
         click.echo("Process manager is running.")
     else:
-        click.echo("Process manager is not reachable.")
+        click.echo("Process manager is not reachable (is `geenii daemon start` running?).")
         raise SystemExit(1)
 
 
 @pm.command()
 @click.option("--socket", "-s", default=None, help="Path to the Unix socket to listen on.")
-def serve(socket):
-    """Start the process manager service."""
-    service = ProcessManagerService(socket) if socket else ProcessManagerService()
-    click.echo(f"Starting process manager on {service.socket_path}")
-    asyncio.run(service.serve_forever())
+@click.pass_context
+def serve(ctx, socket):
+    """Alias for `geenii daemon start`: runs the daemon, which hosts the process manager."""
+    from geenii.cli.daemon_cli import start_daemon
+    from geenii.daemon.server import DEFAULT_SCHEDULER_CONFIG
+    start_daemon(socket or ctx.obj or None, DEFAULT_SCHEDULER_CONFIG)
 
 
 @pm.command()
@@ -76,6 +76,26 @@ def output(ctx, process_id, stream, tail):
     client = _client(ctx)
     text = client.output(process_id, stream=stream, tail=tail)
     click.echo(text, nl=False)
+
+
+@pm.command()
+@click.argument("process_id")
+@click.option("--timeout", "-t", type=float, default=None, help="Give up after this many seconds.")
+@click.pass_context
+def wait(ctx, process_id, timeout):
+    """Wait until a background process has finished and print its final state.
+
+    Exits with the process's exit code (1 if it was killed or orphaned).
+    """
+    client = _client(ctx)
+    try:
+        result = client.wait(process_id, timeout=timeout)
+    except RuntimeError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(2 if "TimeoutError" in str(exc) else 1)
+    click.echo(json.dumps(result, indent=2))
+    code = result.get("exit_code")
+    raise SystemExit(code if isinstance(code, int) and code >= 0 else 1)
 
 
 @pm.command()

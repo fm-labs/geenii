@@ -1,13 +1,14 @@
 # Process Management: Supervisor, Scheduler, Process Manager
 
-Geenii has three separate building blocks that start and manage external
-processes. They overlap a little, but each solves a different problem:
+Geenii has three building blocks that start and manage external processes.
+Each solves a different problem, and all three run inside one process, the
+[geenii daemon](#the-geenii-daemon-geeniidaemon):
 
 | Component | Module | Model | Runs as | Used by |
 |---|---|---|---|---|
-| **Supervisor** | `geenii/supervisor.py` | Desired state: keep long-lived processes up and restart them when they exit | Library (asyncio), embedded in a host process | The server repository (`/api/v1/supervisor/*`, consumed by `data/apps/geenii-supervisor`). Nothing in this repo calls it. |
-| **Scheduler** | `geenii/scheduler.py` | Time-based: run a command or Python callable on a cron schedule or once at a set time | Standalone daemon (`geenii-scheduler`, `geenii scheduler start`) or embedded | CLI, cron-style agent runs |
-| **Process Manager** | `geenii/pm/` | Fire and forget: start a background job, get an ID back, check its state and output later | Unix-socket JSON-RPC service plus a synchronous client | `ProcessingAgent` (the `bg_process_*` tools), `geenii pm` CLI |
+| **Supervisor** | `geenii/supervisor.py` | Desired state: keep long-lived processes up and restart them when they exit | Inside the daemon (`supervisor.*` methods); also embedded by the server repository | `geenii supervisor` CLI and `supervisor.*` RPC; the server repository (`/api/v1/supervisor/*`, consumed by `data/apps/geenii-supervisor`) |
+| **Scheduler** | `geenii/scheduler.py` | Time-based: run a command or Python callable on a cron schedule or once at a set time | Inside the daemon, with tasks from `scheduler.json` | CLI, cron-style agent runs, `scheduler.*` RPC |
+| **Process Manager** | `geenii/pm/` | Fire and forget: start a background job, get an ID back, check its state and output later | Inside the daemon (`pm.*` methods), plus a synchronous client | `ProcessingAgent` (the `bg_process_*` tools), `geenii pm` CLI |
 
 Rule of thumb:
 
@@ -16,8 +17,102 @@ Rule of thumb:
 - A process that an **agent or user starts on demand** and checks on later belongs in the **Process Manager**.
 
 For how to configure and use the scheduler, see the user guide page
-[Scheduler](../user-guide/scheduler.md). For the `geenii pm` and
-`geenii scheduler` commands, see the [CLI reference](../cli-reference/index.md).
+[Scheduler](../user-guide/scheduler.md). For the `geenii daemon`, `geenii pm`
+and `geenii scheduler` commands, see the [CLI reference](../cli-reference/index.md).
+
+---
+
+## The geenii daemon (`geenii/daemon/`)
+
+All three components run inside **one process**, the geenii daemon, on one
+event loop. They are reached through **one Unix socket**.
+
+```
+ agents (ProcessManagerClient) · geenii pm / daemon CLI · other DaemonClient users
+        │  DaemonClient (sync, one connection per call)
+        ▼
+  Unix socket  $GEENII_CACHE_DIR/geenii.sock   (newline-delimited JSON-RPC)
+        │
+  DaemonServer (daemon/server.py): socket, dispatch, lifecycle
+        │
+  ProcessHost (daemon/host.py): owns the components, registers their RPC methods
+        ├── ProcessManager   pm.*
+        ├── Scheduler        scheduler.*   (tasks from $GEENII_DIR/scheduler.json)
+        └── Supervisor       supervisor.*
+```
+
+| Module | Contents |
+|---|---|
+| `daemon/client.py` | `DaemonClient` with `call(method, params)`, `is_available()`, `info()` and `shutdown()`. Also `default_socket_path()`: `GEENII_SOCKET`, then `GEENII_PM_SOCKET`, then `$GEENII_CACHE_DIR/geenii.sock`. It imports nothing heavy, so agents can use it cheaply. |
+| `daemon/host.py` | `ProcessHost(pm=, scheduler=, supervisor=, scheduler_config=, services_config=)`. `scheduler_config` and `services_config` are the files that `scheduler.reload` and `supervisor.reload` re-read. `start()` runs `pm.recover()`, applies the services file (if one exists; errors are logged, not fatal), then starts the scheduler loop. `stop()` stops, in order: the scheduler (its running tasks are cancelled and their processes killed), then the supervised processes, then `pm.shutdown()`. `methods` maps RPC names to coroutines. |
+| `daemon/server.py` | `DaemonServer(host, socket_path)`, `build_host(scheduler_config)`, `run_daemon()` and `main()`, which is the `geenii-daemon` entry point. |
+
+**Starting.** Run `geenii daemon start [--socket] [--scheduler-config]`.
+The following are aliases for it:
+- `geenii pm serve`
+- `geenii scheduler start`
+- `geenii-scheduler CONFIG`
+- `geenii-daemon`
+- `python -m geenii.pm.process_manager_service`
+
+Only one daemon can own a socket. If the socket file exists and something
+answers on it, `start()` raises `DaemonAlreadyRunning`. A stale file with
+nothing listening is replaced.
+
+**Stopping.** Stop the daemon with `geenii daemon stop` (RPC
+`daemon.shutdown`) or with SIGINT/SIGTERM. The server first stops accepting
+connections, then calls `ProcessHost.stop()`, then removes the socket file.
+
+### CLI
+
+| Command group | Talks to the daemon | Without a daemon |
+|---|---|---|
+| `geenii daemon` | `start`, `status`, `stop` | `status` and `stop` exit with code 1 |
+| `geenii pm` | every command except `serve` (an alias of `daemon start`) | Commands fail; `ping` exits with code 1 |
+| `geenii scheduler` | `status` (live table), `run` (starts in the daemon), `add`/`remove` (edit the file, then `scheduler.reload`), `reload` | Works on the config file: offline `status`, local `run`, and file edits only. The same fallback applies when the daemon uses a different config file |
+| `geenii supervisor` | `status`, `start`, `stop`, `restart`, `logs` | Commands exit with code 1 |
+
+### Wire protocol
+
+Each request and response is one JSON object followed by a newline. A single
+connection may send several requests.
+
+```json
+→ {"method": "pm.start", "params": {"command": "sleep 5; echo done"}}
+← {"ok": true, "result": {"pid": "a1b2c3d4e5f6", "shell": true, "state": "running", ...}}
+← {"ok": false, "error": "KeyError: 'Unknown process: xyz'"}
+```
+
+| Method | Params | Result |
+|---|---|---|
+| `ping` | none | `"pong"` |
+| `daemon.info` | none | `pid`, `socket`, `uptime_s`, plus a summary for `pm`, `scheduler` and `supervisor`, each of the last two with its `config` path |
+| `daemon.shutdown` | none | `"shutting down"` (the daemon stops right after replying) |
+| `pm.start` | `command` (string, or list of strings), `env?`, `cwd?`, `pid?` | `ProcessInfo` dict |
+| `pm.status` | `process_id` | `ProcessInfo` dict |
+| `pm.output` | `process_id`, `stream?`, `tail?` (a value of 0 or less means all output) | string |
+| `pm.wait` | `process_id`, `timeout?` | Final `ProcessInfo` dict once the process has finished. Fails with `TimeoutError` after `timeout` seconds; the process keeps running |
+| `pm.kill` | `process_id`, `force?` | `ProcessInfo` dict |
+| `pm.list` | `include_finished?` | list of `ProcessInfo` dicts |
+| `pm.cleanup` | `process_id` | `"ok"` |
+| `scheduler.status` | none | `Scheduler.status` (live: next and last run, `running` flag per task) |
+| `scheduler.run` | `name` | `"started"`. Starts a run now via `Scheduler.run_now()`, without waiting for it. Fails for unknown tasks, or if the task is still running and doesn't allow overlap |
+| `scheduler.reload` | none | `{"added": [...], "removed": [...], "updated": [...]}`. Re-reads the daemon's scheduler config via `Scheduler.reload_config()`. Fails if the daemon was started without a config file |
+| `supervisor.status` | none | `Supervisor.status()` |
+| `supervisor.ensure` | `name`, `cmd` (list of strings), `restart?`, `env?`, `cwd?`, `capture_output?` | `"ok"` |
+| `supervisor.stop` | `name`, `disable_restart?` (default `true`) | `"ok"` |
+| `supervisor.restart` | `name` | `"ok"` |
+| `supervisor.logs` | `name`, `tail?` (default 100) | list of log lines |
+| `supervisor.reload` | none | `{"started": [...], "stopped": [...], "restarted": [...]}`. Applies the daemon's services file via `Supervisor.apply_services()`. Fails if the daemon has no services config or the file is missing or invalid |
+
+`start`, `status`, `output`, `kill`, `list` and `cleanup` without a prefix
+are aliases of the `pm.*` methods, left over from the former standalone
+process manager service.
+
+Errors raised by a handler are returned as `"<ExceptionType>: <message>"`.
+The socket has no authentication. Access is controlled only by the socket
+file's permissions (the process umask), and anyone who can connect can run
+commands.
 
 ---
 
@@ -39,7 +134,7 @@ common conventions:
 | `terminate_sync(popen, grace=5.0)` | The same for a blocking `subprocess.Popen` |
 | `signal_group(proc, sig)` | Signals the process group; works for asyncio processes and `Popen`, and ignores processes that have already exited |
 | `await pump_lines(stream, on_line)` | Reads a stream to EOF and calls `on_line(str)` for each decoded line |
-| `add_shutdown_handlers(on_signal)` | Calls `on_signal` on SIGINT or SIGTERM; for daemons such as `geenii-scheduler` and `geenii pm serve` |
+| `add_shutdown_handlers(on_signal)` | Calls `on_signal` on SIGINT or SIGTERM; used by the geenii daemon |
 
 On platforms without `os.killpg`, `USE_PROCESS_GROUPS` is `False`, and the
 helpers signal the direct child only.
@@ -156,6 +251,34 @@ group.
 | `await stop()` | Sets the stop event, cancels all watchers and terminates all processes. |
 | `is_active()` | `True` while any process is running or any watcher task is alive. Useful for graceful-shutdown loops. |
 
+### Services config file
+
+`services.json` (format in the
+[supervisor CLI reference](../cli-reference/supervisor.md#servicesjson)) declares
+services that the daemon starts at startup.
+
+| Item | Purpose |
+|---|---|
+| `ServiceConfig` | Pydantic schema for one entry: `name`, `cmd`, `restart`, `env`, `cwd`, `capture_output`, `enabled` |
+| `read_services(path)` | Parses the file into `ProcConfig`s. Expands `$VAR` in `cmd`/`cwd` and `~` in `cwd`. Invalid entries, disabled services and duplicate names are logged and skipped. A missing file or bad JSON raises |
+| `await apply_services(configs)` | Makes the file-declared services match `configs` and returns `{"started", "stopped", "restarted"}` |
+
+`apply_services()` keeps a snapshot (`_configured`) of the services it applied
+last. It compares the file against that snapshot, not against the live
+configuration:
+
+- **started:** services that are new in the file, and file services that are
+  currently not desired (for example stopped with `stop_process()`)
+- **stopped:** services removed from the file (`stop_process()`, which also
+  removes their config)
+- **restarted:** services whose definition changed. They are `ensure()`d with
+  the new config and restarted, so the change applies immediately. An ad-hoc
+  service that the file now declares under the same name is taken over this
+  way.
+
+Services created with `ensure()` that aren't in the file are never touched.
+`status()` marks each desired process with `"source": "config"` or `"api"`.
+
 ### Example
 
 ```python
@@ -193,26 +316,49 @@ this section covers the internals.
 | `ScheduledTask` | Dataclass for a runtime task: `name`, `interval`, `cmd` **or** `module` **or** `run_fn`, `params`, `enabled`, `env`, `working_dir`, `timeout`, `allow_overlap` |
 | `ScheduledTask.load()` | Validates the interval, resolves `module` (`"pkg.mod.fn"`) to a callable, and works out how the callable is called (see below). Raises `TypeError` for callables whose signature is not supported. |
 | `ScheduledTask.next_run(after)` | For `at:` tasks, the fixed datetime converted to UTC. For `cron:` tasks, the next croniter match after `after` (default: now, UTC). |
-| `ScheduledTask.run()` | Runs the task under `asyncio.wait_for(..., timeout)`. Failures and timeouts are caught and logged. **Cancellation is passed on**, so the subprocess cleanup can run. |
-| `Scheduler` | Loads the config, runs the main loop, and supports adding and removing tasks at runtime. |
-| `serve(scheduler)` | Installs SIGINT and SIGTERM handlers with `proc.add_shutdown_handlers`, starts the scheduler and waits until it has stopped. Used by both `main()` and `geenii scheduler start`. |
+| `ScheduledTask.run(pm)` | Runs the task under `asyncio.wait_for(..., timeout)`. `cmd` tasks need a `ProcessManager`, and run without one raises `ValueError`. Failures and timeouts are caught and logged. **Cancellation is passed on**, so the process can be killed. |
+| `Scheduler(pm=None)` | Loads the config, runs the main loop, and supports adding and removing tasks at runtime. `pm` runs the `cmd` tasks; if it's missing, a `ProcessManager()` in the default directory is used. |
+| `read_config(path, existing_names=)` | Parses a config file into loaded `ScheduledTask`s. Invalid entries, disabled tasks and duplicate names are logged and skipped. Used by `load_config()` and `reload_config()`. |
+| `await Scheduler.reload_config(path)` | Replaces the task list with the file's tasks while the scheduler runs. New tasks and tasks whose interval changed are rescheduled, and other changes apply at the next run. Runs in progress continue, even for removed tasks. Returns the added, removed and updated names. |
+| `Scheduler.run_now(name)` | Starts a run of the task right away, outside its schedule, and doesn't wait for it. Respects `allow_overlap`. Backs the `scheduler.run` RPC method. |
+| `main()` | The `geenii-scheduler CONFIG` entry point: an alias that runs the geenii daemon with this scheduler config. |
 
-Module constant: `TERMINATE_GRACE_S` (default `proc.TERMINATE_GRACE_S`, 5s),
-the delay between SIGTERM and SIGKILL. The maximum output line length (1 MiB)
-comes from `proc.spawn`.
+Module constant: `RUNS_KEPT_PER_TASK` (10), the number of finished runs kept
+per `cmd` task.
 
 ### Execution of `cmd` tasks
 
+A `cmd` task runs as a **Process Manager process**: the scheduler decides
+*when* to run it, and the Process Manager runs and records it. Inside the
+daemon, `ProcessHost` passes its own `ProcessManager` to the scheduler
+(`scheduler.pm`). A standalone `Scheduler()` creates one in the default
+directory.
+
 1. Each argument is expanded with `os.path.expandvars` (for example `$GEENII_BIN`).
-2. `proc.spawn()` starts the command in its own process group. It merges
-   `env` over `os.environ`, and `working_dir` becomes `cwd`.
-3. `proc.pump_lines()` reads stdout and stderr line by line, and each line is
-   logged immediately (stdout at INFO, stderr at WARNING), so output is never
-   buffered as a whole.
-4. A non-zero exit becomes a `RuntimeError`, which `run()` catches and logs.
-5. If the run is cancelled (by a timeout or by `stop()`), `proc.terminate()`
-   sends `SIGTERM` to the **process group**. After `TERMINATE_GRACE_S` it
-   sends `SIGKILL`. Child processes of the command are stopped too.
+2. `pm.start(argv, env=, cwd=working_dir, pid=<run ID>)` starts the command
+   without a shell, in its own process group. The run ID is
+   `<task>-<UTC YYYYmmddTHHMMSS>-<4 hex>`. The task name is sanitized for
+   process IDs: characters other than `[A-Za-z0-9_-]` become `-`, and it is
+   cut to 40 characters. The ID is stored as `task.last_run_id` and shown in
+   `Scheduler.status`.
+3. `await pm.wait(run_id)`. The output is written to the run's
+   `stdout.log`/`stderr.log`, not to the scheduler log. Read it with
+   `geenii pm output <run ID>`.
+4. A non-zero exit becomes a `RuntimeError` naming the run ID, which `run()`
+   catches and logs.
+5. If the run is cancelled (by a timeout or by `stop()`), the process is
+   killed with `pm.kill()`: `SIGTERM` to the **process group**, then `SIGKILL`
+   if it is still running after `KILL_WAIT_S`. Child processes of the command
+   are stopped too.
+6. **Retention:** after each run, finished runs of the task beyond the newest
+   `RUNS_KEPT_PER_TASK` (10) are deleted with `pm.cleanup()`. Runs are matched
+   by the exact run-ID pattern, so a task named `tick` doesn't touch
+   `tick-other`'s runs. Two task names that sanitize to the same string would
+   share a retention window.
+
+Because runs are ordinary processes, they appear in `geenii pm list`, and
+`geenii pm kill <run ID>` stops one. A killed run counts as a failed run for
+the scheduler.
 
 ### Execution of callables
 
@@ -267,9 +413,8 @@ Behavior that follows from this design:
   task. For `cmd` tasks, cancellation terminates the process group.
 - `wait_until_stopped()` waits for the main loop and gathers the running
   tasks. This includes waiting for the subprocess cleanup to finish.
-- `main()` (the `geenii-scheduler <config>` entry point) initializes logging,
-  loads the config and calls `serve()`. `geenii scheduler start` loads the
-  config once and passes the scheduler to `serve()`.
+- The scheduler has no process of its own. The daemon's `ProcessHost` starts
+  it together with the other components and stops it first on shutdown.
 
 `Scheduler.status` returns the following:
 
@@ -284,28 +429,24 @@ Behavior that follows from this design:
 
 `geenii/pm/` provides a way to run commands in the background. The commands
 outlive the caller (the agent or CLI call that started them), and their output
-is saved to files on disk. It has three layers:
+is saved to files on disk. It runs inside the geenii daemon:
 
 ```
 ProcessingAgent / geenii pm CLI
-        │  ProcessManagerClient (sync, one connection per call)
+        │  ProcessManagerClient (a DaemonClient calling pm.*)
         ▼
-  Unix socket  $GEENII_CACHE_DIR/process_manager.sock   (newline-delimited JSON)
-        │
-  ProcessManagerService (asyncio server; RPC handlers are coroutines on its loop)
-        │
-  ProcessManager (asyncio; children write directly to the log files)
+  geenii daemon  →  ProcessHost  →  ProcessManager (asyncio; children write directly to the log files)
         │
   $GEENII_CACHE_DIR/processes/<pid>/{meta.json, stdout.log, stderr.log}
 ```
 
-The service has to be running before the client can be used:
+The daemon has to be running before the client can be used
+(`geenii daemon start`).
 
-```bash
-geenii pm serve
-```
-
-It can also be started with `python -m geenii.pm.process_manager_service [socket]`.
+`pm/process_manager_service.py` is kept for compatibility.
+`ProcessManagerService(socket_path, pm=)` is a `DaemonServer` whose
+`ProcessHost` uses the given `ProcessManager`, and the module's `main()` runs
+the daemon.
 
 ### Commands: shell or no shell
 
@@ -330,8 +471,7 @@ only checks the start of the string. Anything chained after it, for example
 ### ProcessManager (`process_manager.py`)
 
 An asyncio-based manager. All public methods are coroutines and must run on
-the event loop that owns the manager, which is the `ProcessManagerService`
-loop. Blocking disk work runs in `asyncio.to_thread`: reading logs, scanning
+the event loop that owns the manager, which is the daemon's loop. Blocking disk work runs in `asyncio.to_thread`: reading logs, scanning
 for finished processes, and `rmtree`. Each process gets a short ID: 12 hex
 characters, or a caller-supplied `pid`. That ID is separate from the OS
 `system_pid`.
@@ -353,10 +493,11 @@ rejected as well. An empty `pid` means "auto-generate".
 | `await start(cmd, env=, cwd=, pid=)` | Validates `cmd` and `pid`. Under a lock, so that concurrent starts can't claim the same ID, it creates the process directory, opens the log files, and calls `proc.spawn()`, which gives the command its own process group. If spawning fails (for example, `cwd` doesn't exist), the directory is removed again. Then it writes `meta.json`, starts a waiter task and returns `ProcessInfo` with state `running`. |
 | `await status(pid)` | Answers from memory while the process runs, otherwise from `meta.json`. Raises `KeyError` if the ID is unknown. Never creates files. |
 | `await output(pid, stream="stdout", tail=None)` | Returns the log contents, or only the last `tail` lines. Works while the process is still running. `stream` must be `stdout` or `stderr`. |
+| `await wait(pid, timeout=None)` | Waits until the process has finished and returns its final `ProcessInfo`. Returns right away for finished or orphaned processes. On timeout it raises `asyncio.TimeoutError`; a timeout or cancelled wait doesn't affect the process. |
 | `await kill(pid, force=False)` | Sends `SIGTERM` (or `SIGKILL` with `force`) to the **process group**, so child processes are signalled as well. Waits up to `KILL_WAIT_S` (5s) for the exit, so the returned state is normally already `killed`. |
 | `await list(include_finished=False)` | Processes in memory, plus finished ones from disk if requested, newest first. Each ID appears only once. |
 | `await cleanup(pid)` | Runs `rmtree` on the process directory. Refuses while the process is still tracked. |
-| `await shutdown()` | Terminates all running processes at the same time with `proc.terminate()` (process group `SIGTERM`, then `SIGKILL` after `TERMINATE_GRACE_S`), waits for their waiter tasks and records their final state. Called by `ProcessManagerService.stop()`. |
+| `await shutdown()` | Terminates all running processes at the same time with `proc.terminate()` (process group `SIGTERM`, then `SIGKILL` after `TERMINATE_GRACE_S`), waits for their waiter tasks and records their final state. Called by `ProcessHost.stop()` when the daemon shuts down. |
 
 The waiter task sets the final state from the return code:
 
@@ -370,49 +511,31 @@ It then rewrites `meta.json` (atomically, via a temporary file and
 `os.replace`) and removes the process from memory. `meta.json` stores only env
 **keys**; env values stay in memory.
 
-**Orphans.** When a `ProcessManager` is created, it looks for `meta.json`
-files still in the `running` (or `pending`) state. That only happens if the
-previous service was killed without a clean shutdown. Those processes are
+**Orphans.** `recover()` looks for `meta.json` files still in the `running`
+(or `pending`) state. That only happens if the previous daemon was killed
+without a clean shutdown. The daemon calls `recover()` once at startup,
+before it accepts connections. It is deliberately not called in `__init__`:
+short-lived instances in the same directory, such as a local
+`geenii scheduler run`, must not touch the daemon's live records. Those processes are
 marked `orphaned`, with an explanation in `error`: whether they are still
 running is unknown. Because the output goes straight to the log files, any
 output they produce is still captured. They are not
 signalled, because their OS pid may have been reused by another process.
 
-### Wire protocol (`process_manager_service.py`)
+### RPC methods
 
-Each request and response is one JSON object followed by a newline. A single
-connection may send several requests.
-
-```json
-→ {"method": "start", "params": {"command": "sleep 5; echo done", "cwd": null, "pid": null, "env": null}}
-← {"ok": true, "result": {"pid": "a1b2c3d4e5f6", "shell": true, "state": "running", ...}}
-← {"ok": false, "error": "KeyError: 'Unknown process: xyz'"}
-```
-
-| Method | Params | Result |
-|---|---|---|
-| `ping` | none | `"pong"` |
-| `start` | `command` (string, or list of strings), `env?`, `cwd?`, `pid?` | `ProcessInfo` dict |
-| `status` | `process_id` | `ProcessInfo` dict |
-| `output` | `process_id`, `stream?`, `tail?` (a value of 0 or less means all output) | string |
-| `kill` | `process_id`, `force?` | `ProcessInfo` dict |
-| `list` | `include_finished?` | list of `ProcessInfo` dicts |
-| `cleanup` | `process_id` | `"ok"` |
-
-Errors raised by a handler are returned as `"<ExceptionType>: <message>"`.
-The socket has no authentication; access is controlled only by the socket
-file's permissions (the process umask).
-
-On SIGINT or SIGTERM the service stops accepting connections, terminates all
-running processes via `shutdown()`, and removes the socket file.
+The process manager's operations are the `pm.*` methods of the daemon (see
+[Wire protocol](#wire-protocol)). When the daemon stops, `shutdown()`
+terminates all running processes.
 
 ### Client (`process_manager_client.py`)
 
-`ProcessManagerClient(socket_path)` is stateless. Each call opens a new
-connection, sends one request, reads up to the first newline, and closes the
-connection. If the response has `"ok": false`, the client raises
-`RuntimeError(error)`. `is_available()` checks that the socket file exists and
-that `ping` succeeds. The client has no socket timeout.
+`ProcessManagerClient(socket_path=None)` is a `DaemonClient` with typed
+wrappers for the `pm.*` methods. Like every `DaemonClient` it is stateless:
+each call opens a new connection, sends one request, reads up to the first
+newline, and closes the connection. If the response has `"ok": false`, the
+client raises `RuntimeError(error)`. `is_available()` checks that the socket
+file exists and that `ping` succeeds. The client has no socket timeout.
 
 ### Integration
 
@@ -424,12 +547,13 @@ that `ping` succeeds. The client has no socket timeout.
     shell.
   - If no `working_directory` is given, it defaults to `GEENII_WORKING_DIR`,
     the same directory the `bash` tool uses. Without this default, the command
-    would run in the directory `geenii pm serve` was started from.
+    would run in the directory the daemon was started from.
   - Errors (for example an invalid ID) are returned to the model as
     `{"error": ...}`.
-- `geenii pm` (`cli/pm_cli.py`) provides `serve`, `ping`, `start`, `status`,
-  `output`, `kill`, `list` and `cleanup`. The socket path can be overridden
-  with `--socket` or `GEENII_PM_SOCKET`.
+- `geenii pm` (`cli/pm_cli.py`) provides `ping`, `start`, `status`, `output`,
+  `kill`, `list` and `cleanup`, plus `serve`, an alias for
+  `geenii daemon start`. The socket path can be overridden with `--socket`,
+  `GEENII_SOCKET` or `GEENII_PM_SOCKET`.
 
 ---
 

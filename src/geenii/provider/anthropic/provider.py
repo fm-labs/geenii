@@ -34,6 +34,7 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
     @property
     def client(self) -> anthropic.Anthropic:
         if self._client is None:
+            logger.info(f"Initializing AnthropicAIProvider with api key {config.ANTHROPIC_API_KEY[0:16]}..{config.ANTHROPIC_API_KEY[-4:]}")
             self._client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
         return self._client
 

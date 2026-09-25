@@ -1,23 +1,36 @@
 # Scheduler
 
-`geenii/scheduler.py` is a standalone cron-style task runner, typically used to
-run agents on a schedule (reminders, monitors, periodic summaries).
+`geenii/scheduler.py` is a cron-style task runner, typically used to run agents
+on a schedule (reminders, monitors, periodic summaries). It runs inside the
+[geenii daemon](../cli-reference/daemon.md), alongside the process manager and
+the supervisor.
 
 ## Running
 
-The scheduler can be started via the CLI or as a standalone entry point:
+Start the daemon. By default it loads `.geenii/scheduler.json`:
 
 ```bash
-# via CLI
-geenii scheduler start --config /path/to/scheduler.json
+geenii daemon start                                   # uses $GEENII_DIR/scheduler.json
+geenii daemon start --scheduler-config /path/to/scheduler.json
 
-# standalone entry point
+# older forms, now aliases for the above
+geenii scheduler start --config /path/to/scheduler.json
 geenii-scheduler /path/to/.geenii/scheduler.json
 ```
 
-The process loads the config, starts an asyncio loop that checks due tasks
-every second, and runs until SIGINT/SIGTERM (graceful shutdown waits for
-running tasks).
+The daemon loads the config and checks for due tasks every second. It runs
+until `geenii daemon stop` or SIGINT/SIGTERM; a graceful shutdown stops
+running tasks, including their child processes.
+
+While the daemon runs, the `geenii scheduler` commands work against it:
+
+- `status` shows the live state: next and last run, and whether a task is
+  running.
+- `run NAME` starts a run inside the daemon.
+- `add` and `remove` update the running daemon right away.
+- After editing `scheduler.json` by hand, run `geenii scheduler reload`.
+
+Without a daemon, these commands work on the config file alone.
 
 See [cli.md](cli.md) for the full set of `geenii scheduler` subcommands
 (`start`, `status`, `list`, `add`, `remove`, `run`).
@@ -77,10 +90,23 @@ The `interval` field uses a prefixed format:
 
 ### `cmd` tasks (subprocess)
 
-The `cmd` list is executed as a subprocess. Each element is expanded with
-`os.path.expandvars`, and `env` values are merged into the process environment.
-stdout and stderr are logged line by line as they are produced (stdout at INFO,
-stderr at WARNING). A non-zero exit code counts as a failure.
+The `cmd` list is executed as a process of the process manager, without a
+shell. Each element is expanded with `os.path.expandvars`, and `env` values are
+merged into the process environment. A non-zero exit code counts as a failure.
+
+Every run gets its own **run ID**, such as `backup-20260925T030000-1a2b`,
+which `geenii scheduler status` shows. The run's output is saved to disk, not
+to the scheduler log:
+
+```bash
+geenii scheduler status                  # "Last Run ID" column
+geenii pm output backup-20260925T030000-1a2b
+geenii pm output backup-20260925T030000-1a2b --stream stderr
+geenii pm list -a                        # all runs, with state and exit code
+```
+
+The newest 10 finished runs of each task are kept; older runs are deleted
+automatically.
 
 The command runs in its own process group. When the scheduler stops, or the
 task's `timeout` is exceeded, the whole group receives `SIGTERM`, followed by

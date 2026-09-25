@@ -1,6 +1,7 @@
 # geenii pm
 
-Manage background processes via a Unix-socket process manager service.
+Manage background processes. The process manager runs inside the
+[geenii daemon](daemon.md), so start that first (`geenii daemon start`).
 
 ## Synopsis
 
@@ -12,7 +13,7 @@ geenii pm [--socket PATH] <command>
 
 | Option | Short | Env Var | Description |
 |---|---|---|---|
-| `--socket` | `-s` | `GEENII_PM_SOCKET` | Path to the process manager Unix socket |
+| `--socket` | `-s` | `GEENII_SOCKET`, then `GEENII_PM_SOCKET` | Path to the daemon's Unix socket (default `$GEENII_CACHE_DIR/geenii.sock`) |
 
 ## Commands
 
@@ -22,8 +23,8 @@ geenii pm [--socket PATH] <command>
 geenii pm ping
 ```
 
-Check if the process manager service is running. Exits with code 1 if not
-reachable.
+Check if the daemon, and with it the process manager, is running. Exits with
+code 1 if not reachable.
 
 ### serve
 
@@ -31,8 +32,9 @@ reachable.
 geenii pm serve [--socket PATH]
 ```
 
-Start the process manager service. Accepts an optional `--socket`/`-s` to set
-the listen path.
+Alias for [`geenii daemon start`](daemon.md). It runs the whole daemon,
+including the scheduler (with `$GEENII_DIR/scheduler.json`, if it exists) and
+the supervisor. Accepts an optional `--socket`/`-s` to set the listen path.
 
 ### start
 
@@ -74,6 +76,17 @@ Show captured output of a background process.
 | `--stream` | | Output stream: `stdout` (default) or `stderr` |
 | `--tail` | `-n` | Show only the last N lines |
 
+### wait
+
+```
+geenii pm wait <PROCESS_ID> [--timeout SECONDS]
+```
+
+Wait until the process has finished and print its final state as JSON. Exits
+with the process's exit code: 1 if it was killed or orphaned, 2 if the timeout
+expired, in which case the process keeps running. Works for scheduled runs too;
+their IDs are shown by `geenii scheduler status`.
+
 ### kill
 
 ```
@@ -84,9 +97,10 @@ Kill a running background process, including any processes it started (the
 whole process group is signalled). Waits up to 5 seconds for the process to
 exit and prints its final state.
 
-Stopping `geenii pm serve` (SIGINT/SIGTERM) also terminates all running
-background processes. If the service dies without a clean shutdown, processes
-it was tracking are shown as `orphaned` after the next start.
+Stopping the daemon (`geenii daemon stop`, or SIGINT/SIGTERM) also
+terminates all running background processes. If the daemon dies without a
+clean shutdown, processes it was tracking are shown as `orphaned` after the
+next start.
 
 #### Options
 
@@ -119,7 +133,7 @@ Remove on-disk logs for a finished process.
 ## Examples
 
 ```bash
-geenii pm serve
+geenii daemon start
 geenii pm ping
 geenii pm start "python my_script.py" -d /tmp
 geenii pm list -a

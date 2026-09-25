@@ -21,6 +21,10 @@ Config file format (scheduler.json):
 Interval formats:
     "cron:EXPRESSION"   – recurring cron schedule, e.g. "cron:*/5 * * * *"
     "at:DATETIME"       – one-shot execution at an ISO datetime, e.g. "at:2026-07-21T18:00:00Z"
+
+`cmd` tasks run as process-manager processes: every run gets a process ID
+("<task>-<UTC timestamp>-<random>"), its output is saved to disk, and the last
+RUNS_KEPT_PER_TASK finished runs of each task are kept.
 """
 from __future__ import annotations
 
@@ -30,21 +34,22 @@ import inspect
 import json
 import logging
 import os
+import re
 import sys
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 
 import pydantic
 from croniter import croniter
 
-from geenii import proc as proc_util
+from geenii.pm.process_manager import ProcessManager, ProcessState
 
 logger = logging.getLogger(__name__)
 
-TERMINATE_GRACE_S = proc_util.TERMINATE_GRACE_S  # SIGTERM → SIGKILL grace period for task subprocesses
+RUNS_KEPT_PER_TASK = 10  # finished runs (process records + logs) kept per cmd task
 
 
 def parse_interval(interval: str) -> tuple[str, str]:
@@ -92,6 +97,7 @@ class ScheduledTask:
     working_dir: Path | None = None
     timeout: float | None = None        # seconds; the run is cancelled (and its process killed) when exceeded
     allow_overlap: bool = False         # start a new run even if the previous one is still running
+    last_run_id: str | None = field(default=None, init=False)  # process ID of the latest cmd run
     _pass_args: bool = field(default=False, init=False, repr=False)
 
     def load(self) -> None:
@@ -127,23 +133,26 @@ class ScheduledTask:
         base = after or datetime.now(timezone.utc)
         return croniter(value, base).get_next(datetime).replace(tzinfo=timezone.utc)
 
-    async def run(self) -> None:
-        """Run the task as a subprocess (cmd) or Python callable (run_fn).
+    async def run(self, pm: ProcessManager | None = None) -> None:
+        """Run the task: cmd as a process of pm, or the Python callable (run_fn).
 
         Failures and timeouts are logged, not raised. Cancellation propagates.
+        Raises ValueError if a cmd task is run without a ProcessManager.
         """
+        if self.cmd and pm is None:
+            raise ValueError(f"Task '{self.name}' runs a command and needs a ProcessManager")
         logger.info("Running task '%s'", self.name)
         try:
-            await asyncio.wait_for(self._execute(), timeout=self.timeout)
+            await asyncio.wait_for(self._execute(pm), timeout=self.timeout)
             logger.info("Task '%s' completed successfully", self.name)
         except asyncio.TimeoutError:
             logger.error("Task '%s' timed out after %ss", self.name, self.timeout)
         except Exception:
             logger.exception("Task '%s' failed", self.name)
 
-    async def _execute(self) -> None:
+    async def _execute(self, pm: ProcessManager | None) -> None:
         if self.cmd:
-            await self._run_cmd()
+            await self._run_cmd(pm)
         elif self.run_fn is not None:
             args = (self.params or [], self.env) if self._pass_args else ()
             if inspect.iscoroutinefunction(self.run_fn):
@@ -155,30 +164,57 @@ class ScheduledTask:
         else:
             raise RuntimeError("Task has no cmd or run_fn")
 
-    async def _run_cmd(self) -> None:
+    async def _run_cmd(self, pm: ProcessManager) -> None:
         expanded = [os.path.expandvars(arg) for arg in self.cmd]
-        logger.info("Task '%s' executing: %s", self.name, expanded)
-        # Own process group (via proc.spawn), so stop/timeout also reaches the command's children
-        proc = await proc_util.spawn(
+        info = await pm.start(
             expanded,
             env=self.env,
             cwd=str(self.working_dir) if self.working_dir else None,
+            pid=self._new_run_id(),
         )
+        self.last_run_id = info.pid
+        logger.info("Task '%s' started as process %s: %s", self.name, info.pid, expanded)
         try:
-            await asyncio.gather(
-                proc_util.pump_lines(proc.stdout, partial(self._log_line, "stdout", logging.INFO)),
-                proc_util.pump_lines(proc.stderr, partial(self._log_line, "stderr", logging.WARNING)),
-                proc.wait(),
-            )
+            done = await pm.wait(info.pid)
         except BaseException:
-            # Cancelled (scheduler stop or timeout) — don't leave the child running
-            await proc_util.terminate(proc, grace=TERMINATE_GRACE_S)
+            # Cancelled (scheduler stop or timeout) — don't leave the process running
+            await _stop_process(pm, info.pid)
             raise
-        if proc.returncode != 0:
-            raise RuntimeError(f"Command exited with code {proc.returncode}")
+        await self._prune_runs(pm)
+        if done.exit_code != 0:
+            raise RuntimeError(
+                f"Command exited with code {done.exit_code} "
+                f"(output: geenii pm output {info.pid} [--stream stderr])"
+            )
 
-    def _log_line(self, tag: str, level: int, line: str) -> None:
-        logger.log(level, "Task '%s' %s: %s", self.name, tag, line)
+    def _run_id_prefix(self) -> str:
+        # Process IDs allow [A-Za-z0-9_-] only and must start with a letter or digit
+        safe = re.sub(r"[^A-Za-z0-9_-]", "-", self.name)[:40] or "task"
+        return safe if safe[0].isalnum() else f"t{safe[:39]}"
+
+    def _new_run_id(self) -> str:
+        return f"{self._run_id_prefix()}-{datetime.now(timezone.utc):%Y%m%dT%H%M%S}-{uuid.uuid4().hex[:4]}"
+
+    async def _prune_runs(self, pm: ProcessManager) -> None:
+        """Delete finished runs of this task beyond the newest RUNS_KEPT_PER_TASK."""
+        pattern = re.compile(rf"^{re.escape(self._run_id_prefix())}-\d{{8}}T\d{{6}}-[0-9a-f]{{4}}$")
+        runs = [p for p in await pm.list(include_finished=True)
+                if pattern.match(p.pid) and p.state not in (ProcessState.PENDING, ProcessState.RUNNING)]
+        for old in runs[RUNS_KEPT_PER_TASK:]:  # list() is sorted newest first
+            try:
+                await pm.cleanup(old.pid)
+            except (KeyError, RuntimeError, OSError) as exc:
+                logger.warning("Could not remove old run %s of task '%s': %s", old.pid, self.name, exc)
+
+
+async def _stop_process(pm: ProcessManager, pid: str) -> None:
+    """Kill a run (SIGTERM, then SIGKILL if it is still running after kill() returns)."""
+    try:
+        info = await pm.kill(pid)
+        if info.state == ProcessState.RUNNING:
+            await pm.kill(pid, force=True)
+    except KeyError:
+        pass  # finished in the meantime
 
 
 class SchedulerConfig(pydantic.BaseModel):
@@ -196,10 +232,71 @@ class SchedulerConfig(pydantic.BaseModel):
     enabled: bool = True
 
 
+def read_config(config_path: str | Path, existing_names: set[str] | frozenset[str] = frozenset()) -> list[ScheduledTask]:
+    """Parse and load the enabled tasks in a scheduler config file.
+
+    Invalid entries, disabled tasks and duplicate names (within the file or
+    in existing_names) are logged and skipped.
+    """
+    config_path = Path(config_path)
+    data = json.loads(config_path.read_text())
+
+    raw_tasks: list[dict] = data.get("tasks", [])
+    if not raw_tasks:
+        logger.warning("No tasks found in %s", config_path)
+        return []
+
+    names = set(existing_names)
+    tasks: list[ScheduledTask] = []
+    for entry in raw_tasks:
+        try:
+            task_conf = SchedulerConfig.model_validate(entry)
+        except pydantic.ValidationError as e:
+            logger.error("Invalid task configuration in %s: %s — skipping entry: %s", config_path, str(e), entry)
+            continue
+
+        if not task_conf.enabled:
+            logger.info("Task '%s' is disabled — skipping", task_conf.name)
+            continue
+
+        if task_conf.name in names:
+            logger.error("Duplicate task name '%s' in %s — skipping", task_conf.name, config_path)
+            continue
+
+        task = ScheduledTask(
+            name=task_conf.name, interval=task_conf.interval,
+            cmd=task_conf.cmd, module=task_conf.module, params=task_conf.params,
+            env=task_conf.env, enabled=task_conf.enabled,
+            working_dir=Path(task_conf.working_dir) if task_conf.working_dir else None,
+            timeout=task_conf.timeout, allow_overlap=task_conf.allow_overlap,
+        )
+        try:
+            task.load()
+        except Exception:
+            logger.exception("Failed to load task '%s' — skipping", task_conf.name)
+            continue
+
+        logger.info(
+            "Loaded task '%s' (interval=%s, cmd=%s, next=%s)",
+            task.name, task.interval, task.cmd, task.next_run(),
+        )
+        names.add(task.name)
+        tasks.append(task)
+    return tasks
+
+
+def _definition(task: ScheduledTask) -> tuple:
+    """The configurable parts of a task, for change detection on reload."""
+    return (task.interval, task.cmd, task.module, task.params, task.env,
+            task.working_dir, task.timeout, task.allow_overlap)
+
+
 class Scheduler:
     """Reads tasks from a config file and runs them on schedule."""
 
-    def __init__(self) -> None:
+    def __init__(self, pm: ProcessManager | None = None) -> None:
+        # Runs cmd tasks. The daemon passes its own; standalone schedulers use the default directory.
+        self.pm = pm or ProcessManager()
         self.tasks: list[ScheduledTask] = []
         self._stop_event = asyncio.Event()
         self._task: asyncio.Task | None = None
@@ -221,9 +318,11 @@ class Scheduler:
                     "name": task.name,
                     "interval": task.interval,
                     "cmd": task.cmd,
+                    "module": task.module or None,
                     "next_run": self._schedule.get(task.name).isoformat() if self._schedule.get(task.name) else None,
                     "last_run": self._last_run.get(task.name).isoformat() if self._last_run.get(task.name) else None,
                     "running": self._is_running(task.name),
+                    "last_run_id": task.last_run_id,
                     "enabled": task.enabled,
                 }
                 for task in self.tasks
@@ -240,6 +339,7 @@ class Scheduler:
     # -- configuration --------------------------------------------------------
 
     def load_config(self, config_path: str | Path) -> None:
+        """Add the tasks from config_path. Problems are logged; invalid entries are skipped."""
         config_path = Path(config_path) if config_path else None
         if config_path is None:
             logger.error("No config path provided, cannot load tasks")
@@ -247,48 +347,42 @@ class Scheduler:
         if not config_path.exists():
             logger.error("Config file %s does not exist, cannot load tasks", config_path)
             return
+        self.tasks.extend(read_config(config_path, existing_names={t.name for t in self.tasks}))
 
-        text = config_path.read_text()
-        data = json.loads(text)
+    async def reload_config(self, config_path: str | Path) -> dict[str, list[str]]:
+        """Replace the task list with the tasks in config_path, while the scheduler runs.
 
-        raw_tasks: list[dict] = data.get("tasks", [])
-        if not raw_tasks:
-            logger.warning("No tasks found in %s", config_path)
-            return
+        Runs already in progress continue. New tasks and tasks whose interval
+        changed are rescheduled; other changes take effect at the next run.
+        Raises FileNotFoundError if the file does not exist.
+        """
+        config_path = Path(config_path)
+        if not config_path.is_file():
+            raise FileNotFoundError(f"Config file {config_path} does not exist")
+        new_tasks = read_config(config_path)
 
-        for entry in raw_tasks:
-            try:
-                task_conf = SchedulerConfig.model_validate(entry)
-            except pydantic.ValidationError as e:
-                logger.error("Invalid task configuration in %s: %s — skipping entry: %s", config_path, str(e), entry)
-                continue
+        async with self._lock:
+            old = {t.name: t for t in self.tasks}
+            new = {t.name: t for t in new_tasks}
+            now = datetime.now(timezone.utc)
+            for name in set(old) - set(new):
+                self._schedule.pop(name, None)
+                self._last_run.pop(name, None)
+            for task in new_tasks:
+                prev = old.get(task.name)
+                if prev is not None:
+                    task.last_run_id = prev.last_run_id
+                if prev is None or prev.interval != task.interval:
+                    self._schedule[task.name] = task.next_run(after=now)
+            self.tasks = new_tasks
 
-            if not task_conf.enabled:
-                logger.info("Task '%s' is disabled — skipping", task_conf.name)
-                continue
-
-            if self._has_task(task_conf.name):
-                logger.error("Duplicate task name '%s' in %s — skipping", task_conf.name, config_path)
-                continue
-
-            task = ScheduledTask(
-                name=task_conf.name, interval=task_conf.interval,
-                cmd=task_conf.cmd, module=task_conf.module, params=task_conf.params,
-                env=task_conf.env, enabled=task_conf.enabled,
-                working_dir=Path(task_conf.working_dir) if task_conf.working_dir else None,
-                timeout=task_conf.timeout, allow_overlap=task_conf.allow_overlap,
-            )
-            try:
-                task.load()
-            except Exception:
-                logger.exception("Failed to load task '%s' — skipping", task_conf.name)
-                continue
-
-            logger.info(
-                "Loaded task '%s' (interval=%s, cmd=%s, next=%s)",
-                task.name, task.interval, task.cmd, task.next_run(),
-            )
-            self.tasks.append(task)
+        changes = {
+            "added": sorted(set(new) - set(old)),
+            "removed": sorted(set(old) - set(new)),
+            "updated": sorted(n for n in set(old) & set(new) if _definition(old[n]) != _definition(new[n])),
+        }
+        logger.info("Reloaded scheduler config %s: %s", config_path, changes)
+        return changes
 
     # -- lifecycle ------------------------------------------------------------
 
@@ -335,6 +429,22 @@ class Scheduler:
             logger.info("Added task '%s' (interval=%s, next=%s)", task.name, task.interval, task.next_run())
             self._schedule[task.name] = task.next_run(after=datetime.now(timezone.utc))
 
+    async def run_now(self, task_name: str) -> None:
+        """Start a run of task_name immediately, outside its schedule (does not wait for it).
+
+        Raises KeyError for unknown tasks and RuntimeError if the previous run is
+        still in progress and the task does not allow overlap.
+        """
+        async with self._lock:
+            task = next((t for t in self.tasks if t.name == task_name), None)
+            if task is None:
+                raise KeyError(f"Unknown task: {task_name}")
+            if not task.allow_overlap and self._is_running(task.name):
+                raise RuntimeError(f"Task '{task_name}' is already running")
+            logger.info("Task '%s' started manually", task.name)
+            self._launch(task)
+            self._last_run[task.name] = datetime.now(timezone.utc)
+
     async def remove_task(self, task_name: str) -> None:
         async with self._lock:
             _task = next((t for t in self.tasks if t.name == task_name), None)
@@ -346,7 +456,7 @@ class Scheduler:
     # -- main loop ------------------------------------------------------------
 
     def _launch(self, task: ScheduledTask) -> None:
-        _t = asyncio.create_task(task.run(), name=f"task:{task.name}")
+        _t = asyncio.create_task(task.run(self.pm), name=f"task:{task.name}")
         self._running_tasks.add(_t)
         self._active[task.name] = _t
 
@@ -400,41 +510,19 @@ class Scheduler:
             await asyncio.sleep(1)
 
 
-async def serve(scheduler: Scheduler) -> None:
-    """Run the scheduler until SIGINT/SIGTERM, then shut down gracefully."""
-    async def shutdown_handler():
-        logger.info("Shutting down...")
-        await scheduler.stop()
-        await scheduler.wait_until_stopped()
-        logger.info("Scheduler shutdown complete.")
-
-    # Keep a reference to the shutdown task so it isn't garbage-collected mid-run
-    shutdown_tasks: set[asyncio.Task] = set()
-
-    def on_signal() -> None:
-        t = asyncio.create_task(shutdown_handler())
-        shutdown_tasks.add(t)
-        t.add_done_callback(shutdown_tasks.discard)
-
-    proc_util.add_shutdown_handlers(on_signal)
-
-    await scheduler.start()
-    logger.info("Scheduler started.")
-    await scheduler.wait_until_stopped()
-    logger.info("Scheduler stopped.")
-
-
 def main():
-    from geenii.logs import init_logging
-    init_logging()
+    """`geenii-scheduler <config>`: runs the geenii daemon with this scheduler config.
+
+    The scheduler no longer runs as a separate service; the daemon hosts it
+    together with the process manager and the supervisor.
+    """
+    from geenii.daemon.server import main as daemon_main
 
     config_path = sys.argv[1] if len(sys.argv) > 1 else None
     if not config_path:
         logger.error("No config path provided, exiting")
         sys.exit(1)
-    scheduler = Scheduler()
-    scheduler.load_config(config_path)
-    asyncio.run(serve(scheduler))
+    daemon_main(["--scheduler-config", config_path])
 
 
 if __name__ == "__main__":

@@ -270,6 +270,9 @@ def test_restart_marks_leftover_running_processes_as_orphaned(tmp_path):
 
     async def main():
         pm = ProcessManager(str(procs_dir))
+        # Creating a manager leaves the records alone; recover() marks them
+        assert (await pm.status("stale")).state == ProcessState.RUNNING
+        assert pm.recover() == ["stale"]
         return await pm.status("stale")
 
     info = asyncio.run(main())
@@ -306,6 +309,34 @@ def test_cleanup_refuses_running_process(procs_dir):
         await pm.cleanup(info.pid)
         with pytest.raises(KeyError):
             await pm.status(info.pid)
+
+    asyncio.run(main())
+
+
+def test_wait_returns_final_state(procs_dir):
+    async def main():
+        pm = ProcessManager(procs_dir)
+        info = await pm.start("sleep 0.3; exit 2")
+        done = await pm.wait(info.pid)
+        assert (done.state, done.exit_code) == (ProcessState.FAILED, 2)
+        # Already finished (and no longer in memory): answered from disk
+        assert (await pm.wait(info.pid)).exit_code == 2
+
+    asyncio.run(main())
+
+
+def test_wait_timeout_and_cancel_leave_the_process_running(procs_dir):
+    async def main():
+        pm = ProcessManager(procs_dir)
+        info = await pm.start(["sleep", "30"])
+        with pytest.raises(asyncio.TimeoutError):
+            await pm.wait(info.pid, timeout=0.2)
+        waiter = asyncio.create_task(pm.wait(info.pid))
+        await asyncio.sleep(0.1)
+        waiter.cancel()
+        assert (await pm.status(info.pid)).state == ProcessState.RUNNING
+        await pm.kill(info.pid)
+        assert (await pm.wait(info.pid)).state == ProcessState.KILLED
 
     asyncio.run(main())
 

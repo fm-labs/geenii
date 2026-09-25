@@ -52,8 +52,11 @@ src/
     │   └── ...
     ├── memory.py           # ChatMemory implementations (in-memory, JSONL file)
     ├── hitl.py             # Human-in-the-loop controllers (auto-approve, file ticket, HTTP poll)
-    ├── scheduler.py        # Cron scheduler (geenii-scheduler entry point)
-    ├── supervisor.py       # Asyncio process supervisor with log bus (library, used by the server repo)
+    ├── daemon/             # geenii daemon: ProcessHost + socket server + client
+    ├── pm/                 # Process manager (background jobs, logs on disk)
+    ├── scheduler.py        # Cron scheduler (runs inside the daemon)
+    ├── supervisor.py       # Asyncio process supervisor with log bus (daemon, server repo)
+    ├── proc.py             # Shared subprocess helpers (spawn, process groups, terminate)
     ├── sandbox.py          # Docker sandbox helpers for running Python in a container
     ├── cli/                # click command groups (agent, agents, tools, skills, scheduler, info)
     ├── logs.py             # Logging setup, rotating file handlers

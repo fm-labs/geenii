@@ -216,3 +216,97 @@ def test_run_spawn_error_is_logged_and_raised(monkeypatch):
 
     # The failed job's log buffer is retired like any finished run
     assert asyncio.run(main()) == set()
+
+
+# -- services config file --------------------------------------------------------
+
+import json  # noqa: E402
+
+from geenii.supervisor import read_services  # noqa: E402
+
+
+def _services_file(tmp_path, services):
+    path = tmp_path / "services.json"
+    path.write_text(json.dumps({"services": services}))
+    return path
+
+
+def test_read_services_parses_and_validates(tmp_path, monkeypatch):
+    monkeypatch.setenv("SVC_PORT", "8123")
+    path = _services_file(tmp_path, [
+        {"name": "web", "cmd": ["python", "-m", "http.server", "$SVC_PORT"], "cwd": "~/site",
+         "env": {"A": "1"}},
+        {"name": "once", "cmd": ["true"], "restart": False},
+        {"name": "off", "cmd": ["true"], "enabled": False},
+        {"name": "web", "cmd": ["duplicate"]},
+        {"name": "bad", "cmd": []},
+        {"cmd": ["no-name"]},
+    ])
+    services = read_services(path)
+    assert [s.name for s in services] == ["web", "once"]
+    web = services[0]
+    assert web.cmd == ["python", "-m", "http.server", "8123"]
+    assert web.cwd == os.path.expanduser("~/site")
+    assert (web.env, web.restart, services[1].restart) == ({"A": "1"}, True, False)
+
+
+def test_read_services_rejects_non_object(tmp_path):
+    path = tmp_path / "services.json"
+    path.write_text("[]")
+    with pytest.raises(ValueError):
+        read_services(path)
+
+
+def test_apply_services(tmp_path):
+    def svc(name, *cmd, **kw):
+        return {"name": name, "cmd": list(cmd) or ["sleep", "30"], **kw}
+
+    async def main():
+        sup = Supervisor()
+        await sup.ensure("adhoc", ProcConfig(name="adhoc", cmd=["sleep", "30"]))
+
+        changes = await sup.apply_services(read_services(_services_file(tmp_path, [svc("a"), svc("b")])))
+        assert changes == {"started": ["a", "b"], "stopped": [], "restarted": []}
+        st = sup.status()
+        assert {n: d["source"] for n, d in st["desired"].items()} == {"adhoc": "api", "a": "config", "b": "config"}
+        await asyncio.sleep(0.2)
+        pid_a = sup.status()["running"]["a"]["pid"]
+        pid_b = sup.status()["running"]["b"]["pid"]
+
+        # Unchanged file: nothing happens
+        assert await sup.apply_services(read_services(_services_file(tmp_path, [svc("a"), svc("b")]))) == {
+            "started": [], "stopped": [], "restarted": []}
+
+        # b stopped by hand is started again by a reload
+        await sup.stop_process("b")
+        changes = await sup.apply_services(read_services(_services_file(tmp_path, [svc("a"), svc("b")])))
+        assert changes["started"] == ["b"]
+
+        # a changed -> restarted with the new command; b removed -> stopped; c added
+        new = [svc("a", "sleep", "31"), svc("c")]
+        changes = await sup.apply_services(read_services(_services_file(tmp_path, new)))
+        assert changes == {"started": ["c"], "stopped": ["b"], "restarted": ["a"]}
+        await asyncio.sleep(0.2)
+        st = sup.status()
+        assert set(st["desired"]) == {"adhoc", "a", "c"}  # ad-hoc service untouched
+        assert st["desired"]["a"]["cmd"] == ["sleep", "31"]
+        assert st["running"]["a"]["pid"] != pid_a
+        assert not _pid_alive(pid_a) and not _pid_alive(pid_b)
+        await sup.stop()
+
+    asyncio.run(main())
+
+
+def test_apply_services_adopts_an_ad_hoc_service_of_the_same_name(tmp_path):
+    async def main():
+        sup = Supervisor()
+        await sup.ensure("web", ProcConfig(name="web", cmd=["sleep", "30"]))
+        changes = await sup.apply_services(read_services(_services_file(
+            tmp_path, [{"name": "web", "cmd": ["sleep", "31"]}])))
+        st = sup.status()
+        await sup.stop()
+        return changes, st
+
+    changes, st = asyncio.run(main())
+    assert changes["restarted"] == ["web"]
+    assert (st["desired"]["web"]["source"], st["desired"]["web"]["cmd"]) == ("config", ["sleep", "31"])

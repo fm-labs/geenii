@@ -54,22 +54,38 @@ geenii
 │   ├── list
 │   ├── inspect NAME [-i]         # -i/--instructions prints the SKILL.md body
 │   └── install NAME SOURCE       # SOURCE must be file:///path/to/skill
+├── daemon
+│   ├── start                     # run the daemon (process manager, scheduler, supervisor)
+│   ├── status                    # daemon info and component summary
+│   └── stop                      # shut the daemon down
 ├── pm
-│   ├── ping                      # check if the process manager is running
-│   ├── serve                     # start the process manager service
+│   ├── ping                      # check if the daemon is running
+│   ├── serve                     # alias for `daemon start`
 │   ├── start COMMAND             # start a background process
 │   ├── status PROCESS_ID         # check process state
 │   ├── output PROCESS_ID         # show captured output
+│   ├── wait PROCESS_ID           # wait for a process to finish (exits with its code)
 │   ├── kill PROCESS_ID           # kill a process
 │   ├── list                      # list background processes
 │   └── cleanup PROCESS_ID        # remove on-disk logs for a finished process
-└── scheduler
-    ├── start                     # start the scheduler
-    ├── status                    # show tasks and next run times
-    ├── list                      # list configured tasks
-    ├── add NAME CMD              # add a task to the config
-    ├── remove NAME               # remove a task from the config
-    └── run NAME                  # run a single task immediately
+├── scheduler
+│   ├── start                     # alias for `daemon start --scheduler-config`
+│   ├── status                    # live task state (or the config file offline)
+│   ├── list                      # list configured tasks
+│   ├── add NAME CMD              # add a task to the config (reloads the daemon)
+│   ├── remove NAME               # remove a task from the config (reloads the daemon)
+│   ├── reload                    # make the daemon re-read its config
+│   └── run NAME                  # run a task now (in the daemon, or --local)
+└── supervisor
+    ├── status                    # supervised processes and their state
+    ├── start NAME CMD            # start and keep a process running (ad hoc)
+    ├── stop NAME                 # stop a process and stop supervising it
+    ├── restart NAME              # restart a process now
+    ├── logs NAME                 # recent output of a process
+    ├── list                      # services declared in services.json
+    ├── add NAME CMD              # declare a service in services.json (reloads the daemon)
+    ├── remove NAME               # remove a service from services.json (reloads the daemon)
+    └── reload                    # make the daemon apply services.json
 ```
 
 ## Subcommand Reference
@@ -82,10 +98,14 @@ geenii
 - [mcp](mcp.md) — manage MCP servers and tools
 - [tools](tools.md) — list, inspect, and call tools
 - [skills](skills.md) — list, inspect, and install skills
+- [daemon](daemon.md) — run and control the geenii daemon
 - [pm](pm.md) — manage background processes
 - [scheduler](scheduler.md) — manage and run the task scheduler
+- [supervisor](supervisor.md) — keep long-running processes up
 
 ## Related Entry Points
 
-- `geenii-scheduler <config.json>` — runs the scheduler as a standalone
-  process (see [scheduler](scheduler.md)).
+- `geenii-daemon [--socket PATH] [--scheduler-config PATH]` runs the daemon
+  (see [daemon](daemon.md)).
+- `geenii-scheduler <config.json>` is an alias for
+  `geenii-daemon --scheduler-config <config.json>`.
