@@ -22,6 +22,7 @@ from geenii.chat_models import (
 from geenii.datamodels import ModelMessage, ChatCompletionRequest
 from geenii.g import init_global_agent_registry, init_agent_by_name
 from geenii.tool.registry import ToolRegistry
+from geenii.tool.tool_filter import ToolFilterSet
 from geenii.utils.json_util import parse_json_safe
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,19 @@ class ToolCallTask(BaseAgentTask):
         self.arguments = arguments
         self.call_id = call_id
 
+    def _get_active_tool_filters(self) -> ToolFilterSet | None:
+        """Collect argument-level tool filters from all active skills."""
+        if not self.agent.active_skills:
+            return None
+        combined = ToolFilterSet()
+        has_any = False
+        for skill_name in self.agent.active_skills:
+            skill = self.agent.skills.get(skill_name)
+            if skill and skill.tool_filters:
+                combined.filters.extend(skill.tool_filters.filters)
+                has_any = True
+        return combined if has_any else None
+
     async def execute(self) -> AsyncGenerator[ModelMessage, None]:
         tool_name = self.tool_name
         arguments = self.arguments
@@ -45,6 +59,25 @@ class ToolCallTask(BaseAgentTask):
         tool = self.agent.tools.get(tool_name)
         if tool is None:
             raise ValueError(f"Tool {tool_name!r} is not registered")
+
+        # enforce argument-level tool filters from active skills
+        tool_filter_set = self._get_active_tool_filters()
+        if tool_filter_set and not tool_filter_set.allows(tool_name, arguments):
+            logger.warning(f"Tool call {tool_name} blocked by tool filters: args={arguments}")
+            msg = ModelMessage(
+                role="tool",
+                content=[
+                    ToolCallResultContent(
+                        name=tool_name,
+                        arguments=arguments,
+                        result={"error": f"Tool call '{tool_name}' is not allowed with the given arguments. "
+                                         f"Active tool filters restrict this operation."},
+                        call_id=call_id,
+                    )
+                ],
+            )
+            yield msg
+            return
 
         # yield a message, requesting approval for the tool call before executing it
         tool_usage_request_message = ModelMessage(
@@ -147,14 +180,17 @@ class LLMTask(BaseAgentTask):
         all_skills_unrestricted = True
         for skill_name in self.agent.active_skills:
             skill = self.agent.skills.get(skill_name)
-            if skill and skill.allowed_tools:
+            if skill and skill.tool_filters:
                 all_skills_unrestricted = False
-                skill_tools.update(skill.allowed_tools)
+                skill_tools.update(skill.tool_filters.tool_names())
+            elif skill and skill.allowed_tools:
+                all_skills_unrestricted = False
+                skill_tools.update(t.lower() for t in skill.allowed_tools)
 
         if all_skills_unrestricted:
             return base_tools
 
-        effective = base_tools & skill_tools
+        effective = {t for t in base_tools if t.lower() in skill_tools}
         if not effective:
             logger.warning("Skill allowed_tools intersection with agent tools is empty — no tools available for this request.")
         return effective

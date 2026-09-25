@@ -7,6 +7,7 @@ from pathlib import Path
 import pydantic
 
 from geenii.config import GEENII_DIR, read_user_settings, GEENII_WORKING_DIR
+from geenii.tool.tool_filter import ToolFilterSet
 from geenii.utils.os_util import get_user_home_dir
 from geenii.utils.mdfile import read_frontmatter_file
 
@@ -14,13 +15,14 @@ logger = logging.getLogger(__name__)
 
 
 class SkillSpec(pydantic.BaseModel):
-    model_config = pydantic.ConfigDict(ignored_types=(cached_property,))
+    model_config = pydantic.ConfigDict(ignored_types=(cached_property,), arbitrary_types_allowed=True)
 
     path: str
     name: str
     description: str
     metadata: dict | None = pydantic.Field(default_factory=dict)
     allowed_tools: list[str] | None = pydantic.Field(default_factory=list)
+    tool_filters: ToolFilterSet | None = pydantic.Field(default=None)
     triggers: list[str] = pydantic.Field(default_factory=list)
 
     @cached_property
@@ -47,12 +49,17 @@ class SkillSpec(pydantic.BaseModel):
         else:
             triggers = [t.strip().lower() for t in re.split(r'[,\s]+', str(raw_triggers)) if t.strip()]
 
+        raw_allowed_tools = skill_header.get("allowed-tools", "")
+        tool_filters = ToolFilterSet.parse(raw_allowed_tools) if raw_allowed_tools else None
+        allowed_tool_names = list(tool_filters.tool_names()) if tool_filters else []
+
         return SkillSpec(
             path=str(md_path.parent),
             name=skill_header.get("name"),
             description=skill_header.get("description", ""),
             metadata=skill_header.get("metadata", {}),
-            allowed_tools=[t for t in skill_header.get("allowed-tools", "").split(" ") if t],
+            allowed_tools=allowed_tool_names,
+            tool_filters=tool_filters,
             triggers=triggers,
         )
 
