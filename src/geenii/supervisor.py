@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 import os
+import signal
 import time
 import uuid
 from collections import deque
@@ -22,6 +23,23 @@ BACKOFF_MAX = 30.0          # upper bound for the exponential restart delay
 BACKOFF_RESET_AFTER = 60.0  # a process that ran this long counts as healthy again
 RUN_LOG_HISTORY = 50        # number of finished one-shot run() log buffers to keep
 SUBSCRIBER_QUEUE_SIZE = 1000  # per-subscriber queue bound; oldest events are dropped
+TERMINATE_GRACE_S = 5.0     # SIGTERM → SIGKILL grace period when terminating a process
+
+# Every child is started in its own process group (start_new_session), so
+# signals reach everything the command spawned, not just the direct child.
+_USE_PROCESS_GROUPS = hasattr(os, "killpg")
+_SIGKILL = getattr(signal, "SIGKILL", signal.SIGTERM)
+
+
+def _signal_group(proc: asyncio.subprocess.Process, sig: int) -> None:
+    """Send sig to the process group led by proc (or to proc alone without process groups)."""
+    try:
+        if _USE_PROCESS_GROUPS:
+            os.killpg(proc.pid, sig)
+        else:
+            proc.send_signal(sig)
+    except ProcessLookupError:
+        pass
 
 # ---------------------------------------------------------------------------
 # Internal state
@@ -186,6 +204,7 @@ class Supervisor:
             stderr=asyncio.subprocess.PIPE,
             env=merged_env,
             cwd=cwd,
+            start_new_session=_USE_PROCESS_GROUPS,
         )
 
         stdout_lines: List[str] = []
@@ -209,13 +228,14 @@ class Supervisor:
                 ),
                 timeout=timeout,
             )
-        except asyncio.TimeoutError:
-            try:
-                proc.kill()
-            except ProcessLookupError:
-                pass
+        except BaseException as exc:
+            # Timeout or cancellation by the caller — don't leave the command running
+            _signal_group(proc, _SIGKILL)
             await proc.wait()
-            self._log(job, f"killed after {timeout}s timeout")
+            if isinstance(exc, asyncio.TimeoutError):
+                self._log(job, f"killed after {timeout}s timeout")
+            else:
+                self._log(job, f"killed: {type(exc).__name__}")
             raise
         finally:
             self._retire_run_log(job)
@@ -468,6 +488,7 @@ class Supervisor:
             stderr=stderr,
             env=merged_env,
             cwd=cfg.cwd,
+            start_new_session=_USE_PROCESS_GROUPS,
         )
 
         rt = ProcRuntime(proc=proc)
@@ -529,19 +550,11 @@ class Supervisor:
             self._runtime.pop(name, None)
             return
 
+        _signal_group(proc, signal.SIGTERM)
         try:
-            proc.terminate()
-        except ProcessLookupError:
-            self._runtime.pop(name, None)
-            return
-
-        try:
-            await asyncio.wait_for(proc.wait(), timeout=5)
+            await asyncio.wait_for(proc.wait(), timeout=TERMINATE_GRACE_S)
         except asyncio.TimeoutError:
-            try:
-                proc.kill()
-            except ProcessLookupError:
-                pass
+            _signal_group(proc, _SIGKILL)
             await proc.wait()
 
         self._log(name, f"terminated rc={proc.returncode}")

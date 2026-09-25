@@ -40,7 +40,7 @@ src/
     ├── tools.py            # Built-in tool registration + MCP server tool discovery
     ├── core/
     │   ├── tools.py        # Decorator-registered utility tools (file ops, notifications)
-    │   └── tasks.py        # Functions runnable by the scheduler (run_proc, cleanup, ...)
+    │   └── tasks.py        # Functions runnable by the scheduler (cleanup, run_agent)
     ├── skills.py           # SkillSpec, SkillRegistry, skill discovery paths
     ├── mcp.py              # MCP config file access + McpClient (fastmcp wrapper)
     ├── provider/

@@ -39,8 +39,8 @@ See [cli.md](cli.md) for the full set of `geenii scheduler` subcommands
     {
       "name": "one_time_job",
       "interval": "at:2026-07-08T18:00:00+00:00",
-      "module": "geenii.core.tasks.run_proc",
-      "params": ["echo done"]
+      "module": "geenii.core.tasks.run_agent",
+      "params": ["mac-bot"]
     }
   ]
 }
@@ -51,7 +51,7 @@ See [cli.md](cli.md) for the full set of `geenii scheduler` subcommands
 | `name` | Task name (required). Must be unique; later entries with the same name are skipped |
 | `interval` | Schedule expression (required). See [Interval formats](#interval-formats) |
 | `cmd` | Command to run as a subprocess, as a list of strings. `$VAR` placeholders are filled in from the scheduler's environment |
-| `module` | Dot-path to a Python callable (for example `geenii.core.tasks.run_proc`). The last segment is the function name. Use either `cmd` or `module`, not both |
+| `module` | Dot-path to a Python callable (for example `geenii.core.tasks.cleanup`). The last segment is the function name. Use either `cmd` or `module`, not both |
 | `params` | List of strings passed to a `module` callable (see [`module` tasks](#module-tasks-python-callable)) |
 | `env` | Extra environment variables. For `cmd` tasks they are merged into the subprocess environment; `module` callables receive them as an argument |
 | `working_dir` | Working directory for `cmd` tasks |
@@ -97,8 +97,8 @@ therefore stopped as well.
 
 ### `module` tasks (Python callable)
 
-The `module` string is resolved to a Python callable: `geenii.core.tasks.run_proc`
-imports `geenii.core.tasks` and looks up `run_proc`. Both sync functions (run in
+The `module` string is resolved to a Python callable: `geenii.core.tasks.cleanup`
+imports `geenii.core.tasks` and looks up `cleanup`. Both sync functions (run in
 a thread pool) and async functions are supported.
 
 The call depends on the function's signature:
@@ -118,13 +118,11 @@ Built-in task functions live in `geenii/core/tasks.py`:
 
 | Function | Behavior |
 |---|---|
-| `run_proc` | Runs a subprocess. `params[0]` is split with shlex and the remaining `params` are appended; `env` is merged into the process environment |
 | `cleanup` | Maintenance stub (logs only) |
 | `run_agent` | Stub for in-process agent runs (logs only) |
 
-For running commands, `cmd` tasks are usually the better choice. They are
-killed when the task times out or the scheduler stops, and their output is
-logged line by line.
+To run a command, use a `cmd` task. It is killed when the task times out or
+the scheduler stops, and its output is logged line by line.
 
 ## Runtime behavior
 

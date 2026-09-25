@@ -58,6 +58,7 @@ Tuning constants at module level:
 | `BACKOFF_RESET_AFTER` | `60.0` | A process that stayed up this many seconds before crashing starts again from `BACKOFF_INITIAL` |
 | `RUN_LOG_HISTORY` | `50` | Number of finished `run()` log buffers kept |
 | `SUBSCRIBER_QUEUE_SIZE` | `1000` | Maximum events queued for each log subscriber |
+| `TERMINATE_GRACE_S` | `5.0` | Delay between `SIGTERM` and `SIGKILL` when terminating a process |
 
 ### Lifecycle
 
@@ -68,7 +69,7 @@ ensure(name, cfg)
        ▼
   _watch(name)  ── loops until the stop event is set or the config is removed
        ├─ not running → _spawn()
-       │     ├─ create_subprocess_exec(cmd, env=os.environ ∪ cfg.env, cwd)
+       │     ├─ create_subprocess_exec(cmd, env=os.environ ∪ cfg.env, cwd, start_new_session=True)
        │     ├─ _runtime[name] = ProcRuntime(...)
        │     └─ if capture_output: _pipe() tasks copy stdout/stderr to the LogBus
        │     (if spawn raises: log it, sleep the current backoff, double it)
@@ -87,8 +88,15 @@ ensure(name, cfg)
   backoff doubles, up to `BACKOFF_MAX`. A process that keeps crashing
   therefore waits 0.5s, 1s, 2s, … and then 30s between attempts.
 
-Termination (`_terminate_one`) cancels the log pipe tasks, sends `SIGTERM`,
-waits up to 5 seconds, then sends `SIGKILL`.
+Every process is started in its **own process group**
+(`start_new_session=True`), the same way the Scheduler and the Process Manager
+do it. Signals go to the whole group, so processes started by the command are
+stopped too. This covers the members of `sh -c "a | b"`, for example, or
+anything the command put in the background.
+
+Termination (`_terminate_one`) cancels the log pipe tasks and sends `SIGTERM`
+to the group. After waiting up to `TERMINATE_GRACE_S` for the process to exit,
+it sends `SIGKILL` to the group.
 
 ### Public API
 
@@ -102,7 +110,7 @@ waits up to 5 seconds, then sends `SIGKILL`.
 | `logs(name, tail=100)` | The last `tail` log lines as text. |
 | `stream_logs(name)` | Async iterator: replays the buffer, then yields live lines. Every 15 seconds without output it yields `""` as a keepalive, which the HTTP route turns into an SSE comment. |
 | `stream_logs_jsonl(name)` | The same, but yields `LogEvent` objects, with `None` as the keepalive. |
-| `await run(cmd, env=, cwd=, timeout=, name=)` | One-shot command that is **not** part of the desired state. Output goes to a LogBus (so it can be streamed live) and is returned as a `RunResult`. On timeout the process is killed and `asyncio.TimeoutError` is raised again. Only the last `RUN_LOG_HISTORY` finished jobs keep their LogBus. Older ones are removed, unless a supervised process has the same name. |
+| `await run(cmd, env=, cwd=, timeout=, name=)` | One-shot command that is **not** part of the desired state. Output goes to a LogBus (so it can be streamed live) and is returned as a `RunResult`. On timeout, or when the caller cancels the coroutine, the process group is sent `SIGKILL` and the exception is raised again. Only the last `RUN_LOG_HISTORY` finished jobs keep their LogBus. Older ones are removed, unless a supervised process has the same name. |
 | `await stop()` | Sets the stop event, cancels all watchers and terminates all processes. |
 | `is_active()` | `True` while any process is running or any watcher task is alive. Useful for graceful-shutdown loops. |
 

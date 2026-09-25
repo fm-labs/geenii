@@ -1,5 +1,7 @@
 import asyncio
+import os
 import re
+import time
 
 import pytest
 
@@ -104,3 +106,100 @@ def test_logbus_subscriber_queue_drops_oldest(monkeypatch):
         return [q.get_nowait().msg for _ in range(q.qsize())]
 
     assert asyncio.run(main()) == ["2", "3", "4"]
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+async def _read_pidfile(path, timeout=3.0) -> int:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if path.exists() and path.read_text().strip():
+            return int(path.read_text().strip())
+        await asyncio.sleep(0.05)
+    raise AssertionError(f"{path} was not written")
+
+
+def _grandchild_cmd(pidfile) -> list[str]:
+    # The shell starts a background child and records its pid, so the tests can
+    # check that the whole process group is signalled, not just the shell.
+    return ["sh", "-c", f"sleep 30 & echo $! > {pidfile}; wait"]
+
+
+def _assert_dead(pid: int, timeout: float = 2.0) -> None:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not _pid_alive(pid):
+            return
+        time.sleep(0.05)
+    raise AssertionError(f"pid {pid} is still alive")
+
+
+def test_stop_kills_the_whole_process_group(tmp_path):
+    pidfile = tmp_path / "pid"
+
+    async def main():
+        sup = Supervisor()
+        await sup.ensure("grp", ProcConfig(name="grp", cmd=_grandchild_cmd(pidfile)))
+        grandchild = await _read_pidfile(pidfile)
+        await sup.stop()
+        return grandchild
+
+    _assert_dead(asyncio.run(main()))
+
+
+def test_stop_process_and_restart_kill_the_whole_process_group(tmp_path):
+    first, second = tmp_path / "first", tmp_path / "second"
+
+    async def main():
+        sup = Supervisor()
+        await sup.ensure("grp", ProcConfig(name="grp", cmd=_grandchild_cmd(first)))
+        before_restart = await _read_pidfile(first)
+        # ensure() replaces the config without restarting; the restarted instance writes elsewhere
+        await sup.ensure("grp", ProcConfig(name="grp", cmd=_grandchild_cmd(second)))
+        await sup.restart_process("grp")
+        after_restart = await _read_pidfile(second)
+        await sup.stop_process("grp")
+        return before_restart, after_restart
+
+    before_restart, after_restart = asyncio.run(main())
+    _assert_dead(before_restart)
+    _assert_dead(after_restart)
+
+
+def test_run_timeout_kills_the_whole_process_group(tmp_path):
+    pidfile = tmp_path / "pid"
+
+    async def main():
+        sup = Supervisor()
+        t0 = time.time()
+        with pytest.raises(asyncio.TimeoutError):
+            await sup.run(_grandchild_cmd(pidfile), name="slow", timeout=0.5)
+        # A leaked child keeps the pipes open, and proc.wait() blocks until it exits
+        assert time.time() - t0 < 5
+        _assert_dead(await _read_pidfile(pidfile))
+
+    asyncio.run(main())
+
+
+def test_cancelled_run_kills_the_whole_process_group(tmp_path):
+    pidfile = tmp_path / "pid"
+
+    async def main():
+        sup = Supervisor()
+        task = asyncio.create_task(sup.run(_grandchild_cmd(pidfile), name="cancelled"))
+        grandchild = await _read_pidfile(pidfile)
+        t0 = time.time()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        # A leaked child keeps the pipes open, and proc.wait() blocks until it exits
+        assert time.time() - t0 < 5
+        _assert_dead(grandchild)
+
+    asyncio.run(main())
