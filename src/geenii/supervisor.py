@@ -6,15 +6,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
-import signal
 import time
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any, AsyncIterator, Dict, List, Literal, Optional
 
 import pydantic
+
+from geenii import proc as proc_util
 
 logger = logging.getLogger(__name__)
 
@@ -23,23 +24,10 @@ BACKOFF_MAX = 30.0          # upper bound for the exponential restart delay
 BACKOFF_RESET_AFTER = 60.0  # a process that ran this long counts as healthy again
 RUN_LOG_HISTORY = 50        # number of finished one-shot run() log buffers to keep
 SUBSCRIBER_QUEUE_SIZE = 1000  # per-subscriber queue bound; oldest events are dropped
-TERMINATE_GRACE_S = 5.0     # SIGTERM → SIGKILL grace period when terminating a process
+TERMINATE_GRACE_S = proc_util.TERMINATE_GRACE_S  # SIGTERM → SIGKILL grace period when terminating
 
-# Every child is started in its own process group (start_new_session), so
+# Children are spawned via geenii.proc: each in its own process group, so
 # signals reach everything the command spawned, not just the direct child.
-_USE_PROCESS_GROUPS = hasattr(os, "killpg")
-_SIGKILL = getattr(signal, "SIGKILL", signal.SIGTERM)
-
-
-def _signal_group(proc: asyncio.subprocess.Process, sig: int) -> None:
-    """Send sig to the process group led by proc (or to proc alone without process groups)."""
-    try:
-        if _USE_PROCESS_GROUPS:
-            os.killpg(proc.pid, sig)
-        else:
-            proc.send_signal(sig)
-    except ProcessLookupError:
-        pass
 
 # ---------------------------------------------------------------------------
 # Internal state
@@ -190,47 +178,36 @@ class Supervisor:
         """
         job = name or f"run-{uuid.uuid4().hex[:8]}"
 
-        merged_env = {**os.environ}
-        if env:
-            merged_env.update(env)
-
         self._logs.setdefault(job, LogBus())
         self._log(job, f"starting: {' '.join(cmd)}")
         t0 = time.time()
 
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=merged_env,
-            cwd=cwd,
-            start_new_session=_USE_PROCESS_GROUPS,
-        )
+        try:
+            proc = await proc_util.spawn(cmd, env=env, cwd=cwd)
+        except Exception as exc:
+            self._log(job, f"spawn error: {type(exc).__name__}: {exc}")
+            self._retire_run_log(job)
+            raise
 
         stdout_lines: List[str] = []
         stderr_lines: List[str] = []
 
-        async def drain(stream: asyncio.StreamReader, tag: Tag, buf: List[str]) -> None:
-            while True:
-                line = await stream.readline()
-                if not line:
-                    return
-                text = line.decode(errors="replace").rstrip()
-                buf.append(text)
-                self._emit(job, tag, text)
+        def collect(tag: Tag, buf: List[str], text: str) -> None:
+            buf.append(text)
+            self._emit(job, tag, text)
 
         try:
             await asyncio.wait_for(
                 asyncio.gather(
-                    drain(proc.stdout, "stdout", stdout_lines),
-                    drain(proc.stderr, "stderr", stderr_lines),
+                    proc_util.pump_lines(proc.stdout, partial(collect, "stdout", stdout_lines)),
+                    proc_util.pump_lines(proc.stderr, partial(collect, "stderr", stderr_lines)),
                     proc.wait(),
                 ),
                 timeout=timeout,
             )
         except BaseException as exc:
             # Timeout or cancellation by the caller — don't leave the command running
-            _signal_group(proc, _SIGKILL)
+            proc_util.signal_group(proc, proc_util.SIGKILL)
             await proc.wait()
             if isinstance(exc, asyncio.TimeoutError):
                 self._log(job, f"killed after {timeout}s timeout")
@@ -474,22 +451,8 @@ class Supervisor:
     async def _spawn(self, name: str, cfg: ProcConfig) -> None:
         self._log(name, f"starting: {' '.join(cfg.cmd)}")
 
-        # Merge extra env vars into current environment (not a replacement)
-        merged_env = {**os.environ}
-        if cfg.env:
-            merged_env.update(cfg.env)
-
-        stdout = asyncio.subprocess.PIPE if cfg.capture_output else None
-        stderr = asyncio.subprocess.PIPE if cfg.capture_output else None
-
-        proc = await asyncio.create_subprocess_exec(
-            *cfg.cmd,
-            stdout=stdout,
-            stderr=stderr,
-            env=merged_env,
-            cwd=cfg.cwd,
-            start_new_session=_USE_PROCESS_GROUPS,
-        )
+        # cfg.env is merged over os.environ (not a replacement)
+        proc = await proc_util.spawn(cfg.cmd, env=cfg.env, cwd=cfg.cwd, capture_output=cfg.capture_output)
 
         rt = ProcRuntime(proc=proc)
         self._runtime[name] = rt
@@ -508,11 +471,7 @@ class Supervisor:
 
     async def _pipe(self, name: str, stream: asyncio.StreamReader, tag: Tag) -> None:
         try:
-            while True:
-                line = await stream.readline()
-                if not line:
-                    return
-                self._emit(name, tag, line.decode(errors="replace").rstrip())
+            await proc_util.pump_lines(stream, partial(self._emit, name, tag))
         except asyncio.CancelledError:
             return
 
@@ -550,13 +509,7 @@ class Supervisor:
             self._runtime.pop(name, None)
             return
 
-        _signal_group(proc, signal.SIGTERM)
-        try:
-            await asyncio.wait_for(proc.wait(), timeout=TERMINATE_GRACE_S)
-        except asyncio.TimeoutError:
-            _signal_group(proc, _SIGKILL)
-            await proc.wait()
-
+        await proc_util.terminate(proc, grace=TERMINATE_GRACE_S)
         self._log(name, f"terminated rc={proc.returncode}")
         self._runtime.pop(name, None)
 

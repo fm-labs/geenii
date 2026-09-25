@@ -2,8 +2,11 @@
 Background process manager.
 
 Starts external commands as non-blocking subprocesses, assigns each a short
-process ID, and streams stdout/stderr to log files on disk.  Callers can
+process ID, and writes stdout/stderr to log files on disk.  Callers can
 check process state and read captured output at any time via the process ID.
+
+The manager is asyncio-based: all public methods are coroutines and must run
+on the event loop that owns the manager (the ProcessManagerService loop).
 
 Commands are dispatched by type:
     str        – run through the shell (/bin/sh -c), so pipes, redirects,
@@ -11,8 +14,12 @@ Commands are dispatched by type:
                  line; no untrusted data is interpolated here.
     list[str]  – executed directly (no shell); each element is one argument.
 
-Every process is started in its own process group so that kill() and
-shutdown() also reach processes spawned by the command (e.g. by the shell).
+Every process is started in its own process group (see geenii.proc) so that
+kill() and shutdown() also reach processes spawned by the command.
+
+The child's stdout/stderr are connected directly to the log files, so no
+reader tasks are needed and output keeps being written even if the manager
+exits unexpectedly.
 
 Output directory layout (under CACHE_DIR/processes/<pid>/):
     meta.json   – process metadata and current state
@@ -21,14 +28,13 @@ Output directory layout (under CACHE_DIR/processes/<pid>/):
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 import re
 import shutil
 import signal
-import subprocess
-import threading
 import time
 import uuid
 from collections import deque
@@ -36,6 +42,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from geenii import proc as proc_util
 from geenii.config import CACHE_DIR
 
 logger = logging.getLogger(__name__)
@@ -43,7 +50,7 @@ logger = logging.getLogger(__name__)
 PROCESSES_DIR = os.path.join(CACHE_DIR, "processes")
 
 KILL_WAIT_S = 5.0        # how long kill() waits for the process to exit before returning
-TERMINATE_GRACE_S = 5.0  # SIGTERM → SIGKILL grace period used by shutdown()
+TERMINATE_GRACE_S = proc_util.TERMINATE_GRACE_S  # SIGTERM → SIGKILL grace period used by shutdown()
 
 # Process IDs become directory names: allow only a safe, bounded character set
 # (no path separators, no leading dot, so no "." / ".." / hidden files).
@@ -56,8 +63,7 @@ class ProcessState(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     KILLED = "killed"
-    # The manager exited while the process was running; its fate is unknown
-    # and its output is no longer captured.
+    # The manager exited while the process was running; its final state is unknown.
     ORPHANED = "orphaned"
 
 
@@ -128,20 +134,19 @@ class ProcessInfo:
 @dataclass
 class _RunningProcess:
     info: ProcessInfo
-    proc: subprocess.Popen
-    stdout_thread: Optional[threading.Thread] = None
-    stderr_thread: Optional[threading.Thread] = None
-    waiter: Optional[threading.Thread] = None
+    proc: asyncio.subprocess.Process
+    waiter: Optional[asyncio.Task] = None
     kill_requested: bool = False
 
 
 class ProcessManager:
-    """Manage background subprocesses with file-backed output capture."""
+    """Manage background subprocesses with file-backed output capture (asyncio)."""
 
     def __init__(self, processes_dir: str = PROCESSES_DIR) -> None:
         self._processes_dir = processes_dir
         self._procs: Dict[str, _RunningProcess] = {}
-        self._lock = threading.Lock()
+        # Serializes the check-and-register part of start() across awaits
+        self._start_lock = asyncio.Lock()
         self._reconcile_orphans()
 
     def _make_pid(self) -> str:
@@ -181,7 +186,7 @@ class ProcessManager:
                     continue
                 info = ProcessInfo.from_meta(meta)
                 info.state = ProcessState.ORPHANED
-                info.error = "process manager exited while the process was running"
+                info.error = "process manager exited while the process was running; final state unknown"
                 self._write_meta(info)
                 logger.warning(f"Marked process {name} (system pid {info.system_pid}) as orphaned")
             except Exception as exc:
@@ -191,7 +196,7 @@ class ProcessManager:
     # Core API
     # ------------------------------------------------------------------
 
-    def start(
+    async def start(
         self,
         cmd: str | List[str],
         *,
@@ -214,76 +219,63 @@ class ProcessManager:
             if not cmd.strip():
                 raise ValueError("Command must not be empty")
             shell = True
+            argv = proc_util.shell_argv(cmd)
         elif isinstance(cmd, list) and cmd and all(isinstance(a, str) for a in cmd):
             shell = False
+            argv = cmd
         else:
             raise ValueError("Command must be a non-empty string or a non-empty list of strings")
 
-        with self._lock:
+        async with self._start_lock:
             pid = validate_pid(pid) if pid else self._make_pid()
             proc_dir = self._proc_path(pid)
             if pid in self._procs or os.path.exists(proc_dir):
                 raise ValueError(f"Process ID {pid!r} is already in use")
 
-            merged_env = os.environ.copy()
-            if env:
-                merged_env.update(env)
-
-            proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=merged_env,
-                cwd=cwd,
-                shell=shell,
-                start_new_session=True,  # own process group, see kill()
-            )
-
             os.makedirs(proc_dir)
+            stdout_path = os.path.join(proc_dir, "stdout.log")
+            stderr_path = os.path.join(proc_dir, "stderr.log")
+            try:
+                # The child gets its own descriptors; ours can be closed right after spawning
+                with open(stdout_path, "ab") as out, open(stderr_path, "ab") as err:
+                    p = await proc_util.spawn(argv, env=env, cwd=cwd, stdout=out, stderr=err)
+            except BaseException:
+                shutil.rmtree(proc_dir, ignore_errors=True)
+                raise
+
             info = ProcessInfo(
                 pid=pid,
-                system_pid=proc.pid,
+                system_pid=p.pid,
                 cmd=cmd,
                 state=ProcessState.RUNNING,
                 cwd=cwd,
                 env=env,
                 started_at=time.time(),
                 shell=shell,
-                stdout_path=os.path.join(proc_dir, "stdout.log"),
-                stderr_path=os.path.join(proc_dir, "stderr.log"),
+                stdout_path=stdout_path,
+                stderr_path=stderr_path,
             )
-            rp = _RunningProcess(info=info, proc=proc)
+            rp = _RunningProcess(info=info, proc=p)
             self._procs[pid] = rp
             self._write_meta(info)
+            rp.waiter = asyncio.create_task(self._wait(rp), name=f"pm-wait:{pid}")
 
-        rp.stdout_thread = threading.Thread(
-            target=self._drain, args=(pid, proc.stdout, info.stdout_path), daemon=True
-        )
-        rp.stderr_thread = threading.Thread(
-            target=self._drain, args=(pid, proc.stderr, info.stderr_path), daemon=True
-        )
-        rp.waiter = threading.Thread(target=self._wait, args=(rp,), daemon=True)
-        rp.stdout_thread.start()
-        rp.stderr_thread.start()
-        rp.waiter.start()
-
-        logger.info(f"Started process {pid} (system pid {proc.pid}, shell={shell}): {cmd}")
+        logger.info(f"Started process {pid} (system pid {p.pid}, shell={shell}): {cmd}")
         return info
 
-    def status(self, pid: str) -> ProcessInfo:
+    async def status(self, pid: str) -> ProcessInfo:
         """Return current state of a process."""
         validate_pid(pid)
-        with self._lock:
-            rp = self._procs.get(pid)
+        rp = self._procs.get(pid)
         if rp is not None:
             return rp.info
 
-        meta = self._read_meta(pid)
+        meta = await asyncio.to_thread(self._read_meta, pid)
         if meta is None:
             raise KeyError(f"Unknown process: {pid}")
         return ProcessInfo.from_meta(meta)
 
-    def output(self, pid: str, stream: str = "stdout", tail: Optional[int] = None) -> str:
+    async def output(self, pid: str, stream: str = "stdout", tail: Optional[int] = None) -> str:
         """
         Read captured output of a process.
 
@@ -295,14 +287,9 @@ class ProcessManager:
         if stream not in ("stdout", "stderr"):
             raise ValueError(f"Invalid stream {stream!r}: must be 'stdout' or 'stderr'")
         log_file = os.path.join(self._proc_path(pid), f"{stream}.log")
-        if not os.path.isfile(log_file):
-            raise KeyError(f"No {stream} log for process {pid}")
-        with open(log_file, "r", errors="replace") as f:
-            if tail is None:
-                return f.read()
-            return "".join(deque(f, maxlen=max(tail, 0))).rstrip("\n")
+        return await asyncio.to_thread(self._read_log, pid, stream, log_file, tail)
 
-    def kill(self, pid: str, *, force: bool = False) -> ProcessInfo:
+    async def kill(self, pid: str, *, force: bool = False) -> ProcessInfo:
         """
         Kill a running process and its process group.
 
@@ -314,76 +301,59 @@ class ProcessManager:
         :return: Updated ProcessInfo.
         """
         validate_pid(pid)
-        with self._lock:
-            rp = self._procs.get(pid)
+        rp = self._procs.get(pid)
         if rp is None:
             raise KeyError(f"Process {pid} is not running (may have already finished)")
 
-        sig = signal.SIGKILL if force else signal.SIGTERM
+        sig = proc_util.SIGKILL if force else signal.SIGTERM
         rp.kill_requested = True
-        self._signal_group(rp, sig)
-        logger.info(f"Sent {sig.name} to process {pid} (process group {rp.proc.pid})")
+        proc_util.signal_group(rp.proc, sig)
+        logger.info(f"Sent {signal.Signals(sig).name} to process {pid} (process group {rp.proc.pid})")
 
         if rp.waiter:
-            rp.waiter.join(timeout=KILL_WAIT_S)
+            try:
+                await asyncio.wait_for(asyncio.shield(rp.waiter), timeout=KILL_WAIT_S)
+            except asyncio.TimeoutError:
+                pass
         return rp.info
 
-    def list(self, *, include_finished: bool = False) -> List[ProcessInfo]:
+    async def list(self, *, include_finished: bool = False) -> List[ProcessInfo]:
         """
         List tracked processes.
 
         :param include_finished: If True, also scan disk for finished processes
                                  that are no longer in memory.
         """
-        result: List[ProcessInfo] = []
+        by_pid: Dict[str, ProcessInfo] = {pid: rp.info for pid, rp in self._procs.items()}
+        if include_finished:
+            # A process may finish while the scan runs; keep the in-memory entry then
+            for info in await asyncio.to_thread(self._scan_finished, set(by_pid)):
+                by_pid.setdefault(info.pid, info)
+        return sorted(by_pid.values(), key=lambda i: i.started_at, reverse=True)
 
-        with self._lock:
-            for rp in self._procs.values():
-                result.append(rp.info)
-
-        if include_finished and os.path.isdir(self._processes_dir):
-            known_pids = {info.pid for info in result}
-            for name in os.listdir(self._processes_dir):
-                if name in known_pids or not _PID_RE.match(name):
-                    continue
-                meta = self._read_meta(name)
-                if meta is not None:
-                    result.append(ProcessInfo.from_meta(meta))
-
-        result.sort(key=lambda i: i.started_at, reverse=True)
-        return result
-
-    def cleanup(self, pid: str) -> None:
+    async def cleanup(self, pid: str) -> None:
         """Remove all on-disk artifacts for a finished process."""
         proc_dir = self._proc_path(pid)
-        with self._lock:
-            if pid in self._procs:
-                raise RuntimeError(f"Process {pid} is still tracked in memory; wait for it to finish or kill it first")
+        if pid in self._procs:
+            raise RuntimeError(f"Process {pid} is still tracked in memory; wait for it to finish or kill it first")
 
         if os.path.isdir(proc_dir):
-            shutil.rmtree(proc_dir)
+            await asyncio.to_thread(shutil.rmtree, proc_dir)
             logger.info(f"Cleaned up process directory: {proc_dir}")
 
-    def shutdown(self) -> None:
+    async def shutdown(self) -> None:
         """Terminate all running processes (SIGTERM, then SIGKILL) and record their final state.
 
-        Called when the owning service stops: without it, output could no
-        longer be captured and the processes would be left untracked.
+        Called when the owning service stops, so no process is left untracked.
         """
-        with self._lock:
-            running = list(self._procs.values())
+        running = list(self._procs.values())
         for rp in running:
             rp.kill_requested = True
-            self._signal_group(rp, signal.SIGTERM)
-        deadline = time.time() + TERMINATE_GRACE_S
-        for rp in running:
-            if rp.waiter:
-                rp.waiter.join(timeout=max(0.0, deadline - time.time()))
-        for rp in running:
-            if rp.proc.poll() is None:
-                self._signal_group(rp, signal.SIGKILL)
-            if rp.waiter:
-                rp.waiter.join(timeout=TERMINATE_GRACE_S)
+        await asyncio.gather(
+            *(proc_util.terminate(rp.proc, grace=TERMINATE_GRACE_S) for rp in running),
+            return_exceptions=True,
+        )
+        await asyncio.gather(*(rp.waiter for rp in running if rp.waiter), return_exceptions=True)
         if running:
             logger.info(f"Terminated {len(running)} running process(es) on shutdown")
 
@@ -391,49 +361,46 @@ class ProcessManager:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _signal_group(rp: _RunningProcess, sig: int) -> None:
-        # start_new_session=True makes the child a group leader: pgid == pid.
-        # Signalling the group also reaches children the command spawned.
-        try:
-            os.killpg(rp.proc.pid, sig)
-        except ProcessLookupError:
-            pass
-
-    def _drain(self, pid: str, pipe, log_path: str) -> None:
-        """Read lines from a pipe and append them to a log file."""
-        try:
-            with open(log_path, "ab") as f:
-                for line in iter(pipe.readline, b""):
-                    f.write(line)
-                    f.flush()
-        except Exception as exc:
-            logger.error(f"Drain error for {pid}: {exc}")
-        finally:
-            pipe.close()
-
-    def _wait(self, rp: _RunningProcess) -> None:
+    async def _wait(self, rp: _RunningProcess) -> None:
         """Wait for a process to exit, then update state and persist metadata."""
-        rp.proc.wait()
-
-        # Pipes stay open while other members of the group hold them; don't block forever
-        if rp.stdout_thread:
-            rp.stdout_thread.join(timeout=5)
-        if rp.stderr_thread:
-            rp.stderr_thread.join(timeout=5)
+        rc = await rp.proc.wait()
 
         info = rp.info
         info.finished_at = time.time()
-        info.exit_code = rp.proc.returncode
+        info.exit_code = rc
 
-        if rp.proc.returncode == 0:
+        if rc == 0:
             info.state = ProcessState.COMPLETED
-        elif rp.proc.returncode < 0 or rp.kill_requested:
+        elif rc < 0 or rp.kill_requested:
             info.state = ProcessState.KILLED
         else:
             info.state = ProcessState.FAILED
 
-        with self._lock:
+        try:
             self._write_meta(info)
+        except OSError as exc:
+            logger.error(f"Could not persist final state of process {info.pid}: {exc}")
+        finally:
             self._procs.pop(info.pid, None)
         logger.info(f"Process {info.pid} finished: state={info.state.value} exit_code={info.exit_code}")
+
+    @staticmethod
+    def _read_log(pid: str, stream: str, log_file: str, tail: Optional[int]) -> str:
+        if not os.path.isfile(log_file):
+            raise KeyError(f"No {stream} log for process {pid}")
+        with open(log_file, "r", errors="replace") as f:
+            if tail is None:
+                return f.read()
+            return "".join(deque(f, maxlen=max(tail, 0))).rstrip("\n")
+
+    def _scan_finished(self, known_pids: set[str]) -> List[ProcessInfo]:
+        if not os.path.isdir(self._processes_dir):
+            return []
+        found = []
+        for name in os.listdir(self._processes_dir):
+            if name in known_pids or not _PID_RE.match(name):
+                continue
+            meta = self._read_meta(name)
+            if meta is not None:
+                found.append(ProcessInfo.from_meta(meta))
+        return found

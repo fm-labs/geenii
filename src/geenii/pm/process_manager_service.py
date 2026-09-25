@@ -16,10 +16,10 @@ import asyncio
 import json
 import logging
 import os
-import signal
 import sys
 from typing import Any
 
+from geenii import proc as proc_util
 from geenii.config import CACHE_DIR
 from geenii.pm.process_manager import ProcessManager
 
@@ -30,9 +30,9 @@ DEFAULT_SOCKET_PATH = os.path.join(CACHE_DIR, "process_manager.sock")
 
 class ProcessManagerService:
 
-    def __init__(self, socket_path: str = DEFAULT_SOCKET_PATH) -> None:
+    def __init__(self, socket_path: str = DEFAULT_SOCKET_PATH, pm: ProcessManager | None = None) -> None:
         self._socket_path = socket_path
-        self._pm = ProcessManager()
+        self._pm = pm or ProcessManager()
         self._server: asyncio.AbstractServer | None = None
 
     @property
@@ -53,8 +53,8 @@ class ProcessManagerService:
         if self._server:
             self._server.close()
             await self._server.wait_closed()
-        # Output can't be captured once we exit, so don't leave processes behind
-        await asyncio.get_running_loop().run_in_executor(None, self._pm.shutdown)
+        # Nobody could track or kill them once we exit, so don't leave processes behind
+        await self._pm.shutdown()
         if os.path.exists(self._socket_path):
             os.unlink(self._socket_path)
         logger.info("ProcessManagerService stopped")
@@ -63,9 +63,7 @@ class ProcessManagerService:
         await self.start()
         stop_event = asyncio.Event()
 
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, stop_event.set)
+        proc_util.add_shutdown_handlers(stop_event.set)
 
         logger.info("Service ready, waiting for connections...")
         await stop_event.wait()
@@ -119,8 +117,7 @@ class ProcessManagerService:
             return {"ok": False, "error": f"Unknown method: {method}"}
 
         try:
-            loop = asyncio.get_running_loop()
-            result = await loop.run_in_executor(None, lambda: handler(params))
+            result = await handler(params)
             return {"ok": True, "result": result}
         except Exception as exc:
             logger.exception(f"Error in {method}")
@@ -132,14 +129,14 @@ class ProcessManagerService:
         await writer.drain()
 
     # ------------------------------------------------------------------
-    # RPC handlers — all run in the thread-pool executor
+    # RPC handlers — coroutines on the service loop, which owns the ProcessManager
     # ------------------------------------------------------------------
 
-    def _rpc_ping(self, params: dict) -> str:
+    async def _rpc_ping(self, params: dict) -> str:
         return "pong"
 
-    def _rpc_start(self, params: dict) -> dict:
-        info = self._pm.start(
+    async def _rpc_start(self, params: dict) -> dict:
+        info = await self._pm.start(
             params["command"],
             env=params.get("env"),
             cwd=params.get("cwd") or None,
@@ -147,28 +144,28 @@ class ProcessManagerService:
         )
         return info.to_dict()
 
-    def _rpc_status(self, params: dict) -> dict:
-        info = self._pm.status(params["process_id"])
+    async def _rpc_status(self, params: dict) -> dict:
+        info = await self._pm.status(params["process_id"])
         return info.to_dict()
 
-    def _rpc_output(self, params: dict) -> str:
+    async def _rpc_output(self, params: dict) -> str:
         tail = params.get("tail")
-        return self._pm.output(
+        return await self._pm.output(
             params["process_id"],
             stream=params.get("stream", "stdout"),
             tail=tail if tail and tail > 0 else None,
         )
 
-    def _rpc_kill(self, params: dict) -> dict:
-        info = self._pm.kill(params["process_id"], force=params.get("force", False))
+    async def _rpc_kill(self, params: dict) -> dict:
+        info = await self._pm.kill(params["process_id"], force=params.get("force", False))
         return info.to_dict()
 
-    def _rpc_list(self, params: dict) -> list[dict]:
-        procs = self._pm.list(include_finished=params.get("include_finished", False))
+    async def _rpc_list(self, params: dict) -> list[dict]:
+        procs = await self._pm.list(include_finished=params.get("include_finished", False))
         return [p.to_dict() for p in procs]
 
-    def _rpc_cleanup(self, params: dict) -> str:
-        self._pm.cleanup(params["process_id"])
+    async def _rpc_cleanup(self, params: dict) -> str:
+        await self._pm.cleanup(params["process_id"])
         return "ok"
 
 

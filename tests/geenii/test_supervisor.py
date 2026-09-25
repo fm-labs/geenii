@@ -203,3 +203,16 @@ def test_cancelled_run_kills_the_whole_process_group(tmp_path):
         _assert_dead(grandchild)
 
     asyncio.run(main())
+
+
+def test_run_spawn_error_is_logged_and_raised(monkeypatch):
+    monkeypatch.setattr(sup_mod, "RUN_LOG_HISTORY", 0)
+
+    async def main():
+        sup = Supervisor()
+        with pytest.raises(FileNotFoundError):
+            await sup.run(["/nonexistent/binary"], name="broken")
+        return set(sup._logs)
+
+    # The failed job's log buffer is retired like any finished run
+    assert asyncio.run(main()) == set()

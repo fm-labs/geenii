@@ -21,6 +21,47 @@ For how to configure and use the scheduler, see the user guide page
 
 ---
 
+## Shared helpers (`geenii/proc.py`)
+
+Low-level building blocks shared by all three components. They define the
+common conventions:
+
+- Extra environment variables are merged over `os.environ`.
+- Every child runs in its own process group.
+- Termination is `SIGTERM` to the group, a grace period, then `SIGKILL`.
+
+| Helper | Purpose |
+|---|---|
+| `merged_env(extra)` | Copy of `os.environ` with `extra` applied on top |
+| `await spawn(cmd, env=, cwd=, capture_output=True, stdout=, stderr=)` | `create_subprocess_exec` with `start_new_session=True`. `cmd` is an argument vector; no shell is involved. `stdout`/`stderr` accept an explicit target, such as an open log file, instead of a pipe |
+| `shell_argv(command)` | `["/bin/sh", "-c", command]`, for running a command line through the shell with `spawn()` |
+| `await terminate(proc, grace=5.0)` | `SIGTERM` to the group, wait up to `grace` seconds, then `SIGKILL` to the group. Returns the exit code; a process that has already exited is left alone |
+| `terminate_sync(popen, grace=5.0)` | The same for a blocking `subprocess.Popen` |
+| `signal_group(proc, sig)` | Signals the process group; works for asyncio processes and `Popen`, and ignores processes that have already exited |
+| `await pump_lines(stream, on_line)` | Reads a stream to EOF and calls `on_line(str)` for each decoded line |
+| `add_shutdown_handlers(on_signal)` | Calls `on_signal` on SIGINT or SIGTERM; for daemons such as `geenii-scheduler` and `geenii pm serve` |
+
+On platforms without `os.killpg`, `USE_PROCESS_GROUPS` is `False`, and the
+helpers signal the direct child only.
+
+Note that on Python 3.12+ asyncio's `proc.wait()` also waits for the output
+pipes to close. A leftover child that holds the pipes open therefore delays
+`wait()` until it exits. This is one reason to signal the whole group.
+
+**Status:** the module is tested in `tests/geenii/test_proc.py`.
+
+All three components use it, and none of them keeps its own copy of this
+logic:
+
+- **Process Manager:** `spawn`, `shell_argv`, `signal_group`, `terminate`,
+  `add_shutdown_handlers`
+- **Supervisor:** `spawn`, `pump_lines`, `signal_group`, `terminate`
+- **Scheduler:** `spawn`, `pump_lines`, `terminate`, `add_shutdown_handlers`
+
+`terminate_sync` currently has no caller; it's kept for `Popen`-based code.
+
+---
+
 ## Supervisor
 
 `geenii/supervisor.py` is an asyncio process supervisor. You declare which
@@ -58,7 +99,7 @@ Tuning constants at module level:
 | `BACKOFF_RESET_AFTER` | `60.0` | A process that stayed up this many seconds before crashing starts again from `BACKOFF_INITIAL` |
 | `RUN_LOG_HISTORY` | `50` | Number of finished `run()` log buffers kept |
 | `SUBSCRIBER_QUEUE_SIZE` | `1000` | Maximum events queued for each log subscriber |
-| `TERMINATE_GRACE_S` | `5.0` | Delay between `SIGTERM` and `SIGKILL` when terminating a process |
+| `TERMINATE_GRACE_S` | `5.0` (from `proc.TERMINATE_GRACE_S`) | Delay between `SIGTERM` and `SIGKILL` when terminating a process |
 
 ### Lifecycle
 
@@ -69,7 +110,7 @@ ensure(name, cfg)
        ▼
   _watch(name)  ── loops until the stop event is set or the config is removed
        ├─ not running → _spawn()
-       │     ├─ create_subprocess_exec(cmd, env=os.environ ∪ cfg.env, cwd, start_new_session=True)
+       │     ├─ proc.spawn(cmd, env=cfg.env, cwd, capture_output)   (own process group)
        │     ├─ _runtime[name] = ProcRuntime(...)
        │     └─ if capture_output: _pipe() tasks copy stdout/stderr to the LogBus
        │     (if spawn raises: log it, sleep the current backoff, double it)
@@ -94,9 +135,10 @@ do it. Signals go to the whole group, so processes started by the command are
 stopped too. This covers the members of `sh -c "a | b"`, for example, or
 anything the command put in the background.
 
-Termination (`_terminate_one`) cancels the log pipe tasks and sends `SIGTERM`
-to the group. After waiting up to `TERMINATE_GRACE_S` for the process to exit,
-it sends `SIGKILL` to the group.
+Termination (`_terminate_one`) cancels the log pipe tasks and calls
+`proc.terminate()`. That sends `SIGTERM` to the group, waits up to
+`TERMINATE_GRACE_S` for the process to exit, then sends `SIGKILL` to the
+group.
 
 ### Public API
 
@@ -110,7 +152,7 @@ it sends `SIGKILL` to the group.
 | `logs(name, tail=100)` | The last `tail` log lines as text. |
 | `stream_logs(name)` | Async iterator: replays the buffer, then yields live lines. Every 15 seconds without output it yields `""` as a keepalive, which the HTTP route turns into an SSE comment. |
 | `stream_logs_jsonl(name)` | The same, but yields `LogEvent` objects, with `None` as the keepalive. |
-| `await run(cmd, env=, cwd=, timeout=, name=)` | One-shot command that is **not** part of the desired state. Output goes to a LogBus (so it can be streamed live) and is returned as a `RunResult`. On timeout, or when the caller cancels the coroutine, the process group is sent `SIGKILL` and the exception is raised again. Only the last `RUN_LOG_HISTORY` finished jobs keep their LogBus. Older ones are removed, unless a supervised process has the same name. |
+| `await run(cmd, env=, cwd=, timeout=, name=)` | One-shot command that is **not** part of the desired state. Output goes to a LogBus (so it can be streamed live) and is returned as a `RunResult`. On timeout, or when the caller cancels the coroutine, the process group is sent `SIGKILL` and the exception is raised again. If the command can't be started (for example, the binary doesn't exist), the error is logged to the job's LogBus and raised. Only the last `RUN_LOG_HISTORY` finished jobs keep their LogBus. Older ones are removed, unless a supervised process has the same name. |
 | `await stop()` | Sets the stop event, cancels all watchers and terminates all processes. |
 | `is_active()` | `True` while any process is running or any watcher task is alive. Useful for graceful-shutdown loops. |
 
@@ -153,24 +195,24 @@ this section covers the internals.
 | `ScheduledTask.next_run(after)` | For `at:` tasks, the fixed datetime converted to UTC. For `cron:` tasks, the next croniter match after `after` (default: now, UTC). |
 | `ScheduledTask.run()` | Runs the task under `asyncio.wait_for(..., timeout)`. Failures and timeouts are caught and logged. **Cancellation is passed on**, so the subprocess cleanup can run. |
 | `Scheduler` | Loads the config, runs the main loop, and supports adding and removing tasks at runtime. |
-| `serve(scheduler)` | Installs SIGINT and SIGTERM handlers, starts the scheduler and waits until it has stopped. Used by both `main()` and `geenii scheduler start`. |
+| `serve(scheduler)` | Installs SIGINT and SIGTERM handlers with `proc.add_shutdown_handlers`, starts the scheduler and waits until it has stopped. Used by both `main()` and `geenii scheduler start`. |
 
-Module constants: `TERMINATE_GRACE_S` (5s, the delay between SIGTERM and
-SIGKILL) and `STREAM_LINE_LIMIT` (1 MiB, the maximum length of one output
-line).
+Module constant: `TERMINATE_GRACE_S` (default `proc.TERMINATE_GRACE_S`, 5s),
+the delay between SIGTERM and SIGKILL. The maximum output line length (1 MiB)
+comes from `proc.spawn`.
 
 ### Execution of `cmd` tasks
 
 1. Each argument is expanded with `os.path.expandvars` (for example `$GEENII_BIN`).
-2. `env` is merged over `os.environ`, and `working_dir` becomes `cwd`.
-3. The process is started with `start_new_session=True`, which puts it in its
-   own process group.
-4. stdout and stderr are read line by line and logged immediately (stdout at
-   INFO, stderr at WARNING), so output is never buffered as a whole.
-5. A non-zero exit becomes a `RuntimeError`, which `run()` catches and logs.
-6. If the run is cancelled (by a timeout or by `stop()`), `_terminate()` sends
-   `SIGTERM` to the **process group**. After `TERMINATE_GRACE_S` it sends
-   `SIGKILL`. Child processes of the command are stopped too.
+2. `proc.spawn()` starts the command in its own process group. It merges
+   `env` over `os.environ`, and `working_dir` becomes `cwd`.
+3. `proc.pump_lines()` reads stdout and stderr line by line, and each line is
+   logged immediately (stdout at INFO, stderr at WARNING), so output is never
+   buffered as a whole.
+4. A non-zero exit becomes a `RuntimeError`, which `run()` catches and logs.
+5. If the run is cancelled (by a timeout or by `stop()`), `proc.terminate()`
+   sends `SIGTERM` to the **process group**. After `TERMINATE_GRACE_S` it
+   sends `SIGKILL`. Child processes of the command are stopped too.
 
 ### Execution of callables
 
@@ -250,9 +292,9 @@ ProcessingAgent / geenii pm CLI
         ▼
   Unix socket  $GEENII_CACHE_DIR/process_manager.sock   (newline-delimited JSON)
         │
-  ProcessManagerService (asyncio server; each RPC runs in the thread-pool executor)
+  ProcessManagerService (asyncio server; RPC handlers are coroutines on its loop)
         │
-  ProcessManager (subprocess.Popen + threads)
+  ProcessManager (asyncio; children write directly to the log files)
         │
   $GEENII_CACHE_DIR/processes/<pid>/{meta.json, stdout.log, stderr.log}
 ```
@@ -271,7 +313,7 @@ The type of `cmd` decides how the command is executed:
 
 | `cmd` type | Execution | Use for |
 |---|---|---|
-| `str` | Through the shell (`/bin/sh -c`, via `shell=True`) | Command lines with pipes, redirects, `&&`, `cd`, `$VAR`. This is what the agent tool and `geenii pm start` send |
+| `str` | Through the shell (`/bin/sh -c`, via `proc.shell_argv()`) | Command lines with pipes, redirects, `&&`, `cd`, `$VAR`. This is what the agent tool and `geenii pm start` send |
 | `list[str]` | Directly, without a shell. Each element is one argument | Programmatic callers that build an argument vector; nothing is interpreted by a shell |
 
 The shell is used on purpose for strings. The caller supplies the **whole**
@@ -287,9 +329,18 @@ only checks the start of the string. Anything chained after it, for example
 
 ### ProcessManager (`process_manager.py`)
 
-A thread-based, synchronous manager. Each process gets a short ID: 12 hex
+An asyncio-based manager. All public methods are coroutines and must run on
+the event loop that owns the manager, which is the `ProcessManagerService`
+loop. Blocking disk work runs in `asyncio.to_thread`: reading logs, scanning
+for finished processes, and `rmtree`. Each process gets a short ID: 12 hex
 characters, or a caller-supplied `pid`. That ID is separate from the OS
 `system_pid`.
+
+The child's stdout and stderr are **connected directly to the log files**, not
+to pipes. The operating system writes the output unchanged, so there are no
+reader tasks and nothing gets decoded or re-encoded. `wait()` returns as soon
+as the process exits, and output keeps being written even if the manager dies
+unexpectedly.
 
 Process IDs become directory names, so they are validated. An ID must be 1–64
 characters long, may contain only letters, digits, `_` and `-`, and must start
@@ -299,15 +350,15 @@ rejected as well. An empty `pid` means "auto-generate".
 
 | Method | Behavior |
 |---|---|
-| `start(cmd, env=, cwd=, pid=)` | Validates `cmd` and `pid`, then calls `Popen(..., start_new_session=True)` so the command gets its own process group. Starts two daemon threads that append each pipe to its log file line by line (flushing after each line), and a waiter thread. Writes `meta.json` and returns `ProcessInfo` with state `running`. |
-| `status(pid)` | Answers from memory while the process runs, otherwise from `meta.json`. Raises `KeyError` if the ID is unknown. Never creates files. |
-| `output(pid, stream="stdout", tail=None)` | Returns the log contents, or only the last `tail` lines. Works while the process is still running. `stream` must be `stdout` or `stderr`. |
-| `kill(pid, force=False)` | Sends `SIGTERM` (or `SIGKILL` with `force`) to the **process group**, so child processes are signalled as well. Waits up to `KILL_WAIT_S` (5s) for the exit, so the returned state is normally already `killed`. |
-| `list(include_finished=False)` | Processes in memory, plus finished ones from disk if requested, newest first. |
-| `cleanup(pid)` | Runs `rmtree` on the process directory. Refuses while the process is still tracked. |
-| `shutdown()` | Terminates all running processes (process group `SIGTERM`, then `SIGKILL` after `TERMINATE_GRACE_S`) and records their final state. Called by `ProcessManagerService.stop()`. |
+| `await start(cmd, env=, cwd=, pid=)` | Validates `cmd` and `pid`. Under a lock, so that concurrent starts can't claim the same ID, it creates the process directory, opens the log files, and calls `proc.spawn()`, which gives the command its own process group. If spawning fails (for example, `cwd` doesn't exist), the directory is removed again. Then it writes `meta.json`, starts a waiter task and returns `ProcessInfo` with state `running`. |
+| `await status(pid)` | Answers from memory while the process runs, otherwise from `meta.json`. Raises `KeyError` if the ID is unknown. Never creates files. |
+| `await output(pid, stream="stdout", tail=None)` | Returns the log contents, or only the last `tail` lines. Works while the process is still running. `stream` must be `stdout` or `stderr`. |
+| `await kill(pid, force=False)` | Sends `SIGTERM` (or `SIGKILL` with `force`) to the **process group**, so child processes are signalled as well. Waits up to `KILL_WAIT_S` (5s) for the exit, so the returned state is normally already `killed`. |
+| `await list(include_finished=False)` | Processes in memory, plus finished ones from disk if requested, newest first. Each ID appears only once. |
+| `await cleanup(pid)` | Runs `rmtree` on the process directory. Refuses while the process is still tracked. |
+| `await shutdown()` | Terminates all running processes at the same time with `proc.terminate()` (process group `SIGTERM`, then `SIGKILL` after `TERMINATE_GRACE_S`), waits for their waiter tasks and records their final state. Called by `ProcessManagerService.stop()`. |
 
-The waiter thread sets the final state from the return code:
+The waiter task sets the final state from the return code:
 
 | Condition | State |
 |---|---|
@@ -322,8 +373,9 @@ It then rewrites `meta.json` (atomically, via a temporary file and
 **Orphans.** When a `ProcessManager` is created, it looks for `meta.json`
 files still in the `running` (or `pending`) state. That only happens if the
 previous service was killed without a clean shutdown. Those processes are
-marked `orphaned`, with an explanation in `error`: their output is no longer
-captured, and whether they are still running is unknown. They are not
+marked `orphaned`, with an explanation in `error`: whether they are still
+running is unknown. Because the output goes straight to the log files, any
+output they produce is still captured. They are not
 signalled, because their OS pid may have been reused by another process.
 
 ### Wire protocol (`process_manager_service.py`)

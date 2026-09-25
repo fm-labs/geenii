@@ -30,20 +30,21 @@ import inspect
 import json
 import logging
 import os
-import signal
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 
 import pydantic
 from croniter import croniter
 
+from geenii import proc as proc_util
+
 logger = logging.getLogger(__name__)
 
-TERMINATE_GRACE_S = 5.0          # SIGTERM → SIGKILL grace period for task subprocesses
-STREAM_LINE_LIMIT = 1024 * 1024  # max length of a single output line
+TERMINATE_GRACE_S = proc_util.TERMINATE_GRACE_S  # SIGTERM → SIGKILL grace period for task subprocesses
 
 
 def parse_interval(interval: str) -> tuple[str, str]:
@@ -74,28 +75,6 @@ def _accepts_params_env(fn: Callable) -> bool:
         pass
     sig.bind()  # raises TypeError if fn needs arguments we cannot provide
     return False
-
-
-async def _terminate(proc: asyncio.subprocess.Process) -> None:
-    """Terminate a task subprocess and its process group (SIGTERM, then SIGKILL)."""
-    if proc.returncode is not None:
-        return
-
-    def send(sig: int) -> None:
-        try:
-            if hasattr(os, "killpg"):
-                os.killpg(proc.pid, sig)
-            else:
-                proc.send_signal(sig)
-        except ProcessLookupError:
-            pass
-
-    send(signal.SIGTERM)
-    try:
-        await asyncio.wait_for(proc.wait(), timeout=TERMINATE_GRACE_S)
-    except asyncio.TimeoutError:
-        send(getattr(signal, "SIGKILL", signal.SIGTERM))
-        await proc.wait()
 
 
 @dataclass
@@ -178,37 +157,28 @@ class ScheduledTask:
 
     async def _run_cmd(self) -> None:
         expanded = [os.path.expandvars(arg) for arg in self.cmd]
-        merged_env = {**os.environ, **(self.env or {})}
         logger.info("Task '%s' executing: %s", self.name, expanded)
-        proc = await asyncio.create_subprocess_exec(
-            *expanded,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=merged_env,
+        # Own process group (via proc.spawn), so stop/timeout also reaches the command's children
+        proc = await proc_util.spawn(
+            expanded,
+            env=self.env,
             cwd=str(self.working_dir) if self.working_dir else None,
-            # Own process group, so stop/timeout also reaches the command's children
-            start_new_session=hasattr(os, "killpg"),
-            limit=STREAM_LINE_LIMIT,
         )
         try:
             await asyncio.gather(
-                self._log_stream(proc.stdout, "stdout", logging.INFO),
-                self._log_stream(proc.stderr, "stderr", logging.WARNING),
+                proc_util.pump_lines(proc.stdout, partial(self._log_line, "stdout", logging.INFO)),
+                proc_util.pump_lines(proc.stderr, partial(self._log_line, "stderr", logging.WARNING)),
                 proc.wait(),
             )
         except BaseException:
             # Cancelled (scheduler stop or timeout) — don't leave the child running
-            await _terminate(proc)
+            await proc_util.terminate(proc, grace=TERMINATE_GRACE_S)
             raise
         if proc.returncode != 0:
             raise RuntimeError(f"Command exited with code {proc.returncode}")
 
-    async def _log_stream(self, stream: asyncio.StreamReader, tag: str, level: int) -> None:
-        while True:
-            line = await stream.readline()
-            if not line:
-                return
-            logger.log(level, "Task '%s' %s: %s", self.name, tag, line.decode(errors="replace").rstrip())
+    def _log_line(self, tag: str, level: int, line: str) -> None:
+        logger.log(level, "Task '%s' %s: %s", self.name, tag, line)
 
 
 class SchedulerConfig(pydantic.BaseModel):
@@ -438,9 +408,15 @@ async def serve(scheduler: Scheduler) -> None:
         await scheduler.wait_until_stopped()
         logger.info("Scheduler shutdown complete.")
 
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, lambda: asyncio.create_task(shutdown_handler()))
+    # Keep a reference to the shutdown task so it isn't garbage-collected mid-run
+    shutdown_tasks: set[asyncio.Task] = set()
+
+    def on_signal() -> None:
+        t = asyncio.create_task(shutdown_handler())
+        shutdown_tasks.add(t)
+        t.add_done_callback(shutdown_tasks.discard)
+
+    proc_util.add_shutdown_handlers(on_signal)
 
     await scheduler.start()
     logger.info("Scheduler started.")
