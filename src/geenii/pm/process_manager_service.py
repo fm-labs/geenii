@@ -2,10 +2,11 @@
 Unix-socket JSON-RPC service wrapping ProcessManager.
 
 Run standalone:
-    python -m geenii.process_manager_service
+    python -m geenii.pm.process_manager_service [SOCKET_PATH]
 
 Protocol: newline-delimited JSON over a Unix domain socket.
     Request:  {"method": "start", "params": {"command": "echo hi"}}\n
+              ("command" may also be a list of strings to run without a shell)
     Response: {"ok": true, "result": {...}}\n
     Error:    {"ok": false, "error": "message"}\n
 """
@@ -52,6 +53,8 @@ class ProcessManagerService:
         if self._server:
             self._server.close()
             await self._server.wait_closed()
+        # Output can't be captured once we exit, so don't leave processes behind
+        await asyncio.get_running_loop().run_in_executor(None, self._pm.shutdown)
         if os.path.exists(self._socket_path):
             os.unlink(self._socket_path)
         logger.info("ProcessManagerService stopped")

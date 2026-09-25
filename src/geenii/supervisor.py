@@ -9,12 +9,19 @@ import logging
 import os
 import time
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, List, Literal, Optional
 
 import pydantic
 
 logger = logging.getLogger(__name__)
+
+BACKOFF_INITIAL = 0.5       # restart delay after a clean exit / first crash
+BACKOFF_MAX = 30.0          # upper bound for the exponential restart delay
+BACKOFF_RESET_AFTER = 60.0  # a process that ran this long counts as healthy again
+RUN_LOG_HISTORY = 50        # number of finished one-shot run() log buffers to keep
+SUBSCRIBER_QUEUE_SIZE = 1000  # per-subscriber queue bound; oldest events are dropped
 
 # ---------------------------------------------------------------------------
 # Internal state
@@ -41,9 +48,6 @@ class ProcRuntime:
     proc: asyncio.subprocess.Process
     started_at: float = field(default_factory=time.time)
     last_exit: Optional[Dict[str, Any]] = None
-    # Backoff lives here and accumulates across restarts; reset only on a
-    # clean exit (returncode == 0) or on an explicit restart call.
-    backoff: float = 3
     out_task: Optional[asyncio.Task] = None
     err_task: Optional[asyncio.Task] = None
 
@@ -92,10 +96,13 @@ class LogBus:
         if len(self._buf) > self._maxlines:
             del self._buf[: len(self._buf) - self._maxlines]
         for q in self._subs:
+            if q.full():
+                # Slow subscriber: drop its oldest event instead of growing unbounded
+                q.get_nowait()
             q.put_nowait(event)
 
     def subscribe(self) -> "asyncio.Queue[LogEvent]":
-        q: asyncio.Queue[LogEvent] = asyncio.Queue()
+        q: asyncio.Queue[LogEvent] = asyncio.Queue(maxsize=SUBSCRIBER_QUEUE_SIZE)
         self._subs.append(q)
         return q
 
@@ -133,10 +140,15 @@ class Supervisor:
         self._runtime: Dict[str, ProcRuntime] = {}
         self._watchers: Dict[str, asyncio.Task] = {}
         self._logs: Dict[str, LogBus] = {}
+        # Restart delay per process. Kept outside ProcRuntime because the
+        # runtime entry is dropped on every exit.
+        self._backoff: Dict[str, float] = {}
+        # Names of finished one-shot run() jobs, oldest first; evicted ones lose their LogBus
+        self._run_history: deque[str] = deque()
 
     def is_active(self) -> bool:
         # True if a process is running or any watcher tasks are active; used for graceful shutdowns
-        return bool(self._runtime) or any(not t.done() for t in self._watchers.values()) or not self._stop_event.is_set()
+        return bool(self._runtime) or any(not t.done() for t in self._watchers.values())
 
 
     # ------------------------------------------------------------------
@@ -205,6 +217,8 @@ class Supervisor:
             await proc.wait()
             self._log(job, f"killed after {timeout}s timeout")
             raise
+        finally:
+            self._retire_run_log(job)
 
         rc = proc.returncode
         self._log(job, f"exited rc={rc} in {time.time() - t0:.2f}s")
@@ -250,21 +264,19 @@ class Supervisor:
         async with self._lock:
             if disable_restart:
                 self._configs.pop(name, None)
-            watcher = self._watchers.pop(name, None)
-            if watcher:
-                watcher.cancel()
-                await asyncio.gather(watcher, return_exceptions=True)
+                self._backoff.pop(name, None)
+            await self._cancel_watcher_locked(name)
             await self._terminate_locked(name)
 
     async def restart_process(self, name: str) -> None:
         async with self._lock:
             if name not in self._configs:
                 raise KeyError(name)
-            # Terminate; watcher will respawn.  Reset backoff on explicit restart.
-            rt = self._runtime.get(name)
-            if rt:
-                rt.backoff = 0.5
+            # Replace the watcher rather than relying on it to respawn: with
+            # restart=False the old watcher would just exit after termination.
+            await self._cancel_watcher_locked(name)
             await self._terminate_locked(name)
+            self._backoff[name] = BACKOFF_INITIAL
             self._ensure_watcher_locked(name)
 
     async def update_config(self, name: str, req: "UpdateProcRequest") -> None:
@@ -295,7 +307,7 @@ class Supervisor:
                 "pid": rt.proc.pid,
                 "returncode": rt.proc.returncode,
                 "uptime_s": round(time.time() - rt.started_at, 3),
-                "backoff_s": rt.backoff,
+                "backoff_s": self._backoff.get(name, BACKOFF_INITIAL),
                 "last_exit": rt.last_exit,
             }
         for name, t in self._watchers.items():
@@ -359,6 +371,38 @@ class Supervisor:
                 self._watch(name), name=f"watch:{name}"
             )
 
+    async def _cancel_watcher_locked(self, name: str) -> None:
+        watcher = self._watchers.pop(name, None)
+        if watcher:
+            watcher.cancel()
+            await asyncio.gather(watcher, return_exceptions=True)
+
+    def _next_delay(self, name: str, rc: Optional[int], uptime: float) -> float:
+        """Return how long to wait before respawning, and update the stored backoff.
+
+        Clean exits and processes that stayed up for BACKOFF_RESET_AFTER seconds
+        restart quickly; repeated failures double the delay up to BACKOFF_MAX.
+        """
+        if rc == 0 or uptime >= BACKOFF_RESET_AFTER:
+            self._backoff[name] = BACKOFF_INITIAL
+        delay = self._backoff.get(name, BACKOFF_INITIAL)
+        if rc != 0:
+            self._backoff[name] = min(delay * 2, BACKOFF_MAX)
+        return delay
+
+    def _retire_run_log(self, job: str) -> None:
+        """Keep the LogBus of a finished run() job, evicting the oldest beyond RUN_LOG_HISTORY."""
+        try:
+            self._run_history.remove(job)
+        except ValueError:
+            pass
+        self._run_history.append(job)
+        while len(self._run_history) > RUN_LOG_HISTORY:
+            old = self._run_history.popleft()
+            # Never drop the log bus of a supervised process that shares the name
+            if old not in self._configs:
+                self._logs.pop(old, None)
+
     async def _watch(self, name: str) -> None:
         """
         Desired-state loop.  Runs outside any lock; acquires it only when
@@ -390,19 +434,10 @@ class Supervisor:
                     self._runtime.pop(name, None)
                     return
 
-                # Backoff: only escalate on non-zero exits; reset on clean exit
-                backoff = rt.backoff
-                if rc != 0:
-                    rt.backoff = min(backoff * 2, 30.0)
-                else:
-                    rt.backoff = 0.5
-
+                delay = self._next_delay(name, rc, time.time() - rt.started_at)
                 self._runtime.pop(name, None)
-                self._log(name, f"restarting in {backoff:.1f}s")
-                try:
-                    await asyncio.sleep(backoff)
-                except asyncio.CancelledError:
-                    raise
+                self._log(name, f"restarting in {delay:.1f}s")
+                await asyncio.sleep(delay)
 
             else:
                 # Not running yet (or runtime cleared) — spawn it.
@@ -411,10 +446,10 @@ class Supervisor:
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
-                    # Avoid tight crash loops; reset on success
-                    backoff = 30
-                    self._log(name, f"spawn error: {type(exc).__name__}: {exc}. retrying in {backoff:.1f}s")
-                    await asyncio.sleep(backoff)
+                    # Escalate the same backoff as crashes to avoid tight loops
+                    delay = self._next_delay(name, None, 0.0)
+                    self._log(name, f"spawn error: {type(exc).__name__}: {exc}. retrying in {delay:.1f}s")
+                    await asyncio.sleep(delay)
 
     async def _spawn(self, name: str, cfg: ProcConfig) -> None:
         self._log(name, f"starting: {' '.join(cfg.cmd)}")
@@ -435,12 +470,7 @@ class Supervisor:
             cwd=cfg.cwd,
         )
 
-        # Preserve accumulated backoff if an entry exists (from a previous exit
-        # that hasn't been cleaned up yet — shouldn't happen, but be safe)
-        prev = self._runtime.get(name)
-        backoff = prev.backoff if prev else 0.5
-
-        rt = ProcRuntime(proc=proc, backoff=backoff)
+        rt = ProcRuntime(proc=proc)
         self._runtime[name] = rt
 
         if cfg.capture_output:

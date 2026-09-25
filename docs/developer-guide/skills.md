@@ -31,6 +31,26 @@ triggers: fm4, radio, track
 You can retrieve live FM4 data using the `fm4-skills__fm4` tool.
 ```
 
+### Argument-level tool filtering
+
+To restrict **which commands** a tool can execute, use the parameterized syntax:
+
+```markdown
+---
+name: system-info
+description: Gather basic system information.
+allowed-tools: >-
+  Bash(command:uname *), Bash(command:hostname *), Bash(command:arch *),
+  Bash(command:uptime *), Bash(command:date *), Bash(command:sw_vers *),
+  Bash(command:sysctl *), read
+triggers: system info, sysinfo
+---
+```
+
+This allows the `bash` tool only for the listed command prefixes. Any other
+command (e.g. `curl`, `rm`) is blocked before execution. See
+[tools.md](tools.md) for the full syntax and programmatic API.
+
 ### Frontmatter fields (`SkillSpec`, `geenii/skills.py`)
 
 | Field | Required | Meaning |
@@ -38,7 +58,7 @@ You can retrieve live FM4 data using the `fm4-skills__fm4` tool.
 | `name` | yes | Skill name; must match the directory name for discovery |
 | `description` | yes | One-liner used for listings and skill selection |
 | `metadata` | no | Free-form dict |
-| `allowed-tools` | no | Space-separated tool names. When set, the agent's available tools are narrowed to the intersection of `agent.allowed_tools` and the union of all active skills' `allowed-tools`. Skills that omit this field inherit the full agent tool set. |
+| `allowed-tools` | no | Comma- or space-separated list of tool access rules. Supports both plain tool names (e.g. `bash`) and argument-level filters using the syntax `ToolName(param:pattern)` where `pattern` is an fnmatch glob (e.g. `Bash(command:uname *)`). When set, the agent's available tools are narrowed to the intersection of `agent.allowed_tools` and the union of all active skills' allowed tool names. Argument-level filters additionally restrict **what arguments** a tool can be called with — blocked calls return an error without executing. Skills that omit this field inherit the full agent tool set. See [tools.md](tools.md) for details. |
 | `triggers` | no | Comma- or space-separated keywords for deterministic skill activation. Matched with word boundaries against the user prompt (case-insensitive). When triggers match, the LLM selection call is skipped entirely. |
 
 The body is the instruction text. It is loaded lazily from disk each time it is
@@ -74,9 +94,12 @@ registering a duplicate name raises an error.
    body are appended to the system prompt of the subsequent `LLMTask`,
    delimited by `## Skill: <name>` headers.
 4. **Tool scoping** — `LLMTask` computes the effective tool set as
-   `agent.allowed_tools ∩ union(skill.allowed_tools for each active skill)`.
+   `agent.allowed_tools ∩ union(skill.tool_names for each active skill)`.
    If no active skill declares `allowed-tools`, the full agent tool set is
-   used. An empty intersection logs a warning.
+   used. An empty intersection logs a warning. When skills use argument-level
+   filters (e.g. `Bash(command:uname *)`), the tool is visible to the model
+   but `ToolCallTask` enforces the argument restrictions at invocation time —
+   calls that don't match any filter are rejected before execution.
 5. **Script tools** — when a skill is activated, any executable files in its
    `scripts/` directory are automatically registered as tools named
    `{skill_name}__{script_stem}` (e.g. `fm4-skills__fm4`). These appear in

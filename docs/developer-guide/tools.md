@@ -50,10 +50,13 @@ these are not wired into agents yet.
   skill names — see [skills.md](skills.md)).
 - stdout is returned to the model; on a non-zero exit code, stderr and the exit
   code are appended.
-- There is no allowlist/sandboxing policy yet; the HITL controller (see
-  [agents.md](../agents.md)) is the only gate. `geenii/sandbox.py` contains Docker
-  sandbox helpers that are not yet wired into the tool pipeline — see
-  [sandbox.md](sandbox.md) for the full design and integration roadmap.
+- **Tool filters** can restrict which commands a tool is allowed to execute.
+  See the *Tool filtering* section below and [skills.md](skills.md) for how
+  `allowed-tools` with argument-level patterns work.
+- The HITL controller (see [agents.md](agents.md)) provides an additional
+  approval gate. `geenii/sandbox.py` contains Docker sandbox helpers that are
+  not yet wired into the tool pipeline — see [sandbox.md](sandbox.md) for the
+  full design and integration roadmap.
 
 ## MCP tools
 
@@ -103,6 +106,74 @@ without defaults become required).
    `LLMTask.MAX_TOOL_CALLS = 5`).
 
 A tool that is registered but not in `allowed_tools` is invisible to the model.
+
+## Tool filtering
+
+Tool filters add argument-level restrictions on top of the name-based
+`allowed_tools` whitelist. They use a syntax inspired by Claude's
+`allowed-tools` format:
+
+```
+ToolName                      # allow the tool with any arguments
+ToolName(param:pattern)       # allow only when `param` matches `pattern`
+```
+
+Patterns use `fnmatch`-style wildcards (`*` matches anything). Tool name
+matching is case-insensitive.
+
+### Examples
+
+```yaml
+# In a skill's SKILL.md frontmatter:
+allowed-tools: >-
+  Bash(command:uname *), Bash(command:hostname *), Bash(command:date *),
+  Bash(command:uptime *), read, write
+```
+
+This allows the `bash` tool only for commands starting with `uname`, `hostname`,
+`date`, or `uptime`, while `read` and `write` are unrestricted. Any other
+`bash` command (e.g. `rm -rf /`) is rejected before execution.
+
+### Implementation (`geenii/tool/tool_filter.py`)
+
+| Class | Purpose |
+|---|---|
+| `ToolFilter` | A single rule: tool name + optional parameter name and glob pattern |
+| `ToolFilterSet` | A collection of rules. A tool call is allowed if **any** rule permits it. An empty set allows everything. |
+
+Parsing handles comma-and-space-separated lists correctly even when patterns
+contain spaces (e.g. `Bash(command:uname *)`), by tracking parenthesis depth.
+
+### Enforcement layers
+
+1. **LLM request** — `LLMTask._compute_effective_tools()` extracts the set of
+   tool **names** from active skills' `ToolFilterSet` to decide which tools the
+   model can see. This keeps tools with zero matching filters hidden from the
+   model entirely.
+2. **Invocation gate** — `ToolCallTask` checks active skills' tool filters
+   against the tool name **and arguments** before executing. A blocked call
+   returns an error result to the model without invoking the tool or prompting
+   the HITL controller.
+3. **HITL** — calls that pass the filter still go through the human-in-the-loop
+   approval flow.
+
+### Programmatic use
+
+```python
+from geenii.tool.tool_filter import ToolFilter, ToolFilterSet
+
+# Parse a single filter
+f = ToolFilter.parse("Bash(command:uname *)")
+f.allows("bash", {"command": "uname -a"})   # True
+f.allows("bash", {"command": "rm -rf /"})    # False
+
+# Parse a set
+fs = ToolFilterSet.parse("Bash(command:uname *), Bash(command:date *), read")
+fs.allows("bash", {"command": "date +%Y"})   # True
+fs.allows("read", {})                        # True
+fs.allows("bash", {"command": "curl evil"})  # False
+fs.tool_names()                              # {"bash", "read"}
+```
 
 ## CLI
 

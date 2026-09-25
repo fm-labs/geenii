@@ -43,7 +43,7 @@ tools:
 | `mcp_servers` | list[str] | Reserved; currently all configured MCP servers are loaded regardless |
 
 A built-in `default` agent (using `DEFAULT_COMPLETION_MODEL`) always exists;
-placing a `default.md` in the agents directory overrides it.
+placing a `routing.md` in the agents directory overrides it.
 
 ## Running an agent
 

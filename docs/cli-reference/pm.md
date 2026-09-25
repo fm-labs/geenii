@@ -40,14 +40,16 @@ the listen path.
 geenii pm start <COMMAND> [OPTIONS]
 ```
 
-Start a background process.
+Start a background process. `COMMAND` is a single string that runs through
+the shell, so pipes, redirects and `&&` work. Quote it as a whole:
+`geenii pm start "make build > build.log 2>&1"`.
 
 #### Options
 
 | Option | Short | Description |
 |---|---|---|
 | `--cwd` | `-d` | Working directory for the process |
-| `--pid` | `-p` | Custom process ID |
+| `--pid` | `-p` | Custom process ID: 1–64 letters, digits, `_` or `-`, starting with a letter or digit. Must not be in use |
 
 ### status
 
@@ -78,7 +80,13 @@ Show captured output of a background process.
 geenii pm kill <PROCESS_ID> [OPTIONS]
 ```
 
-Kill a running background process.
+Kill a running background process, including any processes it started (the
+whole process group is signalled). Waits up to 5 seconds for the process to
+exit and prints its final state.
+
+Stopping `geenii pm serve` (SIGINT/SIGTERM) also terminates all running
+background processes. If the service dies without a clean shutdown, processes
+it was tracking are shown as `orphaned` after the next start.
 
 #### Options
 

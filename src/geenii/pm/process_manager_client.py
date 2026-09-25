@@ -55,8 +55,9 @@ class ProcessManagerClient:
         except (ConnectionRefusedError, FileNotFoundError, OSError):
             return False
 
-    def start(self, command: str, *, env: dict[str, str] | None = None,
+    def start(self, command: str | list[str], *, env: dict[str, str] | None = None,
               cwd: str | None = None, pid: str | None = None) -> dict:
+        """Start a process. A string runs through the shell; a list is executed directly."""
         return self._call("start", {
             "command": command, "env": env, "cwd": cwd, "pid": pid,
         })

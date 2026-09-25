@@ -59,6 +59,8 @@ Internals for contributors and library consumers.
   selection, and how skill instructions reach the model.
 - **[Sandbox](developer-guide/sandbox.md)** — Docker-based code isolation,
   security model, SandboxTool API.
+- **[Process Management](developer-guide/processes.md)** — Supervisor,
+  Scheduler, and Process Manager internals, APIs, and known issues.
 - **[Memory](developer-guide/memory.md)** — ChatMemory abstraction and
   persistence implementations.
 - **[Building](developer-guide/building.md)** — dev setup, linting, testing,

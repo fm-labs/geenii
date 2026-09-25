@@ -60,6 +60,8 @@ Add a task to the scheduler config.
 | `--interval` | `-i` | Schedule: `cron:EXPRESSION` or `at:DATETIME` (required) |
 | `--env` | `-e` | Environment variable in `KEY=VALUE` format (repeatable) |
 | `--disabled` | | Add the task in disabled state |
+| `--timeout` | `-t` | Kill the task if it runs longer than this many seconds |
+| `--allow-overlap` | | Start a new run even if the previous run is still in progress |
 | `--config` | | Path to scheduler config JSON file |
 
 ### remove
@@ -83,6 +85,7 @@ Run a single task immediately, bypassing its schedule.
 ```bash
 geenii scheduler add cleanup echo cleanup --interval 'cron:0 * * * *'
 geenii scheduler add oneshot echo done --interval 'at:2026-07-21T18:00:00Z'
+geenii scheduler add backup ./backup.sh --interval 'cron:0 3 * * *' --timeout 1800
 geenii scheduler run cleanup
 geenii scheduler list
 geenii scheduler status

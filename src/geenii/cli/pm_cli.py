@@ -1,5 +1,6 @@
 import asyncio
 import json
+import shlex
 
 import click
 
@@ -102,7 +103,7 @@ def list_procs(ctx, include_finished):
     for p in procs:
         state = p["state"]
         pid = p["pid"]
-        cmd = " ".join(p["cmd"])
+        cmd = p["cmd"] if isinstance(p["cmd"], str) else shlex.join(p["cmd"])
         exit_code = p.get("exit_code")
         suffix = f" exit={exit_code}" if exit_code is not None else ""
         click.echo(f"  {pid}  {state:<10} {cmd}{suffix}")

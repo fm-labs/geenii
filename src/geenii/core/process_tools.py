@@ -2,6 +2,7 @@
 import json
 import logging
 
+from geenii import config
 from geenii.pm.process_manager_client import ProcessManagerClient
 from geenii.tool.registry import ToolRegistry
 
@@ -17,16 +18,19 @@ def init_process_tools(tool_registry: ToolRegistry, client: ProcessManagerClient
         Returns immediately with a process ID that can be used to check status and retrieve output later.
 
         :param command: The shell command to run, e.g. "python3 train.py --epochs 10".
-        :param working_directory: Working directory for the process. Uses current directory if empty.
-        :param process_id: Optional custom process ID. Auto-generated if empty.
+        :param working_directory: Working directory for the process. Uses the geenii working directory if empty.
+        :param process_id: Optional custom process ID (letters, digits, '_' or '-'). Auto-generated if empty.
         :return: JSON with the assigned process ID and initial state.
         """
-        result = client.start(
-            command,
-            cwd=working_directory or None,
-            pid=process_id or None,
-        )
-        return json.dumps(result, indent=2)
+        try:
+            result = client.start(
+                command,
+                cwd=working_directory or config.GEENII_WORKING_DIR,
+                pid=process_id or None,
+            )
+            return json.dumps(result, indent=2)
+        except RuntimeError as exc:
+            return json.dumps({"error": str(exc)})
 
     @tool_registry.tool(name="bg_process_status")
     def process_status(process_id: str) -> str:

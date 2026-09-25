@@ -1,14 +1,13 @@
 import asyncio
 import json
 import os
-import sys
 
 import click
 from rich.console import Console
 from rich.table import Table
 
 from geenii.config import GEENII_DIR
-from geenii.scheduler import Scheduler, parse_interval, main as scheduler_main
+from geenii.scheduler import Scheduler, parse_interval, serve
 
 console = Console()
 
@@ -35,9 +34,7 @@ def start_scheduler(config):
         raise SystemExit(1)
 
     click.echo(f"Starting scheduler with {len(sched.tasks)} task(s) from {config}")
-
-    sys.argv = [sys.argv[0], config]
-    scheduler_main()
+    asyncio.run(serve(sched))
 
 
 @scheduler.command(name="status")
@@ -65,6 +62,8 @@ def status_scheduler(config):
         flags = " ".join(f for f in [
             "oneshot" if task.is_oneshot else "",
             "env" if task.env else "",
+            f"timeout={task.timeout:g}s" if task.timeout else "",
+            "overlap" if task.allow_overlap else "",
         ] if f)
         table.add_row(task.name, task.interval, cmd, next_run.isoformat(), flags)
 
@@ -104,9 +103,13 @@ def list_tasks(config):
               help="Schedule: 'cron:EXPRESSION' or 'at:DATETIME'.")
 @click.option("--env", "-e", multiple=True, help="Environment variable in KEY=VALUE format.")
 @click.option("--disabled", is_flag=True, help="Add the task in disabled state.")
+@click.option("--timeout", "-t", type=click.FloatRange(min=0, min_open=True), default=None,
+              help="Kill the task if it runs longer than this many seconds.")
+@click.option("--allow-overlap", is_flag=True,
+              help="Start a new run even if the previous run is still in progress.")
 @click.option("--config", default=DEFAULT_CONFIG_PATH,
               help="Path to scheduler config JSON file.", show_default=True)
-def add_task(name, cmd, interval, env, disabled, config):
+def add_task(name, cmd, interval, env, disabled, timeout, allow_overlap, config):
     """Add a task to the scheduler config.
 
     NAME is the task identifier. CMD is the command to run (remaining arguments).
@@ -138,6 +141,10 @@ def add_task(name, cmd, interval, env, disabled, config):
         "interval": interval,
         "cmd": list(cmd),
     }
+    if timeout is not None:
+        task_entry["timeout"] = timeout
+    if allow_overlap:
+        task_entry["allow_overlap"] = True
     if env:
         env_dict = {}
         for pair in env:
