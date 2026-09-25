@@ -74,7 +74,9 @@ def init_agent_by_name(name: str, context_id: str | None = None) -> BaseAgent:
     md_file_path = locate_agent_md_file(name)
     if md_file_path is None:
         if name == "default":
-            return init_fallback_agent(context_id=context_id)
+            return init_default_agent(context_id=context_id)
+        if name == "auto":
+            return init_routing_agent(context_id=context_id)
         raise ValueError(f"Agent '{name}' not found.")
 
     try:
@@ -84,10 +86,22 @@ def init_agent_by_name(name: str, context_id: str | None = None) -> BaseAgent:
     except Exception as e:
         raise e
 
-def init_fallback_agent(context_id: str | None = None) -> BaseAgent:
+def init_default_agent(context_id: str | None = None) -> BaseAgent:
     try:
         agent_conf = AgentSpec(
             name="default",
+            class_name="geenii.agents.Agent",
+            model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
+            system=DEFAULT_AGENT_SYSTEM_PROMPT,
+        )
+        return init_agent(agent_conf, context_id=context_id)
+    except Exception as e:
+        raise e
+
+def init_routing_agent(context_id: str | None = None) -> BaseAgent:
+    try:
+        agent_conf = AgentSpec(
+            name="routing",
             class_name="geenii.agents.RoutingAgent",
             model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
             system=DEFAULT_AGENT_SYSTEM_PROMPT,
