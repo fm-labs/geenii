@@ -26,6 +26,7 @@ GEENII_MEMORY_ENGINE = "file"
 FERNET_SECRET_KEY = os.environ.get("FERNET_SECRET_KEY", "")
 
 MCP_CONFIG_FILE="mcp.json"
+MCP_INIT_TIMEOUT = float(os.environ.get("GEENII_MCP_INIT_TIMEOUT", "30"))
 
 # Completion models
 #DEFAULT_COMPLETION_MODEL= "openai:gpt-4o-mini"

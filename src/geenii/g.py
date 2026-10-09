@@ -55,8 +55,24 @@ def init_global_agent_registry() -> AgentRegistry:
     _agents._agent_configs.update({"default": AgentSpec(
         name="default",
         model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b"
-
     )})
+    # routing
+    _agents._agent_configs.update({"routing": AgentSpec(
+        name="routing",
+        class_name="geenii.agents.RoutingAgent",
+        model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
+    )})
+    # chatgpt
+    _agents._agent_configs.update({"chatgpt": AgentSpec(
+        name="chatgpt",
+        model="openai:gpt-3.5-turbo"
+    )})
+    # anthropic
+    _agents._agent_configs.update({"claude": AgentSpec(
+        name="claude",
+        model="anthropic:claude-opus-4-6"
+    )})
+
     for agent_dir in set(agent_paths()):
         _agents.load_from_directory(agent_dir)
     return _agents

@@ -1,14 +1,11 @@
 from pathlib import Path
 
 import json
-from fastmcp import Client
-from fastmcp.mcp_config import MCPConfig
-from fastmcp.prompts import Prompt
 
 from geenii.config import MCP_CONFIG_FILE, GEENII_DIR
+from geenii.mcp_client import McpClient
 
 import logging
-
 logger = logging.getLogger(__name__)
 
 config = None
@@ -21,13 +18,6 @@ def get_mcp_config(reload: bool = False):
         config = read_mcp_config_json()
     return config
 
-
-# def get_mcp_client():
-#     global client
-#     if client is None:
-#         _config = get_mcp_config()
-#         client = Client(_config)
-#     return client
 
 def get_mcp_config_for_server(server_name: str) -> dict | None:
     """
@@ -100,66 +90,3 @@ def write_mcp_config_json(data: dict):
 
 
 
-class McpClient:
-
-    def __init__(self, server_name: str, server_config: dict):
-        self.server_name = server_name
-        self.server_config = server_config
-        self.client = Client(transport=MCPConfig(mcpServers={server_name: server_config}))
-        self._info = None
-        self._connected = False
-
-    async def _ensure_connected(self):
-        """Ensure the client connection is open, reusing an existing one if available."""
-        if not self._connected:
-            await self.client.__aenter__()
-            self._connected = True
-            logger.info(f"Opened persistent MCP connection for '{self.server_name}'")
-
-    async def close(self):
-        """Close the persistent connection."""
-        if self._connected:
-            try:
-                await self.client.__aexit__(None, None, None)
-            except Exception:
-                pass
-            self._connected = False
-            self._info = None
-            logger.info(f"Closed MCP connection for '{self.server_name}'")
-
-    async def get_info(self) -> dict:
-        if self._info is not None:
-            return self._info
-
-        await self._ensure_connected()
-        tools = await self.client.list_tools()
-        resources = await self.client.list_resources()
-        prompts: list[Prompt] = await self.client.list_prompts()
-
-        info_dict = {
-            "name": self.server_name,
-            "status": "connected",
-            "tools": [tool.model_dump() for tool in tools],
-            "resources": [res.model_dump() for res in resources],
-            "prompts": [prompt.model_dump() for prompt in prompts],
-        }
-        self._info = info_dict
-        return info_dict
-
-    async def list_tools(self):
-        info = await self.get_info()
-        return info["tools"]
-
-    async def list_resources(self):
-        info = await self.get_info()
-        return info["resources"]
-
-    async def list_prompts(self):
-        info = await self.get_info()
-        return info["prompts"]
-
-    async def call_tool(self, tool_name: str, args: dict) -> any:
-        await self._ensure_connected()
-        result = await self.client.call_tool_mcp(tool_name, arguments=args)
-        logger.info(f"Tool call result for '{tool_name}' on '{self.server_name}': {result}")
-        return result

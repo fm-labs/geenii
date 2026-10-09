@@ -3,13 +3,11 @@ from __future__ import annotations
 import asyncio
 
 from geenii.core.tools import init_core_tools
-from geenii.mcp_helper import get_mcp_config, McpClient
-from geenii.pm.process_manager_client import ProcessManagerClient
+from geenii.mcp_helper import get_mcp_config
+from geenii.mcp_client import McpClient
 from geenii.tool.computer import ComputerTool
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.cached import cached
-
-_pm_client = ProcessManagerClient()
 
 
 def init_builtin_tools(registry: ToolRegistry):
@@ -35,41 +33,13 @@ def init_builtin_tools(registry: ToolRegistry):
             "required": ["command"]
         },
     ))
-    # registry.register(SandboxTool(
-    #     name="sandbox_python",
-    #     description="Execute a Python command inside a sandboxed Docker container. "
-    #                 "The container runs with no network, read-only filesystem, dropped capabilities, "
-    #                 "and strict resource limits. Requires a skill to be selected (SKILL_DIR is used as the app directory).",
-    #     parameters={
-    #         "type": "object",
-    #         "properties": {
-    #             "command": {"type": "string", "description": "The command to run inside the container, e.g. 'python3 scripts/fetch.py --format json'."}
-    #         },
-    #         "required": ["command"]
-    #     },
-    #     runtime="python",
-    # ))
-    # registry.register(SandboxTool(
-    #     name="sandbox_bash",
-    #     description="Execute a shell command inside a sandboxed Docker container. "
-    #                 "The container runs with no network, read-only filesystem, dropped capabilities, "
-    #                 "and strict resource limits. Requires a skill to be selected (SKILL_DIR is used as the app directory).",
-    #     parameters={
-    #         "type": "object",
-    #         "properties": {
-    #             "command": {"type": "string", "description": "The shell command to run inside the container, e.g. 'ls -la /app'."}
-    #         },
-    #         "required": ["command"]
-    #     },
-    #     runtime="bash",
-    # ))
     init_core_tools(registry)
-    #init_process_tools(registry, _pm_client)
 
 @cached(ttl=3600)
 async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
+    # short-lived client for discovery only; tool calls use the cached client from get_mcp_client_for_server
+    mcp_client = McpClient(server_name, server_conf)
     try:
-        mcp_client = McpClient(server_name, server_conf)
         try:
             tools = await mcp_client.list_tools()
         except Exception as e:
@@ -86,6 +56,8 @@ async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
     except Exception as e:
         print(f"Error retrieving tools from MCP server {server_name}: {e}")
         return []
+    finally:
+        await mcp_client.close()
 
 
 async def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] = None):

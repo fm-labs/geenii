@@ -45,7 +45,6 @@ class BaseAgent(BotInterface, abc.ABC):
         self.allowed_tools: Set[str] = allowed_tools or set()
         self.mcp_servers: Set[str] = mcp_servers or set()
         self.active_skills: list[str] = []
-
         self._tool_registry = tool_registry or ToolRegistry()
         self._skill_registry = skill_registry or SkillRegistry()
         self._tasks: asyncio.Queue[BaseTask] = asyncio.Queue()
@@ -98,23 +97,23 @@ class BaseAgent(BotInterface, abc.ABC):
             "tools": list(self.tools.list_tool_names())
         }
 
-    def about_me(self):
-        """Returns information about the agent, and it's configured tools and skills"""
-        desc = ""
-        desc += f"Name: {self.name}\n"
-        desc += f"Description: {self.description}\n"
-        desc += f"Model: {self.model}\n"
-        desc += f"System prompt: {self.system_prompt}\n"
-        desc += f"Developer: {self.developer_prompt}\n"
-
-        desc += "Available tools:\n"
-        for tool in self.tools.list_tools():
-            desc += f"Tool: {tool.name} - {tool.description}\n"
-
-        desc += "Skills:\n"
-        for name, skill in self.skills.skills.items():
-            desc += f"Skill: {name} - {skill.description}\n"
-        return desc
+    # def about_me(self):
+    #     """Returns information about the agent, and it's configured tools and skills"""
+    #     desc = ""
+    #     desc += f"Name: {self.name}\n"
+    #     desc += f"Description: {self.description}\n"
+    #     desc += f"Model: {self.model}\n"
+    #     desc += f"System prompt: {self.system_prompt}\n"
+    #     desc += f"Developer: {self.developer_prompt}\n"
+    #
+    #     desc += "Available tools:\n"
+    #     for tool in self.tools.list_tools():
+    #         desc += f"Tool: {tool.name} - {tool.description}\n"
+    #
+    #     desc += "Skills:\n"
+    #     for name, skill in self.skills.skills.items():
+    #         desc += f"Skill: {name} - {skill.description}\n"
+    #     return desc
 
     @property
     def tools(self) -> ToolRegistry:
@@ -256,5 +255,6 @@ def restore_last_context_id(name: str):
 
 def dump_last_context_id(name: str, context_id):
     file_path = f"{CACHE_DIR}/agents/{name}/last_context_id"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, "w") as f:
         f.write(str(context_id))

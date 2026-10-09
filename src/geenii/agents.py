@@ -1,18 +1,23 @@
 import logging
+import shlex
+import time
 
+from geenii.agent.base import message_to_prompt
 from geenii.agent.base_agent import BaseAgent
 from geenii.agent.tasks import (
     LLMTask,
     FindBestAgentTask,
     FindBestSkillTask,
     HandoffTask,
+    ActivateSkillTask,
+    MemoryCompactionTask,
+    ClearMemoryTask,
+    ToolCallTask,
 )
-from geenii.agent.base import message_to_prompt
 from geenii.chat_models import ContentPart
-from geenii.pm.process_manager_client import ProcessManagerClient
-from geenii.skills import register_skill_scripts
-from geenii.tools import init_builtin_tools, init_mcp_server_tools
 from geenii.core.process_tools import init_process_tools
+from geenii.pm.process_manager_client import ProcessManagerClient
+from geenii.tools import init_mcp_server_tools
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +33,7 @@ class Agent(BaseAgent):
         if self._initialized:
             return
 
-        init_builtin_tools(self._tool_registry)
+        #init_builtin_tools(self._tool_registry)
         if self.mcp_servers:
             await init_mcp_server_tools(self._tool_registry, self.mcp_servers)
 
@@ -57,22 +62,73 @@ class Agent(BaseAgent):
         """
         logger.debug("Handling macros for message: %s", message)
         if isinstance(message, str):
-            if message.startswith("/"):
-                message = message[1:]
-                parts = message.split(" ", maxsplit=1)
-                cmd = parts[0]
-                message = parts[1] if len(parts) > 1 else ""
-                logger.debug("Command macro: cmd=%s message=%s", cmd, message)
-                # enqueue command task
-            elif message.startswith("@"):
+
+            # direct agent call using '@' prefix
+            # e.g. '@my-agent PROMPT'
+            if message.startswith("@"):
                 message = message[1:]
                 parts = message.split(" ", maxsplit=1)
                 agent_name = parts[0]
                 message = parts[1] if len(parts) > 1 else ""
-                logger.debug("Agent macro: agent=%s message=%s", agent_name, message)
-                # enqueue a subagent
+                logger.info("Agent macro: agent=%s message=%s", agent_name, message)
+                # handoff to the agent
                 await self.enqueue_task(HandoffTask(agent=self, target_agent_name=agent_name, prompt=message))
                 return True # signal to stop message handling
+
+            # slash commands using '/' prefix
+            # maps to builtin tasks or
+            # fallback to skill activation
+            # e.g. '/clear' (builtin task)
+            if message.startswith("/"):
+                message = message[1:]
+                parts = message.split(" ", maxsplit=1)
+                skill_name = parts[0].lower()
+                prompt = parts[1] if len(parts) > 1 else ""
+                logger.info("Command macro: cmd=%s message=%s", skill_name, prompt)
+
+                if skill_name == "clear":
+                    await self.enqueue_task(ClearMemoryTask(agent=self))
+                    return True
+                elif skill_name == "compact":
+                    await self.enqueue_task(MemoryCompactionTask(agent=self, prompt=prompt))
+                    return True
+                # elif skill_name == "memo":
+                #     await self.enqueue_task(StorePersistentMemoryTask(agent=self, message=prompt))
+                #     return True
+                # elif skill_name == "remember":
+                #     await self.enqueue_task(RetrievePersistentMemoryTask(agent=self, message=prompt))
+                #     return True
+                else:
+                    await self.enqueue_task(ActivateSkillTask(agent=self, skill_name=skill_name, prompt=prompt))
+                    return True
+
+            # direct tool call using ':' prefix
+            if message.startswith(":"):
+                parts = message.split(" ", maxsplit=1)
+                tool_name = parts[0][1:]
+                args_str = parts[1] if len(parts) > 1 else "" # key=value key2="value 2"
+                args = {}
+                try:
+                    for part in shlex.split(args_str):
+                        if "=" not in part:
+                            raise ValueError(f"Invalid argument '{part}', expected key=value")
+                        key, value = part.split("=", maxsplit=1)
+                        args[key] = value
+                except ValueError as e:
+                    logger.warning("Tool macro: %s", e)
+                    return True # signal to stop message handling
+
+                # tool_registry: ToolRegistry = ToolRegistry()
+                # init_builtin_tools(tool_registry)
+                # 
+                # tool = tool_registry.get(tool_name)
+                # async def _invoke_tool(args: dict[str, Any]):
+                #     return await tool.invoke(args=args, env={})
+                # result = await asyncio.create_task(_invoke_tool(args))
+                call_id = f"usr-{tool_name}-{time.time()}"
+                await self.enqueue_task(ToolCallTask(agent=self, tool_name=tool_name, arguments=args, call_id=call_id))
+                return True
+                
 
         return None
     
@@ -99,8 +155,8 @@ class RoutingAgent(Agent):
         await self.enqueue_task(FindBestAgentTask(self, prompt=message_to_prompt(message)))
 
 
-class ProcessingAgent(Agent):
-    """Processing Agent"""
+class ProcessManagerAgent(Agent):
+    """Process Manager Agent"""
 
     def __init__(self, name: str, pm: ProcessManagerClient = None, **kwargs):
         super().__init__(name, **kwargs)
@@ -111,7 +167,7 @@ class ProcessingAgent(Agent):
         if self._initialized:
             return
 
-        init_builtin_tools(self._tool_registry)
+        #init_builtin_tools(self._tool_registry)
         init_process_tools(self._tool_registry, self._pm)
         if self.mcp_servers:
             await init_mcp_server_tools(self._tool_registry, self.mcp_servers)

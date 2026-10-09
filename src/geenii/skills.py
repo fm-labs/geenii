@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pydantic
 
-from geenii.config import GEENII_DIR, read_user_settings, GEENII_WORKING_DIR
+from geenii.config import read_user_settings, GEENII_WORKING_DIR
 from geenii.tool.tool_filter import ToolFilterSet
 from geenii.utils.os_util import get_user_home_dir
 from geenii.utils.mdfile import read_frontmatter_file

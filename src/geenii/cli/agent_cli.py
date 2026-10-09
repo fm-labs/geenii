@@ -10,7 +10,7 @@ from geenii.agent.base_agent import (
     dump_last_context_id,
 )
 from geenii.cli.cli_runner import CliAgentRunner
-from geenii.g import init_agent_by_name
+from geenii.g import init_global_agent_registry
 
 logger = logging.getLogger(__name__)
 
@@ -182,9 +182,11 @@ def agent_run(
     #         if agent_name != name:
     #             click.echo(f"Overriding agent '{name}' to '{agent_name}'")
     #             name = agent_name
-
-    gbot: BaseAgent = init_agent_by_name(name, context_id=context_id)
-    if not gbot:
+    
+    _agents = init_global_agent_registry()
+    agent: BaseAgent = _agents.get_instance(name, context_id=context_id)
+    #agent: BaseAgent = init_agent_by_name(name, context_id=context_id)
+    if not agent:
         click.echo(
             f"Agent '{name}' not found. Please check the available agents with 'geenii agents list'."
         )
@@ -192,32 +194,32 @@ def agent_run(
 
     # Apply overrides from CLI options
     if model:
-        gbot.model = model
+        agent.model = model
     if model_parameters:
         try:
-            gbot.model_parameters = json.loads(model_parameters)
+            agent.model_parameters = json.loads(model_parameters)
         except json.JSONDecodeError as e:
             click.echo(f"Invalid JSON for model parameters: {e}")
             return
     if system_instructions:
-        gbot.system_prompt = system_instructions
+        agent.system_prompt = system_instructions
     if developer_instructions:
-        gbot.developer_prompt = developer_instructions
+        agent.developer_prompt = developer_instructions
     if tools:
         tool_names = [tool.strip() for tool in tools.split(",")]
         click.echo(f"Tool names: {tool_names}")
-        gbot.allowed_tools = set(tool_names)
+        agent.allowed_tools = set(tool_names)
     if skills:
         skill_names = [skill.strip() for skill in skills.split(",")]
         for skill_name in skill_names:
-            gbot.skills.load(skill_name)
+            agent.skills.load(skill_name)
     if output_format:
         if output_format not in ["text", "json"]:
             click.echo(
                 f"Invalid output format '{output_format}'. Supported formats are 'text' and 'json'."
             )
             return
-        gbot.output_format = output_format
+        agent.output_format = output_format
 
-    logger.info(f"Agent '{name}' loaded. {repr(gbot)}")
-    CliAgentRunner(gbot, interactive=interactive).run(prompt)
+    logger.info(f"Agent '{name}' loaded. {repr(agent)}")
+    CliAgentRunner(agent, interactive=interactive).run(prompt)

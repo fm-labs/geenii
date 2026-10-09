@@ -54,7 +54,6 @@ class ToolCallTask(BaseAgentTask):
         tool_name = self.tool_name
         arguments = self.arguments
         call_id = self.call_id
-        active_skills = self.agent.active_skills
 
         tool = self.agent.tools.get(tool_name)
         if tool is None:
@@ -121,11 +120,11 @@ class ToolCallTask(BaseAgentTask):
             # tool_result = await execute_tool_call(self.agent.tools, tool_name=tool_name, args=arguments)
 
             tool_env = {}
-            if active_skills:
-                tool_env["SKILL_NAME"] = ",".join(active_skills)
-                first_skill = self.agent.skills.get(active_skills[0])
-                if first_skill:
-                    tool_env["SKILL_DIR"] = first_skill.path
+            # if active_skills:
+            #     tool_env["SKILL_NAME"] = ",".join(active_skills)
+            #     first_skill = self.agent.skills.get(active_skills[0])
+            #     if first_skill:
+            #         tool_env["SKILL_DIR"] = first_skill.path
             tool_result = await tool.invoke(args=arguments, env=tool_env)
 
             logger.debug(f"Tool {tool_name} returned result: {tool_result}")
@@ -423,7 +422,7 @@ class ToolFilterTask(BaseAgentTask):
     SYSTEM_PROMPT = """
     You are an AI tool orchestrator. Given a user prompt you must:
     1. Select the best-fit tool(s) from the provided list.
-    2. Produce a short execution plan.
+    2. Add a confidence score for the tool match probability.
 
     Always respond with valid JSON in exactly this shape:
     {
@@ -458,6 +457,13 @@ class ToolFilterTask(BaseAgentTask):
             ]
         )
 
+        output_schema = copy.deepcopy(self.OUTPUT_SCHEMA)
+        # inject the tool names as enums in the schema
+        tools_schema = output_schema["properties"]["tools"]
+        tools_schema["items"]["enum"] = list(self.tool_registry.list_tool_names())
+        tools_schema["uniqueItems"] = True
+        tools_schema["minItems"] = 1
+
         request = ChatCompletionRequest(
             model=self.agent.model,
             model_parameters={"temperature": 0.1, "max_tokens": 512},
@@ -465,7 +471,7 @@ class ToolFilterTask(BaseAgentTask):
             prompt=self.prompt,
             messages=[],
             output_format="json",
-            output_schema=self.OUTPUT_SCHEMA,
+            output_schema=output_schema,
             # tools=tool_names,
         )
         response = await asyncio.to_thread(generate_chat_completion, request)
@@ -683,6 +689,23 @@ class FindBestAgentTask(BaseAgentTask):
             )  # fallback to processing the prompt with the current agent
 
 
+class ActivateSkillTask(BaseAgentTask):
+
+    def __init__(self, agent: "BaseAgent", skill_name: str, prompt: str):
+        super().__init__(agent)
+        self.prompt = prompt
+        self.skill_name = skill_name
+
+    async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
+        skill = self.agent.skills.load(self.skill_name)
+        if skill:
+            logger.info("Activating skill %s", skill.name)
+            self.agent.active_skills.append(self.skill_name)
+        return
+        yield  # unreachable; makes execute() an async generator for the task loop
+
+
+
 class FindBestSkillTask(BaseAgentTask):
     """Find the best-suitable skill to handle the current conversation based on the current message and context"""
 
@@ -726,13 +749,13 @@ class FindBestSkillTask(BaseAgentTask):
         self.suggested = suggested  # pre-selected skills
 
     def _activate_skills(self, skill_names: list[str]):
-        from geenii.skills import register_skill_scripts
         self.agent.active_skills = skill_names
-        for skill_name in skill_names:
-            skill = self.agent.skills.get(skill_name)
-            if skill:
-                registered = register_skill_scripts(skill, self.agent.tools)
-                self.agent.allowed_tools.update(registered)
+        # from geenii.skills import register_skill_scripts
+        # for skill_name in skill_names:
+        #     skill = self.agent.skills.get(skill_name)
+        #     if skill:
+        #         registered = register_skill_scripts(skill, self.agent.tools)
+        #         self.agent.allowed_tools.update(registered)
 
     async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
 
@@ -761,6 +784,8 @@ class FindBestSkillTask(BaseAgentTask):
         available_skills = []
         for skill_name in self.agent.skills.names():
             skill = self.agent.skills.get(skill_name)
+            if not skill:
+                continue
             description = skill.description or "No description available."
             # tools = ",".join(skill.tools) if skill.tools else "No tools"
             skill_info = f"{skill_name}: {description}"
@@ -781,7 +806,7 @@ class FindBestSkillTask(BaseAgentTask):
             f"Received model response for agent selection with {len(response.output)} content parts."
         )
 
-        selected_skill = None
+        selected_skill: str | None = None
         if len(response.output) > 0:
             parsed = None
             if isinstance(response.output[0], JsonContent):
@@ -976,6 +1001,20 @@ class FindBestSkillTask(BaseAgentTask):
 #             logger.error("PlanTask: No content in model response.")
 #
 
+class ClearMemoryTask(BaseAgentTask):
+    """Clear the agent's memory."""
+
+    def __init__(self, agent: "BaseAgent"):
+        super().__init__(agent)
+
+    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+
+        self.agent.memory.clear()
+        self.agent.message_history.clear()
+        return
+        yield  # unreachable; makes execute() an async generator for the task loop
+
+
 class MemoryCompactionTask(BaseAgentTask):
     """Compact the agent's memory by summarising the full conversation history
     into a handover summary, then rotating to a fresh memory context."""
@@ -991,8 +1030,9 @@ Produce a concise **handover summary** that a successor assistant can use to con
 
 Write in second person ("the user asked …", "you answered …") so the summary reads as a briefing for the next assistant turn. Be concise but do not drop information that would cause the successor to ask the user to repeat themselves."""
 
-    def __init__(self, agent: "BaseAgent"):
+    def __init__(self, agent: "BaseAgent", prompt: str):
         super().__init__(agent)
+        self.prompt = prompt
 
     async def execute(self) -> AsyncGenerator[ModelMessage, None]:
         full_history = list(self.agent.message_history)

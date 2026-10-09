@@ -57,11 +57,19 @@ def call_tool(tool_name, **kwargs):
                 click.echo(f"Invalid argument format: {arg}. Expected key=value.")
         return parsed
 
-    kwargs = parse_args(kwargs.get("args", []))
+    parsed_kwargs = parse_args(kwargs.get("args", []))
+    del kwargs["args"]
+    print("Parsed arguments:", parsed_kwargs)
+
+    async def _run():
+        # load MCP tools and invoke in the same event loop: MCP clients are cached per server
+        tool_registry = ToolRegistry()
+        init_builtin_tools(tool_registry)
+        await init_mcp_server_tools(tool_registry)
+        return await tool_registry.invoke(tool_name, args=parsed_kwargs, **kwargs)
 
     try:
-        tool_registry = _init_tool_registry()
-        result = tool_registry.invoke(tool_name, **kwargs)
+        result = asyncio.run(_run())
         print("--- Result ---")
         print(result)
         print("--------------")

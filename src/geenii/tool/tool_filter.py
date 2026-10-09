@@ -17,7 +17,6 @@ from __future__ import annotations
 import fnmatch
 import logging
 import re
-import shlex
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)

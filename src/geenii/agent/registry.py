@@ -6,12 +6,11 @@ import pydantic
 
 from geenii.agent.base_agent import BaseAgent
 from geenii.bots import BotInterface
-from geenii.skills import SkillRegistry, register_skill_scripts
+from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.mdfile import read_frontmatter_file
 
 logger = logging.getLogger(__name__)
-
 
 class AgentSpec(pydantic.BaseModel):
     """
@@ -84,9 +83,9 @@ def init_agent(agent_conf: AgentSpec, context_id: str | None = None) -> BaseAgen
     if agent_conf.skills is not None:
         for skill in agent_conf.skills:
             logger.info(f"Adding skill '{skill}' to agent '{agent_conf.name}'.")
-            skill_spec = skill_registry.load(skill)
-            if skill_spec:
-                register_skill_scripts(skill_spec, tool_registry)
+            skill_registry.load(skill)
+            #if skill_spec:
+            #    register_skill_scripts(skill_spec, tool_registry)
 
     agent_class_name = "geenii.agents.Agent"
     if agent_conf.class_name is not None:
@@ -115,17 +114,17 @@ class AgentRegistry:
         self._agent_configs: dict[str, AgentSpec] = {}
         self._agents: dict[str, BaseAgent] = {}
 
-    def get_config(self, name) -> AgentSpec | None:
+    def get_config(self, name: str) -> AgentSpec | None:
         """Get the configuration for a agent by name. Returns None if no configuration is found."""
         return self._agent_configs.get(name)
 
-    def get_instance(self, name) -> BotInterface | None:
+    def get_instance(self, name: str, context_id: str|None = None) -> BotInterface | None:
         """Get a Agent instance by name. If the agent is not already loaded, it will be initialized from its configuration if available. Returns None if no agent instance can be found or initialized."""
         if name in self._agents:
             return self._agents[name]
         elif name in self._agent_configs:
             try:
-                agent = init_agent(self._agent_configs[name])
+                agent = init_agent(self._agent_configs[name], context_id=context_id)
                 self._register_agent(agent)
                 return agent
             except Exception as e:
