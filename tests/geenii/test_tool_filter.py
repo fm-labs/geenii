@@ -1,6 +1,5 @@
 """Tests for ToolFilter and ToolFilterSet."""
 
-import pytest
 from geenii.tool.tool_filter import ToolFilter, ToolFilterSet
 
 
