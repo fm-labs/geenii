@@ -196,8 +196,8 @@ def generate_completion(model: str, prompt: str, stream: bool = False, **kwargs)
 
 def generate_chat_completion_deprecated(model: str,
                                         prompt: str,
-                                        system: str = None,
-                                        messages: list[ModelMessage] = None,
+                                        system: str | None = None,
+                                        messages: list[ModelMessage] | None = None,
                                         tools: set[str] = None,
                                         tool_registry = None,
                                         output_format: str = None,

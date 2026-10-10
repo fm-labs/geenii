@@ -49,7 +49,7 @@ class CompletionErrorResponse(pydantic.BaseModel):
 
 class CompletionRequest(pydantic.BaseModel):
     prompt: str
-    model: str | None = config.DEFAULT_COMPLETION_MODEL
+    model: str = config.DEFAULT_COMPLETION_MODEL
     system: List[str] | None = None
     # Model tweaking parameters
     temperature: float | None = None

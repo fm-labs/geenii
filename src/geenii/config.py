@@ -13,7 +13,7 @@ GEENII_WORKING_DIR = realpath(os.environ.get("GEENII_WORKING_DIR", os.getcwd()))
 GEENII_DIR = realpath(os.environ.get("GEENII_DIR", os.path.join(GEENII_WORKING_DIR, ".geenii")))
 
 # Load environment variables from .env file in the user directory, if it exists
-dotenv.load_dotenv(GEENII_WORKING_DIR + "/.env", override=True, verbose=True)
+dotenv.load_dotenv(get_user_home_dir() + "/.geenii/.env", override=True, verbose=True)
 dotenv.load_dotenv(GEENII_DIR + "/.env", override=True, verbose=True)
 
 CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", get_user_home_dir() + "/.geenii/.cache")

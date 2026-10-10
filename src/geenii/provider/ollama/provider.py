@@ -223,7 +223,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             }
 
             logger.info(
-                f"OLLAMA: Generating chat completion model={model} temperature={temperature} output={output_format} and {len(input_messages)} input messages")
+                f"OLLAMA: Generating chat completion model={model} ctx={max_tokens} temperature={temperature} output={output_format} and {len(input_messages)} input messages")
             model_result = self.ollama.chat(
                 model=model,
                 messages=input_messages,

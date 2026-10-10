@@ -3,7 +3,7 @@ import json
 
 import click
 
-from geenii.mcp_helper import get_mcp_config, get_mcp_config_for_server, get_mcp_client_for_server
+from geenii.mcp_config import get_mcp_config, get_mcp_config_for_server, get_mcp_client_for_server
 
 
 @click.group()
@@ -27,9 +27,16 @@ def server_list():
         click.echo("No MCP servers configured.")
         return
     for name, cfg in servers.items():
-        command = cfg.get("command", "")
-        args = " ".join(cfg.get("args", []))
-        click.echo(f"  {name:30s} {command} {args}")
+        _type = cfg.get("type", "")
+        if _type == "stdio":
+            command = cfg.get("command", "")
+            args = " ".join(cfg.get("args", []))
+            click.echo(f"  {name:30s} {_type:10s} {command} {args}")
+        elif _type == "http":
+            url = cfg.get("url", "")
+            click.echo(f"  {name:30s} {_type:10s} {url}")
+        else:
+            click.echo(f"  {name:30s} {_type:10s} Unknown")
 
 
 @server.command("inspect")

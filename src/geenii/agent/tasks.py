@@ -194,10 +194,19 @@ class LLMTask(BaseAgentTask):
             logger.warning("Skill allowed_tools intersection with agent tools is empty — no tools available for this request.")
         return effective
 
+    def _calculate_max_tokens(self, system_prompt: str, messages: list[ContentPart]) -> int:
+        """Calculate the maximum number of tokens needed to complete the response"""
+        str_len = len(system_prompt)
+        for message in messages:
+            str_len += len(message.to_text())
+        # simple heuristic: 1 token ~ 4 characters
+        max_tokens = str_len // 4
+        return int(max_tokens + 4096)
+
     async def execute(self) -> AsyncGenerator[ModelMessage, None]:
         full_system_prompt = self._build_system_prompt()
         prompt = message_to_prompt(self.message)
-        allowed_tools = self.allowed_tools if self.allowed_tools else self._compute_effective_tools()
+        allowed_tools = self.allowed_tools # if self.allowed_tools else self._compute_effective_tools()
         # message history (last MAX_MESSAGE_HISTORY messages)
         input_messages = list(self.agent.message_history[-self.MAX_MESSAGE_HISTORY:])
 
@@ -212,6 +221,7 @@ class LLMTask(BaseAgentTask):
             context_id=self.agent.context_id,
             output_format=self.output_format,
             output_schema=self.output_schema,
+            max_tokens=self._calculate_max_tokens(full_system_prompt, input_messages),
         )
         # add user request to message history *before* the completion so ordering is correct
         if prompt and len(prompt.strip()) > 0:

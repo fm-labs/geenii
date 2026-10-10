@@ -28,7 +28,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
     DEFAULT_MODEL = "gpt-3.5-turbo"
     DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer."
 
-    DEFAULT_TEMPERATURE = 0.3
+    DEFAULT_TEMPERATURE = 0.1
     DEFAULT_MAX_TOKENS = 4096
     DEFAULT_MAX_TOOL_CALLS = 5
 
@@ -52,7 +52,8 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
     @property
     def client(self):
         if self._client is None:
-            api_key = os.environ.get("OPENAI_API_KEY", None)
+            #api_key = os.environ.get("OPENAI_API_KEY", None)
+            api_key = config.OPENAI_API_KEY
             if not api_key:
                 raise ValueError("OpenAI API key not found. Please set the OPENAI_API_KEY environment variable.")
 
@@ -253,7 +254,8 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         max_tool_calls = model_params.get('max_tool_calls', self.DEFAULT_MAX_TOOL_CALLS)
 
         # call OpenAI Responses API
-        logger.info("OPENAI: Generate completion response with %d input messages:", len(input_messages))
+        logger.info("OPENAI: Generate completion temperature=%d context=%d with %d input messages:",
+                    float(temperature), int(max_tokens), len(input_messages))
         time_start = time.time()
         model_result = self.client.responses.create(
             model=model,
@@ -278,7 +280,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             if output_item.type == "message":
                 for content_item in output_item.content:
                     if content_item.type == "output_text":
-                        logger.info(f"Model output text: {content_item.text}")
+                        #logger.info(f"Model output text: {content_item.text}")
                         _text = content_item.text
                         _text_part = TextContent(text=_text)
                         if _text.strip().startswith("{") and _text.strip().endswith("}"):

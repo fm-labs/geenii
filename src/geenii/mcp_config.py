@@ -2,10 +2,13 @@ from pathlib import Path
 
 import json
 
-from geenii.config import MCP_CONFIG_FILE, GEENII_DIR
+from geenii.config import MCP_CONFIG_FILE, GEENII_DIR, GEENII_WORKING_DIR
 from geenii.mcp_client import McpClient
 
 import logging
+
+from geenii.utils.os_util import get_user_home_dir
+
 logger = logging.getLogger(__name__)
 
 config = None
@@ -62,31 +65,39 @@ def read_mcp_config_json() -> dict:
 
     :return: A dictionary containing the configuration data.
     """
-    filename = Path(GEENII_DIR) / MCP_CONFIG_FILE
-    try:
-        with open(filename, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        print(f"Configuration file {filename} not found.")
-        return {}
-    except json.JSONDecodeError:
-        print(f"Error decoding JSON from the file {filename}.")
-        return {}
+    filenames = [
+        Path(get_user_home_dir()) / ".geenii" / MCP_CONFIG_FILE,
+        Path(GEENII_WORKING_DIR) / ".geenii" / MCP_CONFIG_FILE
+    ]
+    mcp_config = {"mcpServers": {}}
+    for filename in filenames:
+        try:
+            with open(filename, 'r') as f:
+                data = json.load(f)
+                mcp_config.update({
+                    "mcpServers": data.get("mcpServers", {})
+                })
+        except FileNotFoundError:
+            print(f"Configuration file {filename} not found.")
+            #return {}
+        except json.JSONDecodeError:
+            print(f"Error decoding JSON from the file {filename}.")
+            #return {}
+    return mcp_config
 
-
-def write_mcp_config_json(data: dict):
-    """
-    Update the MCP configuration file with new data.
-
-    :param data: A dictionary containing the new configuration data.
-    """
-    filename = Path(GEENII_DIR) / MCP_CONFIG_FILE
-    try:
-        with open(filename, 'w') as f:
-            json.dump(data, f, indent=4)
-        print(f"Configuration file {filename} updated successfully.")
-    except Exception as e:
-        print(f"Error updating configuration file {filename}: {e}")
+# def write_mcp_config_json(data: dict):
+#     """
+#     Update the MCP configuration file with new data.
+#
+#     :param data: A dictionary containing the new configuration data.
+#     """
+#     filename = Path(GEENII_DIR) / MCP_CONFIG_FILE
+#     try:
+#         with open(filename, 'w') as f:
+#             json.dump(data, f, indent=4)
+#         print(f"Configuration file {filename} updated successfully.")
+#     except Exception as e:
+#         print(f"Error updating configuration file {filename}: {e}")
 
 
 
