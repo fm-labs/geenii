@@ -7,6 +7,7 @@ from geenii.cli.agent_cli import agent_cli, agent_run
 from geenii.cli.agents_cli import agents as agents_cli
 from geenii.cli.apps_cli import apps as apps_cli
 from geenii.cli.daemon_cli import daemon as daemon_cli
+from geenii.cli.flow_cli import flow as flow_cli
 from geenii.cli.info_cli import info as info_cli
 from geenii.cli.models_cli import models as models_cli
 from geenii.cli.mcp_cli import mcp as mcp_cli
@@ -110,6 +111,7 @@ geecli.add_command(daemon_cli)
 geecli.add_command(pm_cli)
 geecli.add_command(scheduler_cli)
 geecli.add_command(supervisor_cli)
+geecli.add_command(flow_cli)
 
 
 def main():

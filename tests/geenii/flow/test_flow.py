@@ -1,5 +1,7 @@
 import json
 import sys
+import threading
+import time
 
 import httpx
 import pytest
@@ -237,3 +239,91 @@ def test_edges_from_toml(tmp_path):
     result = Flow.from_file(toml).run()
     assert _order(result) == ["a", "b"]
     assert result.output == {"message": {"message": "x"}}
+
+
+# --- parallel execution ---
+
+@register_step("test_barrier")
+class BarrierStep(FlowStep):
+    """Waits until `parties` steps reach the barrier in ctx.vars; fails when they don't run concurrently"""
+    def process(self, input_data, ctx):
+        ctx.vars["barrier"].wait()
+        return {"thread": threading.current_thread().name}
+
+
+@register_step("test_sleep")
+class SleepStep(FlowStep):
+    def process(self, input_data, ctx):
+        time.sleep(self.config.get("seconds", 0.2))
+        return {"stopping": ctx.stopping}
+
+
+def _branches(n: int, step_type: str = "test_barrier") -> list[dict]:
+    steps = [{"id": "root", "type": "echo", "config": {"message": "r"}}]
+    steps += [{"id": f"b{i}", "type": step_type, "after": "root"} for i in range(n)]
+    steps += [{"id": "join", "type": "echo", "after": [f"b{i}" for i in range(n)]}]
+    return steps
+
+
+def test_parallel_branches_run_concurrently():
+    flow = Flow("t", _branches(3), variables={"barrier": threading.Barrier(3, timeout=2)}, max_workers=3)
+    result = flow.run()
+    assert result.status == "success", [s.error for s in result.steps]
+    threads = {result.get(f"b{i}").output["thread"] for i in range(3)}
+    assert len(threads) == 3 and all(t.startswith("flow-t") for t in threads)
+    assert [s.step_id for s in result.steps] == ["root", "b0", "b1", "b2", "join"]
+    assert set(result.get("join").output["message"]) == {"b0", "b1", "b2"}
+
+
+def test_sequential_by_default():
+    # with one worker the barrier can never be reached by 2 steps at once
+    flow = Flow("t", _branches(2), variables={"barrier": threading.Barrier(2, timeout=0.2)})
+    result = flow.run()
+    assert result.get("b0").status == "failed"
+    assert result.get("b1").status == "skipped"
+
+
+def test_max_workers_override_and_limit():
+    flow = Flow("t", _branches(2), variables={"barrier": threading.Barrier(2, timeout=2)})
+    assert flow.run(max_workers=2).status == "success"
+    # 3 branches, 2 workers: the third waits, so a barrier of 3 can't be reached
+    flow = Flow("t", _branches(3), variables={"barrier": threading.Barrier(3, timeout=0.2)}, max_workers=2)
+    assert flow.run().status == "failed"
+    with pytest.raises(FlowError):
+        flow.run(max_workers=0)
+
+
+def test_parallel_stop_lets_running_steps_finish():
+    flow = Flow("t", [
+        {"id": "slow", "type": "test_sleep", "config": {"seconds": 0.3}},
+        {"id": "fail", "type": "test_fail"},
+        {"id": "after_slow", "type": "echo", "after": "slow"},
+    ], max_workers=2)
+    result = flow.run()
+    assert result.status == "failed"
+    assert result.get("fail").status == "failed"
+    assert result.get("slow").status == "success"
+    assert result.get("slow").output == {"stopping": True}
+    assert result.get("after_slow").status == "skipped"
+
+
+def test_parallel_events_are_serialized():
+    active = 0
+    overlaps = []
+
+    def on_event(event):
+        nonlocal active
+        active += 1
+        overlaps.append(active)
+        time.sleep(0.01)
+        active -= 1
+
+    flow = Flow("t", _branches(4, "test_sleep"), max_workers=4)
+    assert flow.run(on_event=on_event).status == "success"
+    assert max(overlaps) == 1
+
+
+def test_max_workers_from_file(tmp_path):
+    path = tmp_path / "flow.json"
+    path.write_text(json.dumps({"name": "f", "max_workers": 4, "steps": [{"id": "a", "type": "echo"}]}))
+    assert Flow.from_file(path).max_workers == 4

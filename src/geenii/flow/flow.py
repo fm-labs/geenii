@@ -7,8 +7,10 @@ spec names a step type (a registered name like "echo", or
 Flow.add_edge() or inferred from a step's ``after`` list. A flow without any
 edges runs its steps in the order they were added.
 
-Steps run one at a time in topological order (ties keep insertion order). A
-step's input is the flow input if it has no predecessors, the predecessor's
+A step starts once all its predecessors have finished. With max_workers=1 (the
+default) steps run one at a time in the calling thread, in topological order
+(ties keep insertion order). With max_workers > 1, independent steps run in
+parallel in a thread pool. A step's input is the flow input if it has no predecessors, the predecessor's
 output if it has one, or a dict {step_id: output} if it has several.
 
 String values in a step config may reference earlier results with ``${...}``:
@@ -26,8 +28,10 @@ import inspect
 import json
 import logging
 import re
+import threading
 import time
 import tomllib
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Generator, Literal
@@ -99,7 +103,13 @@ class FlowResult(pydantic.BaseModel):
 
 
 class FlowContext:
-    """Run state shared by all steps of one flow run"""
+    """
+    Run state shared by all steps of one flow run.
+
+    With parallel execution, steps call into the context from worker threads:
+    results are only written by the runner thread, and events are delivered
+    to on_event one at a time.
+    """
 
     def __init__(self, flow_name: str, input_data: Any = None, variables: dict | None = None,
                  on_event: Callable[[StepEvent], None] | None = None):
@@ -109,6 +119,13 @@ class FlowContext:
         self.results: dict[str, Any] = {}
         self.logger = logging.getLogger(f"{__name__}.{flow_name}")
         self._on_event = on_event
+        self._event_lock = threading.RLock()
+        self._stopping = threading.Event()
+
+    @property
+    def stopping(self) -> bool:
+        """True once the flow is stopping (a step failed or aborted); long-running steps may check it"""
+        return self._stopping.is_set()
 
     def emit(self, event_type: str, data: Any = None, step_id: str | None = None):
         self._emit(StepEvent(type=event_type, data=data, step_id=step_id))
@@ -116,7 +133,8 @@ class FlowContext:
     def _emit(self, event: StepEvent):
         self.logger.debug("event %s [%s]: %s", event.type, event.step_id, event.data)
         if self._on_event:
-            self._on_event(event)
+            with self._event_lock:
+                self._on_event(event)
 
     def abort(self, reason: str = "aborted"):
         raise FlowAborted(reason)
@@ -212,6 +230,12 @@ def register_step(name: str):
     return decorator
 
 
+def list_step_types() -> dict[str, type[FlowStep]]:
+    """All registered step types by name, including the built-in steps"""
+    import geenii.flow.steps  # noqa: F401 - registers the built-in steps
+    return dict(sorted(_STEP_REGISTRY.items()))
+
+
 def get_step_class(step_type: str) -> type[FlowStep]:
     if ":" in step_type:
         module_name, class_name = step_type.split(":", 1)
@@ -234,11 +258,14 @@ class Flow:
     """
 
     def __init__(self, name: str, steps: list[FlowStepSpec | dict] | None = None,
-                 edges: list[FlowEdge | dict | tuple[str, str]] | None = None, variables: dict | None = None):
+                 edges: list[FlowEdge | dict | tuple[str, str]] | None = None, variables: dict | None = None,
+                 max_workers: int = 1):
         self.name = name
         self.steps: list[FlowStepSpec] = []
         self._edges: list[FlowEdge] = []
         self.variables = dict(variables or {})
+        # number of steps that may run at the same time; 1 runs them sequentially in the calling thread
+        self.max_workers = max_workers
         for step in steps or []:
             self.add_step(step)
         for edge in edges or []:
@@ -313,7 +340,7 @@ class Flow:
     @classmethod
     def from_dict(cls, data: dict) -> "Flow":
         return cls(name=data["name"], steps=data.get("steps", []), edges=data.get("edges"),
-                   variables=data.get("vars"))
+                   variables=data.get("vars"), max_workers=data.get("max_workers", 1))
 
     @classmethod
     def from_file(cls, path: str | Path) -> "Flow":
@@ -327,41 +354,64 @@ class Flow:
             raise FlowError(f"Unsupported flow file type '{path.suffix}'")
         return cls.from_dict(data)
 
-    def run(self, input_data: Any = None, on_event: Callable[[StepEvent], None] | None = None) -> FlowResult:
-        """Run the flow. Raises FlowError for an invalid graph (unknown step in an edge, cycle)."""
+    def run(self, input_data: Any = None, on_event: Callable[[StepEvent], None] | None = None,
+            max_workers: int | None = None) -> FlowResult:
+        """
+        Run the flow. max_workers overrides Flow.max_workers for this run.
+        Raises FlowError for an invalid graph (unknown step in an edge, cycle) or max_workers < 1.
+        """
+        workers = self.max_workers if max_workers is None else max_workers
+        if workers < 1:
+            raise FlowError(f"max_workers must be at least 1, got {workers}")
         order = self.execution_order()
         preds = self.predecessors()
         ctx = FlowContext(self.name, input_data=input_data, variables=self.variables, on_event=on_event)
-        results: list[StepResult] = []
+        results: dict[str, StepResult] = {}
         # outputs of finished steps; a failed step with on_error="continue" contributes None
         outputs: dict[str, Any] = {}
+        pending = list(order)
+        running: dict[Future, FlowStepSpec] = {}
         status = "success"
 
-        for idx, spec in enumerate(order):
-            step_preds = preds[spec.id]
-            if not step_preds:
-                step_input = input_data
-            elif len(step_preds) == 1:
-                step_input = outputs[step_preds[0]]
-            else:
-                step_input = {p: outputs[p] for p in step_preds}
+        executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix=f"flow-{self.name}") \
+            if workers > 1 else _InlineExecutor()
+        try:
+            while True:
+                # start every ready step (all predecessors finished), in execution order
+                if not ctx.stopping:
+                    for spec in list(pending):
+                        if len(running) >= workers:
+                            break
+                        if all(p in results for p in preds[spec.id]):
+                            pending.remove(spec)
+                            step_input = _step_input(preds[spec.id], outputs, input_data)
+                            running[executor.submit(self._execute_step, spec, step_input, ctx)] = spec
+                if not running:
+                    break
 
-            result = self._execute_step(spec, step_input, ctx)
-            results.append(result)
-            outputs[spec.id] = result.output
+                done, _ = wait(running, return_when=FIRST_COMPLETED)
+                for future in sorted(done, key=lambda f: order.index(running[f])):
+                    spec = running.pop(future)
+                    result = future.result()
+                    results[spec.id] = result
+                    outputs[spec.id] = result.output
+                    if result.status == "success":
+                        ctx.results[spec.id] = result.output
+                    elif result.status == "aborted":
+                        status = "aborted"
+                        ctx._stopping.set()
+                    else:
+                        if status != "aborted":
+                            status = "failed"
+                        if spec.on_error == "stop":
+                            ctx._stopping.set()
+        finally:
+            ctx._stopping.set()
+            executor.shutdown(wait=True, cancel_futures=True)
 
-            if result.status == "success":
-                continue
-            if result.status == "aborted":
-                status = "aborted"
-            else:
-                status = "failed"
-                if spec.on_error == "continue":
-                    continue
-            results.extend(StepResult(step_id=s.id, status="skipped") for s in order[idx + 1:])
-            break
-
-        return FlowResult(name=self.name, status=status, steps=results)
+        for spec in pending:
+            results[spec.id] = StepResult(step_id=spec.id, status="skipped")
+        return FlowResult(name=self.name, status=status, steps=[results[s.id] for s in order])
 
     def _execute_step(self, spec: FlowStepSpec, input_data: Any, ctx: FlowContext) -> StepResult:
         ctx.emit("step.start", {"type": spec.type}, step_id=spec.id)
@@ -370,7 +420,6 @@ class Flow:
             step = get_step_class(spec.type)(config=ctx.resolve(spec.config))
             output = self._drive(step, spec, input_data, ctx)
             output = _dump(step.output_model.model_validate(output) if step.output_model else output)
-            ctx.results[spec.id] = output
             result = StepResult(step_id=spec.id, status="success", output=output)
         except FlowAborted as e:
             result = StepResult(step_id=spec.id, status="aborted", error=str(e))
@@ -395,6 +444,29 @@ class Flow:
                 event = StepEvent(type="data", data=event)
             event.step_id = spec.id
             ctx._emit(event)
+
+
+def _step_input(step_preds: list[str], outputs: dict[str, Any], flow_input: Any) -> Any:
+    if not step_preds:
+        return flow_input
+    if len(step_preds) == 1:
+        return outputs[step_preds[0]]
+    return {p: outputs[p] for p in step_preds}
+
+
+class _InlineExecutor:
+    """Runs submitted calls immediately in the calling thread (max_workers=1)"""
+
+    def submit(self, fn: Callable, *args: Any) -> Future:
+        future: Future = Future()
+        try:
+            future.set_result(fn(*args))
+        except BaseException as e:
+            future.set_exception(e)
+        return future
+
+    def shutdown(self, wait: bool = True, cancel_futures: bool = False):
+        pass
 
 
 def _dump(value: Any) -> Any:

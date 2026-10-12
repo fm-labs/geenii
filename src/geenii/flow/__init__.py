@@ -10,6 +10,7 @@ from geenii.flow.flow import (
     StepEvent,
     StepResult,
     get_step_class,
+    list_step_types,
     register_step,
 )
 
@@ -25,5 +26,6 @@ __all__ = [
     "StepEvent",
     "StepResult",
     "get_step_class",
+    "list_step_types",
     "register_step",
 ]
