@@ -160,5 +160,6 @@ $ geenii flow processors
 echo                 Returns the configured message, or the step input if no message is set
 execute_command      Runs a command in a subprocess
 execute_script       Runs a Python script in a separate interpreter process.
+read_file            Reads a text file. JSON, TOML or lines are parsed into `data`; format "auto" picks by file extension.
 read_http            Sends an HTTP request. `body` is sent as JSON; a JSON response is parsed into `data`.
 ```

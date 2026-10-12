@@ -18,7 +18,7 @@ Two terms:
 | Module | Contents |
 |---|---|
 | `geenii/flow/flow.py` | `Flow`, `FlowStepSpec`, `FlowProcessor`, `FlowContext`, results, processor registry |
-| `geenii/flow/processor/` | Built-in processors: `echo`, `execute_command`, `execute_script`, `read_http` |
+| `geenii/flow/processor/` | Built-in processors: `echo`, `execute_command`, `execute_script`, `read_file`, `read_http` |
 
 A runnable example is in `src/xflow.py` (`uv run python src/xflow.py`), and a
 file-based one is in `examples/flow_example.toml`.
@@ -391,6 +391,22 @@ stdin.
 | `json_output` | `false` | Parse stdout as JSON into `result` |
 
 Output: `{"stdout", "stderr", "rc", "result"}`.
+
+### `read_file`
+
+Reads a text file.
+
+| Config | Default | Meaning |
+|---|---|---|
+| `path` | required | File path; `~` is expanded, and a relative path is relative to the current working directory |
+| `format` | `"auto"` | How to parse the text into `data`: `"text"` (no parsing), `"json"`, `"toml"`, `"lines"` (a list of lines without line endings), or `"auto"`: `json` for `.json`, `toml` for `.toml`, otherwise `text` |
+| `encoding` | `"utf-8"` | Text encoding |
+| `max_size` | `None` | Fail the step if the file is larger than this many bytes |
+
+Output: `{"path", "size", "text", "data"}`. `path` is the resolved absolute
+path, and `size` is in bytes. `data` is `None` for the `text` format. A
+missing file, a file that can't be decoded, or invalid JSON/TOML fails the
+step.
 
 ### `read_http`
 

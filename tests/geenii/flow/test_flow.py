@@ -367,3 +367,38 @@ def test_graph_unknown_step_raises():
         flow.to_mermaid()
     with pytest.raises(FlowError):
         flow.to_dot()
+
+
+# --- read_file ---
+
+def test_read_file_formats(tmp_path):
+    (tmp_path / "a.txt").write_text("one\ntwo\n")
+    (tmp_path / "a.json").write_text('{"n": 1}')
+    (tmp_path / "a.toml").write_text('n = 2\n')
+    result = Flow("t", [
+        {"id": "text", "processor": "read_file", "config": {"path": str(tmp_path / "a.txt")}},
+        {"id": "lines", "processor": "read_file", "config": {"path": str(tmp_path / "a.txt"), "format": "lines"}},
+        {"id": "json", "processor": "read_file", "config": {"path": str(tmp_path / "a.json")}},
+        {"id": "toml", "processor": "read_file", "config": {"path": str(tmp_path / "a.toml")}},
+        {"id": "raw", "processor": "read_file", "config": {"path": str(tmp_path / "a.json"), "format": "text"}},
+    ]).run()
+    assert result.status == "success", [s.error for s in result.steps]
+    assert result.get("text").output == {"path": str((tmp_path / "a.txt").resolve()), "size": 8,
+                                         "text": "one\ntwo\n", "data": None}
+    assert result.get("lines").output["data"] == ["one", "two"]
+    assert result.get("json").output["data"] == {"n": 1}
+    assert result.get("toml").output["data"] == {"n": 2}
+    assert result.get("raw").output["data"] is None
+
+
+def test_read_file_path_reference_and_errors(tmp_path):
+    (tmp_path / "big.txt").write_text("x" * 100)
+    result = Flow("t", [
+        {"id": "a", "processor": "read_file", "config": {"path": "${input}/big.txt", "max_size": 10}},
+        {"id": "b", "processor": "read_file", "config": {"path": "${input}/missing.txt"}},
+    ]).run(input_data=str(tmp_path))
+    assert "more than max_size 10" in result.get("a").error
+    assert result.get("b").status == "skipped"
+
+    result = Flow("t", [{"id": "b", "processor": "read_file", "config": {"path": str(tmp_path / "missing.txt")}}]).run()
+    assert result.get("b").error.startswith("FileNotFoundError")
