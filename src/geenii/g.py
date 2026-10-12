@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
 from geenii.agent.registry import AgentRegistry, AgentSpec, init_agent
+from geenii.flows import FlowRegistry
 
 if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
@@ -160,3 +162,16 @@ def get_app_info() -> dict:
     data.update({"system": report})
 
     return data
+
+
+def flow_dirs() -> list[str]:
+    """Directories flows are loaded from: the user's, then the working directory's (without duplicates)"""
+    dirs = [Path(get_user_home_dir(), ".geenii", "flows"), Path(GEENII_DIR, "flows")]
+    return list(dict.fromkeys(str(d.resolve()) for d in dirs))
+
+
+def init_flow_registry() -> FlowRegistry:
+    reg = FlowRegistry()
+    for d in flow_dirs():
+        reg.load_all_from_dir(d)
+    return reg

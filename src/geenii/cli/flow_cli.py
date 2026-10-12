@@ -206,6 +206,26 @@ def graph(path, fmt, output, direction, processor_modules):
         click.echo(text, nl=False)
 
 
+@flow.command(name="list")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Print the flows as JSON.")
+def list_flows(as_json):
+    """List the flows in ~/.geenii/flows and the working directory's .geenii/flows."""
+    from geenii.g import flow_dirs, init_flow_registry
+
+    flows = init_flow_registry().flows
+    if as_json:
+        click.echo(json.dumps([{"name": f.name, "filepath": f.filepath} for f in flows], indent=2))
+        return
+    if not flows:
+        click.echo("No flows found in:")
+        for d in flow_dirs():
+            click.echo(f"  {d}")
+        return
+    width = max(len(f.name) for f in flows)
+    for f in flows:
+        click.echo(f"  {f.name:{width}}  {f.filepath}")
+
+
 @flow.command()
 @processor_module_option
 def processors(processor_modules):

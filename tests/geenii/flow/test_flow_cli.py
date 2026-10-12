@@ -180,3 +180,31 @@ def test_graph_renders_svg(runner, tmp_path):
     result = runner.invoke(flow, ["graph", _graph_file(tmp_path), "-o", str(out)])
     assert result.exit_code == 0, result.stderr
     assert "<svg" in out.read_text()
+
+
+def test_list_flows(runner, tmp_path, monkeypatch):
+    import geenii.g
+    user_dir, project_dir = tmp_path / "user", tmp_path / "project"
+    user_dir.mkdir()
+    project_dir.mkdir()
+    for name in ("b.yaml", "a.toml", "notes.txt"):
+        (user_dir / name).write_text("")
+    (project_dir / "c.json").write_text("{}")
+    monkeypatch.setattr(geenii.g, "flow_dirs", lambda: [str(user_dir), str(project_dir), str(tmp_path / "missing")])
+
+    result = runner.invoke(flow, ["list"])
+    assert result.exit_code == 0, result.output
+    lines = result.output.splitlines()
+    assert [line.split()[0] for line in lines] == ["a", "b", "c"]
+    assert lines[2].split()[1] == str(project_dir / "c.json")
+
+    result = runner.invoke(flow, ["list", "--json"])
+    assert json.loads(result.output)[0] == {"name": "a", "filepath": str(user_dir / "a.toml")}
+
+
+def test_list_flows_empty(runner, tmp_path, monkeypatch):
+    import geenii.g
+    monkeypatch.setattr(geenii.g, "flow_dirs", lambda: [str(tmp_path / "missing")])
+    result = runner.invoke(flow, ["list"])
+    assert result.exit_code == 0
+    assert result.output == f"No flows found in:\n  {tmp_path / 'missing'}\n"
