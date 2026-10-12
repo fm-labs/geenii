@@ -8,7 +8,7 @@ Each solves a different problem, and all three run inside one process, the
 |---|---|---|---|---|
 | **Supervisor** | `geenii/supervisor.py` | Desired state: keep long-lived processes up and restart them when they exit | Inside the daemon (`supervisor.*` methods); also embedded by the server repository | `geenii supervisor` CLI and `supervisor.*` RPC; the server repository (`/api/v1/supervisor/*`, consumed by `data/apps/geenii-supervisor`) |
 | **Scheduler** | `geenii/scheduler.py` | Time-based: run a command or Python callable on a cron schedule or once at a set time | Inside the daemon, with tasks from `scheduler.json` | CLI, cron-style agent runs, `scheduler.*` RPC |
-| **Process Manager** | `geenii/pm/` | Fire and forget: start a background job, get an ID back, check its state and output later | Inside the daemon (`pm.*` methods), plus a synchronous client | `ProcessingAgent` (the `bg_process_*` tools), `geenii pm` CLI |
+| **Process Manager** | `geenii/pm/` | Fire and forget: start a background job, get an ID back, check its state and output later | Inside the daemon (`pm.*` methods), plus a synchronous client | `ProcessManagerAgent` (the `bg_process_*` tools), `geenii pm` CLI |
 
 Rule of thumb:
 
@@ -539,7 +539,7 @@ file exists and that `ping` succeeds. The client has no socket timeout.
 
 ### Integration
 
-- `ProcessingAgent` (`geenii/agents.py`) creates a client and registers the
+- `ProcessManagerAgent` (`geenii/agents.py`) creates a client and registers the
   tools from `geenii/core/process_tools.py`: `bg_process_start`,
   `bg_process_status`, `bg_process_output`, `bg_process_kill` and
   `bg_process_list`.

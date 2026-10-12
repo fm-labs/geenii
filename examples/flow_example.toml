@@ -1,0 +1,30 @@
+# Example flow, run with:
+#   uv run python -c "from geenii.flow import Flow; print(Flow.from_file('examples/flow_example.toml').run())"
+name = "example"
+
+[vars]
+greeting = "Step 0 message"
+
+[[steps]]
+id = "step0"
+type = "echo"
+config = { message = "${vars.greeting}" }
+
+[[steps]]
+id = "step1"
+type = "read_http"
+config = { url = "https://httpbingo.org/get", params = { msg = "${step0.message}" } }
+
+[[steps]]
+id = "step2"
+type = "execute_command"
+on_error = "continue"
+config = { command = ["docker", "container", "list", "--all"] }
+
+[[steps]]
+id = "step3"
+type = "execute_script"
+config = { script = """
+import json, sys
+print(json.dumps({"input": json.load(sys.stdin)}))
+""", json_output = true }

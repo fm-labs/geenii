@@ -61,6 +61,8 @@ Internals for contributors and library consumers.
   security model, SandboxTool API.
 - **[Process Management](developer-guide/processes.md)** — Supervisor,
   Scheduler, and Process Manager internals, APIs, and known issues.
+- **[Flow](developer-guide/flow.md)** — step pipelines: flow specs, references
+  between steps, built-in steps, and writing your own.
 - **[Memory](developer-guide/memory.md)** — ChatMemory abstraction and
   persistence implementations.
 - **[Building](developer-guide/building.md)** — dev setup, linting, testing,
