@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+      :root {
+          color-scheme: light dark;
+      }
+
+      * {
+          box-sizing: border-box;
+      }
+
+      html, body {
+          margin: 0;
+          font-family: system-ui, -apple-system, sans-serif;
+          background: transparent;
+      }
+
+      body {
+          padding: 14px;
+      }
+
+      form {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+      }
+
+      /* textarea container */
+
+      .textarea-wrapper {
+          border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+          border-radius: 10px;
+          padding: 6px 8px;
+          background: Canvas;
+      }
+
+      textarea {
+          width: 100%;
+          resize: none;
+          border: none;
+          outline: none;
+          background: transparent;
+          color: inherit;
+          font: inherit;
+          font-size: 15px;
+          line-height: 1.45;
+          min-height: calc(1.45em * 2);
+          max-height: calc(1.45em * 4);
+      }
+
+      textarea::placeholder {
+          opacity: 0.6;
+      }
+
+      /* button */
+
+      .actions {
+          display: flex;
+          justify-content: flex-end;
+      }
+
+      button {
+          font: inherit;
+          font-weight: 500;
+          padding: 6px 14px;
+          border-radius: 8px;
+          border: none;
+          cursor: pointer;
+
+          background: color-mix(in srgb, CanvasText 85%, transparent);
+          color: Canvas;
+
+          transition: transform .05s ease, opacity .15s ease;
+      }
+
+      button:hover {
+          opacity: 0.9;
+      }
+
+      button:active {
+          transform: translateY(1px);
+      }
+  </style>
+</head>
+
+<body>
+
+<form id="task-form">
+
+  <div class="textarea-wrapper">
+    <textarea
+      id="task-input"
+      rows="2"
+      placeholder="What needs to be done?"
+      autofocus
+    ></textarea>
+  </div>
+
+  <div class="actions">
+    <button type="submit">Create</button>
+  </div>
+
+</form>
+
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const { getCurrentWindow } = window.__TAURI__.window;
+
+  const appWindow = getCurrentWindow();
+  const input = document.getElementById("task-input");
+  const form = document.getElementById("task-form");
+
+  /* auto resize */
+
+  function autoResize() {
+    input.style.height = "auto";
+    input.style.height = input.scrollHeight + "px";
+  }
+
+  input.addEventListener("input", autoResize);
+  autoResize();
+
+  /* submit */
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const value = input.value.trim();
+    if (!value) return;
+
+    try {
+      await invoke("create_task", { input: value });
+      await appWindow.close();
+    } catch (err) {
+      console.error(err);
+    }
+  });
+
+  /* escape closes window */
+
+  window.addEventListener("keydown", async (e) => {
+    if (e.key === "Escape") {
+      await appWindow.close();
+    }
+  });
+
+  /* blur closes window */
+
+  window.addEventListener("blur", async () => {
+    await appWindow.close();
+  });
+</script>
+
+</body>
+</html>

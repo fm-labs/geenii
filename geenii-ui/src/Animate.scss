@@ -1,0 +1,60 @@
+/* Animation */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Total timeline = 30s */
+@keyframes rotateBurst {
+
+  /* Start */
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  /* 1 second out of 30 seconds = 3.333% */
+  3.333% {
+    transform: rotate(720deg) scale(0.75); /* 3 rotations */
+  }
+
+  33% {
+    transform: rotate(720deg) scale(1.2); /* Stay still for 21 seconds */
+  }
+
+  /* Stay still for remaining time */
+  100% {
+    transform: rotate(720deg) scale(1);
+  }
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+
+.pulse {
+  animation: pulse 3s ease-in-out infinite;
+}
+
+.rotate-burst {
+  animation: rotateBurst 10s linear infinite;
+}
+
+.rotate {
+  animation: rotateBurst 3s linear infinite;
+}
