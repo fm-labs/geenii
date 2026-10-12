@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geenii Processes</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #6b7280; --border: #e2e5ea;
+    --accent: #3b5bdb; --accent-text: #ffffff; --danger: #c92a2a; --code-bg: #10141c; --code-text: #d8dee9;
+    --ok: #2b8a3e; --warn: #e67700; --run: #1c7ed6; --off: #868e96;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --panel: #1a1e26; --text: #e6e8ec; --muted: #8b93a1; --border: #2a303b;
+      --accent: #5c7cfa; --danger: #ff6b6b; --code-bg: #0b0e13;
+      --ok: #51cf66; --warn: #ffa94d; --run: #4dabf7; --off: #868e96;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+           background: var(--panel); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; }
+  header .spacer { flex: 1; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--off); margin-right: 6px; }
+  .dot.up { background: var(--ok); } .dot.down { background: var(--danger); }
+  main { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 16px; padding: 16px; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; min-width: 0; }
+  section + section { margin-top: 16px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+  input, textarea, select { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
+                            background: var(--bg); color: var(--text); font: inherit; }
+  textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; resize: vertical; }
+  input[type=checkbox] { width: auto; }
+  button { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel);
+           color: var(--text); font: inherit; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  button.danger { color: var(--danger); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .hint { font-size: 12px; color: var(--muted); }
+  .banner { margin: 16px 16px 0; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--danger);
+            color: var(--danger); background: var(--panel); display: none; }
+  .banner.show { display: block; }
+  .list-wrap { max-height: 60vh; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  thead th { position: sticky; top: 0; background: var(--panel); }
+  td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  col.c-id { width: 34%; } col.c-state { width: 22%; } col.c-started { width: 64px; }
+  td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 500; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--bg); }
+  tbody tr.sel { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .state { font-size: 12px; font-weight: 600; }
+  .state.running, .state.pending { color: var(--run); }
+  .state.completed { color: var(--ok); }
+  .state.failed, .state.killed { color: var(--danger); }
+  .state.orphaned { color: var(--warn); }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0 0 12px; }
+  dt { color: var(--muted); font-size: 12px; } dd { margin: 0; word-break: break-all; }
+  pre#out { background: var(--code-bg); color: var(--code-text); border-radius: 6px; padding: 10px; margin: 10px 0 0;
+            height: 55vh; overflow: auto; white-space: pre-wrap; word-break: break-all;
+            font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .empty { color: var(--muted); padding: 20px 0; text-align: center; }
+  .seg button { border-radius: 0; } .seg button:first-child { border-radius: 6px 0 0 6px; }
+  .seg button:last-child { border-radius: 0 6px 6px 0; } .seg button + button { margin-left: -1px; }
+  .seg button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Geenii Processes</h1>
+  <span id="daemon" class="hint"><span class="dot"></span>checking…</span>
+  <span class="spacer"></span>
+  <label class="row" style="margin:0">API <input id="api" class="mono" style="width:260px"></label>
+</header>
+<div id="banner" class="banner"></div>
+
+<main>
+  <div>
+    <section>
+      <h2>Start process</h2>
+      <form id="start-form">
+        <label for="f-cmd">Command</label>
+        <textarea id="f-cmd" rows="2" required placeholder='echo hello && sleep 5   or   ["ls", "-la"]'></textarea>
+        <div class="hint">A string runs through the shell; a JSON array is executed directly.</div>
+        <label for="f-cwd">Working directory</label>
+        <input id="f-cwd" class="mono" placeholder="(daemon default)">
+        <label for="f-pid">Process ID</label>
+        <input id="f-pid" class="mono" placeholder="(auto)">
+        <label for="f-env">Environment (KEY=value per line)</label>
+        <textarea id="f-env" rows="2"></textarea>
+        <div class="row" style="margin-top:10px"><button class="primary" type="submit">Start</button></div>
+      </form>
+    </section>
+
+    <section>
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <h2 style="margin:0">Processes</h2>
+        <div class="row">
+          <label class="row" style="margin:0"><input type="checkbox" id="show-finished" checked> finished</label>
+          <button id="refresh" type="button">Refresh</button>
+        </div>
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <span class="hint">Clean up finished older than</span>
+        <select id="gc-age" style="width:auto">
+          <option value="3600">1 hour</option>
+          <option value="86400">1 day</option>
+          <option value="604800" selected>7 days</option>
+          <option value="2592000">30 days</option>
+          <option value="0">any age</option>
+        </select>
+        <button id="gc" type="button">Clean up…</button>
+        <span id="gc-result" class="hint"></span>
+      </div>
+      <div class="list-wrap">
+        <table>
+          <colgroup><col class="c-id"><col class="c-state"><col><col class="c-started"></colgroup>
+          <thead><tr><th>ID</th><th>State</th><th>Command</th><th>Started</th></tr></thead>
+          <tbody id="list"></tbody>
+        </table>
+      </div>
+      <div id="list-empty" class="empty" hidden>No processes.</div>
+    </section>
+  </div>
+
+  <section id="detail">
+    <div id="detail-empty" class="empty">Select a process to see its details and output.</div>
+    <div id="detail-body" hidden>
+      <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <h2 style="margin:0">Process <span id="d-pid" class="mono"></span></h2>
+        <div class="row">
+          <button id="kill" class="danger" type="button">Kill</button>
+          <button id="force-kill" class="danger" type="button">Force kill</button>
+          <button id="cleanup" type="button">Clean up</button>
+        </div>
+      </div>
+      <dl id="d-info"></dl>
+      <div class="row" style="justify-content:space-between">
+        <div class="seg row" style="gap:0">
+          <button type="button" data-stream="stdout" class="on">stdout</button>
+          <button type="button" data-stream="stderr">stderr</button>
+        </div>
+        <div class="row">
+          <span id="out-size" class="hint"></span>
+          <label class="row" style="margin:0"><input type="checkbox" id="follow" checked> follow</label>
+          <button id="reload-out" type="button">Reload</button>
+        </div>
+      </div>
+      <pre id="out"></pre>
+    </div>
+  </section>
+</main>
+
+<script>
+const CHUNK = 64 * 1024;      // bytes per output request
+const POLL_MS = 1500;
+const $ = (id) => document.getElementById(id);
+
+// ---- API ------------------------------------------------------------------
+// Served by the API server: same origin; opened as a file: the default dev server
+const defaultApi = location.protocol.startsWith("http") ? `${location.origin}/api/v1` : "http://localhost:33311/api/v1";
+let apiBase = defaultApi;
+try { apiBase = localStorage.getItem("pm.api") || defaultApi; } catch {}
+$("api").value = apiBase;
+$("api").addEventListener("change", () => {
+  apiBase = $("api").value.replace(/\/+$/, "");
+  try { localStorage.setItem("pm.api", apiBase); } catch {}
+  refreshAll();
+});
+
+class ApiError extends Error {
+  constructor(status, message) { super(message); this.status = status; }
+}
+
+async function api(method, path, { query, body, text } = {}) {
+  const url = new URL(apiBase + "/pm" + path);
+  for (const [k, v] of Object.entries(query || {})) if (v !== undefined && v !== null) url.searchParams.set(k, v);
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    throw new ApiError(0, `Cannot reach the API at ${apiBase}`);
+  }
+  if (res.status === 204) return null;
+  const ct = res.headers.get("content-type") || "";
+  const data = ct.includes("json") ? await res.json() : await res.text();
+  // Errors are Problem JSON ({error, status, detail}); unhandled ones may arrive with HTTP 200
+  if (data && typeof data === "object" && !Array.isArray(data) && "error" in data && "status" in data && data.status >= 400) {
+    throw new ApiError(data.status, data.detail || data.error);
+  }
+  if (!res.ok) throw new ApiError(res.status, typeof data === "string" ? data : res.statusText);
+  return text && typeof data !== "string" ? JSON.stringify(data) : data;
+}
+
+// ---- UI helpers -----------------------------------------------------------
+function showError(msg) {
+  const b = $("banner");
+  b.textContent = msg || "";
+  b.classList.toggle("show", !!msg);
+}
+const fmtCmd = (cmd) => Array.isArray(cmd) ? cmd.map(a => /[\s"'\\$]/.test(a) ? JSON.stringify(a) : a).join(" ") : cmd;
+const fmtTime = (t) => t ? new Date(t * 1000).toLocaleString() : "–";
+// Time of day for today's processes, the date for older ones
+function fmtShort(t) {
+  const d = new Date(t * 1000);
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+function fmtDuration(p) {
+  if (!p.started_at) return "–";
+  const s = Math.max(0, (p.finished_at || Date.now() / 1000) - p.started_at);
+  if (s < 60) return `${s.toFixed(1)}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
+  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+}
+const isActive = (p) => p && (p.state === "running" || p.state === "pending");
+function el(tag, attrs = {}, ...children) {
+  const e = document.createElement(tag);
+  Object.assign(e, attrs);
+  e.append(...children);
+  return e;
+}
+
+// ---- Daemon status --------------------------------------------------------
+async function checkDaemon() {
+  const d = $("daemon");
+  try {
+    await api("GET", "/ping");
+    d.innerHTML = '<span class="dot up"></span>daemon running';
+    return true;
+  } catch (e) {
+    d.innerHTML = '<span class="dot down"></span>daemon offline';
+    d.title = e.message;
+    return false;
+  }
+}
+
+// ---- Process list ---------------------------------------------------------
+let processes = [];
+let selected = null;
+
+async function loadList() {
+  processes = await api("GET", "/processes", { query: { include_finished: $("show-finished").checked } });
+  renderList();
+}
+
+function renderList() {
+  const tbody = $("list");
+  tbody.replaceChildren(...processes.map(p => {
+    const tr = el("tr", { className: p.pid === selected ? "sel" : "" },
+      el("td", { className: "mono", title: p.pid }, p.pid),
+      el("td", { className: `state ${p.state}` }, p.state + (p.exit_code != null && p.state !== "completed" ? ` (${p.exit_code})` : "")),
+      el("td", { className: "mono", title: fmtCmd(p.cmd) }, fmtCmd(p.cmd)),
+      el("td", { className: "hint", title: fmtTime(p.started_at) }, fmtShort(p.started_at)),
+    );
+    tr.addEventListener("click", () => select(p.pid));
+    return tr;
+  }));
+  $("list-empty").hidden = processes.length > 0;
+}
+
+// ---- Detail ---------------------------------------------------------------
+let current = null;   // ProcessInfo of the selected process
+
+function select(pid) {
+  selected = pid;
+  current = processes.find(p => p.pid === pid) || null;
+  renderList();
+  $("detail-empty").hidden = true;
+  $("detail-body").hidden = false;
+  $("d-pid").textContent = pid;
+  renderDetail();
+  resetOutput();
+  loadDetail();
+}
+
+async function loadDetail() {
+  if (!selected) return;
+  try {
+    current = await api("GET", `/processes/${encodeURIComponent(selected)}`);
+    renderDetail();
+  } catch (e) {
+    if (e.status === 404) { clearSelection(); loadList().catch(() => {}); }
+    else showError(e.message);
+  }
+}
+
+function clearSelection() {
+  selected = current = null;
+  $("detail-empty").hidden = false;
+  $("detail-body").hidden = true;
+  renderList();
+}
+
+function renderDetail() {
+  const p = current;
+  if (!p) return;
+  const rows = [
+    ["State", el("span", { className: `state ${p.state}` }, p.state)],
+    ["Command", el("span", { className: "mono" }, fmtCmd(p.cmd))],
+    ["Shell", p.shell ? "yes" : "no"],
+    ["System PID", String(p.system_pid ?? "–")],
+    ["Working dir", el("span", { className: "mono" }, p.cwd || "–")],
+    ["Env keys", el("span", { className: "mono" }, (p.env_keys || []).join(", ") || "–")],
+    ["Started", fmtTime(p.started_at)],
+    ["Finished", fmtTime(p.finished_at)],
+    ["Duration", fmtDuration(p)],
+    ["Exit code", p.exit_code == null ? "–" : String(p.exit_code)],
+  ];
+  if (p.error) rows.push(["Error", el("span", { style: "color:var(--danger)" }, p.error)]);
+  $("d-info").replaceChildren(...rows.flatMap(([k, v]) => [el("dt", {}, k), el("dd", {}, v)]));
+  const active = isActive(p);
+  $("kill").disabled = $("force-kill").disabled = !active;
+  $("cleanup").disabled = active;
+}
+
+// ---- Output (chunked via offset/limit) --------------------------------------
+// The log is read in CHUNK-byte pages. A page is "committed" once the page after it
+// exists; the last, still-growing page is re-read on every poll and replaced.
+let stream = "stdout";
+let out = { offset: 0, committed: null, pending: null, gen: 0, busy: false, again: false };
+
+function resetOutput() {
+  out.gen++;
+  out.offset = 0;
+  out.busy = out.again = false;
+  const pre = $("out");
+  out.committed = document.createTextNode("");
+  out.pending = document.createTextNode("");
+  pre.replaceChildren(out.committed, out.pending);
+  $("out-size").textContent = "";
+  pullOutput();
+}
+
+const getChunk = (offset) => api("GET", `/processes/${encodeURIComponent(selected)}/output`,
+  { query: { stream, offset, limit: CHUNK }, text: true });
+
+async function pullOutput() {
+  if (!selected) return;
+  // A pull requested mid-pull (e.g. the final one after the process exits) runs right after it
+  if (out.busy) { out.again = true; return; }
+  const gen = out.gen;
+  out.busy = true;
+  out.again = false;
+  const pre = $("out");
+  const atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
+  try {
+    let chunk = await getChunk(out.offset);
+    while (chunk) {
+      const next = await getChunk(out.offset + CHUNK);
+      if (gen !== out.gen) return;
+      if (!next) { out.pending.data = chunk; break; }
+      out.committed.appendData(chunk);
+      out.pending.data = "";
+      out.offset += CHUNK;
+      chunk = next;
+    }
+    if (gen !== out.gen) return;
+    if (!chunk) out.pending.data = "";
+    const shown = out.committed.length + out.pending.length;
+    $("out-size").textContent = shown ? `${shown.toLocaleString()} chars` : "no output";
+    if (atBottom && $("follow").checked) pre.scrollTop = pre.scrollHeight;
+  } catch (e) {
+    if (gen !== out.gen) return;
+    if (e.status === 404) { $("out-size").textContent = "no log"; }
+    else showError(e.message);
+  } finally {
+    if (gen === out.gen) {
+      out.busy = false;
+      if (out.again) pullOutput();
+    }
+  }
+}
+
+document.querySelectorAll("[data-stream]").forEach(b => b.addEventListener("click", () => {
+  stream = b.dataset.stream;
+  document.querySelectorAll("[data-stream]").forEach(x => x.classList.toggle("on", x === b));
+  resetOutput();
+}));
+$("reload-out").addEventListener("click", resetOutput);
+
+// ---- Actions ----------------------------------------------------------------
+async function action(fn) {
+  try { showError(""); await fn(); }
+  catch (e) { showError(e.message); }
+  await refreshAll();
+}
+
+$("kill").addEventListener("click", () => action(() => api("POST", `/processes/${encodeURIComponent(selected)}/kill`)));
+$("force-kill").addEventListener("click", () => action(() =>
+  api("POST", `/processes/${encodeURIComponent(selected)}/kill`, { query: { force: true } })));
+$("cleanup").addEventListener("click", () => {
+  if (!confirm(`Delete the logs of process ${selected}?`)) return;
+  const pid = selected;
+  action(async () => { await api("DELETE", `/processes/${encodeURIComponent(pid)}`); clearSelection(); });
+});
+
+$("start-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const raw = $("f-cmd").value.trim();
+  let command = raw;
+  if (raw.startsWith("[")) {
+    try { command = JSON.parse(raw); }
+    catch { showError("Command looks like a JSON array but is not valid JSON"); return; }
+  }
+  const env = {};
+  for (const line of $("f-env").value.split("\n")) {
+    const t = line.trim();
+    if (!t) continue;
+    const i = t.indexOf("=");
+    if (i < 1) { showError(`Invalid env line: ${t}`); return; }
+    env[t.slice(0, i)] = t.slice(i + 1);
+  }
+  action(async () => {
+    const p = await api("POST", "/processes", { body: {
+      command,
+      cwd: $("f-cwd").value.trim() || null,
+      pid: $("f-pid").value.trim() || null,
+      env: Object.keys(env).length ? env : null,
+    }});
+    $("f-pid").value = "";
+    await loadList();
+    select(p.pid);
+  });
+});
+
+// Garbage collect: preview with a dry run, confirm, then remove
+let gcResultTimer;
+$("gc").addEventListener("click", async () => {
+  const sel = $("gc-age");
+  const max_age = Number(sel.value);
+  const label = sel.options[sel.selectedIndex].text;
+  const gcResult = (msg) => {
+    $("gc-result").textContent = msg;
+    clearTimeout(gcResultTimer);
+    gcResultTimer = setTimeout(() => { $("gc-result").textContent = ""; }, 6000);
+  };
+  $("gc").disabled = true;
+  try {
+    showError("");
+    const preview = await api("POST", "/gc", { query: { max_age, dry_run: true } });
+    if (!preview.count) { gcResult("Nothing to clean up."); return; }
+    const ids = preview.removed.slice(0, 15).join("\n") + (preview.count > 15 ? `\n… and ${preview.count - 15} more` : "");
+    const age = max_age ? ` that finished more than ${label} ago` : "";
+    if (!confirm(`Delete the logs of ${preview.count} completed/failed/killed process(es)${age}?\n\n${ids}`)) return;
+    const res = await api("POST", "/gc", { query: { max_age } });
+    gcResult(`Removed ${res.count} process(es).`);
+    if (selected && res.removed.includes(selected)) clearSelection();
+  } catch (e) {
+    showError(/Unknown method/.test(e.message)
+      ? `${e.message} (restart the daemon to pick up pm.gc)` : e.message);
+  } finally {
+    $("gc").disabled = false;
+  }
+  refreshAll();
+});
+
+$("refresh").addEventListener("click", () => refreshAll());
+$("show-finished").addEventListener("change", () => refreshAll());
+
+// ---- Polling ----------------------------------------------------------------
+async function refreshAll() {
+  if (!(await checkDaemon())) {
+    showError("The process manager is not reachable. Start it with `geenii daemon start`.");
+    return;
+  }
+  try {
+    await loadList();
+    showError("");
+  } catch (e) { showError(e.message); return; }
+  if (selected) {
+    const wasActive = isActive(current);
+    await loadDetail();
+    // Keep pulling while running, plus once more after it finished to get the tail
+    if ($("follow").checked && (wasActive || isActive(current))) pullOutput();
+  }
+}
+
+refreshAll();
+setInterval(refreshAll, POLL_MS);
+</script>
+</body>
+</html>
