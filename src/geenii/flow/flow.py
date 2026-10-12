@@ -337,6 +337,49 @@ class Flow:
             order.append(ready)
         return order
 
+    def to_mermaid(self, direction: str = "LR") -> str:
+        """
+        The flow graph as a Mermaid flowchart. Nodes show the step id and type.
+        Raises FlowError if an edge references an unknown step; cycles are drawn as they are.
+        """
+        self.predecessors()  # validates the edges
+        node = {s.id: f"n{i}" for i, s in enumerate(self.steps)}
+
+        def label(text: str) -> str:
+            return text.replace('"', "#quot;")
+
+        lines = [f"flowchart {direction}"]
+        for s in self.steps:
+            lines.append(f'    {node[s.id]}["{label(s.id)}<br/>({label(s.type)})"]')
+        for e in self.edges:
+            lines.append(f"    {node[e.from_step]} --> {node[e.to_step]}")
+        return "\n".join(lines) + "\n"
+
+    def to_dot(self, direction: str = "LR") -> str:
+        """
+        The flow graph in Graphviz DOT format. Nodes show the step id and type.
+        Raises FlowError if an edge references an unknown step; cycles are drawn as they are.
+        """
+        self.predecessors()  # validates the edges
+
+        def esc(text: str) -> str:
+            return text.replace("\\", "\\\\").replace('"', '\\"')
+
+        def quote(text: str) -> str:
+            return f'"{esc(text)}"'
+
+        lines = [
+            f"digraph {quote(self.name)} {{",
+            f"    rankdir={direction};",
+            '    node [shape=box, style=rounded, fontname="Helvetica"];',
+        ]
+        for s in self.steps:
+            lines.append(f'    {quote(s.id)} [label="{esc(s.id)}\\n{esc(s.type)}"];')
+        for e in self.edges:
+            lines.append(f"    {quote(e.from_step)} -> {quote(e.to_step)};")
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
     @classmethod
     def from_dict(cls, data: dict) -> "Flow":
         return cls(name=data["name"], steps=data.get("steps", []), edges=data.get("edges"),

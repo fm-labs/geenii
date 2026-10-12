@@ -1,4 +1,5 @@
 import json
+import shutil
 
 import pytest
 from click.testing import CliRunner
@@ -100,3 +101,47 @@ def test_steps_with_custom_module(runner, tmp_path, monkeypatch):
 
     result = runner.invoke(flow, ["steps", "-m", "does_not_exist_xyz"])
     assert result.exit_code == 1
+
+
+def _graph_file(tmp_path):
+    return _write(tmp_path, {"name": "f", "steps": [
+        {"id": "a", "type": "echo"},
+        {"id": "b", "type": "echo", "after": "a"},
+    ]})
+
+
+def test_graph_mermaid_to_stdout(runner, tmp_path):
+    result = runner.invoke(flow, ["graph", _graph_file(tmp_path)])
+    assert result.exit_code == 0
+    assert result.stdout.startswith("flowchart LR\n")
+    assert "n0 --> n1" in result.stdout
+
+
+def test_graph_format_from_output_suffix(runner, tmp_path):
+    out = tmp_path / "g.dot"
+    result = runner.invoke(flow, ["graph", _graph_file(tmp_path), "-o", str(out), "-d", "TB"])
+    assert result.exit_code == 0
+    assert out.read_text().startswith('digraph "f" {\n    rankdir=TB;')
+
+    out = tmp_path / "g.mmd"
+    runner.invoke(flow, ["graph", _graph_file(tmp_path), "-o", str(out)])
+    assert out.read_text().startswith("flowchart")
+
+
+def test_graph_image_needs_output_and_dot(runner, tmp_path, monkeypatch):
+    result = runner.invoke(flow, ["graph", _graph_file(tmp_path), "-f", "svg"])
+    assert result.exit_code == 2
+    assert "--output is required" in result.stderr
+
+    monkeypatch.setattr("geenii.cli.flow_cli.shutil.which", lambda name: None)
+    result = runner.invoke(flow, ["graph", _graph_file(tmp_path), "-o", str(tmp_path / "g.svg")])
+    assert result.exit_code == 1
+    assert "Graphviz 'dot' not found" in result.stderr
+
+
+@pytest.mark.skipif(shutil.which("dot") is None, reason="Graphviz not installed")
+def test_graph_renders_svg(runner, tmp_path):
+    out = tmp_path / "g.svg"
+    result = runner.invoke(flow, ["graph", _graph_file(tmp_path), "-o", str(out)])
+    assert result.exit_code == 0, result.stderr
+    assert "<svg" in out.read_text()

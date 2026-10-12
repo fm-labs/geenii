@@ -327,3 +327,43 @@ def test_max_workers_from_file(tmp_path):
     path = tmp_path / "flow.json"
     path.write_text(json.dumps({"name": "f", "max_workers": 4, "steps": [{"id": "a", "type": "echo"}]}))
     assert Flow.from_file(path).max_workers == 4
+
+
+# --- graph output ---
+
+def _graph_flow():
+    return Flow("my flow", [
+        {"id": "a", "type": "echo"},
+        {"id": "b", "type": "echo", "after": "a"},
+        {"id": 'say "hi"', "type": "echo", "after": "a"},
+    ])
+
+
+def test_to_mermaid():
+    text = _graph_flow().to_mermaid()
+    assert text.splitlines() == [
+        "flowchart LR",
+        '    n0["a<br/>(echo)"]',
+        '    n1["b<br/>(echo)"]',
+        '    n2["say #quot;hi#quot;<br/>(echo)"]',
+        "    n0 --> n1",
+        "    n0 --> n2",
+    ]
+    assert _graph_flow().to_mermaid("TB").startswith("flowchart TB\n")
+
+
+def test_to_dot():
+    text = _graph_flow().to_dot()
+    assert text.startswith('digraph "my flow" {\n    rankdir=LR;\n')
+    assert '    "a" [label="a\\necho"];' in text
+    assert '    "say \\"hi\\"" [label="say \\"hi\\"\\necho"];' in text
+    assert '    "a" -> "say \\"hi\\"";' in text
+    assert text.endswith("}\n")
+
+
+def test_graph_unknown_step_raises():
+    flow = Flow("t", [{"id": "a", "type": "echo", "after": "x"}])
+    with pytest.raises(FlowError):
+        flow.to_mermaid()
+    with pytest.raises(FlowError):
+        flow.to_dot()

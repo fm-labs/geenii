@@ -1,6 +1,9 @@
 import importlib
 import json
+import shutil
+import subprocess
 import sys
+from pathlib import Path
 
 import click
 
@@ -141,6 +144,52 @@ def validate(path, step_modules):
     for step in f.execution_order():
         after = f"  (after {', '.join(preds[step.id])})" if preds[step.id] else ""
         click.echo(f"  {step.id} [{step.type}]{after}")
+
+
+GRAPH_IMAGE_FORMATS = ("svg", "png", "pdf")
+GRAPH_SUFFIX_FORMATS = {".mmd": "mermaid", ".mermaid": "mermaid", ".md": "mermaid", ".dot": "dot", ".gv": "dot",
+                        **{f".{f}": f for f in GRAPH_IMAGE_FORMATS}}
+
+
+@flow.command()
+@click.argument("path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--format", "-f", "fmt", type=click.Choice(["mermaid", "dot", *GRAPH_IMAGE_FORMATS]), default=None,
+              help="Output format. Default: from the --output file extension, else mermaid.")
+@click.option("--output", "-o", type=click.Path(dir_okay=False), default=None,
+              help="Write to this file instead of stdout. Required for image formats.")
+@click.option("--direction", "-d", type=click.Choice(["LR", "TB", "RL", "BT"]), default="LR",
+              help="Layout direction (default LR: left to right).")
+@step_module_option
+def graph(path, fmt, output, direction, step_modules):
+    """Print the graph of the flow in PATH as Mermaid or Graphviz DOT, or render it to an image.
+
+    Image formats (svg, png, pdf) are rendered with Graphviz, so the `dot` command must be installed.
+    """
+    f = _load_flow(path, step_modules)
+    if fmt is None:
+        fmt = GRAPH_SUFFIX_FORMATS.get(Path(output).suffix.lower(), "mermaid") if output else "mermaid"
+
+    try:
+        text = f.to_mermaid(direction) if fmt == "mermaid" else f.to_dot(direction)
+    except FlowError as e:
+        raise click.ClickException(str(e))
+
+    if fmt in GRAPH_IMAGE_FORMATS:
+        if not output:
+            raise click.UsageError(f"--output is required for format '{fmt}'")
+        dot = shutil.which("dot")
+        if not dot:
+            raise click.ClickException("Graphviz 'dot' not found; install Graphviz (e.g. `brew install graphviz`) "
+                                       "or use --format dot / mermaid")
+        proc = subprocess.run([dot, f"-T{fmt}", "-o", output], input=text, capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise click.ClickException(f"dot failed: {proc.stderr.strip()}")
+        click.echo(f"Wrote {output}", err=True)
+    elif output:
+        Path(output).write_text(text)
+        click.echo(f"Wrote {output}", err=True)
+    else:
+        click.echo(text, nl=False)
 
 
 @flow.command()

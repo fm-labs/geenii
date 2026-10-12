@@ -87,6 +87,64 @@ Execution order:
   step3 [execute_script]  (after step2)
 ```
 
+### graph
+
+```
+geenii flow graph <PATH> [OPTIONS]
+```
+
+Print the flow's graph (steps as nodes, labelled with id and type; edges as
+arrows) as **Mermaid** or **Graphviz DOT**, or render it to an image.
+
+#### Options
+
+| Option | Short | Description |
+|---|---|---|
+| `--format` | `-f` | `mermaid`, `dot`, `svg`, `png` or `pdf`. Default: taken from the `--output` file extension, otherwise `mermaid` |
+| `--output FILE` | `-o` | Write to FILE instead of stdout. Required for image formats |
+| `--direction` | `-d` | Layout direction: `LR` (left to right, default), `TB`, `RL`, `BT` |
+| `--step-module MODULE` | `-m` | As for `run` |
+
+File extensions used when `--format` isn't given: `.mmd`, `.mermaid` and `.md`
+become `mermaid`; `.dot` and `.gv` become `dot`; `.svg`, `.png` and `.pdf` are
+rendered as images. Any other extension gets `mermaid`.
+
+Image formats are rendered with Graphviz, so the `dot` command must be
+installed (`brew install graphviz`, `apt install graphviz`). Without it the
+command exits with code 1; the `mermaid` and `dot` text formats work anyway.
+An edge to an unknown step exits with code 1. Cycles are drawn as they are.
+
+#### Examples
+
+```bash
+geenii flow graph my_flow.toml
+```
+
+```bash
+geenii flow graph my_flow.toml -o my_flow.svg
+```
+
+```bash
+geenii flow graph my_flow.toml -f dot | dot -Tpng -o my_flow.png
+```
+
+Mermaid output renders directly in GitHub and GitLab Markdown inside a
+` ```mermaid ` block, and in the editor at <https://mermaid.live>. To turn it
+into an image without Graphviz, use the Mermaid CLI:
+`npx @mermaid-js/mermaid-cli -i flow.mmd -o flow.svg`.
+
+```
+$ geenii flow graph examples/flow_example.toml
+flowchart LR
+    n0["step0<br/>(echo)"]
+    n1["step1<br/>(read_http)"]
+    n2["step2<br/>(execute_command)"]
+    n3["step3<br/>(execute_script)"]
+    n0 --> n1
+    n1 --> n2
+    n2 --> n3
+```
+
 ### steps
 
 ```

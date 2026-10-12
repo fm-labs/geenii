@@ -21,7 +21,8 @@ steps run in parallel in a thread pool (see
 daemon or scheduler yet.
 
 From the command line, use [`geenii flow`](../cli-reference/flow.md):
-`geenii flow run FILE`, `geenii flow validate FILE` and `geenii flow steps`.
+`geenii flow run FILE`, `geenii flow validate FILE`, `geenii flow graph FILE`
+and `geenii flow steps`.
 
 ---
 
@@ -116,6 +117,27 @@ Example: a fan-out and a join (from `src/xflow.py`):
 greet -> upper -> count -+-> stats -+-> summary
                          +-> http  -+
 ```
+
+### Drawing the graph
+
+`flow.to_mermaid()` and `flow.to_dot()` return the graph as Mermaid flowchart
+or Graphviz DOT text. Nodes are labelled with the step id and type, and
+`flow.edges` become the arrows, so a flow without edges shows its implicit
+chain. Both take a layout direction (`"LR"` by default, or `"TB"`, `"RL"`,
+`"BT"`). They raise `FlowError` for an edge to an unknown step; cycles are
+drawn as they are.
+
+```python
+print(flow.to_mermaid())
+# flowchart LR
+#     n0["greet<br/>(echo)"]
+#     n1["upper<br/>(execute_command)"]
+#     n0 --> n1
+```
+
+Mermaid node ids are generated (`n0`, `n1`, ...) in step order, so any step
+id is safe to use. To render an image from the command line, use
+[`geenii flow graph`](../cli-reference/flow.md#graph).
 
 ---
 

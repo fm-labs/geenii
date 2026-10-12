@@ -61,6 +61,7 @@ geenii
 ├── flow
 │   ├── run PATH                  # run a flow file (-i input, -v k=v, -w workers)
 │   ├── validate PATH             # check a flow and print its execution order
+│   ├── graph PATH [-o FILE]      # flow graph as Mermaid / DOT, or an svg/png/pdf image
 │   └── steps                     # list registered step types
 ├── pm
 │   ├── ping                      # check if the daemon is running
