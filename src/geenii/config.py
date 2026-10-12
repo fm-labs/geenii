@@ -19,7 +19,14 @@ dotenv.load_dotenv(GEENII_DIR + "/.env", override=True, verbose=True)
 CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", get_user_home_dir() + "/.geenii/.cache")
 CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
 
+# Default minimum age (seconds since a process finished) before the process manager's gc removes it
+PM_GC_MAX_AGE = float(os.environ.get("GEENII_PM_GC_MAX_AGE", 7 * 24 * 3600))
+
 #GEENII_BIN = os.getenv("GEENII_BIN", "geenii")
+
+# Static web GUI served by the API server (defaults to the repo's www/ folder)
+WWW_DIR = os.environ.get("GEENII_WWW_DIR",
+                         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, "www"))
 
 GEENII_MEMORY_ENGINE = "file"
 

@@ -9,7 +9,9 @@ from rich.logging import RichHandler
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from geenii.config import APP_VERSION, GEENII_DIR
+from fastapi.staticfiles import StaticFiles
+
+from geenii.config import APP_VERSION, GEENII_DIR, WWW_DIR
 from geenii.datamodels import Problem
 from geenii.server.router import app_router
 
@@ -192,6 +194,12 @@ async def generic_exception_handler(_: Request, exc: Exception):
                         content=problem.model_dump(),
                         media_type="application/json")
 app.include_router(app_router, prefix="")
+
+# Web GUI; mounted last so the API routes take precedence
+if os.path.isdir(WWW_DIR):
+    app.mount("/", StaticFiles(directory=WWW_DIR, html=True), name="www")
+else:
+    logging.warning(f"Web GUI directory not found, not serving it: {WWW_DIR}")
 
 # # WebSocket endpoint
 # @app.websocket("/ws")

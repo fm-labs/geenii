@@ -141,3 +141,36 @@ def cleanup(ctx, process_id):
     client = _client(ctx)
     client.cleanup(process_id)
     click.echo(f"Cleaned up {process_id}.")
+
+
+_DURATION_UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
+
+
+def _parse_duration(value: str) -> float:
+    """Parse '90', '90s', '15m', '12h', '7d' or '2w' into seconds."""
+    text = value.strip().lower()
+    unit = _DURATION_UNITS.get(text[-1:]) if text else None
+    try:
+        return float(text[:-1]) * unit if unit else float(text)
+    except ValueError:
+        raise click.BadParameter(f"{value!r} is not a duration like 90s, 15m, 12h or 7d")
+
+
+@pm.command()
+@click.option("--max-age", default=None,
+              help="Remove processes finished longer ago than this (e.g. 12h, 7d). "
+                   "Default: GEENII_PM_GC_MAX_AGE, or 7 days.")
+@click.option("--state", "states", multiple=True,
+              type=click.Choice(["completed", "failed", "killed", "orphaned"]),
+              help="Only collect processes in this state (repeatable). Default: completed, failed, killed.")
+@click.option("--dry-run", "-n", is_flag=True, help="Only show what would be removed.")
+@click.pass_context
+def gc(ctx, max_age, states, dry_run):
+    """Remove on-disk logs of old finished processes."""
+    client = _client(ctx)
+    removed = client.gc(_parse_duration(max_age) if max_age else None,
+                        states=list(states) or None, dry_run=dry_run)
+    for pid in removed:
+        click.echo(f"  {pid}")
+    verb = "Would remove" if dry_run else "Removed"
+    click.echo(f"{verb} {len(removed)} process(es).")

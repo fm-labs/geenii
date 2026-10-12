@@ -439,3 +439,83 @@ def test_service_and_client_roundtrip(short_dir):
     with open(os.path.join(short_dir, "procs", long_proc["pid"], "meta.json")) as f:
         assert json.load(f)["state"] == "killed"
     assert not os.path.exists(socket_path)
+
+
+def _age(info, seconds: float, **fields) -> None:
+    """Pretend a finished process finished `seconds` ago (optionally overriding other meta fields)."""
+    meta_path = os.path.join(os.path.dirname(info.stdout_path), "meta.json")
+    with open(meta_path) as f:
+        meta = json.load(f)
+    meta.update(fields, finished_at=time.time() - seconds)
+    with open(meta_path, "w") as f:
+        json.dump(meta, f)
+
+
+def test_gc_removes_old_finished_processes(procs_dir):
+    async def main():
+        pm = ProcessManager(procs_dir)
+        ok = await pm.start(["true"], pid="old-ok")
+        bad = await pm.start(["false"], pid="old-bad")
+        killed = await pm.start(["sleep", "30"], pid="old-killed")
+        recent = await pm.start(["true"], pid="recent")
+        await pm.kill(killed.pid)
+        for info in (ok, bad, recent):
+            await _wait_done(pm, info.pid)
+        _age(ok, 3000)
+        _age(bad, 2000)
+        _age(killed, 1000)
+        running = await pm.start(["sleep", "30"], pid="running")
+
+        # Oldest first; a dry run removes nothing
+        assert await pm.gc(600, dry_run=True) == ["old-ok", "old-bad", "old-killed"]
+        assert os.path.isdir(os.path.join(procs_dir, "old-ok"))
+
+        assert await pm.gc(1500) == ["old-ok", "old-bad"]
+        assert await pm.gc(600) == ["old-killed"]
+        remaining = {p.pid for p in await pm.list(include_finished=True)}
+        assert remaining == {"recent", "running"}
+        assert await pm.gc(600) == []
+        await pm.kill(running.pid)
+
+    asyncio.run(main())
+
+
+def test_gc_states_and_default_age(procs_dir, monkeypatch):
+    async def main():
+        pm = ProcessManager(procs_dir)
+        ok = await pm.start(["true"], pid="ok")
+        bad = await pm.start(["false"], pid="bad")
+        for info in (ok, bad):
+            await _wait_done(pm, info.pid)
+            _age(info, 100)
+
+        monkeypatch.setattr(pm_mod, "PM_GC_MAX_AGE", 1000)
+        assert await pm.gc() == []
+        monkeypatch.setattr(pm_mod, "PM_GC_MAX_AGE", 10)
+        assert await pm.gc(states=["failed"]) == ["bad"]
+        assert await pm.gc() == ["ok"]
+
+    asyncio.run(main())
+
+
+def test_gc_leaves_orphans_unless_asked(procs_dir):
+    async def main():
+        pm = ProcessManager(procs_dir)
+        info = await pm.start(["true"], pid="orphan")
+        await _wait_done(pm, info.pid)
+        _age(info, 3600, state="orphaned")
+
+        assert await pm.gc(0) == []
+        assert await pm.gc(0, states=["orphaned"]) == ["orphan"]
+
+    asyncio.run(main())
+
+
+def test_gc_rejects_bad_arguments(procs_dir):
+    async def main():
+        pm = ProcessManager(procs_dir)
+        for kwargs in ({"max_age": -1}, {"states": ["running"]}, {"states": ["bogus"]}):
+            with pytest.raises(ValueError):
+                await pm.gc(**kwargs)
+
+    asyncio.run(main())

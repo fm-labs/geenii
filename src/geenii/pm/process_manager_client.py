@@ -41,3 +41,8 @@ class ProcessManagerClient(DaemonClient):
 
     def cleanup(self, process_id: str) -> str:
         return self.call("pm.cleanup", {"process_id": process_id})
+
+    def gc(self, max_age: float | None = None, *, states: list[str] | None = None,
+           dry_run: bool = False) -> list[str]:
+        """Remove artifacts of processes finished more than max_age seconds ago; returns their IDs."""
+        return self.call("pm.gc", {"max_age": max_age, "states": states, "dry_run": dry_run})

@@ -1,0 +1,53 @@
+# Example flow running processes through the geenii daemon's process manager.
+# Needs a running daemon (`geenii daemon start`), then run with:
+#   uv run geenii flow run examples/pm_flow_example.yaml
+#
+# Starts a web server in the background, runs a "build" in the foreground while
+# streaming its output, checks the server, then stops it again.
+name: pm_example
+
+vars:
+  port: "8765"
+
+steps:
+  # Background process: returns right after starting, the server keeps running
+  - id: server
+    processor: execute_pm_command
+    config:
+      command: [python3, -m, http.server, "${vars.port}", --bind, 127.0.0.1]
+      wait: false
+
+  # Foreground process: output lines are streamed as stdout/stderr events
+  - id: build
+    processor: execute_pm_command
+    depends_on: [server]
+    config:
+      command: |
+        for i in 1 2 3 4 5; do echo "building part $i/5"; sleep 0.4; done
+        echo "build done" >&2
+      timeout: 30
+      check: true
+
+  - id: ping
+    processor: read_http
+    depends_on: [build]
+    on_error: continue
+    config:
+      url: http://127.0.0.1:${vars.port}/
+      timeout: 5
+
+  # Runs even if the ping failed, so the server is not left behind
+  - id: stop
+    processor: execute_command
+    depends_on: [ping]
+    config:
+      command: [geenii, pm, kill, "${server.process_id}"]
+      check: true
+
+  - id: report
+    processor: echo
+    depends_on: [stop]
+    config:
+      message: >-
+        Server ${server.process_id} (system pid ${server.system_pid}) was stopped;
+        build ${build.process_id} ${build.state} with rc ${build.rc}

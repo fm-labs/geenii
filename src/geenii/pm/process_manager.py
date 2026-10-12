@@ -43,7 +43,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from geenii import proc as proc_util
-from geenii.config import CACHE_DIR
+from geenii.config import CACHE_DIR, PM_GC_MAX_AGE
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +75,8 @@ class ProcessState(str, Enum):
 
 
 _ACTIVE_STATES = (ProcessState.PENDING, ProcessState.RUNNING)
+# States gc() removes by default. Orphaned processes are left alone: they may still be running.
+_GC_STATES = frozenset((ProcessState.COMPLETED, ProcessState.FAILED, ProcessState.KILLED))
 
 
 def validate_pid(pid: str) -> str:
@@ -398,6 +400,34 @@ class ProcessManager:
             await asyncio.to_thread(shutil.rmtree, proc_dir)
             logger.info(f"Cleaned up process directory: {proc_dir}")
 
+    async def gc(
+        self,
+        max_age: Optional[float] = None,
+        *,
+        states: Optional[List[str]] = None,
+        dry_run: bool = False,
+    ) -> List[str]:
+        """
+        Remove the on-disk artifacts of processes that finished long enough ago.
+
+        :param max_age: Minimum seconds since a process finished (default: PM_GC_MAX_AGE).
+        :param states: States to collect (default: completed, failed, killed).
+                       Pending/running processes are never collected.
+        :param dry_run: Only report what would be removed.
+        :return: IDs of the removed (or, with dry_run, removable) processes, oldest first.
+        """
+        max_age = PM_GC_MAX_AGE if max_age is None else max_age
+        if max_age < 0:
+            raise ValueError("max_age must be >= 0")
+        gc_states = frozenset(ProcessState(s) for s in states) if states else _GC_STATES
+        if gc_states & set(_ACTIVE_STATES):
+            raise ValueError("Pending or running processes cannot be garbage collected")
+        removed = await asyncio.to_thread(
+            self._gc, time.time() - max_age, gc_states, set(self._procs), dry_run)
+        if removed and not dry_run:
+            logger.info(f"Garbage collected {len(removed)} process(es) finished more than {max_age:g}s ago")
+        return removed
+
     async def shutdown(self) -> None:
         """Terminate all running processes (SIGTERM, then SIGKILL) and record their final state.
 
@@ -471,6 +501,24 @@ class ProcessManager:
                     end += 1
                 data += extra[:end]
         return data[start:].decode("utf-8", errors="replace")
+
+    def _gc(self, cutoff: float, states: frozenset, known_pids: set[str], dry_run: bool) -> List[str]:
+        candidates = []
+        # A directory without meta.json may belong to a process being started: skip it
+        for info in self._scan_finished(known_pids):
+            finished = info.finished_at or info.started_at
+            if info.state in states and finished < cutoff:
+                candidates.append((finished, info.pid))
+        removed = []
+        for _, pid in sorted(candidates):
+            if not dry_run:
+                try:
+                    shutil.rmtree(self._proc_path(pid))
+                except OSError as exc:
+                    logger.error(f"Could not remove process directory of {pid}: {exc}")
+                    continue
+            removed.append(pid)
+        return removed
 
     def _scan_finished(self, known_pids: set[str]) -> List[ProcessInfo]:
         if not os.path.isdir(self._processes_dir):

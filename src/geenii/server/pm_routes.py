@@ -45,9 +45,12 @@ def _call(fn, *args, **kwargs):
     except RuntimeError as exc:
         message = str(exc)
         exc_type, _, detail = message.partition(": ")
+        if exc_type not in _ERROR_STATUS:
+            # Other daemon errors (e.g. "Unknown method: pm.gc") keep their full message
+            raise HTTPException(status_code=500, detail=message)
         if exc_type == "KeyError":
             detail = detail.strip("'\"")  # str(KeyError) quotes its message
-        raise HTTPException(status_code=_ERROR_STATUS.get(exc_type, 500), detail=detail or message)
+        raise HTTPException(status_code=_ERROR_STATUS[exc_type], detail=detail or message)
     except OSError as exc:
         raise HTTPException(status_code=503,
                             detail=f"Process manager is not reachable (is `geenii daemon start` running?): {exc}")
@@ -73,6 +76,18 @@ def start_process(request: StartProcessRequest,
                   client: ProcessManagerClient = Depends(dep_pm_client)) -> dict:
     """Start a background process."""
     return _call(client.start, request.command, env=request.env, cwd=request.cwd, pid=request.pid)
+
+
+@router.post("/gc")
+def gc_processes(max_age: Optional[float] = Query(None, ge=0, description="Minimum seconds since a process finished "
+                                                                        "(default: GEENII_PM_GC_MAX_AGE, or 7 days)"),
+                 state: Optional[list[Literal["completed", "failed", "killed", "orphaned"]]] = Query(
+                     None, description="States to collect (default: completed, failed, killed)"),
+                 dry_run: bool = Query(False, description="Only report what would be removed"),
+                 client: ProcessManagerClient = Depends(dep_pm_client)) -> dict:
+    """Remove on-disk logs of old finished processes."""
+    removed = _call(client.gc, max_age, states=state, dry_run=dry_run)
+    return {"removed": removed, "count": len(removed), "dry_run": dry_run}
 
 
 @router.get("/processes/{process_id}")

@@ -3,7 +3,7 @@ ProcessHost: owns the Process Manager, Scheduler and Supervisor on one event
 loop and exposes their operations as namespaced RPC methods.
 
 Method names:
-    pm.start, pm.status, pm.output, pm.wait, pm.kill, pm.list, pm.cleanup
+    pm.start, pm.status, pm.output, pm.wait, pm.kill, pm.list, pm.cleanup, pm.gc
     scheduler.status, scheduler.run, scheduler.reload
     supervisor.status, supervisor.ensure, supervisor.stop, supervisor.restart, supervisor.logs,
     supervisor.reload
@@ -57,6 +57,7 @@ class ProcessHost:
             "pm.kill": self._pm_kill,
             "pm.list": self._pm_list,
             "pm.cleanup": self._pm_cleanup,
+            "pm.gc": self._pm_gc,
             "scheduler.status": self._scheduler_status,
             "scheduler.run": self._scheduler_run,
             "scheduler.reload": self._scheduler_reload,
@@ -148,6 +149,13 @@ class ProcessHost:
     async def _pm_cleanup(self, params: dict) -> str:
         await self.pm.cleanup(params["process_id"])
         return "ok"
+
+    async def _pm_gc(self, params: dict) -> list[str]:
+        return await self.pm.gc(
+            params.get("max_age"),
+            states=params.get("states"),
+            dry_run=params.get("dry_run", False),
+        )
 
     # -- scheduler.* ------------------------------------------------------------
 
