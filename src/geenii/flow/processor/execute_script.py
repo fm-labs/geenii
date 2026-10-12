@@ -41,8 +41,9 @@ class ExecuteScriptProcessor(FlowProcessor):
     def process(self, input_data: Any, ctx: FlowContext) -> Generator[Any, None, ExecuteScriptOutput]:
         c: ExecuteScriptConfig = self.config
         yield StepEvent("log", "Running script")
-        out = run_process(
-            [sys.executable, "-c", textwrap.dedent(c.script), *c.args],
+        out = yield from run_process(
+            # -u: unbuffered, so output is streamed while the script runs
+            [sys.executable, "-u", "-c", textwrap.dedent(c.script), *c.args],
             cwd=c.cwd, env=c.env, stdin=json.dumps(input_data, default=str),
             timeout=c.timeout, check=c.check,
         )
