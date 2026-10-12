@@ -1,11 +1,11 @@
 """
-Flow: run steps as a DAG, passing each step's output to the steps after it.
+Flow: run steps as a DAG, passing each step's output to the steps it depends on.
 
 A flow is a set of FlowStepSpecs (the nodes) and FlowEdges (the order). Each
 spec names a processor (a registered name like "echo", or
 "package.module:ClassName") that handles the step, a unique id and a config. Edges are added with
-Flow.add_edge() or inferred from a step's ``after`` list. A flow without any
-edges runs its steps in the order they were added.
+Flow.add_edge() or inferred from a step's ``depends_on`` list. Steps are never
+wired automatically: a step without edges is an independent root.
 
 A step starts once all its predecessors have finished. With max_workers=1 (the
 default) steps run one at a time in the calling thread, in topological order
@@ -27,16 +27,20 @@ import importlib
 import inspect
 import json
 import logging
+import os
 import re
 import threading
 import time
 import tomllib
+import uuid
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Generator, Literal
 
 import pydantic
+import tomli_w
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +60,12 @@ class FlowStepSpec(pydantic.BaseModel):
     processor: str
     config: dict[str, Any] = {}
     on_error: Literal["stop", "continue"] = "stop"
-    # ids of steps this step runs after; each one adds an edge (after_id -> id)
-    after: list[str] = []
+    # ids of steps this step runs after; each one adds an edge (dependency_id -> id)
+    depends_on: list[str] = []
 
-    @pydantic.field_validator("after", mode="before")
+    @pydantic.field_validator("depends_on", mode="before")
     @classmethod
-    def _after_as_list(cls, v: Any) -> Any:
+    def _depends_on_as_list(cls, v: Any) -> Any:
         return [v] if isinstance(v, str) else v
 
 
@@ -87,6 +91,7 @@ class StepResult(pydantic.BaseModel):
 
 class FlowResult(pydantic.BaseModel):
     name: str
+    context_id: str | None = None  # FlowContext.id of the run
     status: Literal["success", "failed", "aborted"]
     steps: list[StepResult]
 
@@ -102,6 +107,46 @@ class FlowResult(pydantic.BaseModel):
         return next((r for r in self.steps if r.step_id == step_id), None)
 
 
+class FlowSnapshot(pydantic.BaseModel):
+    """
+    State of a flow run: the flow definition, the input and the results so far.
+    Written by Flow.run(snapshot=...) while the flow runs and when it ends.
+    """
+
+    context_id: str  # FlowContext.id of the run
+    flow: dict  # Flow.to_dict()
+    input: Any = None
+    status: Literal["running", "success", "failed", "aborted"]
+    started_at: datetime
+    updated_at: datetime
+    steps: list[StepResult] = []  # finished (and, at the end, skipped) steps, in execution order
+    running: list[str] = []
+    pending: list[str] = []
+
+    def get(self, step_id: str) -> StepResult | None:
+        return next((r for r in self.steps if r.step_id == step_id), None)
+
+    def to_flow(self) -> "Flow":
+        return Flow.from_dict(self.flow)
+
+    def to_json(self, indent: int | None = 2) -> str:
+        # the input is stored as is and may not be JSON serializable: fall back to str() for it
+        data = self.model_dump(mode="json", exclude={"input"})
+        data = {"context_id": data.pop("context_id"), "flow": data.pop("flow"), "input": self.input, **data}
+        return json.dumps(data, indent=indent, default=str)
+
+    def save(self, path: str | Path):
+        """Write the snapshot as JSON. The file is replaced atomically, so readers never see a partial file."""
+        path = Path(path)
+        tmp = path.with_name(f".{path.name}.tmp")
+        tmp.write_text(self.to_json() + "\n")
+        os.replace(tmp, path)
+
+    @classmethod
+    def load(cls, path: str | Path) -> "FlowSnapshot":
+        return cls.model_validate_json(Path(path).read_text())
+
+
 class FlowContext:
     """
     Run state shared by all steps of one flow run.
@@ -112,7 +157,9 @@ class FlowContext:
     """
 
     def __init__(self, flow_name: str, input_data: Any = None, variables: dict | None = None,
-                 on_event: Callable[[StepEvent], None] | None = None):
+                 on_event: Callable[[StepEvent], None] | None = None, context_id: str | None = None):
+        # unique id of the run; generated unless given
+        self.id = context_id or uuid.uuid4().hex
         self.flow_name = flow_name
         self.input = input_data
         self.vars = dict(variables or {})
@@ -180,6 +227,17 @@ class FlowContext:
 
 _REF = re.compile(r"\$?\$\{([^}]+)\}")
 _REF_FULL = re.compile(r"\$\{([^}]+)\}")
+
+
+def _config_references(value: Any) -> set[str]:
+    """The ${...} references (without the braces) in strings inside value; $${...} escapes are skipped"""
+    if isinstance(value, str):
+        return {m.group(1) for m in _REF.finditer(value) if not m.group(0).startswith("$$")}
+    if isinstance(value, dict):
+        return set().union(*(_config_references(v) for v in value.values()))
+    if isinstance(value, (list, tuple)):
+        return set().union(*(_config_references(v) for v in value))
+    return set()
 
 
 def _get_item(value: Any, key: str, ref: str) -> Any:
@@ -298,17 +356,15 @@ class Flow:
     @property
     def edges(self) -> list[FlowEdge]:
         """
-        All edges: explicit ones plus those inferred from each step's `after`.
-        Without any edges, the steps are chained in the order they were added.
+        All edges: explicit ones plus those inferred from each step's `depends_on`.
+        A step without edges is an independent root.
         """
         edges = list(self._edges)
         for step in self.steps:
-            for after in step.after:
-                edge = FlowEdge(from_step=after, to_step=step.id)
+            for dep in step.depends_on:
+                edge = FlowEdge(from_step=dep, to_step=step.id)
                 if edge not in edges:
                     edges.append(edge)
-        if not edges:
-            edges = [FlowEdge(from_step=a.id, to_step=b.id) for a, b in zip(self.steps, self.steps[1:])]
         return edges
 
     def predecessors(self) -> dict[str, list[str]]:
@@ -321,6 +377,43 @@ class Flow:
                     raise FlowError(f"Edge {e.from_step} -> {e.to_step}: unknown step '{step_id}'")
             preds[e.to_step].append(e.from_step)
         return preds
+
+    def ancestors(self) -> dict[str, set[str]]:
+        """Map of step id -> ids of all steps it runs after, directly or indirectly"""
+        preds = self.predecessors()
+        result: dict[str, set[str]] = {}
+        for step_id in preds:
+            seen: set[str] = set()
+            todo = list(preds[step_id])
+            while todo:
+                p = todo.pop()
+                if p not in seen:
+                    seen.add(p)
+                    todo.extend(preds[p])
+            result[step_id] = seen
+        return result
+
+    def check_references(self) -> list[str]:
+        """
+        Warnings for ${...} references in step configs that may not resolve: a reference
+        to a step the referencing step doesn't depend on (directly or indirectly), to
+        the step itself, or to an unknown name. Raises FlowError if an edge references an unknown step.
+        """
+        ancestors = self.ancestors()
+        warnings = []
+        for step in self.steps:
+            for ref in sorted(_config_references(step.config)):
+                head = ref.strip().split(".")[0]
+                if head in RESERVED_IDS or head in ancestors[step.id]:
+                    continue
+                if head == step.id:
+                    problem = "references itself"
+                elif head in ancestors:
+                    problem = f"doesn't depend on '{head}'; add it to depends_on"
+                else:
+                    problem = f"unknown step '{head}'"
+                warnings.append(f"Step '{step.id}': reference '${{{ref}}}': {problem}")
+        return warnings
 
     def execution_order(self) -> list[FlowStepSpec]:
         """Topological order of the steps; ties keep insertion order. Raises FlowError on cycles."""
@@ -397,10 +490,43 @@ class Flow:
             raise FlowError(f"Unsupported flow file type '{path.suffix}'")
         return cls.from_dict(data)
 
+    def to_dict(self) -> dict:
+        """
+        The flow definition in the structure from_dict() reads. Step fields with
+        default values are left out; edges are the explicit ones (not those from `depends_on`).
+        """
+        data: dict[str, Any] = {"name": self.name, "max_workers": self.max_workers}
+        if self.variables:
+            data["vars"] = self.variables
+        if self._edges:
+            data["edges"] = [e.model_dump() for e in self._edges]
+        data["steps"] = [s.model_dump(exclude_defaults=True) for s in self.steps]
+        return data
+
+    def to_json(self, indent: int | None = 2) -> str:
+        return json.dumps(self.to_dict(), indent=indent)
+
+    def to_file(self, path: str | Path):
+        """Write the flow definition to a .json or .toml file, readable with from_file()"""
+        path = Path(path)
+        if path.suffix == ".toml":
+            text = tomli_w.dumps(self.to_dict())
+        elif path.suffix == ".json":
+            text = self.to_json() + "\n"
+        else:
+            raise FlowError(f"Unsupported flow file type '{path.suffix}'")
+        path.write_text(text)
+
     def run(self, input_data: Any = None, on_event: Callable[[StepEvent], None] | None = None,
-            max_workers: int | None = None) -> FlowResult:
+            max_workers: int | None = None,
+            snapshot: str | Path | Callable[[FlowSnapshot], None] | None = None,
+            context_id: str | None = None) -> FlowResult:
         """
         Run the flow. max_workers overrides Flow.max_workers for this run.
+        context_id identifies the run (FlowContext.id); a random id is generated if not given.
+        snapshot is a file path or a callback that gets a FlowSnapshot when the run starts,
+        after steps finish and when the run ends (from the runner thread). Errors while
+        saving a snapshot are logged and don't stop the flow.
         Raises FlowError for an invalid graph (unknown step in an edge, cycle) or max_workers < 1.
         """
         workers = self.max_workers if max_workers is None else max_workers
@@ -408,14 +534,35 @@ class Flow:
             raise FlowError(f"max_workers must be at least 1, got {workers}")
         order = self.execution_order()
         preds = self.predecessors()
-        ctx = FlowContext(self.name, input_data=input_data, variables=self.variables, on_event=on_event)
+        for warning in self.check_references():
+            logger.warning("Flow '%s': %s", self.name, warning)
+        ctx = FlowContext(self.name, input_data=input_data, variables=self.variables, on_event=on_event,
+                          context_id=context_id)
         results: dict[str, StepResult] = {}
         # outputs of finished steps; a failed step with on_error="continue" contributes None
         outputs: dict[str, Any] = {}
         pending = list(order)
         running: dict[Future, FlowStepSpec] = {}
         status = "success"
+        flow_dict = self.to_dict() if snapshot is not None else None
+        started_at = datetime.now(timezone.utc)
 
+        def save_snapshot(snapshot_status: str):
+            if snapshot is None:
+                return
+            snap = FlowSnapshot(
+                context_id=ctx.id, flow=flow_dict, input=input_data, status=snapshot_status,
+                started_at=started_at, updated_at=datetime.now(timezone.utc),
+                steps=[results[s.id] for s in order if s.id in results],
+                running=[s.id for s in running.values()],
+                pending=[s.id for s in pending],
+            )
+            try:
+                snapshot(snap) if callable(snapshot) else snap.save(snapshot)
+            except Exception as e:
+                logger.warning("Cannot save snapshot of flow '%s': %s", self.name, e)
+
+        save_snapshot("running")
         executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix=f"flow-{self.name}") \
             if workers > 1 else _InlineExecutor()
         try:
@@ -448,13 +595,16 @@ class Flow:
                             status = "failed"
                         if spec.on_error == "stop":
                             ctx._stopping.set()
+                save_snapshot("running")
         finally:
             ctx._stopping.set()
             executor.shutdown(wait=True, cancel_futures=True)
 
-        for spec in pending:
+        for spec in list(pending):
             results[spec.id] = StepResult(step_id=spec.id, status="skipped")
-        return FlowResult(name=self.name, status=status, steps=[results[s.id] for s in order])
+            pending.remove(spec)
+        save_snapshot(status)
+        return FlowResult(name=self.name, context_id=ctx.id, status=status, steps=[results[s.id] for s in order])
 
     def _execute_step(self, spec: FlowStepSpec, input_data: Any, ctx: FlowContext) -> StepResult:
         ctx.emit("step.start", {"processor": spec.processor}, step_id=spec.id)

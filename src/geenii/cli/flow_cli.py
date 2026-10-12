@@ -82,8 +82,13 @@ def flow():
 @click.option("--json", "as_json", is_flag=True, default=False,
               help="Print the full result as JSON.")
 @click.option("--quiet", "-q", is_flag=True, default=False, help="Don't print step events.")
+@click.option("--snapshot", "-s", "snapshot_path", type=click.Path(dir_okay=False), default=None,
+              help="Write the flow, its input and the step results to this JSON file "
+                   "while the flow runs and when it ends.")
+@click.option("--context-id", default=None,
+              help="Id of the run (default: a generated id).")
 @processor_module_option
-def run(path, input_value, variables, max_workers, as_json, quiet, processor_modules):
+def run(path, input_value, variables, max_workers, as_json, quiet, snapshot_path, context_id, processor_modules):
     """Run the flow in PATH (.toml or .json).
 
     Step events are printed to stderr. Exits with code 1 if the flow failed or was aborted.
@@ -104,14 +109,15 @@ def run(path, input_value, variables, max_workers, as_json, quiet, processor_mod
 
     try:
         result = f.run(input_data=input_data, max_workers=max_workers,
-                       on_event=None if quiet else _print_event)
+                       on_event=None if quiet else _print_event, snapshot=snapshot_path,
+                       context_id=context_id)
     except FlowError as e:
         raise click.ClickException(str(e))
 
     if as_json:
         click.echo(result.model_dump_json(indent=2))
     else:
-        click.echo(f"\nFlow '{result.name}': {result.status}")
+        click.echo(f"\nFlow '{result.name}' ({result.context_id}): {result.status}")
         for step in result.steps:
             error = f"  {step.error}" if step.error else ""
             click.echo(f"  {step.step_id:20} {step.status:8} {step.duration:7.3f}s{error}")
@@ -124,18 +130,26 @@ def run(path, input_value, variables, max_workers, as_json, quiet, processor_mod
 
 @flow.command()
 @click.argument("path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--strict", is_flag=True, default=False, help="Treat warnings as errors.")
 @processor_module_option
-def validate(path, processor_modules):
+def validate(path, strict, processor_modules):
     """Check the flow in PATH and print its execution order.
 
     Checks the file, the graph (unknown steps in edges, cycles) and the processor types.
-    Exits with code 1 if there are problems.
+    Warns about ${...} references to steps that a step doesn't depend on.
+    Exits with code 1 if there are problems (or warnings, with --strict).
     """
     f = _load_flow(path, processor_modules)
     problems = _check_flow(f)
     if problems:
         for problem in problems:
             click.echo(f"error: {problem}", err=True)
+        raise SystemExit(1)
+
+    warnings = f.check_references()
+    for warning in warnings:
+        click.echo(f"warning: {warning}", err=True)
+    if warnings and strict:
         raise SystemExit(1)
 
     preds = f.predecessors()

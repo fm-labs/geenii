@@ -6,7 +6,8 @@ import time
 import httpx
 import pytest
 
-from geenii.flow import Flow, FlowContext, FlowError, FlowProcessor, FlowStepSpec, StepEvent, register_processor
+from geenii.flow import (Flow, FlowContext, FlowError, FlowProcessor, FlowSnapshot, FlowStepSpec, StepEvent,
+                         register_processor)
 from geenii.flow.processor.read_http import ReadHttpProcessor
 
 
@@ -31,7 +32,7 @@ class PlainProcessor(FlowProcessor):
 def test_echo_passes_output_to_next_step():
     flow = Flow("t", [
         FlowStepSpec(id="a", processor="echo", config={"message": "hello"}),
-        FlowStepSpec(id="b", processor="echo"),
+        FlowStepSpec(id="b", processor="echo", depends_on="a"),
     ])
     result = flow.run()
     assert result.status == "success"
@@ -42,8 +43,8 @@ def test_echo_passes_output_to_next_step():
 def test_references_and_interpolation():
     flow = Flow("t", [
         {"id": "a", "processor": "echo", "config": {"message": {"name": "geenii", "items": [1, 2]}}},
-        {"id": "b", "processor": "echo", "config": {"message": "${a.message.items}"}},
-        {"id": "c", "processor": "echo", "config": {"message": "hi ${a.message.name} ${vars.x} ${input} $${a}"}},
+        {"id": "b", "processor": "echo", "depends_on": "a", "config": {"message": "${a.message.items}"}},
+        {"id": "c", "processor": "echo", "depends_on": "a", "config": {"message": "hi ${a.message.name} ${vars.x} ${input} $${a}"}},
     ], variables={"x": "X"})
     result = flow.run(input_data="IN")
     assert result.get("b").output["message"] == [1, 2]
@@ -107,12 +108,38 @@ def test_events():
 def test_execute_command():
     result = Flow("t", [
         {"id": "a", "processor": "execute_command", "config": {"command": [sys.executable, "-c", "print('out', end='')"]}},
-        {"id": "b", "processor": "execute_command", "config": {"command": "echo ${a.stdout} | tr a-z A-Z", "shell": True}},
+        {"id": "b", "processor": "execute_command", "depends_on": "a", "config": {"command": "echo ${a.stdout} | tr a-z A-Z", "shell": True}},
         {"id": "c", "processor": "execute_command", "config": {"command": "false", "check": True}},
     ]).run()
     assert result.get("a").output == {"stdout": "out", "stderr": "", "rc": 0}
     assert result.get("b").output["stdout"].strip() == "OUT"
     assert result.get("c").status == "failed"
+
+
+def test_execute_command_streams_output_lines():
+    events: list[StepEvent] = []
+    script = "import sys, time; print('one', flush=True); time.sleep(0.2); print('err', file=sys.stderr); print('two')"
+    result = Flow("t", [
+        {"id": "a", "processor": "execute_command", "config": {"command": [sys.executable, "-c", script]}},
+    ]).run(on_event=lambda e: events.append((e, time.monotonic())))
+    assert result.get("a").output == {"stdout": "one\ntwo\n", "stderr": "err\n", "rc": 0}
+    streamed = [(e.type, e.data) for e, _ in events if e.type in ("stdout", "stderr")]
+    assert sorted(streamed) == [("stderr", "err"), ("stdout", "one"), ("stdout", "two")]
+    # the first line arrives before the process exits
+    first = next(t for e, t in events if e.data == "one")
+    end = next(t for e, t in events if e.type == "step.end")
+    assert end - first >= 0.15
+
+
+def test_execute_command_timeout_kills_process():
+    started = time.monotonic()
+    result = Flow("t", [
+        {"id": "a", "processor": "execute_command",
+         "config": {"command": [sys.executable, "-c", "import time; time.sleep(10)"], "timeout": 0.3}},
+    ]).run()
+    assert result.get("a").status == "failed"
+    assert "TimeoutExpired" in result.get("a").error
+    assert time.monotonic() - started < 5
 
 
 def test_execute_script_receives_input_on_stdin():
@@ -152,21 +179,120 @@ def test_from_file(tmp_path):
     assert Flow.from_file(toml).run().output == {"message": "y"}
 
 
+def test_to_dict_and_to_file_round_trip(tmp_path):
+    flow = Flow("f", [
+        {"id": "a", "processor": "echo", "config": {"message": "${vars.x}"}},
+        {"id": "b", "processor": "echo", "on_error": "continue"},
+        {"id": "c", "processor": "echo", "depends_on": ["a"]},
+    ], edges=[("a", "b")], variables={"x": "X"}, max_workers=2)
+    assert flow.to_dict() == {
+        "name": "f", "max_workers": 2, "vars": {"x": "X"},
+        "edges": [{"from_step": "a", "to_step": "b"}],
+        "steps": [
+            {"id": "a", "processor": "echo", "config": {"message": "${vars.x}"}},
+            {"id": "b", "processor": "echo", "on_error": "continue"},
+            {"id": "c", "processor": "echo", "depends_on": ["a"]},
+        ],
+    }
+    assert json.loads(flow.to_json()) == flow.to_dict()
+    for name in ("flow.json", "flow.toml"):
+        flow.to_file(tmp_path / name)
+        assert Flow.from_file(tmp_path / name).to_dict() == flow.to_dict()
+    with pytest.raises(FlowError):
+        flow.to_file(tmp_path / "flow.yaml")
+
+
+def test_snapshots_during_and_after_run(tmp_path):
+    flow = Flow("f", [
+        {"id": "a", "processor": "echo", "config": {"message": "m"}},
+        {"id": "b", "processor": "echo", "depends_on": "a"},
+    ])
+    snapshots: list[FlowSnapshot] = []
+    result = flow.run(input_data={"n": 1}, snapshot=snapshots.append)
+    assert [(s.status, [r.step_id for r in s.steps], s.pending) for s in snapshots] == [
+        ("running", [], ["a", "b"]),
+        ("running", ["a"], ["b"]),
+        ("running", ["a", "b"], []),
+        ("success", ["a", "b"], []),
+    ]
+    final = snapshots[-1]
+    assert final.steps == result.steps
+    assert final.input == {"n": 1}
+    assert final.to_flow().to_dict() == flow.to_dict()
+
+    path = tmp_path / "snap.json"
+    flow.run(input_data=object(), snapshot=path)  # input that isn't JSON serializable is stored as str
+    loaded = FlowSnapshot.load(path)
+    assert loaded.status == "success"
+    assert loaded.get("b").output == {"message": {"message": "m"}}
+    assert isinstance(loaded.input, str)
+    assert not list(tmp_path.glob(".*.tmp"))
+
+
+def test_context_id():
+    @register_processor("test_context_id")
+    class ContextIdProcessor(FlowProcessor):
+        def process(self, input_data, ctx):
+            return ctx.id
+
+    flow = Flow("f", [{"id": "a", "processor": "test_context_id"}])
+    snapshots: list[FlowSnapshot] = []
+    first, second = flow.run(snapshot=snapshots.append), flow.run()
+    assert first.context_id and first.context_id != second.context_id
+    assert first.output == first.context_id
+    assert {s.context_id for s in snapshots} == {first.context_id}
+    assert flow.run(context_id="run-1").context_id == "run-1"
+
+
+def test_snapshot_error_does_not_stop_flow(tmp_path):
+    result = Flow("f", [{"id": "a", "processor": "echo"}]).run(snapshot=tmp_path / "missing" / "snap.json")
+    assert result.status == "success"
+
+
 def test_context_lookup_attribute_and_index():
     ctx = FlowContext("t")
     ctx.results["a"] = {"list": [{"v": 1}]}
     assert ctx.lookup("a.list.0.v") == 1
 
 
-# --- DAG: edges and `after` ---
+# --- DAG: edges and `depends_on` ---
 
 def _order(result):
     return [s.step_id for s in result.steps]
 
 
-def test_no_edges_runs_in_insertion_order():
+def test_check_references():
+    flow = Flow("t", [
+        {"id": "a", "processor": "echo", "config": {"message": "${input} ${vars.x} $${b.literal}"}},
+        {"id": "b", "processor": "echo", "depends_on": "a", "config": {"message": "${a.message}"}},
+        # indirect dependency on 'a' is fine; nested config values are checked too
+        {"id": "c", "processor": "echo", "depends_on": "b", "config": {"message": {"x": ["${a}", "${ b.message }"]}}},
+        {"id": "d", "processor": "echo", "config": {"message": "${c.message} ${d} ${nope.x}"}},
+    ])
+    assert flow.check_references() == [
+        "Step 'd': reference '${c.message}': doesn't depend on 'c'; add it to depends_on",
+        "Step 'd': reference '${d}': references itself",
+        "Step 'd': reference '${nope.x}': unknown step 'nope'",
+    ]
+    assert flow.ancestors()["c"] == {"a", "b"}
+
+
+def test_run_logs_reference_warnings(caplog):
+    flow = Flow("t", [
+        {"id": "a", "processor": "echo"},
+        {"id": "b", "processor": "echo", "config": {"message": "${a.message}"}},
+    ])
+    with caplog.at_level("WARNING", logger="geenii.flow.flow"):
+        assert flow.run().status == "success"  # sequential: 'a' happens to run first
+    assert "Step 'b': reference '${a.message}': doesn't depend on 'a'" in caplog.text
+
+
+def test_no_edges_are_independent_roots():
     flow = Flow("t", [{"id": "a", "processor": "echo"}, {"id": "b", "processor": "echo"}, {"id": "c", "processor": "echo"}])
-    assert [(e.from_step, e.to_step) for e in flow.edges] == [("a", "b"), ("b", "c")]
+    assert flow.edges == []
+    result = flow.run(input_data="in")
+    assert _order(result) == ["a", "b", "c"]  # sequential: insertion order
+    assert [r.output for r in result.steps] == [{"message": "in"}] * 3  # each root gets the flow input
 
 
 def test_edges_define_order():
@@ -180,9 +306,9 @@ def test_edges_define_order():
     assert result.get("c").output == {"message": {"message": {"message": "A"}}}
 
 
-def test_after_infers_edges():
+def test_depends_on_infers_edges():
     flow = Flow("t", [
-        {"id": "b", "processor": "echo", "after": "a"},
+        {"id": "b", "processor": "echo", "depends_on": "a"},
         {"id": "a", "processor": "echo", "config": {"message": "A"}},
     ])
     assert [(e.from_step, e.to_step) for e in flow.edges] == [("a", "b")]
@@ -193,7 +319,7 @@ def test_roots_get_flow_input_and_join_gets_dict():
     flow = Flow("t", [
         {"id": "left", "processor": "echo"},
         {"id": "right", "processor": "echo", "config": {"message": "R"}},
-        {"id": "join", "processor": "echo", "after": ["left", "right"]},
+        {"id": "join", "processor": "echo", "depends_on": ["left", "right"]},
     ])
     result = flow.run(input_data="IN")
     assert result.get("left").output == {"message": "IN"}
@@ -201,7 +327,7 @@ def test_roots_get_flow_input_and_join_gets_dict():
 
 
 def test_add_edge_variants_and_dedupe():
-    flow = Flow("t", [{"id": "a", "processor": "echo"}, {"id": "b", "processor": "echo", "after": "a"}])
+    flow = Flow("t", [{"id": "a", "processor": "echo"}, {"id": "b", "processor": "echo", "depends_on": "a"}])
     flow.add_edge("a", "b")
     flow.add_edge(("a", "b"))
     assert len(flow.edges) == 1
@@ -211,15 +337,15 @@ def test_add_edge_variants_and_dedupe():
 
 def test_invalid_graph_raises():
     with pytest.raises(FlowError, match="unknown step 'x'"):
-        Flow("t", [{"id": "a", "processor": "echo", "after": "x"}]).run()
+        Flow("t", [{"id": "a", "processor": "echo", "depends_on": "x"}]).run()
     with pytest.raises(FlowError, match="Cycle"):
-        Flow("t", [{"id": "a", "processor": "echo", "after": "b"}, {"id": "b", "processor": "echo", "after": "a"}]).run()
+        Flow("t", [{"id": "a", "processor": "echo", "depends_on": "b"}, {"id": "b", "processor": "echo", "depends_on": "a"}]).run()
 
 
 def test_continue_in_dag_passes_none_downstream():
     flow = Flow("t", [
         {"id": "a", "processor": "test_fail", "on_error": "continue"},
-        {"id": "b", "processor": "echo", "after": "a"},
+        {"id": "b", "processor": "echo", "depends_on": "a"},
         {"id": "c", "processor": "echo", "config": {"message": "independent"}},
     ])
     result = flow.run()
@@ -260,8 +386,8 @@ class SleepProcessor(FlowProcessor):
 
 def _branches(n: int, processor: str = "test_barrier") -> list[dict]:
     steps = [{"id": "root", "processor": "echo", "config": {"message": "r"}}]
-    steps += [{"id": f"b{i}", "processor": processor, "after": "root"} for i in range(n)]
-    steps += [{"id": "join", "processor": "echo", "after": [f"b{i}" for i in range(n)]}]
+    steps += [{"id": f"b{i}", "processor": processor, "depends_on": "root"} for i in range(n)]
+    steps += [{"id": "join", "processor": "echo", "depends_on": [f"b{i}" for i in range(n)]}]
     return steps
 
 
@@ -297,7 +423,7 @@ def test_parallel_stop_lets_running_steps_finish():
     flow = Flow("t", [
         {"id": "slow", "processor": "test_sleep", "config": {"seconds": 0.3}},
         {"id": "fail", "processor": "test_fail"},
-        {"id": "after_slow", "processor": "echo", "after": "slow"},
+        {"id": "after_slow", "processor": "echo", "depends_on": "slow"},
     ], max_workers=2)
     result = flow.run()
     assert result.status == "failed"
@@ -334,8 +460,8 @@ def test_max_workers_from_file(tmp_path):
 def _graph_flow():
     return Flow("my flow", [
         {"id": "a", "processor": "echo"},
-        {"id": "b", "processor": "echo", "after": "a"},
-        {"id": 'say "hi"', "processor": "echo", "after": "a"},
+        {"id": "b", "processor": "echo", "depends_on": "a"},
+        {"id": 'say "hi"', "processor": "echo", "depends_on": "a"},
     ])
 
 
@@ -362,7 +488,7 @@ def test_to_dot():
 
 
 def test_graph_unknown_step_raises():
-    flow = Flow("t", [{"id": "a", "processor": "echo", "after": "x"}])
+    flow = Flow("t", [{"id": "a", "processor": "echo", "depends_on": "x"}])
     with pytest.raises(FlowError):
         flow.to_mermaid()
     with pytest.raises(FlowError):

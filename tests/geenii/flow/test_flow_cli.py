@@ -34,7 +34,7 @@ def test_run_input_from_stdin_and_events(runner, tmp_path):
     result = runner.invoke(flow, ["run", path], input="plain text\n")
     assert result.exit_code == 0
     assert "[a] start (echo)" in result.stderr
-    assert "Flow 'f': success" in result.stdout
+    assert "Flow 'f' (" in result.stdout and "): success" in result.stdout
 
     result = runner.invoke(flow, ["run", path, "-q", "--json", "-i", "-"], input="plain text\n")
     assert json.loads(result.stdout)["steps"][0]["output"] == {"message": "plain text\n"}
@@ -49,8 +49,28 @@ def test_run_failed_flow_exits_1(runner, tmp_path):
     assert "failed" in result.stdout
 
 
+def test_run_snapshot(runner, tmp_path):
+    path = _write(tmp_path, {"name": "f", "steps": [
+        {"id": "a", "processor": "echo", "config": {"message": "hi"}},
+        {"id": "b", "processor": "execute_command", "config": {"command": "false", "check": True}},
+        {"id": "c", "processor": "echo"},
+    ]})
+    snapshot = tmp_path / "snap.json"
+    result = runner.invoke(flow, ["run", path, "-q", "-i", "x", "--snapshot", str(snapshot), "--context-id", "run-1"])
+    assert result.exit_code == 1
+    assert "Flow 'f' (run-1): failed" in result.stdout
+    data = json.loads(snapshot.read_text())
+    assert data["context_id"] == "run-1"
+    assert data["status"] == "failed"
+    assert data["input"] == "x"
+    assert data["flow"]["name"] == "f"
+    assert [(s["step_id"], s["status"]) for s in data["steps"]] == [
+        ("a", "success"), ("b", "failed"), ("c", "skipped")]
+    assert data["steps"][0]["output"] == {"message": "hi"}
+
+
 def test_run_invalid_graph_and_file(runner, tmp_path):
-    path = _write(tmp_path, {"name": "f", "steps": [{"id": "a", "processor": "echo", "after": "x"}]})
+    path = _write(tmp_path, {"name": "f", "steps": [{"id": "a", "processor": "echo", "depends_on": "x"}]})
     result = runner.invoke(flow, ["run", path])
     assert result.exit_code == 1
     assert "unknown step 'x'" in result.stderr
@@ -67,7 +87,7 @@ def test_run_invalid_graph_and_file(runner, tmp_path):
 
 def test_validate(runner, tmp_path):
     path = _write(tmp_path, {"name": "f", "steps": [
-        {"id": "b", "processor": "echo", "after": "a"},
+        {"id": "b", "processor": "echo", "depends_on": "a"},
         {"id": "a", "processor": "echo"},
     ]})
     result = runner.invoke(flow, ["validate", path])
@@ -75,13 +95,28 @@ def test_validate(runner, tmp_path):
     assert result.stdout.index("  a [echo]") < result.stdout.index("  b [echo]  (after a)")
 
     path = _write(tmp_path, {"name": "f", "steps": [
-        {"id": "a", "processor": "nope", "after": "b"},
-        {"id": "b", "processor": "echo", "after": "a"},
+        {"id": "a", "processor": "nope", "depends_on": "b"},
+        {"id": "b", "processor": "echo", "depends_on": "a"},
     ]}, name="bad.json")
     result = runner.invoke(flow, ["validate", path])
     assert result.exit_code == 1
     assert "Cycle" in result.stderr
     assert "Unknown processor type 'nope'" in result.stderr
+
+
+def test_validate_reference_warnings(runner, tmp_path):
+    path = _write(tmp_path, {"name": "f", "steps": [
+        {"id": "a", "processor": "echo"},
+        {"id": "b", "processor": "echo", "config": {"message": "${a.message}"}},
+    ]})
+    result = runner.invoke(flow, ["validate", path])
+    assert result.exit_code == 0
+    assert "warning: Step 'b': reference '${a.message}': doesn't depend on 'a'" in result.stderr
+    assert "is valid" in result.stdout
+
+    result = runner.invoke(flow, ["validate", path, "--strict"])
+    assert result.exit_code == 1
+    assert "warning: Step 'b'" in result.stderr
 
 
 def test_processors_with_custom_module(runner, tmp_path, monkeypatch):
@@ -106,7 +141,7 @@ def test_processors_with_custom_module(runner, tmp_path, monkeypatch):
 def _graph_file(tmp_path):
     return _write(tmp_path, {"name": "f", "steps": [
         {"id": "a", "processor": "echo"},
-        {"id": "b", "processor": "echo", "after": "a"},
+        {"id": "b", "processor": "echo", "depends_on": "a"},
     ]})
 
 

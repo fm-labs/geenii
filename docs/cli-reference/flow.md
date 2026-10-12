@@ -33,6 +33,8 @@ flow output (the output of the last successful step) as JSON.
 | `--max-workers` | `-w` | Number of steps that may run at the same time, overriding `max_workers` in the file |
 | `--json` | | Print the full `FlowResult` as JSON instead of the summary |
 | `--quiet` | `-q` | Don't print step events |
+| `--snapshot FILE` | `-s` | Write a JSON snapshot (flow definition, input, status and step results) to FILE when the run starts, after steps finish and when the run ends. See [Snapshots](../developer-guide/flow.md#snapshots) |
+| `--context-id ID` | | Id of the run, shown in the summary and stored in the result and snapshot. Default: a generated UUID |
 | `--processor-module MODULE` | `-m` | Import a Python module that registers custom processors with `@register_processor`. Repeatable |
 
 #### Exit codes
@@ -57,10 +59,14 @@ geenii flow run my_flow.toml -i '{"url": "https://example.com"}' -v env=prod -w 
 echo "some text" | geenii flow run my_flow.toml -i - -q --json
 ```
 
+```bash
+geenii flow run my_flow.toml --snapshot run.json
+```
+
 ### validate
 
 ```
-geenii flow validate <PATH> [--processor-module MODULE ...]
+geenii flow validate <PATH> [--strict] [--processor-module MODULE ...]
 ```
 
 Check a flow without running it, and print its execution order with each
@@ -72,9 +78,16 @@ step's predecessors. It checks:
 - that every step's processor exists (registered, or importable as
   `package.module:ClassName`).
 
-It doesn't validate step configs, because `${...}` references in a config can
-only be resolved during a run. All problems are printed to stderr, and the
-command exits with code 1 if there are any.
+It doesn't validate step config values, because `${...}` references in a
+config can only be resolved during a run. All problems are printed to stderr,
+and the command exits with code 1 if there are any.
+
+It also warns about `${...}` references to a step that the referencing step
+doesn't depend on (directly or indirectly through `depends_on` or edges), to the
+step itself, or to an unknown name. Such a reference may fail when steps run in
+parallel. Warnings are printed to stderr as `warning: ...` and don't change the
+exit code, unless `--strict` is given: then any warning exits with code 1.
+`geenii flow run` logs the same warnings and runs the flow anyway.
 
 ```
 $ geenii flow validate examples/flow_example.toml

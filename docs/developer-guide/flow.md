@@ -46,7 +46,7 @@ flow = Flow(
   variables={"greeting": "hello"},
   steps=[
     FlowStepSpec(id="greet", processor="echo", config={"message": "${vars.greeting}"}),
-    FlowStepSpec(id="upper", processor="execute_command",
+    FlowStepSpec(id="upper", processor="execute_command", depends_on="greet",
                  config={"command": [sys.executable, "-c",
                                      "import sys; print(sys.argv[1].upper())",
                                      "${greet.message}"]}),
@@ -74,7 +74,7 @@ Each entry in a flow is a `FlowStepSpec`:
 | `processor` | `str` | required | The processor that handles the step: a registered name (`"echo"`) or `"package.module:ClassName"` |
 | `config` | `dict` | `{}` | Settings passed to the processor; string values may contain `${...}` references |
 | `on_error` | `"stop"` \| `"continue"` | `"stop"` | What happens when this step fails |
-| `after` | `list[str]` (or one `str`) | `[]` | Ids of steps this step runs after; each adds an edge |
+| `depends_on` | `list[str]` (or one `str`) | `[]` | Ids of steps this step depends on (runs after); each adds an edge |
 
 Step ids must be unique and cannot be `input` or `vars` (these are reserved for
 references). Both rules are checked when the step is added, and violations
@@ -94,17 +94,18 @@ from geenii.flow import Flow, FlowStepSpec
 flow = Flow("t", steps=[...], edges=[("a", "b"), {"from_step": "b", "to_step": "c"}])
 flow.add_edge("c", "d")  # also: add_edge(("c", "d")), add_edge(FlowEdge(...))
 
-# inferred from `after`
-flow.add_step(FlowStepSpec(id="report", processor="echo", after=["left", "right"]))
+# inferred from `depends_on`
+flow.add_step(FlowStepSpec(id="report", processor="echo", depends_on=["left", "right"]))
 ```
 
 `flow.edges` returns all edges: the explicit ones, then the ones inferred from
-`after`. Duplicate edges are ignored.
+`depends_on`. Duplicate edges are ignored.
 
-**Without any edges, the steps are chained in the order they were added**
-(`a -> b -> c ...`). This is the original sequential behavior. As soon as one
-edge exists (explicit or from `after`), only the edges count. A step without
-edges is then an independent root.
+**Steps are never wired automatically.** A step without edges is an
+independent root: it gets the flow input and may run in parallel with other
+steps. To pass a step's output on, or to make sure a step has finished before
+another one references its results with `${...}`, set `depends_on` (or add an
+edge).
 
 Order rules:
 
@@ -131,8 +132,7 @@ greet -> upper -> count -+-> stats -+-> summary
 
 `flow.to_mermaid()` and `flow.to_dot()` return the graph as Mermaid flowchart
 or Graphviz DOT text. Nodes are labelled with the step id and processor, and
-`flow.edges` become the arrows, so a flow without edges shows its implicit
-chain. Both take a layout direction (`"LR"` by default, or `"TB"`, `"RL"`,
+`flow.edges` become the arrows. Both take a layout direction (`"LR"` by default, or `"TB"`, `"RL"`,
 `"BT"`). They raise `FlowError` for an edge to an unknown step; cycles are
 drawn as they are.
 
@@ -239,9 +239,17 @@ Resolution rules:
   `FlowError`.
 - Only steps that have already succeeded can be referenced. Outputs are
   stored as plain data, so pydantic outputs are dumped to dicts.
-- References don't add edges. A step that references `${a.x}` should run after
+- References don't add edges. A step that references `${a.x}` must depend on
   `a` (directly or indirectly); otherwise whether `a` has run yet depends on
-  insertion order.
+  insertion order and `max_workers`.
+
+`flow.check_references()` checks this without running the flow. It returns a
+warning for each reference to a step that the referencing step doesn't depend
+on, to the step itself, or to an unknown name. `${input}`, `${vars...}` and
+`$${...}` escapes are not checked. `run()` logs these warnings on the
+`geenii.flow.flow` logger and then runs the flow anyway, and
+`geenii flow validate` prints them. `flow.ancestors()` returns, for each step,
+the ids of all steps it depends on directly or indirectly.
 
 > **Shell commands:** with `execute_command` and `shell: true`, interpolated
 > values are pasted into the command line as text. A trailing newline (common
@@ -262,11 +270,17 @@ Exceptions raised by a processor are caught and recorded; they don't propagate o
 of `run()`. An invalid graph raises `FlowError` before any step runs (see
 [Edges and execution order](#edges-and-execution-order)).
 
+Each run has a **context id**, `FlowContext.id`. By default it is a random
+UUID (32 hex characters), generated for every run. Pass
+`run(context_id="...")` to use your own, e.g. to match a run with a job in
+another system. Processors can read it as `ctx.id`.
+
 `FlowResult`:
 
 | Member | Meaning |
 |---|---|
 | `name` | Flow name |
+| `context_id` | Context id of the run |
 | `status` | `"success"`, `"failed"` (any step failed) or `"aborted"` |
 | `steps` | `list[StepResult]`, one per step in the flow, in execution order |
 | `output` | Output of the last successful step in execution order |
@@ -314,7 +328,7 @@ the same structure:
 name = "example"
 max_workers = 2   # optional, default 1
 
-# optional; edges can also come from `after` on the steps
+# optional; edges can also come from `depends_on` on the steps
 edges = [
     { from_step = "greet", to_step = "list" },
 ]
@@ -336,7 +350,7 @@ config = { command = ["docker", "container", "list", "--all"] }
 [[steps]]
 id = "report"
 processor = "echo"
-after = ["greet", "list"]
+depends_on = ["greet", "list"]
 ```
 
 ```python
@@ -344,6 +358,60 @@ from geenii.flow import Flow
 
 result = Flow.from_file("examples/flow_example.toml").run()
 ```
+
+### Saving flows
+
+`flow.to_dict()` returns the flow definition in the same structure, and
+`flow.to_json()` returns it as a JSON string. `flow.to_file(path)` writes it to
+a `.json` or `.toml` file that `from_file()` can read again. Step fields with
+default values are left out, and only explicit edges are written (edges from
+`depends_on` stay on the steps). TOML can't store `None` values, so use `.json` for
+flows whose config contains `None`.
+
+To save a run together with its results, see [Snapshots](#snapshots).
+
+### Snapshots
+
+`run(snapshot=...)` saves the state of the run as a `FlowSnapshot`. Pass a
+file path to write it as JSON, or a callback to get the `FlowSnapshot` object
+itself:
+
+```python
+result = flow.run(input_data={"n": 1}, snapshot="run.json")
+
+snap = FlowSnapshot.load("run.json")
+snap.status            # "success"
+snap.get("a").output   # output of step "a"
+snap.to_flow()         # the Flow again
+```
+
+A snapshot is taken when the run starts, after steps finish, and once more
+when the run ends. Each snapshot replaces the last one. The file is written to
+a temporary file and then renamed, so another process reading it never sees a
+half-written file. The callback is called from the thread that runs the flow.
+An error while saving is logged as a warning and doesn't stop the flow.
+
+`FlowSnapshot` fields:
+
+| Field | Meaning |
+|---|---|
+| `context_id` | Context id of the run |
+| `flow` | The flow definition (`Flow.to_dict()`) |
+| `input` | The flow input; a value that isn't JSON serializable is written as `str()` |
+| `status` | `"running"` until the run ends, then the flow status |
+| `started_at`, `updated_at` | UTC timestamps |
+| `steps` | `StepResult`s of the finished steps in execution order; at the end, skipped steps too |
+| `running` | Ids of steps that were running at the time of the snapshot |
+| `pending` | Ids of steps that hadn't started yet |
+
+Snapshots are taken right after steps finish, before the next steps start.
+So with parallel execution, steps that are about to start are listed in
+`pending`.
+
+Without snapshots, the run's results are still in the returned `FlowResult`,
+a pydantic model: `result.model_dump_json(indent=2)` gives the status, outputs,
+errors and durations of all steps, but not the flow definition or the input.
+This is what `geenii flow run --json` prints.
 
 ---
 
@@ -360,7 +428,12 @@ input if no message is set. Useful for building values and in tests.
 
 ### `execute_command`
 
-Runs a command with `subprocess.run` and waits for it to finish.
+Runs a command in a subprocess and waits for it to finish. While it runs, each
+line of output is emitted as a `stdout` or `stderr` event (without the line
+ending), so `geenii flow run` prints it as it arrives. A partial line without a
+newline is emitted only when the newline or the end of the output arrives. A
+program that buffers its output when it isn't writing to a terminal may emit
+lines only when its buffer fills or the program exits.
 
 | Config | Default | Meaning |
 |---|---|---|
@@ -369,7 +442,7 @@ Runs a command with `subprocess.run` and waits for it to finish.
 | `cwd` | `None` | Working directory |
 | `env` | `None` | Extra variables, merged over the current environment |
 | `stdin` | `None` | Text sent to stdin |
-| `timeout` | `None` | Seconds; on timeout the step fails |
+| `timeout` | `None` | Seconds; on timeout the process is killed and the step fails |
 | `check` | `false` | Fail the step on a non-zero exit code |
 
 Without `shell`, a string command is split with `shlex.split`.
@@ -377,10 +450,10 @@ Output: `{"stdout", "stderr", "rc"}`.
 
 ### `execute_script`
 
-Runs a Python script in a **separate interpreter** (`sys.executable -c`), so a
+Runs a Python script in a **separate interpreter** (`sys.executable -u -c`), so a
 broken script can't affect the runner. The script is dedented, so indented
 triple-quoted strings work. The step input is sent to the script as JSON on
-stdin.
+stdin. Output is unbuffered and streamed as events, as for `execute_command`.
 
 | Config | Default | Meaning |
 |---|---|---|
@@ -471,7 +544,7 @@ Rules for processors:
   (dicts, lists, scalars) so that later references can traverse it.
 - Raise an exception to fail the step. Its `on_error` decides what happens
   next.
-- `ctx` (`FlowContext`) gives access to `ctx.input`, `ctx.vars`,
+- `ctx` (`FlowContext`) gives access to `ctx.id` (the context id), `ctx.input`, `ctx.vars`,
   `ctx.results` (outputs by step id), `ctx.emit(type, data)`,
   `ctx.abort(reason)`, `ctx.stopping` and `ctx.logger`.
 - A processor may run in a worker thread (with `max_workers > 1`), so don't
@@ -519,5 +592,3 @@ monkeypatch.setattr(ReadHttpProcessor, "transport", httpx.MockTransport(handler)
 - Branch-local failure handling: with `on_error="stop"` a failure stops the
   whole flow, not just the steps that depend on the failed step.
 - Inferring edges from `${...}` references.
-- Streaming output from long-running commands; `execute_command` returns only
-  when the process exits.
