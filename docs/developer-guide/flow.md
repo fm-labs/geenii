@@ -14,8 +14,14 @@ from a JSON or TOML file.
 A runnable example is in `src/xflow.py` (`uv run python src/xflow.py`), and a
 file-based one is in `examples/flow_example.toml`.
 
-Flows are **synchronous** and run in the calling thread. They are not wired
-into the daemon, scheduler or CLI yet.
+`run()` is **synchronous**: it returns when the flow is done. By default steps
+run one at a time in the calling thread; with `max_workers > 1`, independent
+steps run in parallel in a thread pool (see
+[Parallel execution](#parallel-execution)). Flows are not wired into the
+daemon or scheduler yet.
+
+From the command line, use [`geenii flow`](../cli-reference/flow.md):
+`geenii flow run FILE`, `geenii flow validate FILE` and `geenii flow steps`.
 
 ---
 
@@ -92,8 +98,13 @@ edges is then an independent root.
 
 Order rules:
 
-- Steps run **one at a time**, in topological order (`flow.execution_order()`).
-  When several steps are ready, they run in the order they were added.
+- A step is **ready** once all the steps it runs after have finished
+  (succeeded, or failed with `on_error="continue"`).
+- With the default `max_workers=1`, steps run one at a time in topological
+  order (`flow.execution_order()`). When several steps are ready, they run in
+  the order they were added.
+- With `max_workers > 1`, ready steps start right away, up to `max_workers`
+  at a time (see [Parallel execution](#parallel-execution)).
 - A step that lists itself (`add_edge("a", "a")`) raises `FlowError` right away.
 - An edge to an unknown step id, or a cycle, makes `run()` (and
   `execution_order()`) raise `FlowError` before any step runs. These are the
@@ -105,6 +116,56 @@ Example: a fan-out and a join (from `src/xflow.py`):
 greet -> upper -> count -+-> stats -+-> summary
                          +-> http  -+
 ```
+
+---
+
+## Parallel execution
+
+Set `max_workers` to let independent steps run at the same time:
+
+```python
+flow = Flow("t", steps=[...], max_workers=4)   # default for this flow
+result = flow.run()
+result = flow.run(max_workers=1)               # override for one run
+```
+
+In a flow file, set `max_workers = 4` at the top level. Values below 1 make
+`run()` raise `FlowError`.
+
+How it works:
+
+- `max_workers=1` (the default) runs every step in the calling thread, exactly
+  as before.
+- With `max_workers > 1`, steps run in a `ThreadPoolExecutor`, in threads
+  named `flow-<flow name>_N`. The runner thread starts every ready step (in
+  insertion order) while fewer than `max_workers` are running, and starts
+  more steps as running ones finish.
+- Threads suit the built-in steps, which mostly wait on subprocesses and
+  HTTP. CPU-heavy Python code in a step doesn't run in parallel because of
+  the GIL; use `execute_script` to run it in its own process.
+- `FlowResult.steps` is always in execution order, not completion order, so
+  results look the same whichever thread finished first.
+
+Failures and aborts while steps run in parallel:
+
+- When a step fails with `on_error="stop"` or aborts, no new steps start.
+  Steps that are **already running keep running to the end**, and their
+  results are recorded as usual. The steps that never started are marked
+  `"skipped"`.
+- A running step can check `ctx.stopping` (it becomes `True` once the flow is
+  stopping) to finish early. There is no way to kill a running step from the
+  outside.
+- If an aborted step and a failed step both happen in one run, the flow
+  status is `"aborted"`.
+
+Thread safety for step authors:
+
+- `on_event` callbacks are called one at a time (under a lock), so a
+  callback doesn't have to be thread-safe. A slow callback slows down every
+  step that emits events.
+- `ctx.results` is only written by the runner thread, after a step finishes.
+- `ctx.vars` is shared between steps. Changing it from a step isn't
+  synchronized.
 
 ---
 
@@ -188,7 +249,8 @@ seconds.
 
 - `on_error="stop"` (the default): the flow status becomes `"failed"` and all
   remaining steps are marked `"skipped"`, including steps on independent
-  branches.
+  branches. With parallel execution, steps that are already running finish
+  first.
 - `on_error="continue"`: the step is marked `"failed"` and the flow continues.
   Steps after it still run and get `None` for its output. The final flow
   status is still `"failed"`.
@@ -219,6 +281,7 @@ the same structure:
 
 ```toml
 name = "example"
+max_workers = 2   # optional, default 1
 
 # optional; edges can also come from `after` on the steps
 edges = [
@@ -361,7 +424,10 @@ Rules for steps:
   next.
 - `ctx` (`FlowContext`) gives access to `ctx.input`, `ctx.vars`,
   `ctx.results` (outputs by step id), `ctx.emit(type, data)`,
-  `ctx.abort(reason)` and `ctx.logger`.
+  `ctx.abort(reason)`, `ctx.stopping` and `ctx.logger`.
+- A step may run in a worker thread (with `max_workers > 1`), so don't rely
+  on thread-local state or signal handlers. Long-running steps should check
+  `ctx.stopping` now and then.
 
 ### Step types and lookup
 
@@ -396,9 +462,8 @@ monkeypatch.setattr(ReadHttpStep, "transport", httpx.MockTransport(handler))
 
 ## Not implemented yet
 
-- A `geenii flow run <file>` CLI command.
 - Async execution and integration with the daemon or scheduler.
-- Parallel execution: independent branches still run one at a time.
+- Process-based parallelism, and cancelling a running step.
 - Conditional edges, loops and retries.
 - Branch-local failure handling: with `on_error="stop"` a failure stops the
   whole flow, not just the steps that depend on the failed step.

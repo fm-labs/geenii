@@ -58,6 +58,10 @@ geenii
 │   ├── start                     # run the daemon (process manager, scheduler, supervisor)
 │   ├── status                    # daemon info and component summary
 │   └── stop                      # shut the daemon down
+├── flow
+│   ├── run PATH                  # run a flow file (-i input, -v k=v, -w workers)
+│   ├── validate PATH             # check a flow and print its execution order
+│   └── steps                     # list registered step types
 ├── pm
 │   ├── ping                      # check if the daemon is running
 │   ├── serve                     # alias for `daemon start`
@@ -99,6 +103,7 @@ geenii
 - [tools](tools.md) — list, inspect, and call tools
 - [skills](skills.md) — list, inspect, and install skills
 - [daemon](daemon.md) — run and control the geenii daemon
+- [flow](flow.md) — run and inspect flows (step pipelines)
 - [pm](pm.md) — manage background processes
 - [scheduler](scheduler.md) — manage and run the task scheduler
 - [supervisor](supervisor.md) — keep long-running processes up
