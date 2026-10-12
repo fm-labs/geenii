@@ -178,6 +178,16 @@ def test_from_file(tmp_path):
     toml.write_text('name = "f"\n[[steps]]\nid = "a"\nprocessor = "echo"\nconfig = { message = "y" }\n')
     assert Flow.from_file(toml).run().output == {"message": "y"}
 
+    yml = tmp_path / "flow.yml"
+    yml.write_text("name: f\nsteps:\n  - id: a\n    processor: echo\n    config:\n      message: ${vars.x}\n"
+                   "vars:\n  x: z\n")
+    assert Flow.from_file(yml).run().output == {"message": "z"}
+
+    bad = tmp_path / "bad.yaml"
+    bad.write_text("name: [")
+    with pytest.raises(FlowError, match="Invalid YAML"):
+        Flow.from_file(bad)
+
 
 def test_to_dict_and_to_file_round_trip(tmp_path):
     flow = Flow("f", [
@@ -195,11 +205,11 @@ def test_to_dict_and_to_file_round_trip(tmp_path):
         ],
     }
     assert json.loads(flow.to_json()) == flow.to_dict()
-    for name in ("flow.json", "flow.toml"):
+    for name in ("flow.json", "flow.toml", "flow.yaml"):
         flow.to_file(tmp_path / name)
         assert Flow.from_file(tmp_path / name).to_dict() == flow.to_dict()
     with pytest.raises(FlowError):
-        flow.to_file(tmp_path / "flow.yaml")
+        flow.to_file(tmp_path / "flow.xml")
 
 
 def test_snapshots_during_and_after_run(tmp_path):

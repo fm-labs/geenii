@@ -41,10 +41,12 @@ from typing import Any, Callable, ClassVar, Generator, Literal
 
 import pydantic
 import tomli_w
+import yaml
 
 logger = logging.getLogger(__name__)
 
 RESERVED_IDS = {"input", "vars"}
+YAML_SUFFIXES = (".yaml", ".yml")
 
 
 class FlowError(Exception):
@@ -480,12 +482,17 @@ class Flow:
 
     @classmethod
     def from_file(cls, path: str | Path) -> "Flow":
-        """Load a flow from a .json or .toml file"""
+        """Load a flow from a .yaml/.yml, .json or .toml file"""
         path = Path(path)
         if path.suffix == ".toml":
             data = tomllib.loads(path.read_text())
         elif path.suffix == ".json":
             data = json.loads(path.read_text())
+        elif path.suffix in YAML_SUFFIXES:
+            try:
+                data = yaml.safe_load(path.read_text())
+            except yaml.YAMLError as e:
+                raise FlowError(f"Invalid YAML: {e}") from None
         else:
             raise FlowError(f"Unsupported flow file type '{path.suffix}'")
         return cls.from_dict(data)
@@ -507,12 +514,14 @@ class Flow:
         return json.dumps(self.to_dict(), indent=indent)
 
     def to_file(self, path: str | Path):
-        """Write the flow definition to a .json or .toml file, readable with from_file()"""
+        """Write the flow definition to a .yaml/.yml, .json or .toml file, readable with from_file()"""
         path = Path(path)
         if path.suffix == ".toml":
             text = tomli_w.dumps(self.to_dict())
         elif path.suffix == ".json":
             text = self.to_json() + "\n"
+        elif path.suffix in YAML_SUFFIXES:
+            text = yaml.safe_dump(self.to_dict(), sort_keys=False, allow_unicode=True)
         else:
             raise FlowError(f"Unsupported flow file type '{path.suffix}'")
         path.write_text(text)

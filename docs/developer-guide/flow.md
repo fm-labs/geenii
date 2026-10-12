@@ -21,7 +21,7 @@ Two terms:
 | `geenii/flow/processor/` | Built-in processors: `echo`, `execute_command`, `execute_script`, `read_file`, `read_http` |
 
 A runnable example is in `src/xflow.py` (`uv run python src/xflow.py`), and a
-file-based one is in `examples/flow_example.toml`.
+file-based one is in `examples/flow_example.yaml`.
 
 `run()` is **synchronous**: it returns when the flow is done. By default steps
 run one at a time in the calling thread; with `max_workers > 1`, independent
@@ -321,17 +321,58 @@ logger.
 
 ## Loading flows from files
 
-`Flow.from_file(path)` reads `.toml` or `.json`; `Flow.from_dict(data)` takes
-the same structure:
+`Flow.from_file(path)` reads `.yaml`/`.yml`, `.json` or `.toml`, picked by
+the file extension; `Flow.from_dict(data)` takes the same structure. YAML is
+loaded with `yaml.safe_load`, and a syntax error raises `FlowError`.
+
+```yaml
+name: example
+max_workers: 2   # optional, default 1
+
+vars:
+  greeting: hello
+
+# optional; edges usually come from `depends_on` on the steps
+edges:
+  - {from_step: greet, to_step: list}
+
+steps:
+  - id: greet
+    processor: echo
+    config:
+      message: ${vars.greeting}
+
+  - id: list
+    processor: execute_command
+    on_error: continue
+    config:
+      command: [docker, container, list, --all]
+
+  # a Python script in its own interpreter; the step input
+  # (greet's output, {"message": "hello"}) arrives as JSON on stdin
+  - id: count
+    processor: execute_script
+    depends_on: [greet]
+    config:
+      json_output: true   # parse stdout as JSON into `result`
+      script: |
+        import json, sys
+        data = json.load(sys.stdin)
+        print(json.dumps({"words": len(data["message"].split())}))
+
+  - id: report
+    processor: echo
+    depends_on: [greet, list, count]
+    config:
+      message: "${greet.message}: ${count.result.words} word(s)"
+```
+
+The same flow in TOML:
 
 ```toml
 name = "example"
-max_workers = 2   # optional, default 1
-
-# optional; edges can also come from `depends_on` on the steps
-edges = [
-    { from_step = "greet", to_step = "list" },
-]
+max_workers = 2
+edges = [{ from_step = "greet", to_step = "list" }]
 
 [vars]
 greeting = "hello"
@@ -348,22 +389,33 @@ on_error = "continue"
 config = { command = ["docker", "container", "list", "--all"] }
 
 [[steps]]
+id = "count"
+processor = "execute_script"
+depends_on = ["greet"]
+config = { json_output = true, script = """
+import json, sys
+data = json.load(sys.stdin)
+print(json.dumps({"words": len(data["message"].split())}))
+""" }
+
+[[steps]]
 id = "report"
 processor = "echo"
-depends_on = ["greet", "list"]
+depends_on = ["greet", "list", "count"]
+config = { message = "${greet.message}: ${count.result.words} word(s)" }
 ```
 
 ```python
 from geenii.flow import Flow
 
-result = Flow.from_file("examples/flow_example.toml").run()
+result = Flow.from_file("examples/flow_example.yaml").run()
 ```
 
 ### Saving flows
 
 `flow.to_dict()` returns the flow definition in the same structure, and
 `flow.to_json()` returns it as a JSON string. `flow.to_file(path)` writes it to
-a `.json` or `.toml` file that `from_file()` can read again. Step fields with
+a `.yaml`/`.yml`, `.json` or `.toml` file that `from_file()` can read again. Step fields with
 default values are left out, and only explicit edges are written (edges from
 `depends_on` stay on the steps). TOML can't store `None` values, so use `.json` for
 flows whose config contains `None`.

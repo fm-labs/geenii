@@ -89,7 +89,7 @@ def flow():
               help="Id of the run (default: a generated id).")
 @processor_module_option
 def run(path, input_value, variables, max_workers, as_json, quiet, snapshot_path, context_id, processor_modules):
-    """Run the flow in PATH (.toml or .json).
+    """Run the flow in PATH (.yaml/.yml, .json or .toml).
 
     Step events are printed to stderr. Exits with code 1 if the flow failed or was aborted.
     """

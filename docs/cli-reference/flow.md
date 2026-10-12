@@ -1,6 +1,6 @@
 # geenii flow
 
-Run and inspect flows: step pipelines defined in a `.toml` or `.json` file.
+Run and inspect flows: step pipelines defined in a `.yaml`/`.yml`, `.json` or `.toml` file.
 Flows run locally in the CLI process; they don't need the daemon. For the
 file format, the processors and how steps pass data, see the developer guide
 page [Flow](../developer-guide/flow.md).
@@ -48,19 +48,19 @@ flow output (the output of the last successful step) as JSON.
 #### Examples
 
 ```bash
-geenii flow run examples/flow_example.toml
+geenii flow run examples/flow_example.yaml
 ```
 
 ```bash
-geenii flow run my_flow.toml -i '{"url": "https://example.com"}' -v env=prod -w 4
+geenii flow run my_flow.yaml -i '{"url": "https://example.com"}' -v env=prod -w 4
 ```
 
 ```bash
-echo "some text" | geenii flow run my_flow.toml -i - -q --json
+echo "some text" | geenii flow run my_flow.yaml -i - -q --json
 ```
 
 ```bash
-geenii flow run my_flow.toml --snapshot run.json
+geenii flow run my_flow.yaml --snapshot run.json
 ```
 
 ### validate
@@ -90,7 +90,7 @@ exit code, unless `--strict` is given: then any warning exits with code 1.
 `geenii flow run` logs the same warnings and runs the flow anyway.
 
 ```
-$ geenii flow validate examples/flow_example.toml
+$ geenii flow validate examples/flow_example.yaml
 Flow 'example' is valid (4 steps, max_workers=1)
 
 Execution order:
@@ -130,15 +130,15 @@ An edge to an unknown step exits with code 1. Cycles are drawn as they are.
 #### Examples
 
 ```bash
-geenii flow graph my_flow.toml
+geenii flow graph my_flow.yaml
 ```
 
 ```bash
-geenii flow graph my_flow.toml -o my_flow.svg
+geenii flow graph my_flow.yaml -o my_flow.svg
 ```
 
 ```bash
-geenii flow graph my_flow.toml -f dot | dot -Tpng -o my_flow.png
+geenii flow graph my_flow.yaml -f dot | dot -Tpng -o my_flow.png
 ```
 
 Mermaid output renders directly in GitHub and GitLab Markdown inside a
@@ -147,7 +147,7 @@ into an image without Graphviz, use the Mermaid CLI:
 `npx @mermaid-js/mermaid-cli -i flow.mmd -o flow.svg`.
 
 ```
-$ geenii flow graph examples/flow_example.toml
+$ geenii flow graph examples/flow_example.yaml
 flowchart LR
     n0["step0<br/>(echo)"]
     n1["step1<br/>(read_http)"]

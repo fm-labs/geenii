@@ -1,0 +1,36 @@
+# Example flow, run with:
+#   uv run geenii flow run examples/flow_example.yaml
+name: example
+
+vars:
+  greeting: Step 0 message
+
+steps:
+  - id: step0
+    processor: echo
+    config:
+      message: ${vars.greeting}
+
+  - id: step1
+    processor: read_http
+    depends_on: [step0]
+    config:
+      url: https://httpbingo.org/get
+      params:
+        msg: ${step0.message}
+
+  - id: step2
+    processor: execute_command
+    depends_on: [step1]
+    on_error: continue
+    config:
+      command: [docker, container, list, --all]
+
+  - id: step3
+    processor: execute_script
+    depends_on: [step2]
+    config:
+      json_output: true
+      script: |
+        import json, sys
+        print(json.dumps({"input": json.load(sys.stdin)}))
