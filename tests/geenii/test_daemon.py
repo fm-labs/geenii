@@ -105,6 +105,7 @@ def test_one_socket_serves_all_three_components(short_dir):
         _wait_until(lambda: pm.status(a["pid"])["state"] == "completed"
                     and pm.status(b["pid"])["state"] == "completed")
         assert pm.output(a["pid"]) == "prefixed\n"
+        assert pm.output(a["pid"], offset=3, limit=3) == "fix"
         assert client.call("output", {"process_id": b["pid"]}) == "legacy\n"
 
         # Scheduler: live status and a manual run

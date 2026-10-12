@@ -110,6 +110,51 @@ def test_output_tail(procs_dir):
     asyncio.run(main())
 
 
+def test_output_offset_limit(procs_dir):
+    async def main():
+        pm = ProcessManager(procs_dir)
+        info = await pm.start(["printf", "0123456789"])
+        await _wait_done(pm, info.pid)
+        assert await pm.output(info.pid, offset=3, limit=4) == "3456"
+        assert await pm.output(info.pid, offset=7) == "789"
+        assert await pm.output(info.pid, limit=2) == "01"
+        assert await pm.output(info.pid, offset=10, limit=4) == ""
+        assert await pm.output(info.pid, offset=99) == ""
+
+    asyncio.run(main())
+
+
+@pytest.mark.parametrize("limit", [4, 5, 7, 64])
+def test_output_chunks_reassemble_multibyte_text(procs_dir, limit):
+    text = "a€b😀cdé\nümlaut ✓ ok\n" * 3
+
+    async def main():
+        pm = ProcessManager(procs_dir)
+        info = await pm.start(["printf", "%s", text])
+        await _wait_done(pm, info.pid)
+        chunks, offset = [], 0
+        while chunk := await pm.output(info.pid, offset=offset, limit=limit):
+            assert "�" not in chunk
+            chunks.append(chunk)
+            offset += limit
+        assert "".join(chunks) == text
+
+    asyncio.run(main())
+
+
+def test_output_rejects_bad_ranges(procs_dir):
+    async def main():
+        pm = ProcessManager(procs_dir)
+        info = await pm.start(["true"])
+        await _wait_done(pm, info.pid)
+        for kwargs in ({"tail": 2, "offset": 0}, {"tail": 2, "limit": 5},
+                       {"offset": -1}, {"limit": 0}):
+            with pytest.raises(ValueError):
+                await pm.output(info.pid, **kwargs)
+
+    asyncio.run(main())
+
+
 def test_output_while_running(procs_dir):
     async def main():
         pm = ProcessManager(procs_dir)

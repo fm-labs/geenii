@@ -70,11 +70,15 @@ def status(ctx, process_id):
 @click.argument("process_id")
 @click.option("--stream", type=click.Choice(["stdout", "stderr"]), default="stdout")
 @click.option("--tail", "-n", default=None, type=int, help="Show only the last N lines.")
+@click.option("--offset", default=None, type=int, help="Start reading at this byte position.")
+@click.option("--limit", default=None, type=int, help="Read at most this many bytes.")
 @click.pass_context
-def output(ctx, process_id, stream, tail):
+def output(ctx, process_id, stream, tail, offset, limit):
     """Show captured output of a background process."""
+    if tail is not None and (offset is not None or limit is not None):
+        raise click.UsageError("--tail cannot be combined with --offset/--limit")
     client = _client(ctx)
-    text = client.output(process_id, stream=stream, tail=tail)
+    text = client.output(process_id, stream=stream, tail=tail, offset=offset, limit=limit)
     click.echo(text, nl=False)
 
 

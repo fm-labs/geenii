@@ -47,13 +47,16 @@ def init_process_tools(tool_registry: ToolRegistry, client: ProcessManagerClient
             return json.dumps({"error": str(exc)})
 
     @tool_registry.tool(name="bg_process_output")
-    def process_output(process_id: str, stream: str = "stdout", tail: int = 0) -> str:
+    def process_output(process_id: str, stream: str = "stdout", tail: int = 0,
+                       offset: int = 0, limit: int = 0) -> str:
         """
         Retrieve captured output from a background process. Can be called while the process is still running to see partial output.
 
         :param process_id: The process ID returned by bg_process_start.
         :param stream: Which output stream to read: "stdout" or "stderr".
-        :param tail: If greater than 0, return only the last N lines. 0 returns all output.
+        :param tail: If greater than 0, return only the last N lines. 0 returns all output. Cannot be combined with offset/limit.
+        :param offset: Byte position to start reading at. Use with limit to read large output in chunks.
+        :param limit: If greater than 0, return at most this many bytes. An empty result means the end of the output.
         :return: The captured output text.
         """
         try:
@@ -61,6 +64,8 @@ def init_process_tools(tool_registry: ToolRegistry, client: ProcessManagerClient
                 process_id,
                 stream=stream,
                 tail=tail if tail > 0 else None,
+                offset=offset if offset > 0 else None,
+                limit=limit if limit > 0 else None,
             )
         except RuntimeError as exc:
             return f"Error: {exc}"

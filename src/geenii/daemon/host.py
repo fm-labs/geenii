@@ -131,6 +131,8 @@ class ProcessHost:
             params["process_id"],
             stream=params.get("stream", "stdout"),
             tail=tail if tail and tail > 0 else None,
+            offset=params.get("offset"),
+            limit=params.get("limit"),
         )
 
     async def _pm_wait(self, params: dict) -> dict:

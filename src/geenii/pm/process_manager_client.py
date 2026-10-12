@@ -21,9 +21,12 @@ class ProcessManagerClient(DaemonClient):
     def status(self, process_id: str) -> dict:
         return self.call("pm.status", {"process_id": process_id})
 
-    def output(self, process_id: str, stream: str = "stdout", tail: int | None = None) -> str:
+    def output(self, process_id: str, stream: str = "stdout", tail: int | None = None, *,
+               offset: int | None = None, limit: int | None = None) -> str:
+        """Read the last `tail` lines, or `limit` bytes from byte `offset` (not both)."""
         return self.call("pm.output", {
             "process_id": process_id, "stream": stream, "tail": tail,
+            "offset": offset, "limit": limit,
         })
 
     def wait(self, process_id: str, timeout: float | None = None) -> dict:

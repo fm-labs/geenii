@@ -56,6 +56,13 @@ TERMINATE_GRACE_S = proc_util.TERMINATE_GRACE_S  # SIGTERM → SIGKILL grace per
 # (no path separators, no leading dot, so no "." / ".." / hidden files).
 _PID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
+# A UTF-8 character is a lead byte followed by at most 3 continuation bytes (0b10xxxxxx)
+_UTF8_MAX_CONT = 3
+
+
+def _is_utf8_cont(byte: int) -> bool:
+    return byte & 0xC0 == 0x80
+
 
 class ProcessState(str, Enum):
     PENDING = "pending"
@@ -284,19 +291,44 @@ class ProcessManager:
             raise KeyError(f"Unknown process: {pid}")
         return ProcessInfo.from_meta(meta)
 
-    async def output(self, pid: str, stream: str = "stdout", tail: Optional[int] = None) -> str:
+    async def output(
+        self,
+        pid: str,
+        stream: str = "stdout",
+        tail: Optional[int] = None,
+        *,
+        offset: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> str:
         """
         Read captured output of a process.
+
+        Either the last `tail` lines, or a chunk of `limit` bytes starting at
+        byte `offset` (tail is mutually exclusive with offset/limit). To read the
+        whole output in chunks, advance offset by limit until an empty string is
+        returned. A UTF-8 character split across a chunk boundary is returned
+        whole with the chunk holding its first byte, so concatenated chunks equal
+        the full output (with limit >= 4, a chunk is only empty past the end).
 
         :param pid: Process ID.
         :param stream: "stdout" or "stderr".
         :param tail: If set, return only the last N lines.
+        :param offset: Byte position to start reading at (default 0).
+        :param limit: Maximum number of bytes to read (default: to the end).
         :return: The captured output as a string.
         """
         if stream not in ("stdout", "stderr"):
             raise ValueError(f"Invalid stream {stream!r}: must be 'stdout' or 'stderr'")
+        if tail is not None and (offset is not None or limit is not None):
+            raise ValueError("tail cannot be combined with offset/limit")
+        if offset is not None and offset < 0:
+            raise ValueError("offset must be >= 0")
+        if limit is not None and limit < 1:
+            raise ValueError("limit must be >= 1")
         log_file = os.path.join(self._proc_path(pid), f"{stream}.log")
-        return await asyncio.to_thread(self._read_log, pid, stream, log_file, tail)
+        if tail is not None:
+            return await asyncio.to_thread(self._read_log_tail, pid, stream, log_file, tail)
+        return await asyncio.to_thread(self._read_log_chunk, pid, stream, log_file, offset or 0, limit)
 
     async def wait(self, pid: str, timeout: Optional[float] = None) -> ProcessInfo:
         """
@@ -410,13 +442,35 @@ class ProcessManager:
         logger.info(f"Process {info.pid} finished: state={info.state.value} exit_code={info.exit_code}")
 
     @staticmethod
-    def _read_log(pid: str, stream: str, log_file: str, tail: Optional[int]) -> str:
+    def _read_log_tail(pid: str, stream: str, log_file: str, tail: int) -> str:
         if not os.path.isfile(log_file):
             raise KeyError(f"No {stream} log for process {pid}")
         with open(log_file, "r", errors="replace") as f:
-            if tail is None:
-                return f.read()
             return "".join(deque(f, maxlen=max(tail, 0))).rstrip("\n")
+
+    @staticmethod
+    def _read_log_chunk(pid: str, stream: str, log_file: str, offset: int, limit: Optional[int]) -> str:
+        if not os.path.isfile(log_file):
+            raise KeyError(f"No {stream} log for process {pid}")
+        with open(log_file, "rb") as f:
+            f.seek(offset)
+            data = f.read() if limit is None else f.read(limit)
+            if not data:
+                return ""
+            # A character belongs to the chunk holding its first byte: skip the
+            # continuation bytes the previous chunk already returned, and complete
+            # a character cut off at the end of this one.
+            start = 0
+            if offset > 0:
+                while start < min(_UTF8_MAX_CONT, len(data)) and _is_utf8_cont(data[start]):
+                    start += 1
+            if limit is not None:
+                extra = f.read(_UTF8_MAX_CONT)
+                end = 0
+                while end < len(extra) and _is_utf8_cont(extra[end]):
+                    end += 1
+                data += extra[:end]
+        return data[start:].decode("utf-8", errors="replace")
 
     def _scan_finished(self, known_pids: set[str]) -> List[ProcessInfo]:
         if not os.path.isdir(self._processes_dir):
