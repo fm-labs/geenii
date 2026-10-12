@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, UTC
-from typing import List, Any, Set, Literal, Optional
+from typing import List, Any, Set, Literal, Optional, Annotated
 
 import pydantic
 
@@ -25,6 +25,22 @@ class AIModelInfo(pydantic.BaseModel):
     installed: bool = False
 
 
+class SystemMessage(pydantic.BaseModel):
+    type: str = "system"
+    content: list[ContentPart] = pydantic.Field(default_factory=list)
+    id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex)
+    timestamp: datetime = pydantic.Field(default_factory=lambda: datetime.now(UTC))
+
+    def to_text(self) -> str:
+        return "\n".join(part.to_text() for part in self.content)
+
+    def to_json(self) -> str:
+        return self.model_dump_json()
+
+    def to_dict(self) -> dict:
+        return self.model_dump(mode="python")
+
+
 class ModelMessage(pydantic.BaseModel):
     type: str = "message"
     role: str  # e.g., "user", "assistant", "system"
@@ -40,6 +56,11 @@ class ModelMessage(pydantic.BaseModel):
 
     def to_dict(self) -> dict:
         return self.model_dump(mode="python")
+
+WireMessage = Annotated[
+    SystemMessage | ModelMessage,
+    pydantic.Field(discriminator="type"),
+]
 
 # Completion
 

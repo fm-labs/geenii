@@ -1,7 +1,6 @@
 import json
 import uuid
 from typing import Annotated, Literal, Any
-import datetime
 
 import pydantic
 from pydantic import BaseModel, Field
@@ -148,78 +147,78 @@ ContentPart = Annotated[
 ]
 
 
-# --- Message Models ---
-
-class MessageCreate(BaseModel):
-    content: list[ContentPart]
-
-
-# --- Wire Message Models (connection/queue level, no DB id/created_at) ---
-
-class ChatMessage(BaseModel):
-    """A user or bot message travelling through the connection layer."""
-    type: Literal["message"] = "message"
-    room_id: str
-    sender_id: str
-    content: list[ContentPart]
-    id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex)
-    created_at: int = pydantic.Field(default_factory=lambda: int(datetime.datetime.now().timestamp() * 1000)) # default to current timestamp in milliseconds
-
-
-class SystemMessage(BaseModel):
-    """A server-generated notification (join, leave, status, etc.)."""
-    type: Literal["system"] = "system"
-    room_id: str
-    content: str
-
-
-WireMessage = ChatMessage | SystemMessage
-
-
-# --- Room Models ---
-
-RoomType = Literal["group", "dm"]
-
-
-class RoomCreate(BaseModel):
-    name: str
-    is_public: bool = False
-    password: str | None = None
-    room_type: RoomType = "group"
-    dm_peer: str | None = None  # required when room_type == "dm"
-
-
-class Room(BaseModel):
-    id: str
-    name: str
-    owner: str
-    is_public: bool
-    room_type: RoomType
-    created_at: str
-
-
-# --- Member Models ---
-
-class JoinRoom(BaseModel):
-    username: str
-    password: str | None = None
-    member_type: Literal["user", "bot"] = "user"
-
-
-class LeaveRoom(BaseModel):
-    username: str
-
-
-class InviteUser(BaseModel):
-    username: str
-    member_type: Literal["user", "bot"] = "user"
-
-
-class Member(BaseModel):
-    id: int
-    room_id: str
-    username: str
-    member_type: str
-    status: str
-    joined_at: str
-
+# # --- Message Models ---
+#
+# class MessageCreate(BaseModel):
+#     content: list[ContentPart]
+#
+#
+# # --- Wire Message Models (connection/queue level, no DB id/created_at) ---
+#
+# class ChatMessage(BaseModel):
+#     """A user or bot message travelling through the connection layer."""
+#     type: Literal["message"] = "message"
+#     room_id: str
+#     sender_id: str
+#     content: list[ContentPart]
+#     id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex)
+#     created_at: int = pydantic.Field(default_factory=lambda: int(datetime.datetime.now().timestamp() * 1000)) # default to current timestamp in milliseconds
+#
+#
+# class SystemMessage(BaseModel):
+#     """A server-generated notification (join, leave, status, etc.)."""
+#     type: Literal["system"] = "system"
+#     room_id: str
+#     content: str
+#
+#
+# WireMessage = ChatMessage | SystemMessage
+#
+#
+# # --- Room Models ---
+#
+# RoomType = Literal["group", "dm"]
+#
+#
+# class RoomCreate(BaseModel):
+#     name: str
+#     is_public: bool = False
+#     password: str | None = None
+#     room_type: RoomType = "group"
+#     dm_peer: str | None = None  # required when room_type == "dm"
+#
+#
+# class Room(BaseModel):
+#     id: str
+#     name: str
+#     owner: str
+#     is_public: bool
+#     room_type: RoomType
+#     created_at: str
+#
+#
+# # --- Member Models ---
+#
+# class JoinRoom(BaseModel):
+#     username: str
+#     password: str | None = None
+#     member_type: Literal["user", "bot"] = "user"
+#
+#
+# class LeaveRoom(BaseModel):
+#     username: str
+#
+#
+# class InviteUser(BaseModel):
+#     username: str
+#     member_type: Literal["user", "bot"] = "user"
+#
+#
+# class Member(BaseModel):
+#     id: int
+#     room_id: str
+#     username: str
+#     member_type: str
+#     status: str
+#     joined_at: str
+#
