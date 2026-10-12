@@ -6,23 +6,23 @@ import time
 import httpx
 import pytest
 
-from geenii.flow import Flow, FlowContext, FlowError, FlowStep, FlowStepSpec, StepEvent, register_step
-from geenii.flow.steps.read_http import ReadHttpStep
+from geenii.flow import Flow, FlowContext, FlowError, FlowProcessor, FlowStepSpec, StepEvent, register_processor
+from geenii.flow.processor.read_http import ReadHttpProcessor
 
 
-@register_step("test_fail")
-class FailStep(FlowStep):
+@register_processor("test_fail")
+class FailProcessor(FlowProcessor):
     def process(self, input_data, ctx):
         raise ValueError("boom")
 
 
-@register_step("test_abort")
-class AbortStep(FlowStep):
+@register_processor("test_abort")
+class AbortProcessor(FlowProcessor):
     def process(self, input_data, ctx):
         ctx.abort("stop here")
 
 
-class PlainStep(FlowStep):
+class PlainProcessor(FlowProcessor):
     """Non-generator step, loaded by module path"""
     def process(self, input_data, ctx):
         return {"got": input_data}
@@ -30,8 +30,8 @@ class PlainStep(FlowStep):
 
 def test_echo_passes_output_to_next_step():
     flow = Flow("t", [
-        FlowStepSpec(id="a", type="echo", config={"message": "hello"}),
-        FlowStepSpec(id="b", type="echo"),
+        FlowStepSpec(id="a", processor="echo", config={"message": "hello"}),
+        FlowStepSpec(id="b", processor="echo"),
     ])
     result = flow.run()
     assert result.status == "success"
@@ -41,9 +41,9 @@ def test_echo_passes_output_to_next_step():
 
 def test_references_and_interpolation():
     flow = Flow("t", [
-        {"id": "a", "type": "echo", "config": {"message": {"name": "geenii", "items": [1, 2]}}},
-        {"id": "b", "type": "echo", "config": {"message": "${a.message.items}"}},
-        {"id": "c", "type": "echo", "config": {"message": "hi ${a.message.name} ${vars.x} ${input} $${a}"}},
+        {"id": "a", "processor": "echo", "config": {"message": {"name": "geenii", "items": [1, 2]}}},
+        {"id": "b", "processor": "echo", "config": {"message": "${a.message.items}"}},
+        {"id": "c", "processor": "echo", "config": {"message": "hi ${a.message.name} ${vars.x} ${input} $${a}"}},
     ], variables={"x": "X"})
     result = flow.run(input_data="IN")
     assert result.get("b").output["message"] == [1, 2]
@@ -51,22 +51,22 @@ def test_references_and_interpolation():
 
 
 def test_unknown_reference_fails_step():
-    result = Flow("t", [{"id": "a", "type": "echo", "config": {"message": "${nope.x}"}}]).run()
+    result = Flow("t", [{"id": "a", "processor": "echo", "config": {"message": "${nope.x}"}}]).run()
     assert result.status == "failed"
     assert "nope.x" in result.get("a").error
 
 
 def test_duplicate_and_reserved_ids():
     with pytest.raises(FlowError):
-        Flow("t", [{"id": "a", "type": "echo"}, {"id": "a", "type": "echo"}])
+        Flow("t", [{"id": "a", "processor": "echo"}, {"id": "a", "processor": "echo"}])
     with pytest.raises(FlowError):
-        Flow("t", [{"id": "input", "type": "echo"}])
+        Flow("t", [{"id": "input", "processor": "echo"}])
 
 
 def test_on_error_stop_skips_remaining():
     result = Flow("t", [
-        {"id": "a", "type": "test_fail"},
-        {"id": "b", "type": "echo"},
+        {"id": "a", "processor": "test_fail"},
+        {"id": "b", "processor": "echo"},
     ]).run()
     assert result.status == "failed"
     assert result.get("a").error == "ValueError: boom"
@@ -75,8 +75,8 @@ def test_on_error_stop_skips_remaining():
 
 def test_on_error_continue():
     result = Flow("t", [
-        {"id": "a", "type": "test_fail", "on_error": "continue"},
-        {"id": "b", "type": "echo", "config": {"message": "still here"}},
+        {"id": "a", "processor": "test_fail", "on_error": "continue"},
+        {"id": "b", "processor": "echo", "config": {"message": "still here"}},
     ]).run()
     assert result.status == "failed"
     assert result.get("b").status == "success"
@@ -84,8 +84,8 @@ def test_on_error_continue():
 
 def test_abort():
     result = Flow("t", [
-        {"id": "a", "type": "test_abort"},
-        {"id": "b", "type": "echo"},
+        {"id": "a", "processor": "test_abort"},
+        {"id": "b", "processor": "echo"},
     ]).run()
     assert result.status == "aborted"
     assert result.get("a").error == "stop here"
@@ -93,22 +93,22 @@ def test_abort():
 
 
 def test_unknown_type_and_module_path():
-    assert Flow("t", [{"id": "a", "type": "does_not_exist"}]).run().status == "failed"
-    result = Flow("t", [{"id": "a", "type": f"{__name__}:PlainStep"}]).run(input_data=1)
+    assert Flow("t", [{"id": "a", "processor": "does_not_exist"}]).run().status == "failed"
+    result = Flow("t", [{"id": "a", "processor": f"{__name__}:PlainProcessor"}]).run(input_data=1)
     assert result.output == {"got": 1}
 
 
 def test_events():
     events: list[StepEvent] = []
-    Flow("t", [{"id": "a", "type": "echo", "config": {"message": "m"}}]).run(on_event=events.append)
+    Flow("t", [{"id": "a", "processor": "echo", "config": {"message": "m"}}]).run(on_event=events.append)
     assert [(e.type, e.step_id) for e in events] == [("step.start", "a"), ("log", "a"), ("step.end", "a")]
 
 
 def test_execute_command():
     result = Flow("t", [
-        {"id": "a", "type": "execute_command", "config": {"command": [sys.executable, "-c", "print('out', end='')"]}},
-        {"id": "b", "type": "execute_command", "config": {"command": "echo ${a.stdout} | tr a-z A-Z", "shell": True}},
-        {"id": "c", "type": "execute_command", "config": {"command": "false", "check": True}},
+        {"id": "a", "processor": "execute_command", "config": {"command": [sys.executable, "-c", "print('out', end='')"]}},
+        {"id": "b", "processor": "execute_command", "config": {"command": "echo ${a.stdout} | tr a-z A-Z", "shell": True}},
+        {"id": "c", "processor": "execute_command", "config": {"command": "false", "check": True}},
     ]).run()
     assert result.get("a").output == {"stdout": "out", "stderr": "", "rc": 0}
     assert result.get("b").output["stdout"].strip() == "OUT"
@@ -122,7 +122,7 @@ def test_execute_script_receives_input_on_stdin():
         print(json.dumps({"doubled": data["n"] * 2}))
     """
     result = Flow("t", [
-        {"id": "a", "type": "execute_script", "config": {"script": script, "json_output": True}},
+        {"id": "a", "processor": "execute_script", "config": {"script": script, "json_output": True}},
     ]).run(input_data={"n": 21})
     assert result.status == "success", result.get("a").error
     assert result.output["result"] == {"doubled": 42}
@@ -133,9 +133,9 @@ def test_read_http(monkeypatch):
         assert request.url.params["q"] == "x"
         return httpx.Response(200, json={"ok": True})
 
-    monkeypatch.setattr(ReadHttpStep, "transport", httpx.MockTransport(handler))
+    monkeypatch.setattr(ReadHttpProcessor, "transport", httpx.MockTransport(handler))
     result = Flow("t", [
-        {"id": "a", "type": "read_http", "config": {"url": "http://test/api", "params": {"q": "x"}}},
+        {"id": "a", "processor": "read_http", "config": {"url": "http://test/api", "params": {"q": "x"}}},
     ]).run()
     assert result.status == "success", result.get("a").error
     assert result.output["status"] == 200
@@ -144,11 +144,11 @@ def test_read_http(monkeypatch):
 
 def test_from_file(tmp_path):
     path = tmp_path / "flow.json"
-    path.write_text(json.dumps({"name": "f", "steps": [{"id": "a", "type": "echo", "config": {"message": "x"}}]}))
+    path.write_text(json.dumps({"name": "f", "steps": [{"id": "a", "processor": "echo", "config": {"message": "x"}}]}))
     assert Flow.from_file(path).run().output == {"message": "x"}
 
     toml = tmp_path / "flow.toml"
-    toml.write_text('name = "f"\n[[steps]]\nid = "a"\ntype = "echo"\nconfig = { message = "y" }\n')
+    toml.write_text('name = "f"\n[[steps]]\nid = "a"\nprocessor = "echo"\nconfig = { message = "y" }\n')
     assert Flow.from_file(toml).run().output == {"message": "y"}
 
 
@@ -165,15 +165,15 @@ def _order(result):
 
 
 def test_no_edges_runs_in_insertion_order():
-    flow = Flow("t", [{"id": "a", "type": "echo"}, {"id": "b", "type": "echo"}, {"id": "c", "type": "echo"}])
+    flow = Flow("t", [{"id": "a", "processor": "echo"}, {"id": "b", "processor": "echo"}, {"id": "c", "processor": "echo"}])
     assert [(e.from_step, e.to_step) for e in flow.edges] == [("a", "b"), ("b", "c")]
 
 
 def test_edges_define_order():
     flow = Flow("t", [
-        {"id": "c", "type": "echo"},
-        {"id": "b", "type": "echo"},
-        {"id": "a", "type": "echo", "config": {"message": "A"}},
+        {"id": "c", "processor": "echo"},
+        {"id": "b", "processor": "echo"},
+        {"id": "a", "processor": "echo", "config": {"message": "A"}},
     ], edges=[("a", "b"), {"from_step": "b", "to_step": "c"}])
     result = flow.run()
     assert _order(result) == ["a", "b", "c"]
@@ -182,8 +182,8 @@ def test_edges_define_order():
 
 def test_after_infers_edges():
     flow = Flow("t", [
-        {"id": "b", "type": "echo", "after": "a"},
-        {"id": "a", "type": "echo", "config": {"message": "A"}},
+        {"id": "b", "processor": "echo", "after": "a"},
+        {"id": "a", "processor": "echo", "config": {"message": "A"}},
     ])
     assert [(e.from_step, e.to_step) for e in flow.edges] == [("a", "b")]
     assert _order(flow.run()) == ["a", "b"]
@@ -191,9 +191,9 @@ def test_after_infers_edges():
 
 def test_roots_get_flow_input_and_join_gets_dict():
     flow = Flow("t", [
-        {"id": "left", "type": "echo"},
-        {"id": "right", "type": "echo", "config": {"message": "R"}},
-        {"id": "join", "type": "echo", "after": ["left", "right"]},
+        {"id": "left", "processor": "echo"},
+        {"id": "right", "processor": "echo", "config": {"message": "R"}},
+        {"id": "join", "processor": "echo", "after": ["left", "right"]},
     ])
     result = flow.run(input_data="IN")
     assert result.get("left").output == {"message": "IN"}
@@ -201,7 +201,7 @@ def test_roots_get_flow_input_and_join_gets_dict():
 
 
 def test_add_edge_variants_and_dedupe():
-    flow = Flow("t", [{"id": "a", "type": "echo"}, {"id": "b", "type": "echo", "after": "a"}])
+    flow = Flow("t", [{"id": "a", "processor": "echo"}, {"id": "b", "processor": "echo", "after": "a"}])
     flow.add_edge("a", "b")
     flow.add_edge(("a", "b"))
     assert len(flow.edges) == 1
@@ -211,16 +211,16 @@ def test_add_edge_variants_and_dedupe():
 
 def test_invalid_graph_raises():
     with pytest.raises(FlowError, match="unknown step 'x'"):
-        Flow("t", [{"id": "a", "type": "echo", "after": "x"}]).run()
+        Flow("t", [{"id": "a", "processor": "echo", "after": "x"}]).run()
     with pytest.raises(FlowError, match="Cycle"):
-        Flow("t", [{"id": "a", "type": "echo", "after": "b"}, {"id": "b", "type": "echo", "after": "a"}]).run()
+        Flow("t", [{"id": "a", "processor": "echo", "after": "b"}, {"id": "b", "processor": "echo", "after": "a"}]).run()
 
 
 def test_continue_in_dag_passes_none_downstream():
     flow = Flow("t", [
-        {"id": "a", "type": "test_fail", "on_error": "continue"},
-        {"id": "b", "type": "echo", "after": "a"},
-        {"id": "c", "type": "echo", "config": {"message": "independent"}},
+        {"id": "a", "processor": "test_fail", "on_error": "continue"},
+        {"id": "b", "processor": "echo", "after": "a"},
+        {"id": "c", "processor": "echo", "config": {"message": "independent"}},
     ])
     result = flow.run()
     assert result.status == "failed"
@@ -233,8 +233,8 @@ def test_edges_from_toml(tmp_path):
     toml.write_text(
         'name = "f"\n'
         'edges = [{ from_step = "a", to_step = "b" }]\n'
-        '[[steps]]\nid = "b"\ntype = "echo"\n'
-        '[[steps]]\nid = "a"\ntype = "echo"\nconfig = { message = "x" }\n'
+        '[[steps]]\nid = "b"\nprocessor = "echo"\n'
+        '[[steps]]\nid = "a"\nprocessor = "echo"\nconfig = { message = "x" }\n'
     )
     result = Flow.from_file(toml).run()
     assert _order(result) == ["a", "b"]
@@ -243,25 +243,25 @@ def test_edges_from_toml(tmp_path):
 
 # --- parallel execution ---
 
-@register_step("test_barrier")
-class BarrierStep(FlowStep):
+@register_processor("test_barrier")
+class BarrierProcessor(FlowProcessor):
     """Waits until `parties` steps reach the barrier in ctx.vars; fails when they don't run concurrently"""
     def process(self, input_data, ctx):
         ctx.vars["barrier"].wait()
         return {"thread": threading.current_thread().name}
 
 
-@register_step("test_sleep")
-class SleepStep(FlowStep):
+@register_processor("test_sleep")
+class SleepProcessor(FlowProcessor):
     def process(self, input_data, ctx):
         time.sleep(self.config.get("seconds", 0.2))
         return {"stopping": ctx.stopping}
 
 
-def _branches(n: int, step_type: str = "test_barrier") -> list[dict]:
-    steps = [{"id": "root", "type": "echo", "config": {"message": "r"}}]
-    steps += [{"id": f"b{i}", "type": step_type, "after": "root"} for i in range(n)]
-    steps += [{"id": "join", "type": "echo", "after": [f"b{i}" for i in range(n)]}]
+def _branches(n: int, processor: str = "test_barrier") -> list[dict]:
+    steps = [{"id": "root", "processor": "echo", "config": {"message": "r"}}]
+    steps += [{"id": f"b{i}", "processor": processor, "after": "root"} for i in range(n)]
+    steps += [{"id": "join", "processor": "echo", "after": [f"b{i}" for i in range(n)]}]
     return steps
 
 
@@ -276,7 +276,7 @@ def test_parallel_branches_run_concurrently():
 
 
 def test_sequential_by_default():
-    # with one worker the barrier can never be reached by 2 steps at once
+    # with one worker the barrier can never be reached by 2 processor at once
     flow = Flow("t", _branches(2), variables={"barrier": threading.Barrier(2, timeout=0.2)})
     result = flow.run()
     assert result.get("b0").status == "failed"
@@ -295,9 +295,9 @@ def test_max_workers_override_and_limit():
 
 def test_parallel_stop_lets_running_steps_finish():
     flow = Flow("t", [
-        {"id": "slow", "type": "test_sleep", "config": {"seconds": 0.3}},
-        {"id": "fail", "type": "test_fail"},
-        {"id": "after_slow", "type": "echo", "after": "slow"},
+        {"id": "slow", "processor": "test_sleep", "config": {"seconds": 0.3}},
+        {"id": "fail", "processor": "test_fail"},
+        {"id": "after_slow", "processor": "echo", "after": "slow"},
     ], max_workers=2)
     result = flow.run()
     assert result.status == "failed"
@@ -325,7 +325,7 @@ def test_parallel_events_are_serialized():
 
 def test_max_workers_from_file(tmp_path):
     path = tmp_path / "flow.json"
-    path.write_text(json.dumps({"name": "f", "max_workers": 4, "steps": [{"id": "a", "type": "echo"}]}))
+    path.write_text(json.dumps({"name": "f", "max_workers": 4, "steps": [{"id": "a", "processor": "echo"}]}))
     assert Flow.from_file(path).max_workers == 4
 
 
@@ -333,9 +333,9 @@ def test_max_workers_from_file(tmp_path):
 
 def _graph_flow():
     return Flow("my flow", [
-        {"id": "a", "type": "echo"},
-        {"id": "b", "type": "echo", "after": "a"},
-        {"id": 'say "hi"', "type": "echo", "after": "a"},
+        {"id": "a", "processor": "echo"},
+        {"id": "b", "processor": "echo", "after": "a"},
+        {"id": 'say "hi"', "processor": "echo", "after": "a"},
     ])
 
 
@@ -362,7 +362,7 @@ def test_to_dot():
 
 
 def test_graph_unknown_step_raises():
-    flow = Flow("t", [{"id": "a", "type": "echo", "after": "x"}])
+    flow = Flow("t", [{"id": "a", "processor": "echo", "after": "x"}])
     with pytest.raises(FlowError):
         flow.to_mermaid()
     with pytest.raises(FlowError):

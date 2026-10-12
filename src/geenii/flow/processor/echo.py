@@ -2,7 +2,7 @@ from typing import Any, Generator
 
 import pydantic
 
-from geenii.flow.flow import FlowContext, FlowStep, StepEvent, register_step
+from geenii.flow.flow import FlowContext, FlowProcessor, StepEvent, register_processor
 
 
 class EchoConfig(pydantic.BaseModel):
@@ -13,8 +13,8 @@ class EchoOutput(pydantic.BaseModel):
     message: Any
 
 
-@register_step("echo")
-class EchoStep(FlowStep):
+@register_processor("echo")
+class EchoProcessor(FlowProcessor):
     """Returns the configured message, or the step input if no message is set"""
 
     config_model = EchoConfig

@@ -20,7 +20,7 @@ def _write(tmp_path, data: dict, name: str = "flow.json"):
 
 def test_run_success_with_input_and_vars(runner, tmp_path):
     path = _write(tmp_path, {"name": "f", "steps": [
-        {"id": "a", "type": "echo", "config": {"message": "${input.n} ${vars.who}"}},
+        {"id": "a", "processor": "echo", "config": {"message": "${input.n} ${vars.who}"}},
     ]})
     result = runner.invoke(flow, ["run", path, "-q", "--json", "-i", '{"n": 1}', "-v", "who=me"])
     assert result.exit_code == 0, result.output
@@ -30,7 +30,7 @@ def test_run_success_with_input_and_vars(runner, tmp_path):
 
 
 def test_run_input_from_stdin_and_events(runner, tmp_path):
-    path = _write(tmp_path, {"name": "f", "steps": [{"id": "a", "type": "echo"}]})
+    path = _write(tmp_path, {"name": "f", "steps": [{"id": "a", "processor": "echo"}]})
     result = runner.invoke(flow, ["run", path], input="plain text\n")
     assert result.exit_code == 0
     assert "[a] start (echo)" in result.stderr
@@ -42,7 +42,7 @@ def test_run_input_from_stdin_and_events(runner, tmp_path):
 
 def test_run_failed_flow_exits_1(runner, tmp_path):
     path = _write(tmp_path, {"name": "f", "steps": [
-        {"id": "a", "type": "execute_command", "config": {"command": "false", "check": True}},
+        {"id": "a", "processor": "execute_command", "config": {"command": "false", "check": True}},
     ]})
     result = runner.invoke(flow, ["run", path, "-q"])
     assert result.exit_code == 1
@@ -50,7 +50,7 @@ def test_run_failed_flow_exits_1(runner, tmp_path):
 
 
 def test_run_invalid_graph_and_file(runner, tmp_path):
-    path = _write(tmp_path, {"name": "f", "steps": [{"id": "a", "type": "echo", "after": "x"}]})
+    path = _write(tmp_path, {"name": "f", "steps": [{"id": "a", "processor": "echo", "after": "x"}]})
     result = runner.invoke(flow, ["run", path])
     assert result.exit_code == 1
     assert "unknown step 'x'" in result.stderr
@@ -67,46 +67,46 @@ def test_run_invalid_graph_and_file(runner, tmp_path):
 
 def test_validate(runner, tmp_path):
     path = _write(tmp_path, {"name": "f", "steps": [
-        {"id": "b", "type": "echo", "after": "a"},
-        {"id": "a", "type": "echo"},
+        {"id": "b", "processor": "echo", "after": "a"},
+        {"id": "a", "processor": "echo"},
     ]})
     result = runner.invoke(flow, ["validate", path])
     assert result.exit_code == 0
     assert result.stdout.index("  a [echo]") < result.stdout.index("  b [echo]  (after a)")
 
     path = _write(tmp_path, {"name": "f", "steps": [
-        {"id": "a", "type": "nope", "after": "b"},
-        {"id": "b", "type": "echo", "after": "a"},
+        {"id": "a", "processor": "nope", "after": "b"},
+        {"id": "b", "processor": "echo", "after": "a"},
     ]}, name="bad.json")
     result = runner.invoke(flow, ["validate", path])
     assert result.exit_code == 1
     assert "Cycle" in result.stderr
-    assert "Unknown step type 'nope'" in result.stderr
+    assert "Unknown processor type 'nope'" in result.stderr
 
 
-def test_steps_with_custom_module(runner, tmp_path, monkeypatch):
-    (tmp_path / "my_cli_steps.py").write_text(
-        "from geenii.flow import FlowStep, register_step\n\n"
-        "@register_step('my_cli_step')\n"
-        "class MyStep(FlowStep):\n"
+def test_processors_with_custom_module(runner, tmp_path, monkeypatch):
+    (tmp_path / "my_cli_processors.py").write_text(
+        "from geenii.flow import FlowProcessor, register_processor\n\n"
+        "@register_processor('my_cli_step')\n"
+        "class MyProcessor(FlowProcessor):\n"
         "    \"\"\"Does custom things\"\"\"\n"
         "    def process(self, input_data, ctx):\n"
         "        return {'ok': True}\n"
     )
     monkeypatch.syspath_prepend(str(tmp_path))
-    result = runner.invoke(flow, ["steps", "-m", "my_cli_steps"])
+    result = runner.invoke(flow, ["processors", "-m", "my_cli_processors"])
     assert result.exit_code == 0
     assert "echo" in result.stdout
     assert "my_cli_step" in result.stdout and "Does custom things" in result.stdout
 
-    result = runner.invoke(flow, ["steps", "-m", "does_not_exist_xyz"])
+    result = runner.invoke(flow, ["processors", "-m", "does_not_exist_xyz"])
     assert result.exit_code == 1
 
 
 def _graph_file(tmp_path):
     return _write(tmp_path, {"name": "f", "steps": [
-        {"id": "a", "type": "echo"},
-        {"id": "b", "type": "echo", "after": "a"},
+        {"id": "a", "processor": "echo"},
+        {"id": "b", "processor": "echo", "after": "a"},
     ]})
 
 

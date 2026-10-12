@@ -2,8 +2,8 @@
 Flow: run steps as a DAG, passing each step's output to the steps after it.
 
 A flow is a set of FlowStepSpecs (the nodes) and FlowEdges (the order). Each
-spec names a step type (a registered name like "echo", or
-"package.module:ClassName"), a unique id and a config. Edges are added with
+spec names a processor (a registered name like "echo", or
+"package.module:ClassName") that handles the step, a unique id and a config. Edges are added with
 Flow.add_edge() or inferred from a step's ``after`` list. A flow without any
 edges runs its steps in the order they were added.
 
@@ -53,7 +53,7 @@ class FlowAborted(Exception):
 
 class FlowStepSpec(pydantic.BaseModel):
     id: str
-    type: str
+    processor: str
     config: dict[str, Any] = {}
     on_error: Literal["stop", "continue"] = "stop"
     # ids of steps this step runs after; each one adds an edge (after_id -> id)
@@ -193,9 +193,9 @@ def _get_item(value: Any, key: str, ref: str) -> Any:
         raise FlowError(f"Cannot resolve '{key}' in reference '${{{ref}}}'") from None
 
 
-class FlowStep:
+class FlowProcessor:
     """
-    Base class for steps.
+    Base class for processing steps.
 
     Subclasses implement process() as a generator: yield StepEvents (or any
     value, which is wrapped as a "data" event) while working, and return the
@@ -218,37 +218,37 @@ class FlowStep:
         yield  # pragma: no cover
 
 
-_STEP_REGISTRY: dict[str, type[FlowStep]] = {}
+_PROCESSOR_REGISTRY: dict[str, type[FlowProcessor]] = {}
 
 
-def register_step(name: str):
-    """Class decorator registering a step type under a short name"""
-    def decorator(cls: type[FlowStep]) -> type[FlowStep]:
+def register_processor(name: str):
+    """Class decorator registering a processor type under a short name"""
+    def decorator(cls: type[FlowProcessor]) -> type[FlowProcessor]:
         cls.type_name = name
-        _STEP_REGISTRY[name] = cls
+        _PROCESSOR_REGISTRY[name] = cls
         return cls
     return decorator
 
 
-def list_step_types() -> dict[str, type[FlowStep]]:
-    """All registered step types by name, including the built-in steps"""
-    import geenii.flow.steps  # noqa: F401 - registers the built-in steps
-    return dict(sorted(_STEP_REGISTRY.items()))
+def list_processor_types() -> dict[str, type[FlowProcessor]]:
+    """All registered processor types by name, including the built-in processors"""
+    import geenii.flow.processor  # noqa: F401 - registers the built-in processors
+    return dict(sorted(_PROCESSOR_REGISTRY.items()))
 
 
-def get_step_class(step_type: str) -> type[FlowStep]:
-    if ":" in step_type:
-        module_name, class_name = step_type.split(":", 1)
+def get_step_processor_class(processor: str) -> type[FlowProcessor]:
+    if ":" in processor:
+        module_name, class_name = processor.split(":", 1)
         cls = getattr(importlib.import_module(module_name), class_name, None)
         if cls is None:
-            raise FlowError(f"Step class '{class_name}' not found in '{module_name}'")
+            raise FlowError(f"Processor class '{class_name}' not found in '{module_name}'")
     else:
-        import geenii.flow.steps  # noqa: F401 - registers the built-in steps
-        cls = _STEP_REGISTRY.get(step_type)
+        import geenii.flow.processor  # noqa: F401 - registers the built-in processors
+        cls = _PROCESSOR_REGISTRY.get(processor)
         if cls is None:
-            raise FlowError(f"Unknown step type '{step_type}'")
-    if not (inspect.isclass(cls) and issubclass(cls, FlowStep)):
-        raise FlowError(f"'{step_type}' is not a FlowStep")
+            raise FlowError(f"Unknown processor type '{processor}'")
+    if not (inspect.isclass(cls) and issubclass(cls, FlowProcessor)):
+        raise FlowError(f"'{processor}' is not a FlowProcessor")
     return cls
 
 
@@ -350,7 +350,7 @@ class Flow:
 
         lines = [f"flowchart {direction}"]
         for s in self.steps:
-            lines.append(f'    {node[s.id]}["{label(s.id)}<br/>({label(s.type)})"]')
+            lines.append(f'    {node[s.id]}["{label(s.id)}<br/>({label(s.processor)})"]')
         for e in self.edges:
             lines.append(f"    {node[e.from_step]} --> {node[e.to_step]}")
         return "\n".join(lines) + "\n"
@@ -374,7 +374,7 @@ class Flow:
             '    node [shape=box, style=rounded, fontname="Helvetica"];',
         ]
         for s in self.steps:
-            lines.append(f'    {quote(s.id)} [label="{esc(s.id)}\\n{esc(s.type)}"];')
+            lines.append(f'    {quote(s.id)} [label="{esc(s.id)}\\n{esc(s.processor)}"];')
         for e in self.edges:
             lines.append(f"    {quote(e.from_step)} -> {quote(e.to_step)};")
         lines.append("}")
@@ -457,10 +457,10 @@ class Flow:
         return FlowResult(name=self.name, status=status, steps=[results[s.id] for s in order])
 
     def _execute_step(self, spec: FlowStepSpec, input_data: Any, ctx: FlowContext) -> StepResult:
-        ctx.emit("step.start", {"type": spec.type}, step_id=spec.id)
+        ctx.emit("step.start", {"processor": spec.processor}, step_id=spec.id)
         started = time.monotonic()
         try:
-            step = get_step_class(spec.type)(config=ctx.resolve(spec.config))
+            step = get_step_processor_class(spec.processor)(config=ctx.resolve(spec.config))
             output = self._drive(step, spec, input_data, ctx)
             output = _dump(step.output_model.model_validate(output) if step.output_model else output)
             result = StepResult(step_id=spec.id, status="success", output=output)
@@ -474,7 +474,7 @@ class Flow:
         return result
 
     @staticmethod
-    def _drive(step: FlowStep, spec: FlowStepSpec, input_data: Any, ctx: FlowContext) -> Any:
+    def _drive(step: FlowProcessor, spec: FlowStepSpec, input_data: Any, ctx: FlowContext) -> Any:
         gen = step.process(input_data, ctx)
         if not inspect.isgenerator(gen):
             return gen

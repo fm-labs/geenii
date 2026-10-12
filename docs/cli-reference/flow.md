@@ -2,7 +2,7 @@
 
 Run and inspect flows: step pipelines defined in a `.toml` or `.json` file.
 Flows run locally in the CLI process; they don't need the daemon. For the
-file format, the step types and how steps pass data, see the developer guide
+file format, the processors and how steps pass data, see the developer guide
 page [Flow](../developer-guide/flow.md).
 
 ## Synopsis
@@ -33,7 +33,7 @@ flow output (the output of the last successful step) as JSON.
 | `--max-workers` | `-w` | Number of steps that may run at the same time, overriding `max_workers` in the file |
 | `--json` | | Print the full `FlowResult` as JSON instead of the summary |
 | `--quiet` | `-q` | Don't print step events |
-| `--step-module MODULE` | `-m` | Import a Python module that registers custom steps with `@register_step`. Repeatable |
+| `--processor-module MODULE` | `-m` | Import a Python module that registers custom processors with `@register_processor`. Repeatable |
 
 #### Exit codes
 
@@ -60,7 +60,7 @@ echo "some text" | geenii flow run my_flow.toml -i - -q --json
 ### validate
 
 ```
-geenii flow validate <PATH> [--step-module MODULE ...]
+geenii flow validate <PATH> [--processor-module MODULE ...]
 ```
 
 Check a flow without running it, and print its execution order with each
@@ -69,7 +69,7 @@ step's predecessors. It checks:
 - that the file can be read and has a valid structure (step fields, unique
   step ids),
 - the graph: edges to unknown steps and cycles,
-- that every step type exists (registered, or importable as
+- that every step's processor exists (registered, or importable as
   `package.module:ClassName`).
 
 It doesn't validate step configs, because `${...}` references in a config can
@@ -93,7 +93,7 @@ Execution order:
 geenii flow graph <PATH> [OPTIONS]
 ```
 
-Print the flow's graph (steps as nodes, labelled with id and type; edges as
+Print the flow's graph (steps as nodes, labelled with id and processor; edges as
 arrows) as **Mermaid** or **Graphviz DOT**, or render it to an image.
 
 #### Options
@@ -103,7 +103,7 @@ arrows) as **Mermaid** or **Graphviz DOT**, or render it to an image.
 | `--format` | `-f` | `mermaid`, `dot`, `svg`, `png` or `pdf`. Default: taken from the `--output` file extension, otherwise `mermaid` |
 | `--output FILE` | `-o` | Write to FILE instead of stdout. Required for image formats |
 | `--direction` | `-d` | Layout direction: `LR` (left to right, default), `TB`, `RL`, `BT` |
-| `--step-module MODULE` | `-m` | As for `run` |
+| `--processor-module MODULE` | `-m` | As for `run` |
 
 File extensions used when `--format` isn't given: `.mmd`, `.mermaid` and `.md`
 become `mermaid`; `.dot` and `.gv` become `dot`; `.svg`, `.png` and `.pdf` are
@@ -145,17 +145,18 @@ flowchart LR
     n2 --> n3
 ```
 
-### steps
+### processors
 
 ```
-geenii flow steps [--step-module MODULE ...]
+geenii flow processors [--processor-module MODULE ...]
 ```
 
-List the registered step types with the first line of their docstring. Use
-`-m` to include custom steps from your own modules.
+List the registered processor types (the values a step's `processor` field
+can take) with the first line of their docstring. Use `-m` to include custom
+processors from your own modules.
 
 ```
-$ geenii flow steps
+$ geenii flow processors
 echo                 Returns the configured message, or the step input if no message is set
 execute_command      Runs a command in a subprocess
 execute_script       Runs a Python script in a separate interpreter process.

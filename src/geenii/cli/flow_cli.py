@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from geenii.flow import Flow, FlowError, StepEvent, get_step_class, list_step_types
+from geenii.flow import Flow, FlowError, StepEvent, get_step_processor_class, list_processor_types
 
 
 def _parse_value(value: str):
@@ -18,16 +18,16 @@ def _parse_value(value: str):
         return value
 
 
-def _import_step_modules(modules: tuple[str, ...]):
+def _import_processor_modules(modules: tuple[str, ...]):
     for module in modules:
         try:
             importlib.import_module(module)
         except ImportError as e:
-            raise click.ClickException(f"Cannot import step module '{module}': {e}")
+            raise click.ClickException(f"Cannot import processor module '{module}': {e}")
 
 
 def _load_flow(path: str, modules: tuple[str, ...]) -> Flow:
-    _import_step_modules(modules)
+    _import_processor_modules(modules)
     try:
         return Flow.from_file(path)
     except (FlowError, ValueError, KeyError) as e:
@@ -36,7 +36,7 @@ def _load_flow(path: str, modules: tuple[str, ...]) -> Flow:
 
 
 def _check_flow(flow: Flow) -> list[str]:
-    """Return a list of problems: invalid graph and unknown step types"""
+    """Return a list of problems: invalid graph and unknown processor types"""
     problems = []
     try:
         flow.execution_order()
@@ -44,7 +44,7 @@ def _check_flow(flow: Flow) -> list[str]:
         problems.append(str(e))
     for step in flow.steps:
         try:
-            get_step_class(step.type)
+            get_step_processor_class(step.processor)
         except (FlowError, ImportError) as e:
             problems.append(f"Step '{step.id}': {e}")
     return problems
@@ -52,7 +52,7 @@ def _check_flow(flow: Flow) -> list[str]:
 
 def _print_event(event: StepEvent):
     if event.type == "step.start":
-        click.echo(f"[{event.step_id}] start ({event.data['type']})", err=True)
+        click.echo(f"[{event.step_id}] start ({event.data['processor']})", err=True)
     elif event.type == "step.end":
         error = f": {event.data['error']}" if event.data["error"] else ""
         click.echo(f"[{event.step_id}] {event.data['status']}{error}", err=True)
@@ -60,9 +60,9 @@ def _print_event(event: StepEvent):
         click.echo(f"[{event.step_id}] {event.type}: {event.data}", err=True)
 
 
-step_module_option = click.option(
-    "--step-module", "-m", "step_modules", multiple=True, metavar="MODULE",
-    help="Import a Python module that registers custom steps (repeatable).")
+processor_module_option = click.option(
+    "--processor-module", "-m", "processor_modules", multiple=True, metavar="MODULE",
+    help="Import a Python module that registers custom processors (repeatable).")
 
 
 @click.group()
@@ -82,13 +82,13 @@ def flow():
 @click.option("--json", "as_json", is_flag=True, default=False,
               help="Print the full result as JSON.")
 @click.option("--quiet", "-q", is_flag=True, default=False, help="Don't print step events.")
-@step_module_option
-def run(path, input_value, variables, max_workers, as_json, quiet, step_modules):
+@processor_module_option
+def run(path, input_value, variables, max_workers, as_json, quiet, processor_modules):
     """Run the flow in PATH (.toml or .json).
 
     Step events are printed to stderr. Exits with code 1 if the flow failed or was aborted.
     """
-    f = _load_flow(path, step_modules)
+    f = _load_flow(path, processor_modules)
 
     for item in variables:
         key, sep, value = item.partition("=")
@@ -124,14 +124,14 @@ def run(path, input_value, variables, max_workers, as_json, quiet, step_modules)
 
 @flow.command()
 @click.argument("path", type=click.Path(exists=True, dir_okay=False))
-@step_module_option
-def validate(path, step_modules):
+@processor_module_option
+def validate(path, processor_modules):
     """Check the flow in PATH and print its execution order.
 
-    Checks the file, the graph (unknown steps in edges, cycles) and the step types.
+    Checks the file, the graph (unknown steps in edges, cycles) and the processor types.
     Exits with code 1 if there are problems.
     """
-    f = _load_flow(path, step_modules)
+    f = _load_flow(path, processor_modules)
     problems = _check_flow(f)
     if problems:
         for problem in problems:
@@ -143,7 +143,7 @@ def validate(path, step_modules):
     click.echo("\nExecution order:")
     for step in f.execution_order():
         after = f"  (after {', '.join(preds[step.id])})" if preds[step.id] else ""
-        click.echo(f"  {step.id} [{step.type}]{after}")
+        click.echo(f"  {step.id} [{step.processor}]{after}")
 
 
 GRAPH_IMAGE_FORMATS = ("svg", "png", "pdf")
@@ -159,13 +159,13 @@ GRAPH_SUFFIX_FORMATS = {".mmd": "mermaid", ".mermaid": "mermaid", ".md": "mermai
               help="Write to this file instead of stdout. Required for image formats.")
 @click.option("--direction", "-d", type=click.Choice(["LR", "TB", "RL", "BT"]), default="LR",
               help="Layout direction (default LR: left to right).")
-@step_module_option
-def graph(path, fmt, output, direction, step_modules):
+@processor_module_option
+def graph(path, fmt, output, direction, processor_modules):
     """Print the graph of the flow in PATH as Mermaid or Graphviz DOT, or render it to an image.
 
     Image formats (svg, png, pdf) are rendered with Graphviz, so the `dot` command must be installed.
     """
-    f = _load_flow(path, step_modules)
+    f = _load_flow(path, processor_modules)
     if fmt is None:
         fmt = GRAPH_SUFFIX_FORMATS.get(Path(output).suffix.lower(), "mermaid") if output else "mermaid"
 
@@ -193,10 +193,10 @@ def graph(path, fmt, output, direction, step_modules):
 
 
 @flow.command()
-@step_module_option
-def steps(step_modules):
-    """List the registered step types."""
-    _import_step_modules(step_modules)
-    for name, cls in list_step_types().items():
+@processor_module_option
+def processors(processor_modules):
+    """List the registered processor types."""
+    _import_processor_modules(processor_modules)
+    for name, cls in list_processor_types().items():
         doc = (cls.__doc__ or "").strip().splitlines()
         click.echo(f"{name:20} {doc[0] if doc else ''}")

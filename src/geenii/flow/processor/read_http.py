@@ -3,7 +3,7 @@ from typing import Any, ClassVar, Generator
 import httpx
 import pydantic
 
-from geenii.flow.flow import FlowContext, FlowStep, StepEvent, register_step
+from geenii.flow.flow import FlowContext, FlowProcessor, StepEvent, register_processor
 
 
 class ReadHttpConfig(pydantic.BaseModel):
@@ -23,8 +23,8 @@ class ReadHttpOutput(pydantic.BaseModel):
     data: Any = None
 
 
-@register_step("read_http")
-class ReadHttpStep(FlowStep):
+@register_processor("read_http")
+class ReadHttpProcessor(FlowProcessor):
     """Sends an HTTP request. `body` is sent as JSON; a JSON response is parsed into `data`."""
 
     config_model = ReadHttpConfig

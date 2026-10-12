@@ -5,13 +5,13 @@ from geenii.flow.flow import (
     FlowEdge,
     FlowError,
     FlowResult,
-    FlowStep,
+    FlowProcessor,
     FlowStepSpec,
     StepEvent,
     StepResult,
-    get_step_class,
-    list_step_types,
-    register_step,
+    get_step_processor_class,
+    list_processor_types,
+    register_processor,
 )
 
 __all__ = [
@@ -21,11 +21,11 @@ __all__ = [
     "FlowEdge",
     "FlowError",
     "FlowResult",
-    "FlowStep",
+    "FlowProcessor",
     "FlowStepSpec",
     "StepEvent",
     "StepResult",
-    "get_step_class",
-    "list_step_types",
-    "register_step",
+    "get_step_processor_class",
+    "list_processor_types",
+    "register_processor",
 ]

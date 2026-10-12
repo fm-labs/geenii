@@ -6,10 +6,19 @@ becomes the input of the steps after it, and a step's config can reference the
 results of any step that ran before it. Flows are defined in Python or loaded
 from a JSON or TOML file.
 
+Two terms:
+
+- A **step** is a node in the flow, defined by a `FlowStepSpec`: its id, its
+  config, its edges and what happens when it fails.
+- A **processor** is the class that handles a step: a `FlowProcessor`
+  subclass, picked by the spec's `processor` field (e.g. `"echo"`). One
+  processor type can handle many steps, and a new processor instance is
+  created each time a step runs.
+
 | Module | Contents |
 |---|---|
-| `geenii/flow/flow.py` | `Flow`, `FlowStep`, `FlowStepSpec`, `FlowContext`, results, step registry |
-| `geenii/flow/steps/` | Built-in steps: `echo`, `execute_command`, `execute_script`, `read_http` |
+| `geenii/flow/flow.py` | `Flow`, `FlowStepSpec`, `FlowProcessor`, `FlowContext`, results, processor registry |
+| `geenii/flow/processor/` | Built-in processors: `echo`, `execute_command`, `execute_script`, `read_http` |
 
 A runnable example is in `src/xflow.py` (`uv run python src/xflow.py`), and a
 file-based one is in `examples/flow_example.toml`.
@@ -22,7 +31,7 @@ daemon or scheduler yet.
 
 From the command line, use [`geenii flow`](../cli-reference/flow.md):
 `geenii flow run FILE`, `geenii flow validate FILE`, `geenii flow graph FILE`
-and `geenii flow steps`.
+and `geenii flow processors`.
 
 ---
 
@@ -33,24 +42,24 @@ import sys
 from geenii.flow import Flow, FlowStepSpec
 
 flow = Flow(
-    name="demo",
-    variables={"greeting": "hello"},
-    steps=[
-        FlowStepSpec(id="greet", type="echo", config={"message": "${vars.greeting}"}),
-        FlowStepSpec(id="upper", type="execute_command",
-                     config={"command": [sys.executable, "-c",
-                                         "import sys; print(sys.argv[1].upper())",
-                                         "${greet.message}"]}),
-    ],
+  name="demo",
+  variables={"greeting": "hello"},
+  steps=[
+    FlowStepSpec(id="greet", processor="echo", config={"message": "${vars.greeting}"}),
+    FlowStepSpec(id="upper", processor="execute_command",
+                 config={"command": [sys.executable, "-c",
+                                     "import sys; print(sys.argv[1].upper())",
+                                     "${greet.message}"]}),
+  ],
 )
 
 result = flow.run()
-print(result.status)                    # "success"
-print(result.get("upper").output)       # {"stdout": "HELLO\n", "stderr": "", "rc": 0}
-print(result.output)                    # output of the last successful step
+print(result.status)  # "success"
+print(result.get("upper").output)  # {"stdout": "HELLO\n", "stderr": "", "rc": 0}
+print(result.output)  # output of the last successful step
 ```
 
-Steps can also be given as plain dicts (`{"id": ..., "type": ..., "config": ...}`)
+Steps can also be given as plain dicts (`{"id": ..., "processor": ..., "config": ...}`)
 or added later with `flow.add_step(...)`.
 
 ---
@@ -62,8 +71,8 @@ Each entry in a flow is a `FlowStepSpec`:
 | Field | Type | Default | Meaning |
 |---|---|---|---|
 | `id` | `str` | required | Unique id within the flow; used in references and results |
-| `type` | `str` | required | A registered step name (`"echo"`) or `"package.module:ClassName"` |
-| `config` | `dict` | `{}` | Step settings; string values may contain `${...}` references |
+| `processor` | `str` | required | The processor that handles the step: a registered name (`"echo"`) or `"package.module:ClassName"` |
+| `config` | `dict` | `{}` | Settings passed to the processor; string values may contain `${...}` references |
 | `on_error` | `"stop"` \| `"continue"` | `"stop"` | What happens when this step fails |
 | `after` | `list[str]` (or one `str`) | `[]` | Ids of steps this step runs after; each adds an edge |
 
@@ -83,10 +92,10 @@ from geenii.flow import Flow, FlowStepSpec
 
 # explicit edges
 flow = Flow("t", steps=[...], edges=[("a", "b"), {"from_step": "b", "to_step": "c"}])
-flow.add_edge("c", "d")          # also: add_edge(("c", "d")), add_edge(FlowEdge(...))
+flow.add_edge("c", "d")  # also: add_edge(("c", "d")), add_edge(FlowEdge(...))
 
 # inferred from `after`
-flow.add_step(FlowStepSpec(id="report", type="echo", after=["left", "right"]))
+flow.add_step(FlowStepSpec(id="report", processor="echo", after=["left", "right"]))
 ```
 
 `flow.edges` returns all edges: the explicit ones, then the ones inferred from
@@ -121,7 +130,7 @@ greet -> upper -> count -+-> stats -+-> summary
 ### Drawing the graph
 
 `flow.to_mermaid()` and `flow.to_dot()` return the graph as Mermaid flowchart
-or Graphviz DOT text. Nodes are labelled with the step id and type, and
+or Graphviz DOT text. Nodes are labelled with the step id and processor, and
 `flow.edges` become the arrows, so a flow without edges shows its implicit
 chain. Both take a layout direction (`"LR"` by default, or `"TB"`, `"RL"`,
 `"BT"`). They raise `FlowError` for an edge to an unknown step; cycles are
@@ -162,8 +171,8 @@ How it works:
   named `flow-<flow name>_N`. The runner thread starts every ready step (in
   insertion order) while fewer than `max_workers` are running, and starts
   more steps as running ones finish.
-- Threads suit the built-in steps, which mostly wait on subprocesses and
-  HTTP. CPU-heavy Python code in a step doesn't run in parallel because of
+- Threads suit the built-in processors, which mostly wait on subprocesses and
+  HTTP. CPU-heavy Python code in a processor doesn't run in parallel because of
   the GIL; use `execute_script` to run it in its own process.
 - `FlowResult.steps` is always in execution order, not completion order, so
   results look the same whichever thread finished first.
@@ -180,13 +189,13 @@ Failures and aborts while steps run in parallel:
 - If an aborted step and a failed step both happen in one run, the flow
   status is `"aborted"`.
 
-Thread safety for step authors:
+Thread safety for processor authors:
 
 - `on_event` callbacks are called one at a time (under a lock), so a
   callback doesn't have to be thread-safe. A slow callback slows down every
   step that emits events.
 - `ctx.results` is only written by the runner thread, after a step finishes.
-- `ctx.vars` is shared between steps. Changing it from a step isn't
+- `ctx.vars` is shared between steps. Changing it from a processor isn't
   synchronized.
 
 ---
@@ -195,8 +204,8 @@ Thread safety for step authors:
 
 There are two ways data moves through a flow:
 
-1. **Input from predecessors.** The `input_data` that a step's `process()`
-   receives depends on how many steps it runs after:
+1. **Input from predecessors.** The `input_data` that a step's processor
+   receives in `process()` depends on how many steps it runs after:
 
    | Predecessors | `input_data` |
    |---|---|
@@ -205,8 +214,8 @@ There are two ways data moves through a flow:
    | several | `{step_id: output, ...}`, in edge order |
 
    A predecessor that failed with `on_error="continue"` contributes `None`.
-2. **References in config.** Before a step is created, its `config` is resolved
-   against the run state.
+2. **References in config.** Before a step's processor is created, the step's
+   `config` is resolved against the run state.
 
 ### Reference syntax
 
@@ -249,7 +258,7 @@ result = flow.run(input_data=None, on_event=None)
 ```
 
 `run()` executes the steps in execution order and returns a `FlowResult`.
-Exceptions raised by a step are caught and recorded; they don't propagate out
+Exceptions raised by a processor are caught and recorded; they don't propagate out
 of `run()`. An invalid graph raises `FlowError` before any step runs (see
 [Edges and execution order](#edges-and-execution-order)).
 
@@ -276,7 +285,7 @@ seconds.
 - `on_error="continue"`: the step is marked `"failed"` and the flow continues.
   Steps after it still run and get `None` for its output. The final flow
   status is still `"failed"`.
-- A step can call `ctx.abort("reason")` to end the flow. The step is marked
+- A processor can call `ctx.abort("reason")` to end the flow. The step is marked
   `"aborted"` with the reason as its error, the remaining steps are skipped,
   and the flow status is `"aborted"`.
 
@@ -287,9 +296,9 @@ Pass `on_event` to observe a run. It is called with a `StepEvent`
 
 | Event type | When |
 |---|---|
-| `step.start` | Before a step runs; `data = {"type": ...}` |
+| `step.start` | Before a step runs; `data = {"processor": <processor name>}` |
 | `step.end` | After a step; `data = {"status": ..., "error": ...}` |
-| anything a step yields | e.g. `log` from the built-in steps; non-`StepEvent` values are wrapped as `data` |
+| anything a processor yields | e.g. `log` from the built-in processors; non-`StepEvent` values are wrapped as `data` |
 
 Events are also logged at debug level on the `geenii.flow.flow.<flow name>`
 logger.
@@ -315,18 +324,18 @@ greeting = "hello"
 
 [[steps]]
 id = "greet"
-type = "echo"
+processor = "echo"
 config = { message = "${vars.greeting}" }
 
 [[steps]]
 id = "list"
-type = "execute_command"
+processor = "execute_command"
 on_error = "continue"
 config = { command = ["docker", "container", "list", "--all"] }
 
 [[steps]]
 id = "report"
-type = "echo"
+processor = "echo"
 after = ["greet", "list"]
 ```
 
@@ -338,7 +347,7 @@ result = Flow.from_file("examples/flow_example.toml").run()
 
 ---
 
-## Built-in steps
+## Built-in processors
 
 ### `echo`
 
@@ -401,44 +410,46 @@ the response content type is JSON, otherwise `None`.
 
 ---
 
-## Writing a step
+## Writing a processor
 
-Subclass `FlowStep` and register it:
+Subclass `FlowProcessor` and register it under a name. Steps then use it with
+`processor="greet"`:
 
 ```python
 import pydantic
-from geenii.flow import FlowStep, StepEvent, register_step
+from geenii.flow import FlowProcessor, StepEvent, register_processor
 
 
 class GreetConfig(pydantic.BaseModel):
-    name: str
-    shout: bool = False
+  name: str
+  shout: bool = False
 
 
 class GreetOutput(pydantic.BaseModel):
-    text: str
+  text: str
 
 
-@register_step("greet")
-class GreetStep(FlowStep):
-    config_model = GreetConfig      # optional: validates config into self.config
-    output_model = GreetOutput      # optional: validates the returned output
+@register_processor("greet")
+class GreetProcessor(FlowProcessor):
+  config_model = GreetConfig  # optional: validates config into self.config
+  output_model = GreetOutput  # optional: validates the returned output
 
-    def process(self, input_data, ctx):
-        text = f"hello {self.config.name}"
-        yield StepEvent("log", text)        # progress events (optional)
-        if not text:
-            ctx.abort("nothing to say")     # stop the whole flow
-        return GreetOutput(text=text.upper() if self.config.shout else text)
+  def process(self, input_data, ctx):
+    text = f"hello {self.config.name}"
+    yield StepEvent("log", text)  # progress events (optional)
+    if not text:
+      ctx.abort("nothing to say")  # stop the whole flow
+    return GreetOutput(text=text.upper() if self.config.shout else text)
 ```
 
-Rules for steps:
+Rules for processors:
 
 - `process(input_data, ctx)` is a generator. What it **yields** becomes an
-  event; what it **returns** is the step output. A plain method that returns
+  event; what it **returns** is the step's output. A plain method that returns
   the output (no `yield`) also works.
-- A new step instance is created for every run. Config references are resolved
-  first, so `self.config` already holds the final values.
+- A new processor instance is created each time a step runs, with the step's
+  config. Config references are resolved first, so `self.config` already holds
+  the final values.
 - Without `config_model`, `self.config` is the plain dict. Without
   `output_model`, the returned value is stored as is. It should be plain data
   (dicts, lists, scalars) so that later references can traverse it.
@@ -447,37 +458,39 @@ Rules for steps:
 - `ctx` (`FlowContext`) gives access to `ctx.input`, `ctx.vars`,
   `ctx.results` (outputs by step id), `ctx.emit(type, data)`,
   `ctx.abort(reason)`, `ctx.stopping` and `ctx.logger`.
-- A step may run in a worker thread (with `max_workers > 1`), so don't rely
-  on thread-local state or signal handlers. Long-running steps should check
-  `ctx.stopping` now and then.
+- A processor may run in a worker thread (with `max_workers > 1`), so don't
+  rely on thread-local state or signal handlers. Long-running processors should
+  check `ctx.stopping` now and then.
 
-### Step types and lookup
+### Processor types and lookup
 
-- `@register_step("name")` adds the class to a module-level registry. The
-  built-in steps register when `geenii.flow.steps` is imported, which
-  `get_step_class()` does on first use. A custom step only needs its module
-  to be imported before the flow runs.
-- A `type` containing `:` (`"mypkg.steps:GreetStep"`) is imported with
-  `importlib` and doesn't need to be registered. This is the way to use custom
-  steps from flow files.
-- An unknown type, or a class that isn't a `FlowStep`, fails the step with a
-  `FlowError`.
+- `@register_processor("name")` adds the class to a module-level registry. The
+  built-in processors register when `geenii.flow.processor` is imported, which
+  `get_step_processor_class()` and `list_processor_types()` do on first use. A
+  custom processor only needs its module to be imported before the flow runs
+  (on the command line: `--processor-module`).
+- A `processor` value containing `:` (`"mypkg.processors:GreetProcessor"`) is
+  imported with `importlib` and doesn't need to be registered. This is the way
+  to use custom processors from flow files without `--processor-module`.
+- An unknown processor, or a class that isn't a `FlowProcessor`, fails the step
+  with a `FlowError`.
 
 ---
 
 ## Testing
 
-Tests are in `tests/geenii/flow/test_flow.py`:
+Tests are in `tests/geenii/flow/test_flow.py` and
+`tests/geenii/flow/test_flow_cli.py`:
 
 ```bash
 uv run pytest tests/geenii/flow -q
 ```
 
-`read_http` has a class attribute `transport` for tests. Set it to an
+`ReadHttpProcessor` has a class attribute `transport` for tests. Set it to an
 `httpx.MockTransport` to avoid network calls:
 
 ```python
-monkeypatch.setattr(ReadHttpStep, "transport", httpx.MockTransport(handler))
+monkeypatch.setattr(ReadHttpProcessor, "transport", httpx.MockTransport(handler))
 ```
 
 ---

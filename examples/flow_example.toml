@@ -7,23 +7,23 @@ greeting = "Step 0 message"
 
 [[steps]]
 id = "step0"
-type = "echo"
+processor = "echo"
 config = { message = "${vars.greeting}" }
 
 [[steps]]
 id = "step1"
-type = "read_http"
+processor = "read_http"
 config = { url = "https://httpbingo.org/get", params = { msg = "${step0.message}" } }
 
 [[steps]]
 id = "step2"
-type = "execute_command"
+processor = "execute_command"
 on_error = "continue"
 config = { command = ["docker", "container", "list", "--all"] }
 
 [[steps]]
 id = "step3"
-type = "execute_script"
+processor = "execute_script"
 config = { script = """
 import json, sys
 print(json.dumps({"input": json.load(sys.stdin)}))

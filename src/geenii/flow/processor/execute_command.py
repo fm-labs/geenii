@@ -5,7 +5,7 @@ from typing import Any, Generator
 
 import pydantic
 
-from geenii.flow.flow import FlowContext, FlowStep, StepEvent, register_step
+from geenii.flow.flow import FlowContext, FlowProcessor, StepEvent, register_processor
 
 
 class ExecuteCommandConfig(pydantic.BaseModel):
@@ -43,8 +43,8 @@ def run_process(args: str | list[str], shell: bool = False, cwd: str | None = No
     return ExecuteCommandOutput(stdout=proc.stdout, stderr=proc.stderr, rc=proc.returncode)
 
 
-@register_step("execute_command")
-class ExecuteCommandStep(FlowStep):
+@register_processor("execute_command")
+class ExecuteCommandProcessor(FlowProcessor):
     """Runs a command in a subprocess"""
 
     config_model = ExecuteCommandConfig

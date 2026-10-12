@@ -5,8 +5,8 @@ from typing import Any, Generator
 
 import pydantic
 
-from geenii.flow.flow import FlowContext, FlowStep, StepEvent, register_step
-from geenii.flow.steps.execute_command import run_process
+from geenii.flow.flow import FlowContext, FlowProcessor, StepEvent, register_processor
+from geenii.flow.processor.execute_command import run_process
 
 
 class ExecuteScriptConfig(pydantic.BaseModel):
@@ -26,8 +26,8 @@ class ExecuteScriptOutput(pydantic.BaseModel):
     result: Any = None
 
 
-@register_step("execute_script")
-class ExecuteScriptStep(FlowStep):
+@register_processor("execute_script")
+class ExecuteScriptProcessor(FlowProcessor):
     """
     Runs a Python script in a separate interpreter process.
 
