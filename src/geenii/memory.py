@@ -1,4 +1,5 @@
 import sqlite3
+import threading
 
 import abc
 import json
@@ -100,32 +101,53 @@ class FileChatMemory(ChatMemory):
 
 
 class SqliteChatMemory(ChatMemory):
-    """SQLite-based implementation of chat memory."""
+    """
+    SQLite-based implementation of chat memory.
+
+    The connection may be used from any thread (e.g. an agent created in one thread and run in a
+    server threadpool); access is serialized with a lock.
+    """
 
     def __init__(self, db_path: str, restore: bool = True) -> None:
         super().__init__()
         self.db_path = Path(db_path).resolve()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(self.db_path)
-        self._conn.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, content TEXT)")
-        self._conn.commit()
+        self._lock = threading.RLock()
+        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        with self._lock, self._conn:
+            self._conn.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, content TEXT, message TEXT)")
+            # migrate tables created before the 'message' column existed
+            columns = {row[1] for row in self._conn.execute("PRAGMA table_info(messages)")}
+            if "message" not in columns:
+                self._conn.execute("ALTER TABLE messages ADD COLUMN message TEXT")
         if restore:
             self._read()
 
     def _read(self) -> None:
-        cursor = self._conn.cursor()
-        cursor.execute("SELECT role, content FROM messages ORDER BY id")
-        rows = cursor.fetchall()
-        for role, content in rows:
-            message = ModelMessage(role=role, content=json.loads(content))
+        with self._lock:
+            rows = self._conn.execute("SELECT role, content, message FROM messages ORDER BY id").fetchall()
+        for role, content, message_json in rows:
+            if message_json:
+                message = ModelMessage.model_validate_json(message_json)
+            else:
+                message = ModelMessage.model_validate({"role": role, "content": json.loads(content)})
             self._messages.append(message)
 
+    @staticmethod
+    def _row(message: ModelMessage) -> tuple[str, str, str]:
+        content = json.dumps(message.model_dump(mode="json")["content"])
+        return message.role, content, message.to_json()
+
     def _insert(self, message: ModelMessage) -> None:
-        self._conn.execute("INSERT INTO messages (role, content) VALUES (?, ?)", (message.role, json.dumps(message.content)))
-        self._conn.commit()
+        with self._lock, self._conn:
+            self._conn.execute("INSERT INTO messages (role, content, message) VALUES (?, ?, ?)", self._row(message))
 
     def _write(self) -> None:
-        self._conn.execute("DELETE FROM messages")
-        for message in self._messages:
-            self._conn.execute("INSERT INTO messages (role, content) VALUES (?, ?)", (message.role, json.dumps(message.content)))
-        self._conn.commit()
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM messages")
+            self._conn.executemany("INSERT INTO messages (role, content, message) VALUES (?, ?, ?)",
+                                   [self._row(message) for message in self._messages])
+
+    def close(self) -> None:
+        with self._lock:
+            self._conn.close()
