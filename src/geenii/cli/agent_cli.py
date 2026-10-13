@@ -184,7 +184,7 @@ def agent_run(
     #             name = agent_name
     
     _agents = init_global_agent_registry()
-    agent: BaseAgent = _agents.get_instance(name, context_id=context_id)
+    agent: BaseAgent | None = _agents.get_instance(name, context_id=context_id)
     #agent: BaseAgent = init_agent_by_name(name, context_id=context_id)
     if not agent:
         click.echo(

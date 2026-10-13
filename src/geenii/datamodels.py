@@ -25,24 +25,9 @@ class AIModelInfo(pydantic.BaseModel):
     installed: bool = False
 
 
-class SystemMessage(pydantic.BaseModel):
-    type: str = "system"
-    content: list[ContentPart] = pydantic.Field(default_factory=list)
-    id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex)
-    timestamp: datetime = pydantic.Field(default_factory=lambda: datetime.now(UTC))
-
-    def to_text(self) -> str:
-        return "\n".join(part.to_text() for part in self.content)
-
-    def to_json(self) -> str:
-        return self.model_dump_json()
-
-    def to_dict(self) -> dict:
-        return self.model_dump(mode="python")
-
 
 class ModelMessage(pydantic.BaseModel):
-    type: str = "message"
+    type: Literal["message"] = "message"
     role: str  # e.g., "user", "assistant", "system"
     content: list[ContentPart] = pydantic.Field(default_factory=list)
     id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex)
@@ -57,8 +42,71 @@ class ModelMessage(pydantic.BaseModel):
     def to_dict(self) -> dict:
         return self.model_dump(mode="python")
 
+
+class SystemMessage(pydantic.BaseModel):
+    type: Literal["system"] = "system"
+    role: str = "system"
+    content: list[ContentPart] = pydantic.Field(default_factory=list)
+    id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex)
+    timestamp: datetime = pydantic.Field(default_factory=lambda: datetime.now(UTC))
+
+    def to_text(self) -> str:
+        return "\n".join(part.to_text() for part in self.content)
+
+    def to_json(self) -> str:
+        return self.model_dump_json()
+
+    def to_dict(self) -> dict:
+        return self.model_dump(mode="python")
+
+# class StreamMessage(pydantic.BaseModel):
+#     type: str = "stream"
+#     content: list[ContentPart] = pydantic.Field(default_factory=list)
+
+
 WireMessage = Annotated[
     SystemMessage | ModelMessage,
+    pydantic.Field(discriminator="type"),
+]
+
+# class WireMessageProtocol(Protocol):
+#     def to_text(self) -> str: ...
+#     def to_json(self) -> dict[str, Any]: ...
+#     def to_dict(self) -> dict[str, Any]: ...
+
+
+class ChatMessage(pydantic.BaseModel):
+    """Chat message envelope"""
+    id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex)
+    timestamp: datetime = pydantic.Field(default_factory=lambda: datetime.now(UTC))
+    sender_id: str
+    message: WireMessage
+    context_id: str | None = None
+
+
+# Chat stream events (NDJSON lines of POST /chats/{context_id}/messages)
+
+class ChatMessageEvent(pydantic.BaseModel):
+    type: Literal["message"] = "message"
+    message: ChatMessage
+
+
+class ChatStatusEvent(pydantic.BaseModel):
+    type: Literal["status"] = "status"
+    status: Literal["thinking", "tool", "awaiting_input"]
+
+
+class ChatErrorEvent(pydantic.BaseModel):
+    type: Literal["error"] = "error"
+    error: str
+
+
+class ChatDoneEvent(pydantic.BaseModel):
+    type: Literal["done"] = "done"
+
+
+ChatStreamEvent = Annotated[
+    ChatMessageEvent | ChatStatusEvent | ChatErrorEvent | ChatDoneEvent,
     pydantic.Field(discriminator="type"),
 ]
 

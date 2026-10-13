@@ -2,6 +2,7 @@ from os.path import realpath
 
 import json
 import os
+from pathlib import Path
 
 import dotenv
 
@@ -11,12 +12,15 @@ APP_VERSION = "0.3.4"
 
 GEENII_WORKING_DIR = realpath(os.environ.get("GEENII_WORKING_DIR", os.getcwd()))
 GEENII_DIR = realpath(os.environ.get("GEENII_DIR", os.path.join(GEENII_WORKING_DIR, ".geenii")))
+GEENII_USER_HOME = get_user_home_dir()
+
+GEENII_CHAT_SESSIONS_DIR = Path(GEENII_USER_HOME) / ".geenii" / "chats"
 
 # Load environment variables from .env file in the user directory, if it exists
-dotenv.load_dotenv(get_user_home_dir() + "/.geenii/.env", override=True, verbose=True)
+dotenv.load_dotenv(GEENII_USER_HOME + "/.geenii/.env", override=True, verbose=True)
 dotenv.load_dotenv(GEENII_DIR + "/.env", override=True, verbose=True)
 
-CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", get_user_home_dir() + "/.geenii/.cache")
+CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", GEENII_USER_HOME + "/.geenii/.cache")
 CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
 
 # Default minimum age (seconds since a process finished) before the process manager's gc removes it

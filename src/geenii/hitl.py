@@ -1,5 +1,6 @@
 import abc
 import json
+import threading
 import time
 from pathlib import Path
 import httpx
@@ -8,6 +9,10 @@ class HumanInTheLoopController(abc.ABC):
     """
     This class can be used to handle human-in-the-loop interactions for tool call approvals or other decision points in the agent's process.
     """
+    # True if the human answers through the agent's own message stream (e.g. a web chat).
+    # The agent then forwards its approval requests (UserInteractionContent messages) to the caller.
+    interactive: bool = False
+
     @abc.abstractmethod
     def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
         """
@@ -110,3 +115,80 @@ class HttpPollHumanInTheLoopController(HumanInTheLoopController):
             except Exception as e:
                 print(f"Error while requesting approval for call ID '{call_id}': {e}")
                 return False
+
+
+class WebHumanInTheLoopController(HumanInTheLoopController):
+    """
+    HITL handler for chat clients that answer approval requests out of band (e.g. via an HTTP endpoint).
+    - The agent yields an approval request message (interaction_id == call_id) and then blocks in request_tool_execution.
+    - `respond(call_id, choice)` unblocks it; "Allow" approves, any other choice rejects.
+    - Unanswered requests are rejected after approval_timeout seconds, and all of them when `cancel()` is called.
+    An answer may arrive before the agent starts waiting; it is kept until then.
+    """
+    interactive = True
+
+    APPROVE_CHOICES = {"allow", "approve", "yes"}
+
+    def __init__(self, approval_timeout: float = 300):
+        self.approval_timeout = approval_timeout
+        self._lock = threading.Lock()
+        self._events: dict[str, threading.Event] = {}
+        self._answers: dict[str, str] = {}
+        self._expected: set[str] = set()
+        self._cancelled = False
+
+    def reset(self) -> None:
+        """Forget all requests and the cancelled state; call before starting a new turn."""
+        with self._lock:
+            events = list(self._events.values())
+            self._events.clear()
+            self._answers.clear()
+            self._expected.clear()
+            self._cancelled = False
+        for event in events:
+            event.set()
+
+    def expect(self, call_id: str) -> None:
+        """Register a request that was sent to the client, so it can be answered (even before the agent waits)."""
+        with self._lock:
+            self._expected.add(call_id)
+            self._events.setdefault(call_id, threading.Event())
+
+    def is_pending(self, call_id: str) -> bool:
+        with self._lock:
+            return call_id in self._expected and call_id not in self._answers
+
+    def respond(self, call_id: str, choice: str) -> bool:
+        """Answer a request. Returns False if no such request is pending."""
+        with self._lock:
+            if call_id not in self._expected or call_id in self._answers:
+                return False
+            self._answers[call_id] = choice
+            event = self._events[call_id]
+        event.set()
+        return True
+
+    def cancel(self) -> None:
+        """Reject all pending and future requests of this run."""
+        with self._lock:
+            self._cancelled = True
+            events = list(self._events.values())
+        for event in events:
+            event.set()
+
+    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
+        with self._lock:
+            if self._cancelled:
+                return False
+            self._expected.add(call_id)
+            event = self._events.setdefault(call_id, threading.Event())
+
+        event.wait(self.approval_timeout)
+
+        with self._lock:
+            choice = None if self._cancelled else self._answers.get(call_id)
+            # answered or timed out: no longer answerable
+            self._expected.discard(call_id)
+            self._events.pop(call_id, None)
+            self._answers.pop(call_id, None)
+        return choice is not None and choice.strip().lower() in self.APPROVE_CHOICES

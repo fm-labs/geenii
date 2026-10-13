@@ -130,9 +130,17 @@ class BaseAgent(BotInterface, abc.ABC):
     def skills(self) -> SkillRegistry:
         return self._skill_registry
 
+    @property
+    def hitl(self) -> HumanInTheLoopController:
+        return self._hitl
+
     def enqueue_task(self, task: BaseTask):
         """Enqueue a task to be processed by the agent."""
         self._tasks.append(task)
+
+    def clear_tasks(self):
+        """Drop all pending tasks, e.g. after a turn was cancelled before the queue was drained."""
+        self._tasks.clear()
 
     def process(self, message: str | list[ContentPart]) -> Iterator[ModelMessage]:
         """Process an incoming message and generate a response by enqueuing tasks to the internal queue and processing them sequentially."""

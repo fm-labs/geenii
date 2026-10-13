@@ -1,7 +1,7 @@
+import logging
 import os
 import re
 import uuid
-import logging
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, HTTPException
@@ -9,13 +9,15 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from geenii import ai
 from geenii.ai import enumerate_models
 from geenii.chat_models import TextContent
+from geenii.config import DEFAULT_AUDIO_TRANSCRIPTION_MODEL, GEENII_CHAT_SESSIONS_DIR
 from geenii.datamodels import CompletionErrorResponse, CompletionRequest, CompletionResponse, ChatCompletionRequest, \
     ChatCompletionResponse, ImageGenerationApiResponse, \
-    ImageGenerationApiRequest, AudioGenerationApiRequest, AudioSpeechGenerationApiResponse, AudioTranscriptionApiRequest, \
+    ImageGenerationApiRequest, AudioGenerationApiRequest, AudioSpeechGenerationApiResponse, \
+    AudioTranscriptionApiRequest, \
     AudioTranscriptionApiResponse, AudioTranslationApiResponse, AudioTranslationApiRequest, AIModelInfo, ModelMessage, \
     Problem
-from geenii.config import GEENII_DIR, DEFAULT_AUDIO_TRANSCRIPTION_MODEL
 from geenii.memory import FileChatMemory
+from geenii.utils.os_util import get_user_home_dir
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +33,11 @@ router = APIRouter(prefix="/ai", tags=["ai"], responses=_ERROR_RESPONSES)
 # Handlers are plain `def` on purpose: the ai.* calls block (provider HTTP, file I/O),
 # so FastAPI runs them in its threadpool instead of on the event loop.
 
-CHAT_SESSIONS_DIR = Path(GEENII_DIR) / "sessions" / "chat"
 _CONTEXT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 DEFAULT_CHAT_SYSTEM_PROMPT = "You are a helpful assistant that helps the user with their tasks. Give short and concise answers. Always try to help the user as best as you can. If you don't know the answer, say you don't know and don't try to make up an answer."
 
-AUDIO_UPLOAD_DIR = Path(GEENII_DIR) / "uploads" / "audio"
+AUDIO_UPLOAD_DIR = Path(get_user_home_dir()) / ".geenii" / "uploads" / "audio"
 MAX_AUDIO_UPLOAD_BYTES = 25 * 1024 * 1024
 _AUDIO_EXT_RE = re.compile(r"^\.[A-Za-z0-9]{1,8}$")
 _UPLOAD_CHUNK_SIZE = 1024 * 1024
@@ -46,7 +47,7 @@ def _chat_session_dir(context_id: str) -> Path:
     """Resolve the session directory for a client-supplied context_id, rejecting anything that could escape it."""
     if not _CONTEXT_ID_RE.fullmatch(context_id):
         raise HTTPException(status_code=400, detail="Invalid context_id: expected 1-64 characters of [A-Za-z0-9_-].")
-    base = CHAT_SESSIONS_DIR.resolve()
+    base = GEENII_CHAT_SESSIONS_DIR.resolve()
     path = (base / context_id).resolve()
     if path.parent != base:
         raise HTTPException(status_code=400, detail="Invalid context_id.")

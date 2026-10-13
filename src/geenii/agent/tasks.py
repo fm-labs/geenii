@@ -27,6 +27,10 @@ from geenii.utils.json_util import parse_json_safe
 logger = logging.getLogger(__name__)
 
 
+def _is_interaction_message(msg) -> bool:
+    return isinstance(msg, ModelMessage) and any(isinstance(p, UserInteractionContent) for p in msg.content)
+
+
 class ToolCallTask(BaseAgentTask):
     def __init__(
         self, agent: "BaseAgent", tool_name: str, arguments: dict, call_id: str = None
@@ -237,7 +241,9 @@ class LLMTask(BaseAgentTask):
             prompt, request, response
         ):
             yield msg
-            self.agent.add_to_history(msg)
+            # approval requests are for the human, not part of the model conversation
+            if not _is_interaction_message(msg):
+                self.agent.add_to_history(msg)
 
     def _handle_response_with_tool_calls(
         self, prompt, request: ChatCompletionRequest, response, i= 0
@@ -321,7 +327,8 @@ class LLMTask(BaseAgentTask):
                         # if the tool task yields any other messages (e.g. user interaction requests), we yield them immediately
                         # todo: add to message history as well?
                         if isinstance(msg, ModelMessage):
-                            if not isinstance(msg.content[0], UserInteractionContent):
+                            # approval requests only go out if the human answers through this stream
+                            if not isinstance(msg.content[0], UserInteractionContent) or self.agent.hitl.interactive:
                                 yield msg
 
                 tools_called += 1

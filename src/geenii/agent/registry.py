@@ -6,6 +6,8 @@ import pydantic
 
 from geenii.agent.base_agent import BaseAgent
 from geenii.bots import BotInterface
+from geenii.hitl import HumanInTheLoopController
+from geenii.memory import ChatMemory
 from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.mdfile import read_frontmatter_file
@@ -67,7 +69,9 @@ class AgentSpec(pydantic.BaseModel):
         return AgentSpec.model_validate(header)
 
 
-def init_agent(agent_conf: AgentSpec, context_id: str | None = None) -> BaseAgent:
+def init_agent(agent_conf: AgentSpec, context_id: str | None = None, *,
+               memory: ChatMemory | None = None, hitl: HumanInTheLoopController | None = None) -> BaseAgent:
+    """Create a new agent instance from its spec. `memory` and `hitl` override the agent's defaults."""
     # todo check model provider configuration
     # todo check model availability
 
@@ -102,7 +106,7 @@ def init_agent(agent_conf: AgentSpec, context_id: str | None = None) -> BaseAgen
                             model=agent_conf.model, system_prompt=agent_conf.full_instructions,
                             allowed_tools=set(agent_conf.tools), mcp_servers=agent_conf.mcp_servers,
                             tool_registry=tool_registry, skill_registry=skill_registry,
-                            context_id=context_id)
+                            context_id=context_id, memory=memory, hitl=hitl)
         return agent
     except Exception as e:
         logger.error(f"Error loading agent class '{agent_class_name}': {str(e)}", exc_info=e)
