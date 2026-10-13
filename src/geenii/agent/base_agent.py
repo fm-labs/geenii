@@ -13,7 +13,7 @@ from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT, BaseTask
 from geenii.bots import BotInterface
 from geenii.chat_models import ContentPart, TextContent
 from geenii.config import DEFAULT_COMPLETION_MODEL, CACHE_DIR, GEENII_MEMORY_ENGINE
-from geenii.datamodels import ModelMessage
+from geenii.datamodels import ModelMessage, SystemMessage
 from geenii.hitl import HumanInTheLoopController, NoHumanInTheLoopController
 from geenii.memory import (
     ChatMemory,
@@ -191,7 +191,7 @@ class BaseAgent(BotInterface, abc.ABC):
                         # parse task results
                         if result is None:
                             continue
-                        if isinstance(result, ModelMessage):
+                        if isinstance(result, (ModelMessage, SystemMessage)):
                             #_agent_log(self.name, "agent.task_result", {"i": i, "task": result.__class__.__name__, "result": result})
                             _agent_log(self.name, self.context_id, "agent.task_result", result)
                             yield result

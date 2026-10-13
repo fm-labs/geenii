@@ -6,10 +6,12 @@ import type {
   ContentPart,
   InteractionResponse,
   MessageRole,
+  SystemMessageLevel,
 } from '../chat.types.ts'
 import {
   SAMPLE_FILE_TEXT,
   SAMPLE_MARKDOWN,
+  SAMPLE_SYSTEM_MESSAGES,
   sampleBeepDataUrl,
   sampleSvgBase64,
   sampleSvgDataUrl,
@@ -43,14 +45,14 @@ const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, r
  * - Input starting with "tool" simulates an agent tool call that needs approval:
  *   it emits an interaction, waits for `respond`, then emits the tool call result.
  * - Input "example" streams one message per content type (text, image, audio, file, embed, json,
- *   function, tool_call + tool_call_result, interaction, confirmation) plus a system message.
+ *   function, tool_call + tool_call_result, interaction, confirmation) plus one system message per level.
  */
 export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend => {
   const delay = options.delay ?? 500
   const senderId = options.senderId ?? 'echo'
   const waiting = new Map<string, (choice: string) => void>()
 
-  const message = (contextId: string, role: MessageRole, content: ContentPart[]): ChatMessage => {
+  const message = (contextId: string, role: MessageRole, content: ContentPart[], level: SystemMessageLevel = 'info'): ChatMessage => {
     const messageId = id()
     const timestamp = new Date().toISOString()
     return {
@@ -59,13 +61,16 @@ export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend
       sender_id: role === 'system' ? 'system' : senderId,
       context_id: contextId,
       message: role === 'system'
-        ? { type: 'system', id: messageId, role: 'system', content, timestamp }
+        ? { type: 'system', id: messageId, role: 'system', level, content, timestamp }
         : { type: 'message', id: messageId, role, content, timestamp },
     }
   }
 
   const say = (contextId: string, role: MessageRole, ...content: ContentPart[]): ChatEvent =>
     ({ type: 'message', message: message(contextId, role, content) })
+
+  const notify = (contextId: string, level: SystemMessageLevel, text: string): ChatEvent =>
+    ({ type: 'message', message: message(contextId, 'system', [{ type: 'text', text }], level) })
 
   /** Wait until `respond` answers the interaction/confirmation with this id. */
   const waitForAnswer = (interactionId: string, signal: AbortSignal) => new Promise<string>((resolve, reject) => {
@@ -109,7 +114,11 @@ export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend
     const pause = () => sleep(step, signal)
     const file = sampleTextFile()
 
-    yield say(contextId, 'system', { type: 'text', text: 'Example turn: one message per content type.' })
+    yield notify(contextId, 'info', 'Example turn: one message per content type.')
+    await pause()
+    for (const { level, text } of SAMPLE_SYSTEM_MESSAGES) {
+      yield notify(contextId, level, text)
+    }
     await pause()
     yield say(contextId, 'assistant', { type: 'text', text: SAMPLE_MARKDOWN })
     await pause()
@@ -196,7 +205,8 @@ export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend
     const text = request.content
       .map((p) => (p.type === 'text' ? p.text : `[${p.type}]`))
       .join(' ')
-    const command = text.trim().toLowerCase()
+    // the triggers work with and without a leading slash (slash commands)
+    const command = text.trim().toLowerCase().replace(/^\//, '')
 
     if (command === ECHO_EXAMPLE_TRIGGER) {
       yield* exampleTurn(contextId, signal)
@@ -213,6 +223,10 @@ export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend
     id: 'echo',
     capabilities: { streaming: true, interactions: true, files: false, history: false, models: false },
     send,
+    listCommands: async () => [
+      { command: ECHO_EXAMPLE_TRIGGER, description: 'Stream one example message of each content type' },
+      { command: 'tool', description: 'Simulate a tool call that needs your approval' },
+    ],
     respond: async (_contextId: string, response: InteractionResponse) => {
       const resolve = waiting.get(response.interactionId)
       if (!resolve) throw new Error(`No pending interaction ${response.interactionId}`)

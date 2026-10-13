@@ -4,14 +4,23 @@ import { cn } from 'cn'
 import { Button } from '@/components/ui/button.tsx'
 import { useChat, useChatActions } from '@/components/xchat/chat-context.tsx'
 
+/** Return true if the key was handled; the input then skips its own handling (e.g. Enter = submit). */
+export type ChatInputKeyHandler = (e: React.KeyboardEvent<HTMLTextAreaElement>) => boolean
+
 type ChatInputContextType = {
   draft: string
   setDraft: (draft: string) => void
   submit: () => void
+  focus: () => void
+  /** Register a key handler that runs before the input's own; returns the unregister function */
+  addKeyDownHandler: (handler: ChatInputKeyHandler) => () => void
   disabled: boolean
 }
 
-/** Lets input add-ons (voice input, attachments, …) placed inside <ChatInput> read and change the draft. */
+/**
+ * Lets input add-ons (voice input, command menu, …) placed inside <ChatInput> read and change the draft.
+ * Add-ons can position popups relative to the input box (it is `relative`).
+ */
 export const ChatInputContext = React.createContext<ChatInputContextType | null>(null)
 
 export const useChatInput = (): ChatInputContextType => {
@@ -39,6 +48,7 @@ const ChatInput = (props: ChatInputProps) => {
   const busy = useChat((s) => s.status === 'submitting' || s.status === 'streaming' || s.status === 'awaiting_input')
   const [draft, setDraft] = React.useState('')
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+  const keyHandlers = React.useRef(new Set<ChatInputKeyHandler>())
 
   // grow with the content
   React.useLayoutEffect(() => {
@@ -57,18 +67,36 @@ const ChatInput = (props: ChatInputProps) => {
     textareaRef.current?.focus()
   }, [busy, draft, send])
 
+  const focus = React.useCallback(() => textareaRef.current?.focus(), [])
+
+  const addKeyDownHandler = React.useCallback((handler: ChatInputKeyHandler) => {
+    keyHandlers.current.add(handler)
+    return () => {
+      keyHandlers.current.delete(handler)
+    }
+  }, [])
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    for (const handler of keyHandlers.current) {
+      if (handler(e)) {
+        e.preventDefault()
+        return
+      }
+    }
     if (submitOnEnter && e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       submit()
     }
   }
 
-  const context = React.useMemo(() => ({ draft, setDraft, submit, disabled: busy }), [draft, submit, busy])
+  const context = React.useMemo(
+    () => ({ draft, setDraft, submit, focus, addKeyDownHandler, disabled: busy }),
+    [draft, submit, focus, addKeyDownHandler, busy],
+  )
 
   return (
     <ChatInputContext.Provider value={context}>
-      <div className={cn('w-full min-w-64 rounded-2xl border bg-background px-3 py-2 shadow-xs focus-within:ring-1 focus-within:ring-ring', className)}>
+      <div className={cn('relative w-full min-w-64 rounded-2xl border bg-background px-3 py-2 shadow-xs focus-within:ring-1 focus-within:ring-ring', className)}>
         <textarea
           ref={textareaRef}
           rows={1}

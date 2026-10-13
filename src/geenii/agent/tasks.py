@@ -18,7 +18,7 @@ from geenii.chat_models import (
     ToolCallContent,
     JsonContent,
 )
-from geenii.datamodels import ModelMessage, ChatCompletionRequest
+from geenii.datamodels import ModelMessage, SystemMessage, ChatCompletionRequest
 from geenii.g import init_global_agent_registry, init_agent_by_name
 from geenii.tool.registry import ToolRegistry
 from geenii.tool.tool_filter import ToolFilterSet
@@ -711,13 +711,13 @@ class ActivateSkillTask(BaseAgentTask):
         self.prompt = prompt
         self.skill_name = skill_name
 
-    def execute(self) -> Iterator[ModelMessage | BaseTask]:
+    def execute(self) -> Iterator[ModelMessage | SystemMessage | BaseTask]:
         skill = self.agent.skills.load(self.skill_name)
-        if skill:
-            logger.info("Activating skill %s", skill.name)
-            self.agent.active_skills.append(self.skill_name)
-        return
-        yield  # unreachable; makes execute() a generator for the task loop
+        if not skill:
+            yield SystemMessage(level="info", content=[TextContent(text=f"Skill '{self.skill_name}' could not be found.")])
+            return
+        logger.info("Activating skill %s", skill.name)
+        self.agent.active_skills.append(self.skill_name)
 
 
 

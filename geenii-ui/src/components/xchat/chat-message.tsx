@@ -1,7 +1,14 @@
 import React from 'react'
+import { AlertCircleIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'
 import { cn } from 'cn'
-import { ChatMessageRendererProps } from '@/components/xchat/chat.types.ts'
+import { ChatMessageRendererProps, SystemMessageLevel } from '@/components/xchat/chat.types.ts'
 import ChatContentPart, { useIsPartVisible } from '@/components/xchat/chat-content-part.tsx'
+
+const SYSTEM_LEVEL_STYLES: Record<SystemMessageLevel, { icon: typeof InfoIcon, className: string }> = {
+  info: { icon: InfoIcon, className: 'border-transparent text-muted-foreground' },
+  warning: { icon: AlertTriangleIcon, className: 'border-amber-500/50 bg-amber-500/5 text-amber-700 dark:text-amber-400' },
+  error: { icon: AlertCircleIcon, className: 'border-destructive/50 bg-destructive/5 text-destructive' },
+}
 
 const formatTime = (timestamp: string) => {
   const date = new Date(timestamp)
@@ -21,9 +28,18 @@ const ChatMessage = ({ message }: ChatMessageRendererProps) => {
   const isUser = role === 'user'
 
   if (message.message.type === 'system' || role === 'system') {
+    // messages stored before the level field existed have none
+    const level = (message.message.type === 'system' && message.message.level) || 'info'
+    const { icon: Icon, className } = SYSTEM_LEVEL_STYLES[level]
     return (
-      <div className={'text-center text-xs text-muted-foreground italic py-1'} data-role={'system'}>
-        {parts.map((part, i) => <ChatContentPart key={i} part={part} message={message} />)}
+      <div className={'flex justify-center py-1'} data-role={'system'} data-level={level}>
+        <div role={level === 'info' ? 'status' : 'alert'}
+             className={cn('flex max-w-[85%] items-start gap-1.5 rounded-md border px-2.5 py-1 text-xs', className)}>
+          <Icon className={'size-3.5 shrink-0 mt-px'} />
+          <div className={'min-w-0 break-words'}>
+            {parts.map((part, i) => <ChatContentPart key={i} part={part} message={message} />)}
+          </div>
+        </div>
       </div>
     )
   }

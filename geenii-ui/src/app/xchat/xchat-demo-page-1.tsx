@@ -49,14 +49,6 @@ const XchatDemoPage1 = () => {
   return (
     <ChatProvider backend={backend} onError={(error) => notify.error(error)}>
       <XchatLayout sidebarHeader={
-        // <label className={'flex flex-col gap-1 px-2 pt-1 text-sm'}>
-        //   <span className={'text-xs text-muted-foreground'}>Backend</span>
-        //   <select value={selected} onChange={(e) => setSelected(e.target.value)}
-        //           className={'rounded-md border bg-background px-2 py-1'}>
-        //     <option value={ECHO}>Echo (local)</option>
-        //     {agentNames.map((name) => <option key={name} value={name}>Agent: {name}</option>)}
-        //   </select>
-        // </label>
          <BackendSwitcher backends={[ECHO, ...agentNames]} defaultBackend={selected} onChange={setSelected} />
       }>
         <Chat

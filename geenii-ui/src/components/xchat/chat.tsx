@@ -5,6 +5,7 @@ import ChatStatus from '@/components/xchat/chat-status.tsx'
 import ChatError from '@/components/xchat/chat-error.tsx'
 import ChatInput from '@/components/xchat/chat-input.tsx'
 import ChatModelSelector from '@/components/xchat/chat-model-selector.tsx'
+import ChatCommandMenu from '@/components/xchat/chat-command-menu.tsx'
 import { useChat } from '@/components/xchat/chat-context.tsx'
 
 /**
@@ -38,7 +39,10 @@ const Chat = ({ placeholder, empty, inputAddons, footer, className }: {
       )}>
         <ChatStatus />
         <ChatError />
-        <ChatInput placeholder={placeholder}>{inputAddons}</ChatInput>
+        <ChatInput placeholder={placeholder}>
+          <ChatCommandMenu />
+          {inputAddons}
+        </ChatInput>
         <ChatModelSelector className={'max-w-64'} />
         {footer}
       </div>

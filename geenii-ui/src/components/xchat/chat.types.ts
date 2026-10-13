@@ -130,11 +130,14 @@ export type ModelMessage = {
   timestamp: IsoDateTime
 }
 
+export type SystemMessageLevel = 'info' | 'warning' | 'error'
+
 /** A server-generated notification (backend: SystemMessage) */
 export type SystemMessage = {
   type: 'system'
   id: string
   role: 'system'
+  level: SystemMessageLevel
   content: ContentPart[]
   timestamp: IsoDateTime
 }
@@ -194,6 +197,13 @@ export type InteractionResponse = {
   choice: string
 }
 
+/** A slash command the backend understands; the user sends it as "/<command> [args]". */
+export type ChatCommand = {
+  /** Without the leading slash */
+  command: string
+  description?: string | null
+}
+
 export type ChatSessionInfo = {
   id: string
   title?: string | null
@@ -221,6 +231,9 @@ export interface ChatBackend {
 
   /** Requires `capabilities.files`. Returns content parts to attach to the next message. */
   uploadFiles?(contextId: string, files: File[]): Promise<FileContent[]>
+
+  /** Slash commands available in this conversation (null: a new one). */
+  listCommands?(contextId: string | null): Promise<ChatCommand[]>
 }
 
 /** Wraps a backend, e.g. to handle slash commands client-side. */

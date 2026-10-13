@@ -1,6 +1,7 @@
 import { joinUrl } from '@/lib/utils.ts'
 import type {
   ChatBackend,
+  ChatCommand,
   ChatEvent,
   ChatMessage,
   ChatSendRequest,
@@ -104,6 +105,24 @@ export const createAgentBackend = (options: AgentBackendOptions): ChatBackend =>
   const json = async <T>(method: string, path: string, body?: unknown): Promise<T> =>
     (await request(method, path, body)).json()
 
+  // a chat keeps the agent it was created with, which may differ from `agent` (the list shows all chats)
+  const chatAgents = new Map<string, string>()
+  const agentOf = async (contextId: string | null): Promise<string> => {
+    if (!contextId) return agent
+    if (!chatAgents.has(contextId)) {
+      chatAgents.set(contextId, (await json<ChatSessionInfo>('GET', `/${contextId}`)).agent ?? agent)
+    }
+    return chatAgents.get(contextId)!
+  }
+
+  const listCommands = async (contextId: string | null): Promise<ChatCommand[]> => {
+    const name = await agentOf(contextId)
+    const res = await fetch(joinUrl(options.baseUrl, `api/v1/agents/${encodeURIComponent(name)}/commands`),
+      { headers: options.headers })
+    if (!res.ok) throw await toError(res)
+    return res.json()
+  }
+
   async function* send(req: ChatSendRequest, signal: AbortSignal): AsyncIterable<ChatEvent> {
     let contextId = req.contextId
     if (!contextId) {
@@ -145,6 +164,8 @@ export const createAgentBackend = (options: AgentBackendOptions): ChatBackend =>
     listSessions: () => json<ChatSessionInfo[]>('GET', ''),
     deleteSession: async (contextId: string) => {
       await request('DELETE', `/${contextId}`)
+      chatAgents.delete(contextId)
     },
+    listCommands,
   }
 }

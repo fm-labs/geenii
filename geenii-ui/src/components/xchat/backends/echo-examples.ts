@@ -1,5 +1,7 @@
 // Offline sample data for the echo backend's "example" turn (data URLs, so nothing is fetched).
 
+import type { SystemMessageLevel } from '../chat.types.ts'
+
 const toBase64 = (bytes: Uint8Array): string => {
   let binary = ''
   for (let i = 0; i < bytes.length; i += 0x8000) {
@@ -57,7 +59,14 @@ export const sampleTextFile = () => {
   return { url: `data:text/plain;base64,${toBase64(bytes)}`, size: bytes.length }
 }
 
-export const SAMPLE_MARKDOWN = `## Markdown text
+/** One system message per level, as the agent sends them (e.g. a skill that could not be found). */
+export const SAMPLE_SYSTEM_MESSAGES: { level: SystemMessageLevel, text: string }[] = [
+  { level: 'info', text: "Skill 'summarize' could not be found." },
+  { level: 'warning', text: 'Maximum number of tasks almost reached: 18 of 20.' },
+  { level: 'error', text: 'An error occurred while processing the task: connection refused.' },
+]
+
+export const SAMPLE_MARKDOWN =`## Markdown text
 
 This message shows the **text** renderer: *emphasis*, \`inline code\` and a [link](https://example.com).
 
@@ -68,6 +77,16 @@ This message shows the **text** renderer: *emphasis*, \`inline code\` and a [lin
 2. list
 
 > A blockquote.
+
+GitHub-flavored markdown: ~~strikethrough~~, an autolink https://example.com and a task list:
+
+- [x] render tables
+- [ ] something left to do
+
+| Part | Rendered as |
+|---|---|
+| text | markdown |
+| tool_call | collapsible card |
 
 \`\`\`python
 def greet(name: str) -> str:

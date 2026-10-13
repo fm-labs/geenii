@@ -25,6 +25,12 @@ logger = logging.getLogger(__name__)
 class Agent(BaseAgent):
     """Default Agent"""
 
+    # Slash commands handled by _handle_makros; any other "/<name>" activates the skill <name>.
+    BUILTIN_COMMANDS: dict[str, str] = {
+        "clear": "Clear the conversation memory",
+        "compact": "Summarize and compact the conversation memory",
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -86,7 +92,7 @@ class Agent(BaseAgent):
                 prompt = parts[1] if len(parts) > 1 else ""
                 logger.info("Command macro: cmd=%s message=%s", skill_name, prompt)
 
-                if skill_name == "clear":
+                if skill_name == "clear":  # keep in sync with BUILTIN_COMMANDS
                     self.enqueue_task(ClearMemoryTask(agent=self))
                     return True
                 elif skill_name == "compact":

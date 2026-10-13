@@ -46,6 +46,7 @@ class ModelMessage(pydantic.BaseModel):
 class SystemMessage(pydantic.BaseModel):
     type: Literal["system"] = "system"
     role: str = "system"
+    level: Literal["info", "warning", "error"] = "info"
     content: list[ContentPart] = pydantic.Field(default_factory=list)
     id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex)
     timestamp: datetime = pydantic.Field(default_factory=lambda: datetime.now(UTC))
@@ -73,6 +74,12 @@ WireMessage = Annotated[
 #     def to_text(self) -> str: ...
 #     def to_json(self) -> dict[str, Any]: ...
 #     def to_dict(self) -> dict[str, Any]: ...
+
+
+class AgentCommand(pydantic.BaseModel):
+    """A slash command an agent understands (sent as "/<command> [args]")."""
+    command: str  # without the leading slash
+    description: str = ""
 
 
 class ChatMessage(pydantic.BaseModel):
