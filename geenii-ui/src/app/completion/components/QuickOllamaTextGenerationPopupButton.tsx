@@ -1,7 +1,6 @@
 import React from "react";
 import Popup from "../../../components/Popup.tsx";
 import QuickCompletion from "./QuickCompletion.tsx";
-import { AppContext } from '@/context/app-context.tsx';
 import { ollamaGenerate } from '@/api/ollama-api.ts';
 import useNotification from '../../../hooks/useNotification.ts'
 import { Button } from '@/components/ui/button.tsx'
@@ -9,11 +8,7 @@ import { Button } from '@/components/ui/button.tsx'
 const QuickOllamaTextGenerationPopupButton = ({ modelName }) => {
     const [isOpen, setIsOpen] = React.useState(false);
     const [completion, setCompletion] = React.useState("");
-    const context = React.useContext(AppContext);
     const notify = useNotification();
-    if (!context) {
-        throw new Error("AppContext is not provided");
-    }
     if (!modelName || !modelName.startsWith("ollama:")) {
         throw new Error("Model name must be provided and start with 'ollama:'");
     }

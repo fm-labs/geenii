@@ -1,9 +1,9 @@
 import React from "react";
-import { IAiClient, IDockerApiClient } from "../api/xai.types.ts";
+import { IDockerApiClient } from "../api/xai.types.ts";
 
+// the API client lives in ApiContext (useApi())
 type AppContextType = {
     isTauri: boolean;
-    api: IAiClient;
     //dockerApi?: IDockerApiClient;
     apiHealth?: any;
     apiInfo?: any;

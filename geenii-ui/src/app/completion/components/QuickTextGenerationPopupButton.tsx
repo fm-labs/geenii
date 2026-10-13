@@ -1,7 +1,7 @@
 import React from 'react'
 import Popup from '../../../components/Popup.tsx'
 import QuickCompletion from './QuickCompletion.tsx'
-import { AppContext } from '@/context/app-context.tsx'
+import { useApi } from '@/context/api-context.tsx'
 import useNotification from '../../../hooks/useNotification.ts'
 import { Button } from '@/components/ui/button.tsx'
 
@@ -10,10 +10,7 @@ const QuickTextGenerationPopupButton = ({ modelName }) => {
   const [completion, setCompletion] = React.useState('')
   const [isThinking, setIsThinking] = React.useState(false)
   const notify = useNotification()
-  const context = React.useContext(AppContext)
-  if (!context) {
-    throw new Error('AppContext is not provided')
-  }
+  const { api } = useApi()
 
   const handleCompletion = async (prompt: string) => {
     console.log('>> SUBMIT INPUT', prompt)
@@ -24,7 +21,7 @@ const QuickTextGenerationPopupButton = ({ modelName }) => {
     }
 
     setIsThinking(true)
-    const response = await context.api.generateCompletion({ model: modelName, prompt })
+    const response = await api.generateCompletion({ model: modelName, prompt })
       .catch((err) => {
         console.error('Error generating completion:', err)
         notify.error('Error generating completion: ' + err.message)

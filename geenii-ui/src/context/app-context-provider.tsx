@@ -14,8 +14,8 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
   const [apiInfo, setApiInfo] = React.useState<any>(null)
 
   const contextValue = React.useMemo(() => {
-    return { isTauri, api, apiInfo }
-  }, [api])
+    return { isTauri, apiInfo }
+  }, [apiInfo])
 
   //const [loading, setLoading] = React.useState<boolean>(true)
   //const [ready, setReady] = React.useState<boolean>(false)
