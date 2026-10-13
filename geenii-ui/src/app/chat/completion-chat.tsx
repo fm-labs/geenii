@@ -60,6 +60,9 @@ const CompletionChat = (props: ChatProps) => {
     const response = await appContext.xaiApi.generateCompletion({ model: modelName, prompt: input, context_id: chatId})
       .catch((err) => {
         console.error('Error generating response:', err)
+        // error responses carry a Problem body: {error, status, detail}
+        const problem = err?.response?.data
+        notify.error('Error generating response: ' + (problem?.detail || problem?.error || err?.message || 'unknown error'))
         setIsThinking(false)
         return null
       })

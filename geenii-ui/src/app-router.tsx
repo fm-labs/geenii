@@ -96,14 +96,6 @@ const AppRouter = () => {
       //   path: '/wschat',
       //   element: <WsChat />,
       // },
-      // {
-      //   path: '/wizards',
-      //   element: <WizardsPage />,
-      // },
-      // {
-      //   path: '/wizard',
-      //   element: <WizardApp />,
-      // },
       {
         path: '/settings',
         element: <SettingsPage />,

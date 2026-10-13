@@ -1,7 +1,6 @@
 import * as React from 'react'
 import {
   AudioWaveformIcon,
-  BotIcon,
   BrainIcon,
   HammerIcon, InfoIcon, PackageIcon, PaletteIcon,
   ServerIcon,
@@ -52,7 +51,6 @@ const data = {
     { name: "Appearance", icon: PaletteIcon },
     //{ name: "Default Models", icon: BrainIcon },
     { name: "Models", icon: BrainIcon },
-    { name: "Wizards", icon: BotIcon },
     { name: "Tools", icon: HammerIcon },
     { name: "MCP", icon: ServerIcon },
     { name: "Apps", icon: PackageIcon },
