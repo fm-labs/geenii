@@ -61,7 +61,12 @@ const XchatDemoPage1 = () => {
       }>
         <Chat
           className={'w-full max-w-3xl mx-auto px-4 min-h-svh'}
-          empty={<h2 className={'text-center text-2xl font-semibold'}>What can I do for you?</h2>}
+          empty={<div className={'text-center'}>
+            <h2 className={'text-2xl font-semibold'}>What can I do for you?</h2>
+            {selected === ECHO && <p className={'mt-2 text-sm text-muted-foreground'}>
+              Echo backend: send "example" for one message of each type, or start with "tool" for a tool approval.
+            </p>}
+          </div>}
           inputAddons={FEATURE_VOICE_RECORDING_ENABLED && <ChatVoiceInput />}
           footer={<ChatDebugStatus />}
         />

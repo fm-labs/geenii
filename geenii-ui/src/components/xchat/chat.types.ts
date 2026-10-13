@@ -1,4 +1,4 @@
-import { ComponentType, JSX } from 'react'
+import type { ComponentType, JSX } from 'react'
 
 // ---------------------------------------------------------------------------
 // Wire format

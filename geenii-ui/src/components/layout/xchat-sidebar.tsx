@@ -36,9 +36,13 @@ const XchatSessionsGroup = () => {
         <SidebarMenu>
           {sessions.map((session) => (
             <SidebarMenuItem key={session.id}>
-              <SidebarMenuButton isActive={session.id === activeId} onClick={() => open(session.id)}
-                                 title={session.title || session.id}>
-                <span className={'truncate'}>{session.title || session.id}</span>
+              <SidebarMenuButton size={session.agent ? 'lg' : 'default'} isActive={session.id === activeId}
+                                 onClick={() => open(session.id)}
+                                 title={session.agent ? `${session.title || session.id} (${session.agent})` : session.title || session.id}>
+                <div className={'flex min-w-0 flex-col'}>
+                  <span className={'truncate'}>{session.title || session.id}</span>
+                  {session.agent && <span className={'truncate text-xs text-muted-foreground'}>{session.agent}</span>}
+                </div>
               </SidebarMenuButton>
               {canDelete && (
                 <SidebarMenuAction showOnHover title={'Delete chat'} onClick={() => remove(session.id)}>

@@ -86,8 +86,9 @@ const ChatSessionList = ({ className }: { className?: string }) => {
       {sessions.map((s) => (
         <div key={s.id}
              className={cn('group flex items-center rounded-md hover:bg-accent', s.id === activeId && 'bg-accent font-medium')}>
-          <button type={'button'} className={'flex-1 truncate px-2 py-1.5 text-left'} onClick={() => open(s.id)}>
-            {s.title || s.id}
+          <button type={'button'} className={'flex min-w-0 flex-1 flex-col px-2 py-1.5 text-left'} onClick={() => open(s.id)}>
+            <span className={'truncate'}>{s.title || s.id}</span>
+            {s.agent && <span className={'truncate text-xs font-normal text-muted-foreground'}>{s.agent}</span>}
           </button>
           {canDelete && (
             <button type={'button'} aria-label={'Delete chat'} onClick={() => remove(s.id)}

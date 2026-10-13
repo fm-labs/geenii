@@ -5,7 +5,16 @@ import type {
   ChatSendRequest,
   ContentPart,
   InteractionResponse,
+  MessageRole,
 } from '../chat.types.ts'
+import {
+  SAMPLE_FILE_TEXT,
+  SAMPLE_MARKDOWN,
+  sampleBeepDataUrl,
+  sampleSvgBase64,
+  sampleSvgDataUrl,
+  sampleTextFile,
+} from './echo-examples.ts'
 
 export type EchoBackendOptions = {
   /** Simulated response latency in ms */
@@ -13,37 +22,168 @@ export type EchoBackendOptions = {
   senderId?: string
 }
 
+/** Input that triggers the example turn (case-insensitive) */
+export const ECHO_EXAMPLE_TRIGGER = 'example'
+
 const id = () => `${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`
+
+const aborted = () => new DOMException('Aborted', 'AbortError')
 
 const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
   const timer = setTimeout(resolve, ms)
   signal.addEventListener('abort', () => {
     clearTimeout(timer)
-    reject(new DOMException('Aborted', 'AbortError'))
+    reject(aborted())
   }, { once: true })
 })
 
 /**
  * Local backend for demos and tests. Echoes text input back.
  *
- * Input starting with "tool" simulates an agent tool call that needs approval:
- * it emits an interaction, waits for `respond`, then emits the tool call result.
+ * - Input starting with "tool" simulates an agent tool call that needs approval:
+ *   it emits an interaction, waits for `respond`, then emits the tool call result.
+ * - Input "example" streams one message per content type (text, image, audio, file, embed, json,
+ *   function, tool_call + tool_call_result, interaction, confirmation) plus a system message.
  */
 export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend => {
   const delay = options.delay ?? 500
   const senderId = options.senderId ?? 'echo'
   const waiting = new Map<string, (choice: string) => void>()
 
-  const message = (contextId: string, role: 'assistant' | 'tool', content: ContentPart[]): ChatMessage => {
+  const message = (contextId: string, role: MessageRole, content: ContentPart[]): ChatMessage => {
     const messageId = id()
     const timestamp = new Date().toISOString()
     return {
       id: messageId,
       timestamp,
-      sender_id: senderId,
+      sender_id: role === 'system' ? 'system' : senderId,
       context_id: contextId,
-      message: { type: 'message', id: messageId, role, content, timestamp },
+      message: role === 'system'
+        ? { type: 'system', id: messageId, role: 'system', content, timestamp }
+        : { type: 'message', id: messageId, role, content, timestamp },
     }
+  }
+
+  const say = (contextId: string, role: MessageRole, ...content: ContentPart[]): ChatEvent =>
+    ({ type: 'message', message: message(contextId, role, content) })
+
+  /** Wait until `respond` answers the interaction/confirmation with this id. */
+  const waitForAnswer = (interactionId: string, signal: AbortSignal) => new Promise<string>((resolve, reject) => {
+    waiting.set(interactionId, resolve)
+    signal.addEventListener('abort', () => {
+      waiting.delete(interactionId)
+      reject(aborted())
+    }, { once: true })
+  })
+
+  async function* toolTurn(contextId: string, text: string, signal: AbortSignal): AsyncIterable<ChatEvent> {
+    const callId = id()
+    const args = { text }
+    yield say(contextId, 'assistant', {
+      type: 'interaction',
+      interaction_id: callId,
+      interaction_type: 'tool_call_request',
+      text: `Requesting approval to call tool 'echo' with arguments ${JSON.stringify(args)}.`,
+      choices: ['Allow', 'Deny'],
+    })
+    yield { type: 'status', status: 'awaiting_input' }
+    const choice = await waitForAnswer(callId, signal)
+
+    yield { type: 'status', status: 'tool' }
+    await sleep(delay, signal)
+    const allowed = choice === 'Allow'
+    yield say(contextId, 'tool', {
+      type: 'tool_call_result',
+      call_id: callId,
+      name: 'echo',
+      arguments: args,
+      result: allowed ? { echo: text } : { error: 'Tool execution rejected.' },
+    })
+    yield { type: 'status', status: 'thinking' }
+    await sleep(delay, signal)
+    yield say(contextId, 'assistant', { type: 'text', text: allowed ? `Tool said: ${text}` : 'Ok, not calling the tool.' })
+  }
+
+  async function* exampleTurn(contextId: string, signal: AbortSignal): AsyncIterable<ChatEvent> {
+    const step = Math.max(50, delay / 3)
+    const pause = () => sleep(step, signal)
+    const file = sampleTextFile()
+
+    yield say(contextId, 'system', { type: 'text', text: 'Example turn: one message per content type.' })
+    await pause()
+    yield say(contextId, 'assistant', { type: 'text', text: SAMPLE_MARKDOWN })
+    await pause()
+    yield say(contextId, 'assistant',
+      { type: 'text', text: 'An **image** from a URL and one from base64:' },
+      { type: 'image', url: sampleSvgDataUrl('image (url)', '#6366f1'), alt: 'Sample image from a URL' },
+      { type: 'image', base64: sampleSvgBase64('image (base64)', '#0ea5e9', 240, 135), alt: 'Sample image from base64' },
+    )
+    await pause()
+    yield say(contextId, 'assistant',
+      { type: 'text', text: 'An **audio** clip:' },
+      { type: 'audio', url: sampleBeepDataUrl(), duration: 0.6 },
+    )
+    await pause()
+    yield say(contextId, 'assistant',
+      { type: 'text', text: 'A **file**:' },
+      { type: 'file', url: file.url, filename: 'hello.txt', content_type: 'text/plain', size: file.size },
+    )
+    await pause()
+    yield say(contextId, 'assistant', {
+      type: 'embed',
+      title: 'An embed',
+      description: 'Link previews show a title, a description and a thumbnail.',
+      url: 'https://example.com',
+      thumbnail_url: sampleSvgDataUrl('embed', '#f59e0b', 128, 128),
+    })
+    await pause()
+    yield say(contextId, 'assistant', {
+      type: 'json',
+      data: { kind: 'json', nested: { list: [1, 2, 3], ok: true }, text: SAMPLE_FILE_TEXT.trim() },
+    })
+    await pause()
+    yield say(contextId, 'assistant', { type: 'function', name: 'get_time', arguments: { tz: 'UTC' }, result: new Date().toISOString() })
+    await pause()
+
+    // a tool call whose result arrives later: the card shows "running", then fills in the result
+    const callId = id()
+    yield say(contextId, 'assistant', { type: 'tool_call', name: 'add', arguments: { a: 2, b: 3 }, call_id: callId })
+    yield { type: 'status', status: 'tool' }
+    await sleep(delay * 2, signal)
+    yield say(contextId, 'tool', { type: 'tool_call_result', name: 'add', arguments: { a: 2, b: 3 }, call_id: callId, result: 5 })
+    await pause()
+    // a result without a call message, as the agent sends it, and a failed one
+    yield say(contextId, 'tool', { type: 'tool_call_result', name: 'read_file', arguments: { path: 'notes.md' }, call_id: id(), result: { lines: 42 } })
+    yield say(contextId, 'tool', { type: 'tool_call_result', name: 'delete_file', arguments: { path: '/' }, call_id: id(), error: 'Permission denied' })
+    yield { type: 'status', status: 'thinking' }
+    await pause()
+
+    const interactionId = id()
+    yield say(contextId, 'assistant', {
+      type: 'interaction',
+      interaction_id: interactionId,
+      interaction_type: 'choice',
+      text: 'An interaction: pick a color.',
+      choices: ['Red', 'Green', 'Blue'],
+    })
+    yield { type: 'status', status: 'awaiting_input' }
+    const color = await waitForAnswer(interactionId, signal)
+
+    const confirmationId = id()
+    yield say(contextId, 'assistant', {
+      type: 'confirmation',
+      confirmation_id: confirmationId,
+      text: `A confirmation: use ${color}?`,
+    })
+    yield { type: 'status', status: 'awaiting_input' }
+    const confirmed = ['yes', 'confirm', 'confirmed'].includes((await waitForAnswer(confirmationId, signal)).toLowerCase())
+
+    yield { type: 'status', status: 'thinking' }
+    await pause()
+    yield say(contextId, 'assistant', {
+      type: 'text',
+      text: confirmed ? `Done. You picked **${color}**.` : `Ok, not using ${color}.`,
+    })
   }
 
   async function* send(request: ChatSendRequest, signal: AbortSignal): AsyncIterable<ChatEvent> {
@@ -56,51 +196,14 @@ export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend
     const text = request.content
       .map((p) => (p.type === 'text' ? p.text : `[${p.type}]`))
       .join(' ')
+    const command = text.trim().toLowerCase()
 
-    if (text.toLowerCase().startsWith('tool')) {
-      const callId = id()
-      const args = { text }
-      yield {
-        type: 'message',
-        message: message(contextId, 'assistant', [{
-          type: 'interaction',
-          interaction_id: callId,
-          interaction_type: 'tool_call_request',
-          text: `Requesting approval to call tool 'echo' with arguments ${JSON.stringify(args)}.`,
-          choices: ['Allow', 'Deny'],
-        }]),
-      }
-      yield { type: 'status', status: 'awaiting_input' }
-
-      const choice = await new Promise<string>((resolve, reject) => {
-        waiting.set(callId, resolve)
-        signal.addEventListener('abort', () => {
-          waiting.delete(callId)
-          reject(new DOMException('Aborted', 'AbortError'))
-        }, { once: true })
-      })
-
-      yield { type: 'status', status: 'tool' }
-      await sleep(delay, signal)
-      const allowed = choice === 'Allow'
-      yield {
-        type: 'message',
-        message: message(contextId, 'tool', [{
-          type: 'tool_call_result',
-          call_id: callId,
-          name: 'echo',
-          arguments: args,
-          result: allowed ? { echo: text } : { error: 'Tool execution rejected.' },
-        }]),
-      }
-      yield { type: 'status', status: 'thinking' }
-      await sleep(delay, signal)
-      yield {
-        type: 'message',
-        message: message(contextId, 'assistant', [{ type: 'text', text: allowed ? `Tool said: ${text}` : 'Ok, not calling the tool.' }]),
-      }
+    if (command === ECHO_EXAMPLE_TRIGGER) {
+      yield* exampleTurn(contextId, signal)
+    } else if (command.startsWith('tool')) {
+      yield* toolTurn(contextId, text, signal)
     } else {
-      yield { type: 'message', message: message(contextId, 'assistant', [{ type: 'text', text: `You said: ${text}` }]) }
+      yield say(contextId, 'assistant', { type: 'text', text: `You said: ${text}` })
     }
 
     yield { type: 'done' }

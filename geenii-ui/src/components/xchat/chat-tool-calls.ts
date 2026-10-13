@@ -1,5 +1,5 @@
 import React from 'react'
-import { ChatMessage, ToolCallResultContent } from '@/components/xchat/chat.types.ts'
+import type { ChatMessage, ToolCallResultContent } from '@/components/xchat/chat.types.ts'
 
 /**
  * Links tool calls to their results across messages (by call_id).
