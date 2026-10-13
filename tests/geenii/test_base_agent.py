@@ -142,3 +142,32 @@ def test_agent_runs_llm_tool_call_round_trip(monkeypatch):
     assert isinstance(parts[-1], TextContent) and parts[-1].text == "The answer is 5."
     assert not any(isinstance(p, ToolCallContent) for p in parts)
     _assert_queue_settled(agent)
+
+
+def test_initialize_runs_lazily_once_after_subclass_init():
+    """Subclasses may set attributes after super().__init__(); _initialize() must not run before that."""
+
+    class LateAttrAgent(StubAgent):
+        def __init__(self):
+            super().__init__(EchoTask("ok"))
+            self.dependency = "ready"
+            self.init_calls = []
+
+        def _initialize(self):
+            if self._initialized:
+                return
+            self.init_calls.append(self.dependency)
+            self._initialized = True
+
+    agent = LateAttrAgent()
+    assert agent.init_calls == []
+
+    _run(agent)
+    _run(agent)
+    assert agent.init_calls == ["ready"]
+
+
+def test_process_manager_agent_can_be_constructed():
+    from geenii.agents import ProcessManagerAgent
+
+    ProcessManagerAgent("pm", memory=ShortTermChatMemory())
