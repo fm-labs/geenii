@@ -2,7 +2,6 @@
 .idea/
 .venv/
 .geenii/
-.geeniidev/
 bak/
 data/
 build/
@@ -18,3 +17,4 @@ __pycache__/
 .DS_Store
 src/*.egg-info/
 src/x*.py
+SUMMARY.md
