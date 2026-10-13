@@ -3,7 +3,7 @@ import { MessageSquarePlusIcon, TrashIcon } from 'lucide-react'
 
 import {
   Sidebar,
-  SidebarContent,
+  SidebarContent, SidebarFooter,
   SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
@@ -14,8 +14,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-} from "@/components/ui/sidebar"
+} from '@/components/ui/sidebar'
 import { useChatSessions } from '@/components/xchat/chat-session-list.tsx'
+import { NavUser } from '@/components/nav-user.tsx'
 
 /** The chat session list as a sidebar group. Must be used within a ChatProvider. */
 const XchatSessionsGroup = () => {
@@ -57,6 +58,14 @@ const XchatSessionsGroup = () => {
   )
 }
 
+const data = {
+  user: {
+    name: "geenii",
+    email: "daG@geenii.io",
+    avatar: "/avatars/shadcn.jpg",
+  },
+}
+
 export function XchatSidebar({ header, ...props }: React.ComponentProps<typeof Sidebar> & {
   /** Rendered above the chat list, e.g. a backend / agent picker */
   header?: React.ReactNode
@@ -68,6 +77,9 @@ export function XchatSidebar({ header, ...props }: React.ComponentProps<typeof S
         <XchatSessionsGroup />
       </SidebarContent>
       <SidebarRail />
+      <SidebarFooter>
+        <NavUser user={data.user} />
+      </SidebarFooter>
     </Sidebar>
   )
 }
