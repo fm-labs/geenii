@@ -8,35 +8,49 @@ programmatic API. For defining and configuring agents, see the
 
 Class hierarchy (`geenii/agent/`, `geenii/agents.py`):
 
-- `BotInterface` — minimal interface: `prompt(message) -> AsyncGenerator[ModelMessage]`.
+- `BotInterface` — minimal interface: `process(message) -> Iterator[ModelMessage]`.
 - `BaseAgent` — the engine. Owns the tool registry, skill registry, message
-  history, HITL controller, and an asyncio task queue. Subclasses decide which
-  tasks to enqueue per prompt by implementing `_handle_prompt()`.
-- `Agent` — the standard implementation: enqueues `FindBestSkillTask` then `LLMTask`.
+  history, HITL controller, and a FIFO task queue (`collections.deque`).
+  Subclasses decide which tasks to enqueue per message by implementing
+  `_handle_message()`.
+- `Agent` — the standard implementation: handles `@agent`, `/command` and
+  `:tool` macros, otherwise enqueues `FindBestSkillTask` then `LLMTask`.
 - `RoutingAgent` — enqueues `FindBestAgentTask` to hand the conversation off to
   the best-fitting configured agent (not used by default).
+- `ProcessManagerAgent` — an `Agent` that additionally registers the process
+  manager tools.
 
-On the first prompt, `BaseAgent._initialize()` registers the built-in tools and
-discovers all MCP server tools into the agent's tool registry. Which of those
+The agent runtime is fully synchronous: `process()`, task `execute()` methods,
+tool `invoke()` and HITL controllers are plain (blocking) functions/generators.
+To run several agents concurrently, run each one in its own thread or process;
+a single agent instance is not meant to be shared between concurrent callers.
+
+On the first `process()` call, `BaseAgent._initialize()` runs once (lazily, so
+subclasses can finish their own `__init__` first). For `Agent` it registers the
+tools of the agent's configured MCP servers (`mcp_servers`) into its tool
+registry and warns about `allowed_tools` that are not registered. Which tools
 the model may actually call is controlled by `allowed_tools` (from the spec's
 `tools` list or the CLI `--tools` override).
 
 ## The task queue
 
-A prompt is processed by draining the queue (`_process_queue`), bounded by
-`BaseAgent.MAX_TASKS = 10` per prompt. Tasks are `BaseTask` subclasses whose
-`execute()` is an async generator; yielded values are either:
+A message is processed by draining the queue (`_process_queue`), bounded by
+`BaseAgent.MAX_TASKS = 15` tasks per message; when the limit is reached the
+remaining tasks are dropped and an error message is yielded. Tasks are
+`BaseTask` subclasses whose `execute()` is a generator; yielded values are
+either:
 
 - `ModelMessage` — streamed to the caller (CLI prints them as they arrive), or
-- another `BaseTask` — re-enqueued for execution.
+- another `BaseTask` — appended to the end of the queue.
 
-Errors in a task are caught and surfaced as an assistant error message.
+Errors in a task are caught and surfaced as an assistant error message; the
+remaining tasks still run.
 
 ## Built-in tasks (`geenii/agent/tasks.py`)
 
 | Task | Purpose |
 |---|---|
-| `LLMTask` | The main completion. Builds the full system prompt, sends the request (with the last 10 history messages), then drives the tool-call loop: each tool call in the response is executed via `ToolCallTask` and the completion is re-generated with the result, bounded by `MAX_TOOL_CALLS = 5`. If any tools were called, a follow-up `LLMTask` is enqueued to produce the final answer. |
+| `LLMTask` | The main completion. Builds the full system prompt, sends the request (with the last `MAX_MESSAGE_HISTORY = 30` history messages), then drives the tool-call loop: all tool calls in a response are executed via `ToolCallTask`, then the completion is re-generated with the results. This repeats until the model answers without tool calls, bounded by `MAX_TOOL_CALLS = 10` per response and `MAX_RECURSION = 10` re-generations. |
 | `ToolCallTask` | Executes one tool call: emits an approval-request message, asks the HITL controller, invokes the tool (passing skill env vars), and appends the result to history. |
 | `FindBestSkillTask` | Activates one or more skills on `agent.active_skills`. Tries, in order: auto-select (single skill), pre-selection, deterministic trigger matching (keyword-based, no LLM call), and LLM fallback (JSON output, temperature 0.1). Also registers any executable scripts in activated skills' `scripts/` directories as namespaced tools (`{skill}__{script}`). |
 | `FindBestAgentTask` | LLM call that picks the best agent from the global registry, then yields a `HandoffTask`; falls back to a plain `LLMTask` when nothing fits. |
@@ -55,14 +69,22 @@ For each `LLMTask` the system prompt is a list of parts:
 
 ## Message history and memory
 
-`BaseAgent.message_history` is an in-process list of `ModelMessage`s (user,
-assistant, tool-call, and tool-result messages). Requests include the last 10
-entries. History is not persisted between CLI runs.
+`BaseAgent.message_history` is the list of `ModelMessage`s (user, assistant,
+tool-call, and tool-result messages) held by the agent's `ChatMemory`
+(`agent.memory`). Requests include the last 30 entries.
 
-`geenii/memory.py` provides a `ChatMemory` abstraction with `ShortTermChatMemory`
-(in-memory) and `FileChatMemory` (JSONL append/restore) implementations. A
-`memory` parameter exists on `BaseAgent`, but it is not yet used by the runtime —
-persistent conversations (`--context`) are not functional yet.
+`geenii/memory.py` provides the `ChatMemory` implementations; unless a `memory`
+is passed to the agent, `GEENII_MEMORY_ENGINE` selects one, keyed by the agent
+name and `context_id`:
+
+| Engine | Class | Storage |
+|---|---|---|
+| `file` | `FileChatMemory` | JSONL file, appended per message and restored on start |
+| `sqlite` | `SqliteChatMemory` | SQLite database; safe to use from multiple threads |
+| anything else | `ShortTermChatMemory` | in-process only, lost when the process exits |
+
+The `/clear` and `/compact` macros clear the memory or summarise it into a new
+context (`MemoryCompactionTask`).
 
 ## Human-in-the-loop (HITL)
 
@@ -86,7 +108,17 @@ from geenii.g import init_agent_by_name
 
 agent = init_agent_by_name("my-agent")
 
-async for message in agent.process("What's the weather in Vienna?"):
+for message in agent.process("What's the weather in Vienna?"):
     for part in message.content:
         print(part.type, part.to_text())
 ```
+
+`process()` blocks while the model and tools run. From async code (e.g. a
+FastAPI endpoint), run it in a worker thread — e.g. return a
+`StreamingResponse` over the generator, which Starlette iterates in its
+threadpool, or use `await asyncio.to_thread(lambda: list(agent.process(msg)))`.
+
+MCP tools are the one async dependency: `McpClient` exposes a sync API and runs
+every call on a single shared background event loop
+(`geenii/utils/async_bridge.py`), so its persistent connections stay valid no
+matter which thread calls them.

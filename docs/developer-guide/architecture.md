@@ -76,13 +76,13 @@ CLI (cli/agent.py)
  │                                     parse AgentSpec, build Agent with its
  │                                     tool/skill registries
  └─ CliAgentRunner.run(prompt)
-     └─ agent.prompt(prompt)           BaseAgent: lazy _initialize() registers
-         │                             built-in tools + all MCP server tools
-         ├─ _handle_prompt(prompt)     Agent enqueues:
+     └─ agent.process(prompt)          BaseAgent: lazy, run-once _initialize()
+         │                             registers the agent's MCP server tools
+         ├─ _handle_message(prompt)    Agent enqueues:
          │    1. FindBestSkillTask     LLM call selecting the best skill (skipped
          │                             for 0 skills, auto-picked for exactly 1)
          │    2. LLMTask               the main completion
-         └─ _process_queue()           drains the queue (max 10 tasks per prompt),
+         └─ _process_queue()           drains the queue (max 15 tasks per message),
               │                        yields ModelMessages to the caller
               └─ LLMTask.execute()
                    ├─ builds system prompt: agent instructions + context info
@@ -90,22 +90,25 @@ CLI (cli/agent.py)
                    ├─ generate_chat_completion()      ai.py -> provider
                    ├─ for each tool call in the response:
                    │    ├─ ToolCallTask: HITL approval -> tool.invoke()
-                   │    ├─ appends tool call + result to message history
-                   │    └─ re-generates the completion with the tool result
-                   │       (bounded by MAX_TOOL_CALLS = 5)
-                   └─ if tools were called, enqueues one follow-up LLMTask
+                   │    └─ appends tool call + result to message history
+                   └─ re-generates the completion with the tool results,
+                      repeating until the model answers without tool calls
+                      (bounded by MAX_TOOL_CALLS = 10, MAX_RECURSION = 10)
 ```
 
 Key properties of the loop:
 
+- **Synchronous.** The whole loop runs in the caller's thread; `process()` is a
+  plain generator. Only MCP calls hop to a shared background event loop
+  (`utils/async_bridge.py`), because the fastmcp client is async-only.
 - **Everything is a task.** Agent behavior is composed from `BaseTask` subclasses
   that an agent enqueues; tasks may yield messages (streamed to the caller) or
-  further tasks (re-enqueued). `BaseAgent.MAX_TASKS` (10) bounds one prompt cycle.
+  further tasks (appended to the queue). `BaseAgent.MAX_TASKS` (15) bounds one
+  message cycle.
 - **Tool execution is mediated.** Every tool call passes through the agent's
   `HumanInTheLoopController` before executing (default: auto-approve).
-- **History is windowed.** Requests include the last 10 messages of the agent's
-  in-memory history. The `ChatMemory` persistence layer exists but is not yet
-  wired into `BaseAgent`.
+- **History is windowed.** Requests include the last 30 messages of the agent's
+  `ChatMemory` (in-process, JSONL file or SQLite, per `GEENII_MEMORY_ENGINE`).
 
 ## Provider dispatch
 

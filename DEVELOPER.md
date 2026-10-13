@@ -7,11 +7,7 @@ It is one of the core component of the OpenGeenii platform, responsible for exec
 
 ## Developer Guide
 
-### Run geeniid
-
-```bash
-uv run src/server.py
-```
+### Run geenii web server
 
 or with uvicorn:
 
