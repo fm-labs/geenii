@@ -1,6 +1,5 @@
 import React from 'react'
 import TauriAppViewer from '@/app/apps/tauri-app-viewer.tsx'
-import Header from '@/components/header.tsx'
 import Layout from '@/components/layout/layout.tsx'
 import { useRoute } from '@/app-router.tsx'
 import { NotFoundError } from '@/features/errors/not-found-error.tsx'
@@ -22,7 +21,7 @@ const AppPage = () => {
   }
 
   return (
-    <Layout>a
+    <Layout>
       <MainContent>
       <div className={""}>
         {/*<<Header title={appId}>

@@ -2,7 +2,6 @@ import React from 'react'
 import QuickTextGenerationPopupButton from '@/app/completion/components/QuickTextGenerationPopupButton.tsx'
 import QuickImageGenerationPopupButton from '@/app/completion/components/QuickImageGenerationPopupButton.tsx'
 import QuickAudioGenerationPopupButton from '@/app/completion/components/QuickAudioGenerationPopupButton.tsx'
-import Header from '@/components/header.tsx'
 import Layout from '@/components/layout/layout.tsx'
 
 const CompletionsPage = () => {

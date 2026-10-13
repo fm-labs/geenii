@@ -2,7 +2,6 @@ import React, { PropsWithChildren } from 'react'
 import Layout from '@/components/layout/layout.tsx'
 import AgentsView from '@/app/agents/agents.view.tsx'
 import ToolsView from '@/app/tools/tools.view.tsx'
-import AppsView from '@/app/apps/apps-view.tsx'
 import { cn } from '@/lib/utils.ts'
 
 
@@ -25,12 +24,12 @@ const DashboardHeader = ({ title }: { title: string }) => {
   )
 }
 
-const DashboardSection = ({ title, className, children }: PropsWithChildren<{ title: string, className?: string }>) => {
+const DashboardSection = ({ title, className, children }: PropsWithChildren<{ title?: string, className?: string }>) => {
   return (
     <div className={cn('dashboard-section p-20 min-h-screen border-b-13', className)}>
-      <div className={'p-12 text-center'}>
+      {title && <div className={'p-12 text-center'}>
         <h2 className={'text-xl font-semibold text-center'}>{title}</h2>
-      </div>
+      </div>}
       <div>{children}</div>
     </div>
   )
@@ -40,7 +39,6 @@ const DashboardPage = () => {
   return (
     <Layout>
       <div className={'pt-10'}>
-
         <DashboardSection title={"Your Agents"}>
           {/*<a href={'#/agents'} className={'text-sm mb-4 inline-block'}>Manage Agents</a>*/}
           <AgentsView />

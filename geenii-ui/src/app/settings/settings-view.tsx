@@ -33,7 +33,6 @@ import { McpServersSettingsView } from '@/app/settings/components/mcp-servers-se
 import { AiModelSettingsView } from '@/app/settings/components/ai-model-settings-view.tsx'
 import { settingsForms } from '@/app/settings/settings-forms.ts'
 import ToolsView from '@/app/tools/tools.view.tsx'
-import WizardsSettings from '@/app/settings/components/wizards-settings.tsx'
 import AppsSettings from '@/app/settings/components/apps-settings.tsx'
 import {
   FEATURE_AI_ENABLED,
@@ -120,11 +119,6 @@ const SettingsView = () => {
           return <DisabledFeatureSettingsView />;
         }
         return <ToolsView />
-      case "Wizards":
-        if (!FEATURE_AGENTS_ENABLED) {
-          return <DisabledFeatureSettingsView />;
-        }
-        return <WizardsSettings />
       case "Apps":
         if (!FEATURE_APPS_ENABLED) {
           return <DisabledFeatureSettingsView />;
