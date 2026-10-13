@@ -3,16 +3,13 @@ import CompletionChatPage from '@/app/chat/completion-chat-page.tsx'
 import McpServersPage from '@/app/mcp-servers/mcp-servers-page.tsx'
 import DockerCatalogPage from '@/app/mcp-servers/docker-catalog-page.tsx'
 import CompletionsPage from '@/app/completion/completions-page.tsx'
-import { AssistantChatsPage } from '@/app/assistants/assistant-chats-page.tsx'
 import SettingsPage from '@/app/settings/settings-page.tsx'
 import { NotFoundError } from '@/features/errors/not-found-error.tsx'
 import FlowsPage from '@/app/flows/flows-page.tsx'
 import AudioPage from '@/app/aiassist/audio-page.tsx'
-import WelcomeScreen from '@/app/welcome/WelcomeScreen.tsx'
 import ToolsPage from '@/app/tools/tools.page.tsx'
-import AppPage from '@/app/apps/app-page.tsx'
-import AppsPage from '@/app/apps/apps-page.tsx'
 import DashboardPage from '@/app/dashboard/dashboard.page.tsx'
+import AgentsPage from '@/app/agents/agents-page.tsx'
 
 
 
@@ -56,68 +53,72 @@ const AppRouter = () => {
     }
   }, [])
 
-  const routes: Route[] = [
-    {
-      path: '/',
-      element: <DashboardPage />,
-    },
-    {
-      path: '/chat',
-      element: <CompletionChatPage />,
-    },
-    {
-      path: '/completions',
-      element: <CompletionsPage />,
-    },
-    {
-      path: '/agents',
-      element: <AssistantChatsPage />,
-    },
-    {
-      path: '/tools',
-      element: <ToolsPage />,
-    },
-    {
-      path: '/mcp',
-      element: <McpServersPage />,
-    },
-    {
-      path: '/mcp/docker',
-      element: <DockerCatalogPage />,
-    },
-    {
-      path: '/flows',
-      element: <FlowsPage />,
-    },
-    {
-      path: '/audio',
-      element: <AudioPage />,
-    },
-    // {
-    //   path: '/wschat',
-    //   element: <WsChat />,
-    // },
-    // {
-    //   path: '/wizards',
-    //   element: <WizardsPage />,
-    // },
-    // {
-    //   path: '/wizard',
-    //   element: <WizardApp />,
-    // },
-    {
-      path: '/settings',
-      element: <SettingsPage />,
-    },
-    {
-      path: '/apps',
-      element: <AppsPage />,
-    },
-    {
-      path: '/apps/:appId',
-      element: <AppPage />,
-    },
-  ]
+  const routes = React.useMemo(() => {
+    const routes: Route[] = [
+      {
+        path: '/',
+        element: <DashboardPage />,
+      },
+      {
+        path: '/chat',
+        element: <CompletionChatPage />,
+      },
+      {
+        path: '/completions',
+        element: <CompletionsPage />,
+      },
+      {
+        path: '/agents',
+        //element: <AssistantChatsPage />,
+        element: <AgentsPage />,
+      },
+      {
+        path: '/tools',
+        element: <ToolsPage />,
+      },
+      {
+        path: '/mcp',
+        element: <McpServersPage />,
+      },
+      {
+        path: '/mcp/docker',
+        element: <DockerCatalogPage />,
+      },
+      {
+        path: '/flows',
+        element: <FlowsPage />,
+      },
+      {
+        path: '/audio',
+        element: <AudioPage />,
+      },
+      // {
+      //   path: '/wschat',
+      //   element: <WsChat />,
+      // },
+      // {
+      //   path: '/wizards',
+      //   element: <WizardsPage />,
+      // },
+      // {
+      //   path: '/wizard',
+      //   element: <WizardApp />,
+      // },
+      {
+        path: '/settings',
+        element: <SettingsPage />,
+      },
+      // {
+      //   path: '/apps',
+      //   element: <AppsPage />,
+      // },
+      // {
+      //   path: '/apps/:appId',
+      //   element: <AppPage />,
+      // },
+    ]
+    return routes
+  }, [])
 
   const parseUrl = (url: string) => {
     const [path, queryString] = url.split('?')

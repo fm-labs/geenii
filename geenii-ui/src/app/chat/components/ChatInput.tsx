@@ -1,6 +1,5 @@
 import React, { ChangeEventHandler, KeyboardEventHandler } from 'react'
 import { SendHorizonal } from 'lucide-react'
-import VoiceRecorder from '@/components/voice-recorder/VoiceRecorder.tsx'
 import { FEATURE_VOICE_RECORDING_ENABLED } from '@/constants.ts'
 import { AiAssistVoicePrompt } from '@/app/aiassist/AiAssistVoicePrompt.tsx'
 

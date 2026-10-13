@@ -42,13 +42,13 @@ const DashboardPage = () => {
       <div className={'pt-10'}>
 
         <DashboardSection title={"Your Agents"}>
-          <a href={'#/agents'} className={'text-sm mb-4 inline-block'}>Manage Agents</a>
+          {/*<a href={'#/agents'} className={'text-sm mb-4 inline-block'}>Manage Agents</a>*/}
           <AgentsView />
         </DashboardSection>
 
-        <DashboardSection title={"Your Apps"} className={''}>
-          <AppsView />
-        </DashboardSection>
+        {/*<DashboardSection title={"Your Apps"} className={''}>*/}
+        {/*  <AppsView />*/}
+        {/*</DashboardSection>*/}
 
         <DashboardSection title={"Your Tools"}>
           <ToolsView />
