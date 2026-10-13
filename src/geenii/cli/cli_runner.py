@@ -29,7 +29,7 @@ class CliAgentRunner:
 
     def run(self, prompt: str):
         while prompt.lower() != "exit" and len(prompt) > 0:
-            for msg in self.agent.prompt(prompt):
+            for msg in self.agent.process(prompt):
                 for part in msg.content:
                     click.secho(f">>> [{part.type}] {part.to_text()}", fg="cyan")
 

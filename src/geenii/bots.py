@@ -12,7 +12,7 @@ class BotInterface(abc.ABC):
     """
 
     @abc.abstractmethod
-    def prompt(self, message: str | list[ContentPart]) -> Iterator[ModelMessage]:
+    def process(self, message: str | list[ContentPart]) -> Iterator[ModelMessage]:
         """
         Process an incoming message and generate a response.
 

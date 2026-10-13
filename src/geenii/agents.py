@@ -130,7 +130,7 @@ class Agent(BaseAgent):
 
         return None
     
-    def _handle_prompt(self, message: str | list[ContentPart]):
+    def _handle_message(self, message: str | list[ContentPart]):
         if self._handle_makros(message):
             return
         
@@ -146,7 +146,7 @@ class RoutingAgent(Agent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def _handle_prompt(self, message: str | list[ContentPart]):
+    def _handle_message(self, message: str | list[ContentPart]):
         if self._handle_makros(message):
             return
 

@@ -58,13 +58,13 @@ class StubAgent(BaseAgent):
         super().__init__("test-agent", memory=ShortTermChatMemory())
         self._initial_tasks = tasks
 
-    def _handle_prompt(self, message):
+    def _handle_message(self, message):
         for task in self._initial_tasks:
             self.enqueue_task(task)
 
 
 def _run(agent: BaseAgent) -> list[str]:
-    return [msg.content[0].text for msg in agent.prompt("hi")]
+    return [msg.content[0].text for msg in agent.process("hi")]
 
 
 def _assert_queue_settled(agent: BaseAgent):
@@ -135,7 +135,7 @@ def test_agent_runs_llm_tool_call_round_trip(monkeypatch):
     agent = Agent("test-agent", model="fake:test", allowed_tools={"add"}, memory=ShortTermChatMemory(),
                   tool_registry=registry, skill_registry=skills)
 
-    msgs = list(agent.prompt("what is 2 + 3?"))
+    msgs = list(agent.process("what is 2 + 3?"))
 
     parts = [m.content[0] for m in msgs]
     assert any(isinstance(p, ToolCallResultContent) and p.result == 5 for p in parts)

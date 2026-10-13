@@ -544,7 +544,7 @@ class HandoffTask(BaseAgentTask):
         # todo transfer conversation context and message history
         # self.sub.message_history.extend(list(self.agent.message_history[-6:]))  # transfer last 6 messages as context
 
-        for msg in self.sub.prompt(self.prompt):
+        for msg in self.sub.process(self.prompt):
             yield msg
 
 

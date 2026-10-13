@@ -86,7 +86,7 @@ from geenii.g import init_agent_by_name
 
 agent = init_agent_by_name("my-agent")
 
-async for message in agent.prompt("What's the weather in Vienna?"):
+async for message in agent.process("What's the weather in Vienna?"):
     for part in message.content:
         print(part.type, part.to_text())
 ```

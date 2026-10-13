@@ -59,7 +59,9 @@ class BaseAgent(BotInterface, abc.ABC):
 
         logger.info(f"Context ID: {self.context_id} ({context_id})")
         self._init_memory()
+
         self._initialized = False
+        self._initialize()
 
     def __repr__(self):
         return f"Agent(name={self.name}, context_id={self.context_id}, model={self.model}, tools={self.allowed_tools}, skills={self.skills.names()})"
@@ -134,24 +136,21 @@ class BaseAgent(BotInterface, abc.ABC):
         """Enqueue a task to be processed by the agent."""
         self._tasks.append(task)
 
-    def prompt(self, message: str | list[ContentPart]) -> Iterator[ModelMessage]:
+    def process(self, message: str | list[ContentPart]) -> Iterator[ModelMessage]:
         """Process an incoming message and generate a response by enqueuing tasks to the internal queue and processing them sequentially."""
-        # enqueue new llm task
-        # self.enqueue_task(LLMTask(self, message=message))
-        # self.enqueue_task(FindBestAgentTask(self, prompt=message_to_prompt(message)))
-        self._initialize()
         _agent_log(self.name, self.context_id,"agent.init", self.to_dict())
-        _agent_log(self.name, self.context_id, "agent.prompt", {"message": message})
-        self._handle_prompt(message)
+        _agent_log(self.name, self.context_id, "agent.message", {"message": message})
+        self._handle_message(message)
 
         # process the queue and yield messages
         yield from self._process_queue()
 
 
     @abc.abstractmethod
-    def _handle_prompt(self, message: str | list[ContentPart]):
+    def _handle_message(self, message: str | list[ContentPart]):
         """Handle an incoming prompt message by enqueuing an LLM task to generate a response."""
         # self.enqueue_task(LLMTask(self, message=message))
+        # self.enqueue_task(FindBestAgentTask(self, prompt=message_to_prompt(message)))
         ...
 
     def _process_queue(self) -> Iterator[ModelMessage]:
