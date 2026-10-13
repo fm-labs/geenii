@@ -11,7 +11,7 @@ export const OLLAMA_API_URL = import.meta.env.VITE_OLLAMA_API_URL  || 'http://lo
 
 export const FEATURE_AI_ENABLED = import.meta.env.VITE_FEATURE_AI_ENABLED === 'true' || false;
 export const FEATURE_COMPLETION_ENABLED = import.meta.env.VITE_FEATURE_COMPLETION_ENABLED === 'true' || false;
-export const FEATURE_QUICKGEN_BUTTONS_ENABLED = import.meta.env.VITE_FEATURE_FEATURE_QUICKGEN_BUTTONS_ENABLED === 'true' || false;
+export const FEATURE_QUICKGEN_BUTTONS_ENABLED = import.meta.env.VITE_FEATURE_QUICKGEN_BUTTONS_ENABLED === 'true' || false;
 export const FEATURE_CHAT_ENABLED = import.meta.env.VITE_FEATURE_CHAT_ENABLED === 'true' || false;
 export const FEATURE_CHAT_FILES_ENABLED = import.meta.env.VITE_FEATURE_CHAT_FILES_ENABLED === 'true' || false;
 export const FEATURE_CHAT_TOOLS_ENABLED = import.meta.env.VITE_FEATURE_CHAT_TOOLS_ENABLED === 'true' || false;

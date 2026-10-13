@@ -7,6 +7,8 @@ import { ApiContext } from '@/context/api-context.tsx'
 // @ts-ignore
 const isTauri = typeof window.__TAURI__!=='undefined'
 
+const BOOT_LOG_MAX_LINES = 20
+
 export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   const { api } = React.useContext(ApiContext)
@@ -21,6 +23,11 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
   //const [ready, setReady] = React.useState<boolean>(false)
   const [bootLog, setBootLog] = React.useState<string[]>([])
 
+  // the info poll repeats the same lines every interval: skip repeats and keep only the latest entries
+  const log = React.useCallback((line: string) => {
+    setBootLog(prev => prev[prev.length - 1] === line ? prev : [...prev, line].slice(-BOOT_LOG_MAX_LINES))
+  }, [])
+
   const fetchInfo = React.useCallback(async () => {
     console.log('fetch info')
     try {
@@ -28,13 +35,13 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
         throw new Error('API client is not initialized.')
       }
       const apiInfo = await api.getInfo()
-      setBootLog(prev => [...prev, `ℹ️ API Version: ${apiInfo.version}`])
+      log(`ℹ️ API Version: ${apiInfo.version}`)
       return apiInfo
     } catch (error) {
-      setBootLog(prev => [...prev, `❌ No connection: ${error.message}`])
+      log(`❌ No connection: ${error.message}`)
       throw error // Re-throw to handle in the main initialization flow
     }
-  }, [api, setBootLog])
+  }, [api, log])
 
   // React.useEffect(() => {
   //   // first load the API client
@@ -53,7 +60,7 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
     // then fetch info if client is ready
     if (api) {
       console.log('API client is ready, fetching info...')
-      setBootLog(prev => [...prev, 'ℹ️ API client initialized, fetching info...'])
+      log('ℹ️ API client initialized, fetching info...')
       fetchInfo().then(setApiInfo).catch(error => {
         console.error(`Error fetching API info: ${error.message}`)
         setApiInfo(null)
@@ -68,7 +75,6 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
     // todo check status enpoint instead
     console.log('setting up info fetch interval')
     const interval = setInterval(() => {
-      //setBootLog([])
       fetchInfo().then(setApiInfo).catch(error => {
         console.error(`Error fetching API info: ${error.message}`)
         setApiInfo(null)

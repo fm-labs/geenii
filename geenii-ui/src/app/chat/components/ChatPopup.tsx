@@ -1,15 +1,9 @@
 import React from 'react'
 import Popup from '../../../components/Popup.tsx'
-import { AppContext } from '../../../context/app-context.tsx'
 import ChatContextProvider from './ChatContextProvider.tsx'
 import CompletionChat from '../completion-chat.tsx'
 
 const ChatPopup = ({ show, onClose}) => {
-  const context = React.useContext(AppContext)
-  if (!context) {
-    throw new Error('AppContext is not provided')
-  }
-
   const handleClose = () => {
     if (onClose) {
       onClose()
