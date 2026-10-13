@@ -86,6 +86,17 @@ export type AiVideoGenerationApiResponse = BaseAiProviderResponse & {
     output?: { base64?: string, url?: string }[]; // Video output in base64 or URL format
 }
 
+/** A model as returned by GET /api/v1/ai/models (backend: AIModelInfo) */
+export type AiModelInfo = {
+    provider: string;
+    name: string;
+    locality: 'local' | 'cloud' | 'mixed';
+    description?: string | null;
+    capabilities?: string[] | null;
+    metadata?: Record<string, any> | null;
+    installed: boolean;
+}
+
 export interface IAiClient {
     getInfo: () => Promise<any>;
     generateCompletion: (request: AiCompletionApiRequest) => Promise<AiCompletionApiResponse>;

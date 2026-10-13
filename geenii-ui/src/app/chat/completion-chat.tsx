@@ -54,7 +54,7 @@ const CompletionChat = (props: ChatProps) => {
   }
 
   const generateCompletion = async (input: string): Promise<string> => {
-    const response = await api.generateCompletion({ model: modelName, prompt: input, context_id: chatId})
+    const response = await api.generateCompletion({ model: modelName || undefined, prompt: input, context_id: chatId})
       .catch((err) => {
         console.error('Error generating response:', err)
         // error responses carry a Problem body: {error, status, detail}

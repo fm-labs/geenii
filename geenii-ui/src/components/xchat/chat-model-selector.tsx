@@ -1,23 +1,22 @@
 import React from 'react'
-import { AppContext } from '@/context/app-context.tsx'
+import { modelId, useModels } from '@/hooks/use-models.ts'
 import { FilterableSelect } from '@/components/filterable-select.tsx'
 import { useChat, useChatActions, useChatBackend } from '@/components/xchat/chat-context.tsx'
 
 /**
  * Model picker. Only shown if the backend lets the client choose the model (capabilities.models).
- * Without `models`, the models reported by the API (AppContext.apiInfo.models) are offered.
+ * Without `models`, the server's models (GET /api/v1/ai/models) are offered.
  */
 const ChatModelSelector = ({ models, className }: { models?: string[]; className?: string }) => {
   const { setModel } = useChatActions()
   const model = useChat((s) => s.model)
-  const appContext = React.useContext(AppContext)
+  const supported = useChatBackend().capabilities.models
+  const { models: serverModels } = useModels({ enabled: supported && !models })
 
   const options = React.useMemo(() => {
-    const ids = models ?? (appContext?.apiInfo?.models ?? []).map((m: any) => `${m.provider}:${m.name}`)
+    const ids = models ?? serverModels.map(modelId)
     return ids.map((id: string) => ({ value: id, label: id }))
-  }, [models, appContext?.apiInfo])
-
-  const supported = useChatBackend().capabilities.models
+  }, [models, serverModels])
 
   // pick the first available model if none (or an unavailable one) is set
   React.useEffect(() => {
