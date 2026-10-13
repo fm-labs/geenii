@@ -28,14 +28,14 @@ class Agent(BaseAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    async def _initialize(self):
+    def _initialize(self):
         """Initialize the agent by loading built-in tools, MCP server tools, and any tools from loaded skills."""
         if self._initialized:
             return
 
         #init_builtin_tools(self._tool_registry)
         if self.mcp_servers:
-            await init_mcp_server_tools(self._tool_registry, self.mcp_servers)
+            init_mcp_server_tools(self._tool_registry, self.mcp_servers)
 
         #self._tool_registry.register_function(self.about_me, name="about_me")
         #self.allowed_tools.add("about_me")
@@ -51,7 +51,7 @@ class Agent(BaseAgent):
 
         self._initialized = True
 
-    async def _handle_makros(self, message: str | list[ContentPart]) -> True | None:
+    def _handle_makros(self, message: str | list[ContentPart]) -> True | None:
         """
         Handle message makros.
         Following makros exist:
@@ -72,7 +72,7 @@ class Agent(BaseAgent):
                 message = parts[1] if len(parts) > 1 else ""
                 logger.info("Agent macro: agent=%s message=%s", agent_name, message)
                 # handoff to the agent
-                await self.enqueue_task(HandoffTask(agent=self, target_agent_name=agent_name, prompt=message))
+                self.enqueue_task(HandoffTask(agent=self, target_agent_name=agent_name, prompt=message))
                 return True # signal to stop message handling
 
             # slash commands using '/' prefix
@@ -87,19 +87,19 @@ class Agent(BaseAgent):
                 logger.info("Command macro: cmd=%s message=%s", skill_name, prompt)
 
                 if skill_name == "clear":
-                    await self.enqueue_task(ClearMemoryTask(agent=self))
+                    self.enqueue_task(ClearMemoryTask(agent=self))
                     return True
                 elif skill_name == "compact":
-                    await self.enqueue_task(MemoryCompactionTask(agent=self, prompt=prompt))
+                    self.enqueue_task(MemoryCompactionTask(agent=self, prompt=prompt))
                     return True
                 # elif skill_name == "memo":
-                #     await self.enqueue_task(StorePersistentMemoryTask(agent=self, message=prompt))
+                #     self.enqueue_task(StorePersistentMemoryTask(agent=self, message=prompt))
                 #     return True
                 # elif skill_name == "remember":
-                #     await self.enqueue_task(RetrievePersistentMemoryTask(agent=self, message=prompt))
+                #     self.enqueue_task(RetrievePersistentMemoryTask(agent=self, message=prompt))
                 #     return True
                 else:
-                    await self.enqueue_task(ActivateSkillTask(agent=self, skill_name=skill_name, prompt=prompt))
+                    self.enqueue_task(ActivateSkillTask(agent=self, skill_name=skill_name, prompt=prompt))
                     return True
 
             # direct tool call using ':' prefix
@@ -122,24 +122,22 @@ class Agent(BaseAgent):
                 # init_builtin_tools(tool_registry)
                 # 
                 # tool = tool_registry.get(tool_name)
-                # async def _invoke_tool(args: dict[str, Any]):
-                #     return await tool.invoke(args=args, env={})
-                # result = await asyncio.create_task(_invoke_tool(args))
+                # result = tool.invoke(args=args, env={})
                 call_id = f"usr-{tool_name}-{time.time()}"
-                await self.enqueue_task(ToolCallTask(agent=self, tool_name=tool_name, arguments=args, call_id=call_id))
+                self.enqueue_task(ToolCallTask(agent=self, tool_name=tool_name, arguments=args, call_id=call_id))
                 return True
                 
 
         return None
     
-    async def _handle_prompt(self, message: str | list[ContentPart]):
-        if await self._handle_makros(message):
+    def _handle_prompt(self, message: str | list[ContentPart]):
+        if self._handle_makros(message):
             return
         
-        await self.enqueue_task(FindBestSkillTask(self, prompt=message_to_prompt(message)))
-        await self.enqueue_task(LLMTask(self, message=message))
-        #await self.enqueue_task(PlanTask(self, prompt=message_to_prompt(message)))
-        #await self.enqueue_task(LLMTask(self, message="Execute the plan and call the necessary tools to complete the task."))
+        self.enqueue_task(FindBestSkillTask(self, prompt=message_to_prompt(message)))
+        self.enqueue_task(LLMTask(self, message=message))
+        #self.enqueue_task(PlanTask(self, prompt=message_to_prompt(message)))
+        #self.enqueue_task(LLMTask(self, message="Execute the plan and call the necessary tools to complete the task."))
 
 
 class RoutingAgent(Agent):
@@ -148,11 +146,11 @@ class RoutingAgent(Agent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    async def _handle_prompt(self, message: str | list[ContentPart]):
-        if await self._handle_makros(message):
+    def _handle_prompt(self, message: str | list[ContentPart]):
+        if self._handle_makros(message):
             return
 
-        await self.enqueue_task(FindBestAgentTask(self, prompt=message_to_prompt(message)))
+        self.enqueue_task(FindBestAgentTask(self, prompt=message_to_prompt(message)))
 
 
 class ProcessManagerAgent(Agent):
@@ -162,7 +160,7 @@ class ProcessManagerAgent(Agent):
         super().__init__(name, **kwargs)
         self._pm = pm or ProcessManagerClient()
 
-    async def _initialize(self):
+    def _initialize(self):
         """Initialize the agent by loading built-in tools, MCP server tools, and any tools from loaded skills."""
         if self._initialized:
             return
@@ -170,6 +168,6 @@ class ProcessManagerAgent(Agent):
         #init_builtin_tools(self._tool_registry)
         init_process_tools(self._tool_registry, self._pm)
         if self.mcp_servers:
-            await init_mcp_server_tools(self._tool_registry, self.mcp_servers)
+            init_mcp_server_tools(self._tool_registry, self.mcp_servers)
 
         self._initialized = True

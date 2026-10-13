@@ -1,4 +1,3 @@
-import asyncio
 from typing import List
 
 import click
@@ -52,11 +51,8 @@ def chat(model, temperature, output_format, prompt):
 
     tool_registry = ToolRegistry()
     init_builtin_tools(tool_registry)
-    
-    async def _load_mcp_tools():
-        await init_mcp_server_tools(tool_registry)
-    asyncio.run(_load_mcp_tools())
-    
+    init_mcp_server_tools(tool_registry)
+
     tool_registry.register(
         PythonFunctionTool(name="get_weather", description="Get the weather from the given location.",
                            parameters={"location": {"type": "string"}},

@@ -5,7 +5,6 @@ import subprocess
 import os
 import shlex
 import uuid
-import asyncio
 from typing import Any
 
 from geenii import config
@@ -27,7 +26,7 @@ class ComputerTool(Tool):
         self.type = "computer"
         self.command_template = command_template
 
-    async def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
+    def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
         command = args.get("command")
         if not command:
             raise ValueError(f"Missing 'command' argument for ComputerTool {self.name!r}")
@@ -42,8 +41,7 @@ class ComputerTool(Tool):
 
         working_dir = config.GEENII_WORKING_DIR
 
-        # run the command in a thread to avoid blocking the event loop
-        result = await asyncio.to_thread(self.run_subprocess, command, env, working_dir)
+        result = self.run_subprocess(command, env, working_dir)
         #logger.debug(f"Command result: {result}")
         return result
 

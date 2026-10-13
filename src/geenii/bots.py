@@ -1,5 +1,5 @@
 import abc
-from typing import AsyncGenerator
+from typing import Iterator
 
 from geenii.chat_models import ContentPart, TextContent
 from geenii.datamodels import ModelMessage
@@ -12,7 +12,7 @@ class BotInterface(abc.ABC):
     """
 
     @abc.abstractmethod
-    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ModelMessage, None]:
+    def prompt(self, message: str | list[ContentPart]) -> Iterator[ModelMessage]:
         """
         Process an incoming message and generate a response.
 
@@ -20,6 +20,6 @@ class BotInterface(abc.ABC):
             message: The incoming message text or structured content parts to process
 
         Returns:
-            An asynchronous generator that yields ContentPart objects representing the response.
+            A generator that yields ModelMessage objects representing the response.
         """
         yield ModelMessage(role="admin", content=[TextContent(text="Not implemented")])

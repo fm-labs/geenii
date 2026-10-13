@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-from typing import AsyncGenerator, Any, TYPE_CHECKING
+from typing import Iterator, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
@@ -35,11 +35,11 @@ Step 4 — If no tools are relevant, answer the user's question directly.
 class BaseTask(abc.ABC):
     """
     Base class for a task in the agent's process.
-    A task represents a unit of work that can be executed asynchronously and can yield messages as it runs.
+    A task represents a unit of work that yields messages (or follow-up tasks) as it runs.
     """
 
     @abc.abstractmethod
-    async def execute(self) -> AsyncGenerator[Any, None]:
+    def execute(self) -> Iterator[Any]:
         """
         The run method should be implemented by subclasses to perform the task's work and yield messages or other content as needed.
         """

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import subprocess
@@ -21,7 +20,7 @@ class ScriptTool(Tool):
         self.type = "function"
         self.script_path = script_path
 
-    async def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
+    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
         #input_json = json.dumps(args)
         arg_str = args.get("args")
         cmd = [self.script_path]
@@ -33,8 +32,7 @@ class ScriptTool(Tool):
         if env:
             _env.update(env)
 
-        result = await asyncio.to_thread(
-            subprocess.run,
+        result = subprocess.run(
             cmd,
             #input=input_json,
             capture_output=True,

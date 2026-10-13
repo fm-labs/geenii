@@ -1,4 +1,4 @@
-from typing import AsyncGenerator
+from typing import Iterator
 
 from geenii.agents import Agent
 from geenii.ai import generate_chat_completion_deprecated
@@ -23,7 +23,7 @@ class EchoBot(BotInterface):
     #         await asyncio.sleep(5)
     #         yield TextContent(text=f"Periodic message {i + 1} from bot {self.botname}")
 
-    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ModelMessage, None]:
+    def prompt(self, message: str | list[ContentPart]) -> Iterator[ModelMessage]:
         if isinstance(message, str):
             response_text = f"You said: {message}"
         else:
@@ -43,7 +43,7 @@ class SimpleBot(BotInterface):
     def __init__(self, botname: str):
         self.botname = botname
 
-    async def prompt(self, message: str | list[ContentPart]) -> AsyncGenerator[ContentPart, None]:
+    def prompt(self, message: str | list[ContentPart]) -> Iterator[ModelMessage]:
         try:
             model_id = "ollama:qwen3:8b"
             system_prompt = "You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer."

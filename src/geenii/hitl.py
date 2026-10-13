@@ -1,7 +1,6 @@
 import abc
 import json
 import time
-import asyncio
 from pathlib import Path
 import httpx
 
@@ -10,7 +9,7 @@ class HumanInTheLoopController(abc.ABC):
     This class can be used to handle human-in-the-loop interactions for tool call approvals or other decision points in the agent's process.
     """
     @abc.abstractmethod
-    async def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
+    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
         """
         Abstract method to implement logic for approving or rejecting tool execution requests.
         :param tool_name: The name of the tool that is requested to be executed.
@@ -25,7 +24,7 @@ class NoHumanInTheLoopController(HumanInTheLoopController):
     """
     HITL handler that automatically approves all tool execution requests without any human intervention.
     """
-    async def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
+    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
         return True
 
 
@@ -42,7 +41,7 @@ class FileTicketHumanInTheLoopController(HumanInTheLoopController):
         self.ticket_path = Path(ticket_dir).resolve()
         self.ticket_path.mkdir(parents=True, exist_ok=True)
 
-    async def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
+    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
         ticket_file = self.ticket_path / f"{call_id}.json"
         approval_file = self.ticket_path / f"{call_id}.approved"
         rejected_file = self.ticket_path / f"{call_id}.rejected"
@@ -70,7 +69,7 @@ class FileTicketHumanInTheLoopController(HumanInTheLoopController):
                 print(f"Rejection received for call ID '{call_id}'. Rejecting tool execution.")
                 approved = False
                 break
-            await asyncio.sleep(1)
+            time.sleep(1)
 
         if time.time() - start_time >= self.approval_timeout:
             print(f"Approval timeout reached for call ID '{call_id}'.")
@@ -92,10 +91,10 @@ class HttpPollHumanInTheLoopController(HumanInTheLoopController):
         self.approval_endpoint = approval_endpoint
         self.approval_timeout = approval_timeout
 
-    async def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
-        async with httpx.AsyncClient() as client:
+    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
+        with httpx.Client() as client:
             try:
-                response = await client.post(self.approval_endpoint, json={
+                response = client.post(self.approval_endpoint, json={
                     "tool_name": tool_name,
                     "arguments": arguments,
                     "call_id": call_id,

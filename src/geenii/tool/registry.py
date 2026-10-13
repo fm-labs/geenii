@@ -130,17 +130,11 @@ class ToolRegistry:
 
     # -- invocation ---------------------------------------------------------
 
-    async def invoke(self, name: str, args: dict, **kwargs: Any) -> Any:
-        """Look up a tool by *name* and call it with *args*.
-
-        Awaited in the caller's event loop, so cached MCP clients stay bound to one loop.
-        """
+    def invoke(self, name: str, args: dict, **kwargs: Any) -> Any:
+        """Look up a tool by *name* and call it with *args*."""
         tool = self.get(name)
         logger.info("invoking tool %r with %s", name, args)
-        result = tool.invoke(args=args, **kwargs)
-        if inspect.isawaitable(result):
-            result = await result
-        return result
+        return tool.invoke(args=args, **kwargs)
 
     # -- dunder -------------------------------------------------------------
 

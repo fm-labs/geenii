@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+import time
 
 from geenii.core.tools import init_core_tools
 from geenii.mcp_config import get_mcp_config
@@ -36,18 +36,18 @@ def init_builtin_tools(registry: ToolRegistry):
     init_core_tools(registry)
 
 @cached(ttl=3600)
-async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
+def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
     # short-lived client for discovery only; tool calls use the cached client from get_mcp_client_for_server
     mcp_client = McpClient(server_name, server_conf)
     try:
         try:
-            tools = await mcp_client.list_tools()
+            tools = mcp_client.list_tools()
         except Exception as e:
             # try again after a short delay in case the server is still starting up
             print(f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds...")
             try:
-                await asyncio.sleep(1)
-                tools = await mcp_client.list_tools()
+                time.sleep(1)
+                tools = mcp_client.list_tools()
             except Exception as e:
                 print(f"Error listing tools from MCP server {server_name} on second attempt: {e}. Skipping this server.")
                 return []
@@ -57,10 +57,10 @@ async def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
         print(f"Error retrieving tools from MCP server {server_name}: {e}")
         return []
     finally:
-        await mcp_client.close()
+        mcp_client.close()
 
 
-async def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] = None):
+def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] = None):
     mcp_config = get_mcp_config()
     if not mcp_config or "mcpServers" not in mcp_config:
         print("No MCP servers configured")
@@ -71,7 +71,7 @@ async def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] =
             continue
 
         try:
-            mcp_tools = await read_mcp_server_tools(server_name, server_conf)
+            mcp_tools = read_mcp_server_tools(server_name, server_conf)
 
             # map the MCP tool definitions to the internal tool representation and register them in the registry
             registry.register_mcp_tools(

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import atexit
 import json
 
 from geenii.config import MCP_CONFIG_FILE, GEENII_DIR, GEENII_WORKING_DIR
@@ -57,6 +58,20 @@ def get_mcp_client_for_server(server_name: str) -> "McpClient":
     _client_cache[server_name] = mcp_client
     logger.info(f"Created and cached MCP client for server '{server_name}'")
     return mcp_client
+
+
+def close_mcp_clients():
+    """Close all cached MCP clients."""
+    while _client_cache:
+        server_name, client = _client_cache.popitem()
+        try:
+            client.close()
+        except Exception as e:
+            logger.warning(f"Error closing MCP client for server '{server_name}': {e}")
+
+
+# registered after the async bridge's own atexit hook, so it runs before the bridge loop is stopped
+atexit.register(close_mcp_clients)
 
 
 def read_mcp_config_json() -> dict:

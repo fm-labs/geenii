@@ -1,4 +1,3 @@
-import asyncio
 import click
 
 from geenii.tool.registry import ToolRegistry
@@ -8,7 +7,7 @@ from geenii.tools import init_builtin_tools, init_mcp_server_tools
 def _init_tool_registry():
     tool_registry = ToolRegistry()
     init_builtin_tools(tool_registry)
-    asyncio.run(init_mcp_server_tools(tool_registry))
+    init_mcp_server_tools(tool_registry)
     return tool_registry
 
 @click.group()
@@ -61,15 +60,9 @@ def call_tool(tool_name, **kwargs):
     del kwargs["args"]
     print("Parsed arguments:", parsed_kwargs)
 
-    async def _run():
-        # load MCP tools and invoke in the same event loop: MCP clients are cached per server
-        tool_registry = ToolRegistry()
-        init_builtin_tools(tool_registry)
-        await init_mcp_server_tools(tool_registry)
-        return await tool_registry.invoke(tool_name, args=parsed_kwargs, **kwargs)
-
     try:
-        result = asyncio.run(_run())
+        tool_registry = _init_tool_registry()
+        result = tool_registry.invoke(tool_name, args=parsed_kwargs, **kwargs)
         print("--- Result ---")
         print(result)
         print("--------------")

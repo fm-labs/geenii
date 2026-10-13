@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import asyncio
 import copy
 import logging
 from datetime import datetime
-from typing import AsyncGenerator, Set, TYPE_CHECKING
+from typing import Iterator, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
@@ -50,7 +49,7 @@ class ToolCallTask(BaseAgentTask):
                 has_any = True
         return combined if has_any else None
 
-    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+    def execute(self) -> Iterator[ModelMessage]:
         tool_name = self.tool_name
         arguments = self.arguments
         call_id = self.call_id
@@ -92,7 +91,7 @@ class ToolCallTask(BaseAgentTask):
         )
         yield tool_usage_request_message
 
-        tool_usage_approved = await self.agent.request_tool_execution(
+        tool_usage_approved = self.agent.request_tool_execution(
             tool_name=tool_name, arguments=arguments, call_id=call_id
         )
         if not tool_usage_approved:
@@ -117,7 +116,7 @@ class ToolCallTask(BaseAgentTask):
 
         logger.info(f"Calling tool {tool_name} with arguments {arguments}")
         try:
-            # tool_result = await execute_tool_call(self.agent.tools, tool_name=tool_name, args=arguments)
+            # tool_result = execute_tool_call(self.agent.tools, tool_name=tool_name, args=arguments)
 
             tool_env = {}
             # if active_skills:
@@ -125,7 +124,7 @@ class ToolCallTask(BaseAgentTask):
             #     first_skill = self.agent.skills.get(active_skills[0])
             #     if first_skill:
             #         tool_env["SKILL_DIR"] = first_skill.path
-            tool_result = await tool.invoke(args=arguments, env=tool_env)
+            tool_result = tool.invoke(args=arguments, env=tool_env)
 
             logger.debug(f"Tool {tool_name} returned result: {tool_result}")
         except Exception as e:
@@ -203,14 +202,13 @@ class LLMTask(BaseAgentTask):
         max_tokens = str_len // 4
         return int(max_tokens + 4096)
 
-    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+    def execute(self) -> Iterator[ModelMessage]:
         full_system_prompt = self._build_system_prompt()
         prompt = message_to_prompt(self.message)
         allowed_tools = self.allowed_tools # if self.allowed_tools else self._compute_effective_tools()
         # message history (last MAX_MESSAGE_HISTORY messages)
         input_messages = list(self.agent.message_history[-self.MAX_MESSAGE_HISTORY:])
 
-        # run sync task in thread pool to avoid blocking the event loop while waiting for the response
         request = ChatCompletionRequest(
             prompt=prompt,
             temperature=0.0,
@@ -229,21 +227,21 @@ class LLMTask(BaseAgentTask):
             self.agent.add_to_history(user_message)
             #input_messages.append(user_message)
 
-        response = await asyncio.to_thread(self._request_completion, request)
+        response = self._request_completion(request)
         logger.info(
             f"Received model response with {len(response.output)} content parts."
         )
 
         # yield all message from parse_response
-        async for msg in self._handle_response_with_tool_calls(
+        for msg in self._handle_response_with_tool_calls(
             prompt, request, response
         ):
             yield msg
             self.agent.add_to_history(msg)
 
-    async def _handle_response_with_tool_calls(
+    def _handle_response_with_tool_calls(
         self, prompt, request: ChatCompletionRequest, response, i= 0
-    ) -> AsyncGenerator[ModelMessage, None]:
+    ) -> Iterator[ModelMessage]:
 
         #print("_handle_response_with_tool_calls", response.output)
 
@@ -311,7 +309,7 @@ class LLMTask(BaseAgentTask):
                     call_id=tool_call.call_id,
                 )
                 tool_result = None
-                async for msg in tool_task.execute():
+                for msg in tool_task.execute():
                     if isinstance(msg, ModelMessage) and isinstance(
                         msg.content[0], ToolCallResultContent
                     ):
@@ -356,13 +354,13 @@ class LLMTask(BaseAgentTask):
                     self.agent.message_history[-self.MAX_MESSAGE_HISTORY:]
                 )
                 request.prompt = ""  # already in history; re-sending it after the tool result makes the model ask again
-                response2 = await asyncio.to_thread(self._request_completion, request)
+                response2 = self._request_completion(request)
                 logger.info(
                     f"Received model response after {tools_called} tool calls with {len(response2.output)} content parts."
                 )
 
                 # recursively handle response with tool calls
-                async for msg in self._handle_response_with_tool_calls(prompt, request, response2, i + 1):
+                for msg in self._handle_response_with_tool_calls(prompt, request, response2, i + 1):
                    yield msg
             break
 
@@ -419,7 +417,7 @@ class LLMTask(BaseAgentTask):
 #     def __init__(self, agent: "BaseAgent"):
 #         super().__init__(agent)
 #
-#     async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
+#     def execute(self) -> Iterator[ModelMessage | BaseTask]:
 #         #yield ModelMessage(role="assistant",
 #         #                   content=[TextContent(text=f"Finalizing response after processing tool results.")])
 #         yield LLMTask(self.agent, message="Based on the tool results, continue processing the original prompt and provide the next response.",
@@ -458,7 +456,7 @@ class ToolFilterTask(BaseAgentTask):
         self.prompt = prompt
         self.tool_registry = tool_registry
 
-    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+    def execute(self) -> Iterator[ModelMessage]:
 
         tools_str = "\n".join(
             [
@@ -484,7 +482,7 @@ class ToolFilterTask(BaseAgentTask):
             output_schema=output_schema,
             # tools=tool_names,
         )
-        response = await asyncio.to_thread(generate_chat_completion, request)
+        response = generate_chat_completion(request)
         logger.info(
             f"Received model response for tool filtering with {len(response.output)} content parts."
         )
@@ -532,7 +530,7 @@ class HandoffTask(BaseAgentTask):
         self.sub = sub
         self.sub._hitl = self.agent._hitl  # share the same human-in-the-loop handler
 
-    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+    def execute(self) -> Iterator[ModelMessage]:
         msg = ModelMessage(
             role="assistant",
             content=[
@@ -546,7 +544,7 @@ class HandoffTask(BaseAgentTask):
         # todo transfer conversation context and message history
         # self.sub.message_history.extend(list(self.agent.message_history[-6:]))  # transfer last 6 messages as context
 
-        async for msg in self.sub.prompt(self.prompt):
+        for msg in self.sub.prompt(self.prompt):
             yield msg
 
 
@@ -600,7 +598,7 @@ class FindBestAgentTask(BaseAgentTask):
         self.prompt = prompt
         self.agent_registry = init_global_agent_registry()
 
-    async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
+    def execute(self) -> Iterator[ModelMessage | BaseTask]:
         def format_agent(agent) -> str:
             tools = ", ".join(agent.tools) if agent.tools else "none"
             skills = ", ".join(agent.skills) if agent.skills else "none"
@@ -631,7 +629,7 @@ class FindBestAgentTask(BaseAgentTask):
             max_tokens=256,
             temperature=0.0,
         )
-        response = await asyncio.to_thread(generate_chat_completion, request)
+        response = generate_chat_completion(request)
         logger.info(
             f"Received model response for agent selection with {len(response.output)} content parts."
         )
@@ -706,13 +704,13 @@ class ActivateSkillTask(BaseAgentTask):
         self.prompt = prompt
         self.skill_name = skill_name
 
-    async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
+    def execute(self) -> Iterator[ModelMessage | BaseTask]:
         skill = self.agent.skills.load(self.skill_name)
         if skill:
             logger.info("Activating skill %s", skill.name)
             self.agent.active_skills.append(self.skill_name)
         return
-        yield  # unreachable; makes execute() an async generator for the task loop
+        yield  # unreachable; makes execute() a generator for the task loop
 
 
 
@@ -767,7 +765,7 @@ class FindBestSkillTask(BaseAgentTask):
         #         registered = register_skill_scripts(skill, self.agent.tools)
         #         self.agent.allowed_tools.update(registered)
 
-    async def execute(self) -> AsyncGenerator[ModelMessage | BaseTask, None]:
+    def execute(self) -> Iterator[ModelMessage | BaseTask]:
 
         if len(self.agent.skills.skills) == 0:
             logger.info("No skills available.")
@@ -811,7 +809,7 @@ class FindBestSkillTask(BaseAgentTask):
             output_format="json",
             output_schema=self.OUTPUT_SCHEMA,
         )
-        response = await asyncio.to_thread(generate_chat_completion, request)
+        response = generate_chat_completion(request)
         logger.info(
             f"Received model response for agent selection with {len(response.output)} content parts."
         )
@@ -921,7 +919,7 @@ class FindBestSkillTask(BaseAgentTask):
 #             ]
 #         )
 #
-#     async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+#     def execute(self) -> Iterator[ModelMessage]:
 #         tools_list = self._build_tools_list()
 #         skills_list = self._build_skills_list()
 #         system_prompt = self.SYSTEM_PROMPT.replace(
@@ -961,7 +959,7 @@ class FindBestSkillTask(BaseAgentTask):
 #                 "additionalProperties": False,
 #             },
 #         )
-#         response = await asyncio.to_thread(generate_chat_completion, request)
+#         response = generate_chat_completion(request)
 #         logger.info(
 #             f"Received model response for plan generation with {len(response.output)} content parts."
 #         )
@@ -1017,12 +1015,12 @@ class ClearMemoryTask(BaseAgentTask):
     def __init__(self, agent: "BaseAgent"):
         super().__init__(agent)
 
-    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+    def execute(self) -> Iterator[ModelMessage]:
 
         self.agent.memory.clear()
         self.agent.message_history.clear()
         return
-        yield  # unreachable; makes execute() an async generator for the task loop
+        yield  # unreachable; makes execute() a generator for the task loop
 
 
 class MemoryCompactionTask(BaseAgentTask):
@@ -1044,7 +1042,7 @@ Write in second person ("the user asked …", "you answered …") so the summary
         super().__init__(agent)
         self.prompt = prompt
 
-    async def execute(self) -> AsyncGenerator[ModelMessage, None]:
+    def execute(self) -> Iterator[ModelMessage]:
         full_history = list(self.agent.message_history)
         if not full_history:
             logger.info("MemoryCompactionTask: nothing to compact.")
@@ -1058,7 +1056,7 @@ Write in second person ("the user asked …", "you answered …") so the summary
             prompt=f"Summarise the following conversation:\n\n{history_text}",
             messages=[],
         )
-        response = await asyncio.to_thread(generate_chat_completion, request)
+        response = generate_chat_completion(request)
 
         summary_text = ""
         if response.output:

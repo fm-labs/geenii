@@ -3,12 +3,12 @@ from __future__ import annotations
 import logging
 import subprocess
 import shlex
-import asyncio
 import os
 import inspect
 from typing import Callable, Any
 
 from geenii.tool.common import Tool, expand_vars
+from geenii.utils.async_bridge import run_sync
 
 logger = logging.getLogger(__name__)
 
@@ -27,16 +27,14 @@ class PythonFunctionTool(Tool):
         self.type = "function"
         self.handler = handler
 
-    async def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
+    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
         if self.handler is None:
             raise RuntimeError(f"No handler registered for tool {self.name!r}")
 
         # support sync and async handlers
-        if inspect.iscoroutinefunction(self.handler):
-            result = await self.handler(**args)
-        else:
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, lambda: self.handler(**args))
+        result = self.handler(**args)
+        if inspect.isawaitable(result):
+            result = run_sync(result)
 
         # print(f"Tool {self.name!r} returned:", result)
         return result
@@ -54,7 +52,7 @@ class PythonCliTool(Tool):
         super().__init__(name, description, parameters)
         self.type = "python"
 
-    async def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
+    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
         command = args.get("command")
         if not command:
             raise ValueError(f"Missing 'command' argument for PythonTool {self.name!r}")
@@ -64,8 +62,7 @@ class PythonCliTool(Tool):
         # expand environment variables in the command
         command = expand_vars(command, env or {})
 
-        # run the command in a thread to avoid blocking the event loop
-        result: str = await asyncio.to_thread(self.run_subprocess, command, env)
+        result: str = self.run_subprocess(command, env)
         logger.info(f"PythonCliTool result: {str(result)}")
         return result
 

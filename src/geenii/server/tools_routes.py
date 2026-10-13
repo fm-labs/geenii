@@ -16,9 +16,10 @@ def get_tools(registry: ToolRegistry = Depends(dep_tool_registry)):
     return definitions
 
 @router.post("/{tool_name}/execute")
-async def execute_tool(tool_name: str, args: dict, registry: ToolRegistry = Depends(dep_tool_registry)):
+def execute_tool(tool_name: str, args: dict, registry: ToolRegistry = Depends(dep_tool_registry)):
+    # sync endpoint: FastAPI runs it in its threadpool, so the blocking tool call doesn't stall the event loop
     try:
         tool = registry.get(tool_name)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found.")
-    return await tool.invoke(args=args, env={})
+    return tool.invoke(args=args, env={})
