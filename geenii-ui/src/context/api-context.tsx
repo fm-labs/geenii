@@ -2,6 +2,7 @@ import React from "react";
 import { initWebXapi } from '@/init.ts'
 import { IAiClient } from '@/api/xai.types.ts'
 import { ServerContext } from '@/context/server-context.tsx'
+import { ApiError, readProblem } from '@/api/api-error.ts'
 
 type ApiContextType = {
     apiBaseUrl: string,
@@ -9,7 +10,7 @@ type ApiContextType = {
     api: IAiClient,
     /** fetch() with relative paths resolved against apiBaseUrl */
     fetch: (input: RequestInfo, init?: RequestInit) => Promise<Response>
-    /** Like fetch, but throws on non-2xx responses and returns the parsed JSON body */
+    /** Like fetch, but returns the parsed JSON body and throws an ApiError (message = Problem detail) on non-2xx responses */
     fetchJson: (input: RequestInfo, init?: RequestInit) => Promise<any>
 }
 
@@ -34,7 +35,7 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const _fetchJson = React.useCallback(async (input: RequestInfo, init?: RequestInit) => {
         const response = await fetch(resolve(input), init);
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new ApiError(response.status, await readProblem(response));
         }
         return await response.json();
     }, [resolve]);

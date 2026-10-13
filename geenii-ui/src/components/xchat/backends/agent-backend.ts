@@ -1,4 +1,5 @@
 import { joinUrl } from '@/lib/utils.ts'
+import { ApiError, readProblem } from '@/api/api-error.ts'
 import type {
   ChatBackend,
   ChatCommand,
@@ -17,29 +18,16 @@ export type AgentBackendOptions = {
   headers?: Record<string, string>
 }
 
-/** An HTTP error with the server's Problem body ({error, status, detail}). */
-export class ChatApiError extends Error {
-  readonly status: number
-  readonly response: { status: number; data: unknown }
-
+/** An HTTP error of the chat API, with the server's Problem body. */
+export class ChatApiError extends ApiError {
   constructor(status: number, data: any) {
-    super(data?.detail || data?.error || `Request failed with status ${status}`)
+    super(status, data)
     this.name = 'ChatApiError'
-    this.status = status
-    // same shape as axios errors, so errorMessage() finds the Problem detail
-    this.response = { status, data }
   }
 }
 
-const toError = async (res: Response): Promise<ChatApiError> => {
-  let data: unknown = null
-  try {
-    data = await res.json()
-  } catch {
-    // not a Problem body
-  }
-  return new ChatApiError(res.status, data)
-}
+const toError = async (res: Response): Promise<ChatApiError> =>
+  new ChatApiError(res.status, await readProblem(res))
 
 /** Parse an NDJSON response body into objects, one per line. */
 async function* readNdjson(body: ReadableStream<Uint8Array>): AsyncGenerator<any> {
