@@ -70,7 +70,7 @@ RUN addgroup --gid 33311 -S geenii && adduser --uid 33311 -S geenii -G geenii &&
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 #COPY --from=builder /builder/dist/geenii /usr/bin/geenii
 COPY --from=builder /builder/dist/geenii /opt/geenii/bin/geenii
-RUN chmod +x /opt/geenii/geenii && ln -sf /opt/geenii/bin/geenii /usr/bin/geenii
+RUN chmod +x /opt/geenii/bin/geenii && ln -sf /opt/geenii/bin/geenii /usr/bin/geenii
 
 #COPY ./container/entrypoint.sh /usr/bin/entrypoint
 #RUN chmod +x /usr/bin/entrypoint
