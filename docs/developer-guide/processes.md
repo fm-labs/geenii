@@ -6,7 +6,7 @@ Each solves a different problem, and all three run inside one process, the
 
 | Component | Module | Model | Runs as | Used by |
 |---|---|---|---|---|
-| **Supervisor** | `geenii/supervisor.py` | Desired state: keep long-lived processes up and restart them when they exit | Inside the daemon (`supervisor.*` methods); also embedded by the server repository | `geenii supervisor` CLI and `supervisor.*` RPC; the server repository (`/api/v1/supervisor/*`, consumed by `data/apps/geenii-supervisor`) |
+| **Supervisor** | `geenii/supervisor.py` | Desired state: keep long-lived processes up and restart them when they exit | Inside the daemon (`supervisor.*` methods) | `geenii supervisor` CLI and `supervisor.*` RPC. The [server](server.md)'s `/api/v1/supervisor/*` routes (used by `data/apps/geenii-supervisor`) are currently disabled |
 | **Scheduler** | `geenii/scheduler.py` | Time-based: run a command or Python callable on a cron schedule or once at a set time | Inside the daemon, with tasks from `scheduler.json` | CLI, cron-style agent runs, `scheduler.*` RPC |
 | **Process Manager** | `geenii/pm/` | Fire and forget: start a background job, get an ID back, check its state and output later | Inside the daemon (`pm.*` methods), plus a synchronous client | `ProcessManagerAgent` (the `bg_process_*` tools), `geenii pm` CLI |
 

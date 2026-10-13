@@ -97,6 +97,7 @@ Every tool call passes through the agent's `HumanInTheLoopController`
 | `CliHumanInTheLoopController` | Interactive y/n prompt in the terminal (`geenii/cli/cli_runner.py`; currently not enabled by default) |
 | `FileTicketHumanInTheLoopController` | Writes a `<call_id>.json` ticket file and waits (up to a timeout) for a `.approved`/`.rejected` file to appear |
 | `HttpPollHumanInTheLoopController` | POSTs the request to an approval endpoint and expects `{"approved": bool}` |
+| `WebHumanInTheLoopController` | Blocks until a web client answers via `respond(call_id, choice)` (`allow`/`approve`/`yes` approve); rejects on `cancel()` or after a timeout. Used by the server's `/chats` API (see [server.md](server.md#agent-chat)) |
 
 A rejected call produces a tool-result message containing an error instead of
 executing the tool.
@@ -117,6 +118,12 @@ for message in agent.process("What's the weather in Vienna?"):
 FastAPI endpoint), run it in a worker thread — e.g. return a
 `StreamingResponse` over the generator, which Starlette iterates in its
 threadpool, or use `await asyncio.to_thread(lambda: list(agent.process(msg)))`.
+
+The [server](server.md) does exactly this: `WebAgentRunner` runs each chat
+turn in its own thread and streams the messages as NDJSON events. It also
+lists agent specs (`GET /api/v1/agents/`) and each agent's slash commands
+(`GET /api/v1/agents/{name}/commands`: the `Agent.BUILTIN_COMMANDS` `clear`
+and `compact`, then one per configured skill).
 
 MCP tools are the one async dependency: `McpClient` exposes a sync API and runs
 every call on a single shared background event loop

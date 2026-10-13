@@ -4,6 +4,11 @@ The geenii has a web service daemon that provides an API for managing agents, to
 It is one of the core component of the OpenGeenii platform, responsible for executing AI agents and handling interactions.
 
 
+Full developer docs: [docs/index.md](docs/index.md#developer-guide). The server's API is described in
+[docs/developer-guide/server.md](docs/developer-guide/server.md), the web UI in
+[docs/developer-guide/web-ui.md](docs/developer-guide/web-ui.md).
+
+
 ## Webserver
 
 ### Run geenii web server

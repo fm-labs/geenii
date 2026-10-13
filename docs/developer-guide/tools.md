@@ -32,14 +32,15 @@ Registered by `init_builtin_tools()` (`geenii/tools.py`) on every agent:
 |---|---|---|
 | `bash` | ComputerTool | Run a single-line shell command on the local machine |
 | `python` | ComputerTool | Run a python command line (e.g. `python3 script.py`) — note: this executes an arbitrary command, same mechanics as `bash` |
-| `sandbox_python` | SandboxTool | Run a Python command in a Docker sandbox (requires a selected skill) |
-| `sandbox_bash` | SandboxTool | Run a shell command in a Docker sandbox (requires a selected skill) |
-| `display_desktop_notification` | PythonFunctionTool | Show a desktop notification (from `geenii/core/tools.py`) |
+| `read` | PythonFunctionTool | Read a text file |
+| `write` | PythonFunctionTool | Write a text file |
+| `display_desktop_notification` | PythonFunctionTool | Show a desktop notification (macOS, via `osascript`) |
 
-`geenii/core/tools.py` additionally defines a module-level `geenii_tools`
-registry with decorator-registered utilities (`file_exists`, `file_read`,
-`file_write`, `bash`); apart from `display_desktop_notification`
-these are not wired into agents yet.
+`read`, `write` and `display_desktop_notification` are registered by
+`init_core_tools()` in `geenii/core/tools.py`. `read` and `write` only accept
+paths inside `GEENII_WORKING_DIR` or a directory listed in the user
+settings' `allowed_dirs`. The sandbox tools (`SandboxTool`) are not
+registered by default.
 
 ### Command execution details
 
@@ -103,7 +104,7 @@ without defaults become required).
 3. Tool calls in the model response come back as `ToolCallContent` parts with a
    generated `call_id`; results are fed back as `ToolCallResultContent`
    messages, and the completion is re-generated (bounded by
-   `LLMTask.MAX_TOOL_CALLS = 5`).
+   `LLMTask.MAX_TOOL_CALLS = 10` per response and `MAX_RECURSION = 10`).
 
 A tool that is registered but not in `allowed_tools` is invisible to the model.
 
@@ -182,3 +183,16 @@ geenii tools list                 # all registered tools (built-in + MCP)
 geenii tools inspect <name>       # schema and description
 geenii tools call <name> -a key=value -a key2=value2
 ```
+
+## HTTP API
+
+The [server](server.md) keeps one `ToolRegistry` with the built-in tools
+(no MCP tools) and exposes it to the web UI's tools view:
+
+| Method & path | Body | Response |
+|---|---|---|
+| `GET /api/v1/tools/` | — | Array of `{name, type, description, parameters}` |
+| `POST /api/v1/tools/{name}/execute` | Arguments as a JSON object | Tool output; 404 Problem for unknown tools, 500 Problem when the tool raises |
+
+Execution skips tool filters and HITL approval, so it runs any command
+`bash`/`python` are given.

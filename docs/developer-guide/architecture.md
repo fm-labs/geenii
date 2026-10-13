@@ -10,7 +10,9 @@ It is organized around a small set of concepts:
 | **Tool** | A callable the model can invoke: a Python function, a shell command, or an MCP server tool | [tools.md](tools.md) |
 | **Sandbox** | Docker-based isolation for running untrusted code in a container with restricted capabilities and resource limits | [sandbox.md](sandbox.md) |
 | **Skill** | A directory with a `SKILL.md` (Anthropic skill format) whose instructions are injected into the system prompt | [skills.md](skills.md) |
-| **Scheduler** | Cron-style runner that executes tasks (typically agent runs) from a JSON config | [scheduler.md](scheduler.md) |
+| **Scheduler** | Cron-style runner that executes tasks (typically agent runs) from a JSON config | [processes.md](processes.md) |
+| **Server** | FastAPI app exposing agents, tools, completions and agent chats over HTTP (`/api/v1`) | [server.md](server.md) |
+| **Web UI** | React/Tauri frontend for the server (`geenii-ui/`) | [web-ui.md](web-ui.md) |
 
 All user-facing configuration lives in a `.geenii/` directory; see [Configuration](../user-guide/configuration.md).
 
@@ -55,16 +57,20 @@ src/
     ├── daemon/             # geenii daemon: ProcessHost + socket server + client
     ├── pm/                 # Process manager (background jobs, logs on disk)
     ├── scheduler.py        # Cron scheduler (runs inside the daemon)
-    ├── supervisor.py       # Asyncio process supervisor with log bus (daemon, server repo)
+    ├── supervisor.py       # Asyncio process supervisor with log bus (used by the daemon)
     ├── proc.py             # Shared subprocess helpers (spawn, process groups, terminate)
     ├── sandbox.py          # Docker sandbox helpers for running Python in a container
+    ├── server/             # FastAPI HTTP server: /api/v1 routes, agent chat sessions, static web GUI
     ├── cli/                # click command groups (agent, agents, tools, skills, scheduler, info)
     ├── logs.py             # Logging setup, rotating file handlers
     └── utils/              # Cache (SQLite), JSON/TOML helpers, frontmatter parser, system report, ...
+
+geenii-ui/                  # React + Tauri web/desktop UI for the server
+www/                        # Static files served by the server at / (GEENII_WWW_DIR)
 ```
 
-The web UI, REST API daemon, and chat server mentioned in the README live in a
-separate repository; this repo contains the core library, CLI, and scheduler.
+The HTTP server is described in [server.md](server.md), the frontend in
+[web-ui.md](web-ui.md).
 
 ## Request lifecycle
 

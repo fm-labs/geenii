@@ -65,5 +65,9 @@ Internals for contributors and library consumers.
   between steps, built-in steps, and writing your own.
 - **[Memory](developer-guide/memory.md)** — ChatMemory abstraction and
   persistence implementations.
+- **[HTTP Server](developer-guide/server.md)** — the FastAPI `/api/v1` API:
+  endpoints, error format, streamed agent chats, security.
+- **[Web UI](developer-guide/web-ui.md)** — the React/Tauri frontend: boot
+  sequence, `useApi()`, and which views use which endpoints.
 - **[Building](developer-guide/building.md)** — dev setup, linting, testing,
   build targets (wheel, PyInstaller, Docker), CI/CD, and releases.
