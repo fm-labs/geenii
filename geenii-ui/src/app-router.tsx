@@ -10,6 +10,7 @@ import AudioPage from '@/app/aiassist/audio-page.tsx'
 import ToolsPage from '@/app/tools/tools.page.tsx'
 import DashboardPage from '@/app/dashboard/dashboard.page.tsx'
 import AgentsPage from '@/app/agents/agents-page.tsx'
+import XchatDemoPage1 from '@/app/xchat/xchat-demo-page-1.tsx'
 
 
 
@@ -108,6 +109,10 @@ const AppRouter = () => {
       //   path: '/apps/:appId',
       //   element: <AppPage />,
       // },
+      {
+        path: '/xchat',
+        element: <XchatDemoPage1 />,
+      },
     ]
     return routes
   }, [])
