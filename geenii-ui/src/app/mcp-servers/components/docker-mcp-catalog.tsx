@@ -3,8 +3,7 @@ import { useDockerMcpCatalog } from "@/app/mcp-servers/components/docker-mcp-cat
 import { Button } from "@/components/ui/button";
 import {RJSFSchema} from "@rjsf/utils";
 import { Input } from '@/components/ui/input.tsx'
-import { Dialog, DialogTitle } from '@radix-ui/react-dialog'
-import { DialogContent, DialogHeader } from '@/components/ui/dialog.tsx'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import DockerMcpServerConfigBuilder from '@/app/mcp-servers/components/docker-mcp-server-config-builder.tsx'
 

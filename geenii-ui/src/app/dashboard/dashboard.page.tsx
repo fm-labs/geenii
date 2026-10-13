@@ -2,7 +2,7 @@ import React, { PropsWithChildren } from 'react'
 import Layout from '@/components/layout/layout.tsx'
 import AgentsView from '@/app/agents/agents.view.tsx'
 import ToolsView from '@/app/tools/tools.view.tsx'
-import { cn } from '@/lib/utils.ts'
+import { cn } from 'cn'
 
 
 const DashboardCard = ({ title, description, children }: PropsWithChildren<{ title: string, description: string }>) => {

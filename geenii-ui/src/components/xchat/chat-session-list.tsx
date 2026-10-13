@@ -1,6 +1,6 @@
 import React from 'react'
 import { MessageSquarePlusIcon, TrashIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { Button } from '@/components/ui/button.tsx'
 import { useChat, useChatActions, useChatBackend } from '@/components/xchat/chat-context.tsx'
 import { errorMessage } from '@/components/xchat/chat-session.ts'

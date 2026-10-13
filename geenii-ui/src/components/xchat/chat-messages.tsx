@@ -1,5 +1,5 @@
 import React from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { useChat } from '@/components/xchat/chat-context.tsx'
 import { ChatMessageRendererType } from '@/components/xchat/chat.types.ts'
 import { buildToolCallIndex, ToolCallIndexContext } from '@/components/xchat/chat-tool-calls.ts'

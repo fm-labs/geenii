@@ -14,7 +14,7 @@ import {
   Video,
   MessagesSquare, ServerIcon,
 } from 'lucide-react'
-import { cn } from '@/lib/utils.ts'
+import { cn } from 'cn'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { ScrollArea } from '@/components/ui/scroll-area.tsx'

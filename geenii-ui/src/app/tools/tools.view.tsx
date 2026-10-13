@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input.tsx'
 import { Skeleton } from '@/components/ui/skeleton.tsx'
 import JsonView from '@/components/json-view.tsx'
 import { ServerContext } from '@/context/ServerContext.tsx'
-import { cn, joinUrl } from '@/lib/utils.ts'
+import { cn } from 'cn'
+import { joinUrl } from '@/lib/utils.ts'
 import { ToolType } from '@/app/tools/tool-types.ts'
 
 type ExecutionResult = {

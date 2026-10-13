@@ -1,5 +1,5 @@
 import React from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import ChatMessages from '@/components/xchat/chat-messages.tsx'
 import ChatStatus from '@/components/xchat/chat-status.tsx'
 import ChatError from '@/components/xchat/chat-error.tsx'

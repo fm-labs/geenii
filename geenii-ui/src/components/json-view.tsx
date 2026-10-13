@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactJson, { ReactJsonViewProps } from '@microlink/react-json-view'
-import { cn } from '@/lib/utils.ts'
+import { cn } from 'cn'
 import { Button } from './ui/button';
 import { CheckIcon, CopyIcon } from 'lucide-react'
 

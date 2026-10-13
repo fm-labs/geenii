@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Check, ChevronsUpDown, Search, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import {
   Popover,

@@ -1,6 +1,6 @@
 import React from 'react'
 import { SendHorizonalIcon, SquareIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { Button } from '@/components/ui/button.tsx'
 import { useChat, useChatActions } from '@/components/xchat/chat-context.tsx'
 

@@ -1,6 +1,6 @@
 import React from 'react'
 import { LoaderIcon, HandIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { useChat } from '@/components/xchat/chat-context.tsx'
 import { ChatActivity } from '@/components/xchat/chat.types.ts'
 

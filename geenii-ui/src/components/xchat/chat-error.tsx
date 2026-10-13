@@ -1,6 +1,6 @@
 import React from 'react'
 import { AlertCircleIcon, XIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { useChat, useChatActions } from '@/components/xchat/chat-context.tsx'
 
 /**
