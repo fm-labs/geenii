@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { AudioRecorder } from './AudioRecorder.tsx'
-import { XAI_API_URL } from '@/constants.ts'
+import { useApi } from '@/context/api-context.tsx'
 
 export interface AiAssistVoicePromptProps {
   onResponse?: (response: any) => void
@@ -9,6 +9,7 @@ export interface AiAssistVoicePromptProps {
 }
 
 export const AiAssistVoicePrompt = ({ ...props }: AiAssistVoicePromptProps) => {
+  const { fetchJson } = useApi()
   const [audioBlob, setAudioBlob] = React.useState<Blob>()
   const [transcript, setTranscript] = useState<string>()
   const [isRecording, setIsRecording] = useState<boolean>(false)
@@ -26,7 +27,7 @@ export const AiAssistVoicePrompt = ({ ...props }: AiAssistVoicePromptProps) => {
         setIsProcessing(true)
         setTranscript('')
         //@todo handle audio upload
-        // const response = await context.xaiApi.transcribeAudio({ model: modelName, text })
+        // const response = await context.api.transcribeAudio({ model: modelName, text })
         //   .catch((err) => {
         //     console.error('Error generating audio:', err)
         //     notify.error('Error generating audio: ' + err.message)
@@ -36,13 +37,11 @@ export const AiAssistVoicePrompt = ({ ...props }: AiAssistVoicePromptProps) => {
         //   });
 
 
-        const response = await fetch(XAI_API_URL + `api/v1/ai/audio/transcribe`, {
+        // multipart upload: api.generateAudioTranscription posts JSON, which the server route does not accept
+        const data = await fetchJson(`/api/v1/ai/audio/transcribe`, {
           method: 'POST',
           body: formData,
         })
-        console.info('Upload successful')
-        console.log('Success uploading file', response)
-        const data = await response.json()
         console.log('UPLOAD:RESPONSE', data)
         setTranscript(data?.output_text)
 

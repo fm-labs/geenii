@@ -1,5 +1,5 @@
 import React from 'react'
-import { AppContext } from '../../context/AppContext.tsx'
+import { AppContext } from '../../context/app-context.tsx'
 import TauriUpdaterPanelItem from '@/components/tauri/TauriUpdaterPanelItem.tsx'
 import TauriSettingsPanelItem from '@/components/tauri/TauriSettingsPanelItem.tsx'
 import { TauriPanelProvider, useTauriPanel } from '@/components/tauri/TauriPanelContext.tsx'

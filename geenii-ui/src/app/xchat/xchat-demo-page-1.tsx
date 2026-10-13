@@ -1,8 +1,7 @@
 import React from 'react'
 import useNotification from '@/hooks/useNotification.ts'
 import { FEATURE_VOICE_RECORDING_ENABLED } from '@/constants.ts'
-import { ServerContext } from '@/context/ServerContext.tsx'
-import { joinUrl } from '@/lib/utils.ts'
+import { useApi } from '@/context/api-context.tsx'
 import {
   Chat,
   ChatProvider,
@@ -23,28 +22,27 @@ const ChatDebugStatus = () => {
   </div>
 }
 
-const useAgentNames = (serverUrl?: string) => {
+const useAgentNames = () => {
+  const { fetchJson } = useApi()
   const [names, setNames] = React.useState<string[]>([])
   React.useEffect(() => {
-    if (!serverUrl) return
-    fetch(joinUrl(serverUrl, 'api/v1/agents/'))
-      .then((res) => (res.ok ? res.json():[]))
+    fetchJson('/api/v1/agents/')
       .then((agents: { name: string }[]) => setNames(agents.map((a) => a.name)))
       .catch(() => setNames([]))
-  }, [serverUrl])
+  }, [fetchJson])
   return names
 }
 
 const XchatDemoPage1 = () => {
   const notify = useNotification()
-  const { serverUrl } = React.useContext(ServerContext)
-  const agentNames = useAgentNames(serverUrl)
+  const { apiBaseUrl } = useApi()
+  const agentNames = useAgentNames()
   const [selected, setSelected] = React.useState<string>(ECHO)
 
   const backend = React.useMemo(() => {
-    if (selected===ECHO || !serverUrl) return createEchoBackend({ delay: 500 })
-    return createAgentBackend({ baseUrl: serverUrl, agent: selected })
-  }, [selected, serverUrl])
+    if (selected===ECHO || !apiBaseUrl) return createEchoBackend({ delay: 500 })
+    return createAgentBackend({ baseUrl: apiBaseUrl, agent: selected })
+  }, [selected, apiBaseUrl])
 
   return (
     <ChatProvider backend={backend} onError={(error) => notify.error(error)}>

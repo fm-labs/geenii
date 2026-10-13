@@ -1,5 +1,5 @@
 import React from 'react'
-import { XAI_API_URL } from '@/constants.ts'
+import { useApi } from '@/context/api-context.tsx'
 import Header from '@/components/header.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
@@ -28,16 +28,11 @@ const AppViewCard = ({ app }: { app: AppSpecModel }) => {
 
 
 const AppsView = () => {
-
+  const { fetchJson } = useApi()
   const [apps, setApps] = React.useState<AppSpecModel[]>([])
 
   const fetchApps = async () => {
-    const response = await fetch(XAI_API_URL + 'api/v1/apps/', {
-      headers: {
-        "Content-Type": "application/json",
-      }
-    })
-    const data = await response.json()
+    const data = await fetchJson('/api/v1/apps/')
     console.log("Fetched apps", data)
     return data?.apps || []
   }
@@ -47,8 +42,8 @@ const AppsView = () => {
   }, [apps])
 
   React.useEffect(() => {
-    fetchApps().then(setApps)
-  }, [])
+    fetchApps().then(setApps).catch((error) => console.error('Error fetching apps:', error))
+  }, [fetchJson])
 
   return (
     <div>

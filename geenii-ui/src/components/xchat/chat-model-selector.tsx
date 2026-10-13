@@ -1,5 +1,5 @@
 import React from 'react'
-import { AppContext } from '@/context/AppContext.tsx'
+import { AppContext } from '@/context/app-context.tsx'
 import { FilterableSelect } from '@/components/filterable-select.tsx'
 import { useChat, useChatActions, useChatBackend } from '@/components/xchat/chat-context.tsx'
 

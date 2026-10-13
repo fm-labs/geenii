@@ -1,6 +1,6 @@
 import React from 'react'
 import Popup from '../../../components/Popup.tsx'
-import { AppContext } from '../../../context/AppContext.tsx'
+import { AppContext } from '../../../context/app-context.tsx'
 import ChatContextProvider from './ChatContextProvider.tsx'
 import CompletionChat from '../completion-chat.tsx'
 

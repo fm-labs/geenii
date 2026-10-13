@@ -8,9 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input.tsx'
 import { Skeleton } from '@/components/ui/skeleton.tsx'
 import JsonView from '@/components/json-view.tsx'
-import { ServerContext } from '@/context/ServerContext.tsx'
+import { useApi } from '@/context/api-context.tsx'
 import { cn } from 'cn'
-import { joinUrl } from '@/lib/utils.ts'
 import { ToolType } from '@/app/tools/tool-types.ts'
 
 type ExecutionResult = {
@@ -56,7 +55,7 @@ const ParametersTable = ({ schema }: { schema?: ToolType['parameters'] }) => {
 }
 
 const ToolDetailsPane = ({ tool, onClose }: { tool: ToolType, onClose: () => void }) => {
-  const { serverUrl } = React.useContext(ServerContext)
+  const { fetch } = useApi()
 
   const [formData, setFormData] = React.useState<any>({})
   const [isExecuting, setIsExecuting] = React.useState(false)
@@ -67,7 +66,7 @@ const ToolDetailsPane = ({ tool, onClose }: { tool: ToolType, onClose: () => voi
     setResult(null)
     const start = performance.now()
     try {
-      const response = await fetch(joinUrl(serverUrl, `api/v1/tools/${encodeURIComponent(tool.name)}/execute`), {
+      const response = await fetch(`/api/v1/tools/${encodeURIComponent(tool.name)}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData || {}),
@@ -157,7 +156,7 @@ const ToolDetailsPane = ({ tool, onClose }: { tool: ToolType, onClose: () => voi
 }
 
 const ToolsView = () => {
-  const { serverUrl } = React.useContext(ServerContext)
+  const { fetchJson } = useApi()
 
   const [tools, setTools] = React.useState<ToolType[]>([])
   const [loading, setLoading] = React.useState<boolean>(true)
@@ -169,11 +168,7 @@ const ToolsView = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(joinUrl(serverUrl, 'api/v1/tools/'))
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-      const data: ToolType[] = await response.json()
+      const data: ToolType[] = await fetchJson('/api/v1/tools/')
       setTools([...data].sort((a, b) => a.name.localeCompare(b.name)))
     } catch (err) {
       console.error('Error fetching tools', err)
@@ -181,7 +176,7 @@ const ToolsView = () => {
     } finally {
       setLoading(false)
     }
-  }, [serverUrl])
+  }, [fetchJson])
 
   React.useEffect(() => {
     fetchTools()

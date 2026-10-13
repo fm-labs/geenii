@@ -1,6 +1,6 @@
 import React from 'react'
 import ChatFiles from './components/ChatFiles.tsx'
-import { AppContext } from '../../context/AppContext.tsx'
+import { useApi } from '@/context/api-context.tsx'
 import { ChatContext } from './components/ChatContext.tsx'
 import { ChatMessage } from './components/chat.types.ts'
 import ChatPromptSuggestions from '@/app/chat/components/ChatPromptSuggestions.tsx'
@@ -24,10 +24,7 @@ interface ChatProps {
 }
 
 const CompletionChat = (props: ChatProps) => {
-  const appContext = React.useContext(AppContext)
-  if (!appContext) {
-    throw new Error('AppContext is not provided')
-  }
+  const { api } = useApi()
   const chatContext = React.useContext(ChatContext)
   if (!chatContext) {
     throw new Error('ChatContext is not provided')
@@ -57,7 +54,7 @@ const CompletionChat = (props: ChatProps) => {
   }
 
   const generateCompletion = async (input: string): Promise<string> => {
-    const response = await appContext.xaiApi.generateCompletion({ model: modelName, prompt: input, context_id: chatId})
+    const response = await api.generateCompletion({ model: modelName, prompt: input, context_id: chatId})
       .catch((err) => {
         console.error('Error generating response:', err)
         // error responses carry a Problem body: {error, status, detail}

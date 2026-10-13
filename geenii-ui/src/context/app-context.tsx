@@ -3,8 +3,8 @@ import { IAiClient, IDockerApiClient } from "../api/xai.types.ts";
 
 type AppContextType = {
     isTauri: boolean;
-    xaiApi: IAiClient;
-    dockerApi?: IDockerApiClient;
+    api: IAiClient;
+    //dockerApi?: IDockerApiClient;
     apiHealth?: any;
     apiInfo?: any;
 }

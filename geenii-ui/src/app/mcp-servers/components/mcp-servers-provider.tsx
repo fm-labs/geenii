@@ -1,5 +1,5 @@
 import React, { PropsWithChildren, useCallback, useContext } from "react";
-import { XAI_API_URL } from '@/constants.ts'
+import { useApi } from '@/context/api-context.tsx'
 
 type McpServersContextType = {
     servers: McpServer[];
@@ -9,22 +9,18 @@ const McpServersContext = React.createContext<McpServersContextType | null>(null
 
 
 export const McpServersProvider = ({ children }: PropsWithChildren) => {
+    const { fetchJson } = useApi()
     const [servers, setServers] = React.useState<McpServer[]>([]);
 
     const fetchServers = useCallback(async () => {
         try {
-            const response = await fetch(XAI_API_URL + `api/v1/mcp/servers`)
-            if (response.ok) {
-                const mcpServerData = await response.json()
-                setServers(mcpServerData);
-            } else {
-                console.error("Failed to fetch MCP servers:", response.statusText)
-            }
+            const mcpServerData = await fetchJson(`/api/v1/mcp/servers`)
+            setServers(mcpServerData);
         } catch (error) {
             console.error("Error fetching MCP servers:", error)
             setServers([]);
         }
-    }, [setServers])
+    }, [fetchJson, setServers])
 
     React.useEffect(() => {
         fetchServers()

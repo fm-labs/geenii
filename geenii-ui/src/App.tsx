@@ -1,12 +1,12 @@
 import React from 'react'
 import { Bounce, ToastContainer } from 'react-toastify'
-import { AppContextProvider } from './context/AppContextProvider.tsx'
-import ServerContextProvider from './context/ServerContextProvider.tsx'
+import { AppContextProvider } from './context/app-context-provider.tsx'
+import ServerContextProvider from './context/server-context-provider.tsx'
 import AppRouter from './app-router.tsx'
+import { ThemeProvider } from '@/components/theme-provider.tsx'
+import { ApiProvider } from '@/context/api-context.tsx'
 import './tailwind.css'
 import './App.scss'
-import { ThemeProvider } from '@/components/theme-provider.tsx'
-import AppSocket from '@/app-socket.tsx'
 
 const App = () => {
 
@@ -14,11 +14,11 @@ const App = () => {
     <>
       <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
         <ServerContextProvider>
-          <AppContextProvider>
-            <AppRouter />
-            {/*<AppSocket />*/}
-            {/*<AiAssistPanel />*/}
-          </AppContextProvider>
+          <ApiProvider>
+            <AppContextProvider>
+              <AppRouter />
+            </AppContextProvider>
+          </ApiProvider>
         </ServerContextProvider>
         <ToastContainer
           position="top-right"

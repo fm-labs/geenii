@@ -1,7 +1,7 @@
 import React from 'react'
 import { AVAILABLE_MODELS } from '@/constants.ts'
 import { ChatContext } from '@/app/chat/components/ChatContext.tsx'
-import { AppContext } from '@/context/AppContext.tsx'
+import { AppContext } from '@/context/app-context.tsx'
 import { FilterableSelect } from '@/components/filterable-select.tsx'
 
 const ChatModelSelector = () => {

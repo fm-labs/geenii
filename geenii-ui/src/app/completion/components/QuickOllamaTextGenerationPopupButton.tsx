@@ -1,7 +1,7 @@
 import React from "react";
 import Popup from "../../../components/Popup.tsx";
 import QuickCompletion from "./QuickCompletion.tsx";
-import { AppContext } from '@/context/AppContext.tsx';
+import { AppContext } from '@/context/app-context.tsx';
 import { ollamaGenerate } from '@/api/ollama-api.ts';
 import useNotification from '../../../hooks/useNotification.ts'
 import { Button } from '@/components/ui/button.tsx'

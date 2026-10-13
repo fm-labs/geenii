@@ -1,90 +1,57 @@
 import React from 'react'
-import { IAiClient, IDockerApiClient } from '../api/xai.types.ts'
-import { initTauriXapi, initWebXapi } from '../init.ts'
-import { AppContext } from './AppContext.tsx'
-import { FEATURE_TAURI_XAPI_ENABLED, XAI_API_INFO_CHECK_INTERVAL_MS } from '../constants.ts'
+import { AppContext } from './app-context.tsx'
+import { XAI_API_INFO_CHECK_INTERVAL_MS } from '../constants.ts'
 import TauriWrapper from '../components/tauri/TauriWrapper.tsx'
-import { ServerContext } from './ServerContext.tsx'
+import { ApiContext } from '@/context/api-context.tsx'
 
 // @ts-ignore
 const isTauri = typeof window.__TAURI__!=='undefined'
 
-// const initXapiClient = async (serverUrl: string): Promise<IAiClient> => {
-//   if (isTauri && FEATURE_TAURI_XAPI_ENABLED) {
-//     return await initTauriXapi()
-//   } else {
-//     return await initWebXapi(serverUrl)
-//   }
-// }
-
-
 export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
 
-  const { serverUrl } = React.useContext(ServerContext)
+  const { api } = React.useContext(ApiContext)
 
-  const [dockerApi, setDockerApi] = React.useState<IDockerApiClient | null>(null)
-  const [xaiApi, setXaiApi] = React.useState<IAiClient>(null)
   const [apiInfo, setApiInfo] = React.useState<any>(null)
 
   const contextValue = React.useMemo(() => {
-    return { isTauri, xaiApi, dockerApi, apiInfo }
-  }, [xaiApi, dockerApi, apiInfo])
+    return { isTauri, api, apiInfo }
+  }, [api])
 
   //const [loading, setLoading] = React.useState<boolean>(true)
   //const [ready, setReady] = React.useState<boolean>(false)
   const [bootLog, setBootLog] = React.useState<string[]>([])
 
-  const loadXapi = React.useCallback(async () => {
-    let xapiClient
-    try {
-      if (isTauri && FEATURE_TAURI_XAPI_ENABLED) {
-        xapiClient = await initTauriXapi()
-      } else {
-        xapiClient = await initWebXapi(serverUrl)
-      }
-    } catch (error) {
-      setBootLog(prev => [...prev, `❌ Error initializing api client: ${error.message}`])
-      throw error;
-    }
-
-    if (!xapiClient) {
-      throw new Error('API client initialization failed.')
-    }
-    setXaiApi(xapiClient)
-    console.log('API client initialized with base url', serverUrl)
-  }, [isTauri, serverUrl])
-
   const fetchInfo = React.useCallback(async () => {
     console.log('fetch info')
     try {
-      if (!xaiApi) {
+      if (!api) {
         throw new Error('API client is not initialized.')
       }
-      const apiInfo = await xaiApi.getInfo()
+      const apiInfo = await api.getInfo()
       setBootLog(prev => [...prev, `ℹ️ API Version: ${apiInfo.version}`])
       return apiInfo
     } catch (error) {
       setBootLog(prev => [...prev, `❌ No connection: ${error.message}`])
       throw error // Re-throw to handle in the main initialization flow
     }
-  }, [xaiApi])
+  }, [api, setBootLog])
 
-  React.useEffect(() => {
-    // first load the API client
-    const initializeApiClient = async () => {
-      setBootLog(['ℹ️ Initializing ...'])
-      try {
-        await loadXapi()
-      } catch (error) {
-        setBootLog(prev => [...prev, `❌ Initialization error: ${error.message}`])
-      }
-    }
-    initializeApiClient()
-  }, [])
+  // React.useEffect(() => {
+  //   // first load the API client
+  //   const initializeApiClient = async () => {
+  //     setBootLog(['ℹ️ Initializing ...'])
+  //     try {
+  //       await loadXapi()
+  //     } catch (error) {
+  //       setBootLog(prev => [...prev, `❌ Initialization error: ${error.message}`])
+  //     }
+  //   }
+  //   initializeApiClient()
+  // }, [])
 
   React.useEffect(() => {
     // then fetch info if client is ready
-    if (xaiApi) {
+    if (api) {
       console.log('API client is ready, fetching info...')
       setBootLog(prev => [...prev, 'ℹ️ API client initialized, fetching info...'])
       fetchInfo().then(setApiInfo).catch(error => {
@@ -94,14 +61,14 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
     } else {
       console.log('API client is not ready yet.')
     }
-  }, [xaiApi])
+  }, [api])
 
   React.useEffect(() => {
     // check info every 30 seconds to update the status
     // todo check status enpoint instead
     console.log('setting up info fetch interval')
     const interval = setInterval(() => {
-      setBootLog([])
+      //setBootLog([])
       fetchInfo().then(setApiInfo).catch(error => {
         console.error(`Error fetching API info: ${error.message}`)
         setApiInfo(null)
@@ -114,7 +81,7 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
     }
   }, [fetchInfo])
 
-  if (!xaiApi || !apiInfo) {
+  if (!api || !apiInfo) {
     return (
       <div className='h-svh'>
         <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>

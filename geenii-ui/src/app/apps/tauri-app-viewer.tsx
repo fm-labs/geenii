@@ -2,7 +2,7 @@ import React from 'react'
 
 import { invoke } from '@tauri-apps/api/core'
 import { Button } from '@/components/ui/button.tsx'
-import { AppContext } from '@/context/AppContext.tsx'
+import { AppContext } from '@/context/app-context.tsx'
 
 //import { open } from "@tauri-apps/plugin-dialog";
 

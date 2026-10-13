@@ -4,8 +4,7 @@ import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card.tsx'
 import { Skeleton } from '@/components/ui/skeleton.tsx'
-import { ServerContext } from '@/context/ServerContext.tsx'
-import { joinUrl } from '@/lib/utils.ts'
+import { useApi } from '@/context/api-context.tsx'
 import { AgentType } from '@/app/agents/agent-types.ts'
 
 const MAX_VISIBLE_TOOLS = 5
@@ -97,7 +96,7 @@ const AgentCardSkeleton = () => (
 )
 
 const AgentsView = () => {
-  const { serverUrl } = React.useContext(ServerContext)
+  const { fetchJson } = useApi()
 
   const [agents, setAgents] = React.useState<AgentType[]>([])
   const [loading, setLoading] = React.useState<boolean>(true)
@@ -107,11 +106,7 @@ const AgentsView = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(joinUrl(serverUrl, 'api/v1/agents/'))
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-      const data: AgentType[] = await response.json()
+      const data: AgentType[] = await fetchJson('/api/v1/agents/')
       setAgents([...data].sort((a, b) => a.name.localeCompare(b.name)))
     } catch (err) {
       console.error('Error fetching agents', err)
@@ -119,7 +114,7 @@ const AgentsView = () => {
     } finally {
       setLoading(false)
     }
-  }, [serverUrl])
+  }, [fetchJson])
 
   React.useEffect(() => {
     fetchAgents()
