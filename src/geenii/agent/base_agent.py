@@ -30,10 +30,16 @@ logger = logging.getLogger(__name__)
 class BaseAgent(BotInterface, abc.ABC):
     MAX_TASKS = 15  # maximum number of tasks to process in the queue to prevent infinite loops
 
-    def __init__(self, name, model: str = None, system_prompt: str = None, description: str = None,
-                 tool_registry: ToolRegistry = None, skill_registry: SkillRegistry = None,
-                 allowed_tools: Set[str] = None, mcp_servers: Set[str] = None,
-                 context_id: str = None, memory: ChatMemory = None, hitl: HumanInTheLoopController = None):
+    def __init__(self, name, model: str | None = None,
+                 system_prompt: str | None = None,
+                 description: str | None = None,
+                 allowed_tools: Set[str] | None = None,
+                 mcp_servers: Set[str] | None = None,
+                 context_id: str | None = None, memory: ChatMemory | None = None,
+                 *,
+                 tool_registry: ToolRegistry | None = None,
+                 skill_registry: SkillRegistry | None = None,
+                 hitl: HumanInTheLoopController | None = None):
 
         self.name = name
         self.description = description
@@ -45,6 +51,7 @@ class BaseAgent(BotInterface, abc.ABC):
         self.allowed_tools: Set[str] = allowed_tools or set()
         self.mcp_servers: Set[str] = mcp_servers or set()
         self.active_skills: list[str] = []
+
         self._tool_registry = tool_registry or ToolRegistry()
         self._skill_registry = skill_registry or SkillRegistry()
         self._tasks: asyncio.Queue[BaseTask] = asyncio.Queue()

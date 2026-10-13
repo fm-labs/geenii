@@ -114,6 +114,14 @@ class AgentRegistry:
         self._agent_configs: dict[str, AgentSpec] = {}
         self._agents: dict[str, BaseAgent] = {}
 
+    @property
+    def configs(self) -> dict[str, AgentSpec]:
+        return self._agent_configs
+
+    @property
+    def agents(self) -> dict[str, BaseAgent]:
+        return self._agents
+
     def get_config(self, name: str) -> AgentSpec | None:
         """Get the configuration for a agent by name. Returns None if no configuration is found."""
         return self._agent_configs.get(name)

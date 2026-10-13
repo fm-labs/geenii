@@ -11,9 +11,13 @@ from starlette.responses import JSONResponse
 
 from fastapi.staticfiles import StaticFiles
 
+from geenii.agent.registry import AgentRegistry
 from geenii.config import APP_VERSION, GEENII_DIR, WWW_DIR
 from geenii.datamodels import Problem
+from geenii.g import init_global_agent_registry
 from geenii.server.router import app_router
+from geenii.tool.registry import ToolRegistry
+from geenii.tools import init_builtin_tools, init_mcp_server_tools
 
 # logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logging.basicConfig(
@@ -33,14 +37,6 @@ logging.basicConfig(
 # dotenv.load_dotenv(GEENII_DIR + "/.env", override=True, verbose=True)
 
 # redis_listener_stop_event = asyncio.Event()
-
-# async def initialize_tool_registry():
-#     print("Initializing tool registry...")
-#     registry = ToolRegistry()
-#     init_builtin_tools(registry)
-#     await init_mcp_server_tools(registry)
-#     return registry
-
 
 # async def initialize_supervisor():
 #     print("Initializing supervisor...")
@@ -78,13 +74,18 @@ logging.basicConfig(
 #
 #     return scheduler
 
-# async def initialize_agent_registry():
-#     print("Initializing agent registry...")
-#     agent_registry = AgentRegistry()
-#     agent_registry.load_from_directory(f"{GEENII_DIR}/agents")
-#     return agent_registry
-#
-#
+async def initialize_agent_registry():
+    print("Initializing agent registry...")
+    return init_global_agent_registry()
+
+async def initialize_tool_registry():
+    print("Initializing tool registry...")
+    registry = ToolRegistry()
+    init_builtin_tools(registry)
+    #await init_mcp_server_tools(registry)
+    return registry
+
+
 # async def initialize_app_registry():
 #     print("Initializing apps...")
 #     apps = AppRegistry()
@@ -105,9 +106,9 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Agent Registry
-    # app.state.agent_registry = await initialize_agent_registry()
+    app.state.agent_registry = await initialize_agent_registry()
     # Tool Registry
-    # app.state.tool_registry = await initialize_tool_registry()
+    app.state.tool_registry = await initialize_tool_registry()
     # Skill Registry
     # app.state.skill_registry = await initialize_skill_registry()
     # Apps
@@ -140,6 +141,25 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan, title="Geenii API", version=APP_VERSION)
+
+
+# Catch-all for unhandled exceptions -> 500 Problem JSON.
+# Implemented as a middleware instead of an Exception handler: Starlette routes Exception handlers
+# to the outermost ServerErrorMiddleware, which bypasses CORS, so browsers could not read the error.
+# Registered before CORSMiddleware so that it runs inside it.
+@app.middleware("http")
+async def unhandled_exception_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        logging.error(f"Unhandled exception: {exc}", exc_info=False)
+        problem = Problem(error="Internal Server Error",
+                          status=500,
+                          detail=str(exc))
+        return JSONResponse(status_code=500,
+                            content=problem.model_dump(),
+                            media_type="application/json")
+
 
 # Note: Middlewares are executed in reverse order of addition (LIFO)
 app.add_middleware(
@@ -184,15 +204,6 @@ async def http_exception_handler(_: Request, exc: HTTPException):
                         content=problem.model_dump(),
                         media_type="application/json")
 
-@app.exception_handler(Exception)
-async def generic_exception_handler(_: Request, exc: Exception):
-    logging.error(f"Unhandled exception: {exc}", exc_info=False)
-    problem = Problem(error="Internal Server Error",
-                      status=500,
-                      detail=str(exc))
-    return JSONResponse(status_code=200,
-                        content=problem.model_dump(),
-                        media_type="application/json")
 app.include_router(app_router, prefix="")
 
 # Web GUI; mounted last so the API routes take precedence
