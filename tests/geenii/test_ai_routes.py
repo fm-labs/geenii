@@ -13,7 +13,7 @@ from geenii.server.server import app
 @pytest.fixture
 def sessions_dir(tmp_path, monkeypatch):
     path = tmp_path / "home" / ".geenii" / "sessions" / "chat"
-    monkeypatch.setattr(ai_routes, "CHAT_SESSIONS_DIR", path)
+    monkeypatch.setattr(ai_routes, "GEENII_CHAT_SESSIONS_DIR", path)
     return path
 
 
