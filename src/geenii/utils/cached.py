@@ -237,8 +237,8 @@ class InMemoryCacheStore(CacheStore):
 
 
 def default_cache_key(func, args, kwargs):
-    raw = {"func": func.__name__, "args": args, "kwargs": kwargs}
-    logger.debug(">>> Generating cache key for:", raw)
+    raw = {"func": f"{func.__module__}.{func.__qualname__}", "args": args, "kwargs": kwargs}
+    logger.debug(">>> Generating cache key for: %s", raw)
     s = json.dumps(raw, sort_keys=True, default=str)
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
@@ -276,23 +276,25 @@ def _cache_write(func_name: str, key: str, result: Any, ttl: float | None) -> No
     cache_store().write_cache(key, result, ttl=ttl)
 
 
-async def acache_fn(func: Callable, key, ttl) -> Any:
+async def acache_fn(func: Callable, key, ttl, cache_if: Callable[[Any], bool] | None = None) -> Any:
     hit, v = _cache_read(func.__name__, key)
     #hit, v = asyncio.to_thread(_cache_read(func.__name__, key))
     if hit:
         return v
     result = await func()
-    _cache_write(func.__name__, key, result, ttl)
+    if cache_if is None or cache_if(result):
+        _cache_write(func.__name__, key, result, ttl)
     #hit, v = asyncio.to_thread(_cache_write(func.__name__, key, result, ttl))
     return result
 
 
-def cache_fn(func: Callable, key, ttl) -> Any:
+def cache_fn(func: Callable, key, ttl, cache_if: Callable[[Any], bool] | None = None) -> Any:
     hit, v = _cache_read(func.__name__, key)
     if hit:
         return v
     result = func()
-    _cache_write(func.__name__, key, result, ttl)
+    if cache_if is None or cache_if(result):
+        _cache_write(func.__name__, key, result, ttl)
     return result
 
 
@@ -302,7 +304,11 @@ def cache_write(key, data, ttl: Optional[int] = None):
 def cache_read(key) -> Any:
     return cache_store().read_cache(key)
 
-def cached(ttl=None, cachekey=None):
+def cached(ttl=None, cachekey=None, cache_if: Callable[[Any], bool] | None = None):
+    """Memoize a sync or async function in the cache store.
+
+    :param cache_if: optional predicate on the result; the result is only stored if it returns True.
+    """
     def decorator(func):
         is_async = inspect.iscoroutinefunction(func)
 
@@ -317,14 +323,14 @@ def cached(ttl=None, cachekey=None):
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
                 key = make_key(args, kwargs)
-                return await acache_fn(lambda: func(*args, **kwargs), key, ttl)
+                return await acache_fn(lambda: func(*args, **kwargs), key, ttl, cache_if)
             async_wrapper.__wrapped__ = func
             return async_wrapper
 
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
             key = make_key(args, kwargs)
-            return cache_fn(lambda: func(*args, **kwargs), key, ttl)
+            return cache_fn(lambda: func(*args, **kwargs), key, ttl, cache_if)
         sync_wrapper.__wrapped__ = func
         return sync_wrapper
 

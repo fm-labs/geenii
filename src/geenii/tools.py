@@ -35,7 +35,8 @@ def init_builtin_tools(registry: ToolRegistry):
     ))
     init_core_tools(registry)
 
-@cached(ttl=3600)
+# empty results are not cached: [] is also what a failed listing returns, and it would hide the server's tools for the full ttl
+@cached(ttl=3600, cache_if=bool)
 def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
     # short-lived client for discovery only; tool calls use the cached client from get_mcp_client_for_server
     mcp_client = McpClient(server_name, server_conf)

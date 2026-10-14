@@ -3,7 +3,7 @@ from pathlib import Path
 import atexit
 import json
 
-from geenii.config import MCP_CONFIG_FILE, GEENII_DIR, GEENII_WORKING_DIR
+from geenii.config import MCP_CONFIG_FILE, GEENII_WORKING_DIR
 from geenii.mcp_client import McpClient
 
 import logging

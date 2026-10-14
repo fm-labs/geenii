@@ -16,9 +16,10 @@ GEENII_USER_HOME = get_user_home_dir()
 
 GEENII_CHAT_SESSIONS_DIR = Path(GEENII_USER_HOME) / ".geenii" / "chats"
 
-# Load environment variables from .env file in the user directory, if it exists
-dotenv.load_dotenv(GEENII_USER_HOME + "/.geenii/.env", override=True, verbose=True)
-dotenv.load_dotenv(GEENII_DIR + "/.env", override=True, verbose=True)
+# Load environment variables from the project and user .env files, if they exist.
+# Without override the first source to set a variable wins: shell > project .env > user .env
+dotenv.load_dotenv(GEENII_DIR + "/.env", override=False, verbose=True)
+dotenv.load_dotenv(GEENII_USER_HOME + "/.geenii/.env", override=False, verbose=True)
 
 CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", GEENII_USER_HOME + "/.geenii/.cache")
 CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
