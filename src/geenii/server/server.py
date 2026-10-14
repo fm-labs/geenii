@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -11,8 +12,7 @@ from starlette.responses import JSONResponse
 
 from fastapi.staticfiles import StaticFiles
 
-from geenii.agent.registry import AgentRegistry
-from geenii.config import APP_VERSION, GEENII_DIR, WWW_DIR
+from geenii.config import APP_VERSION, WWW_DIR
 from geenii.datamodels import Problem
 from geenii.g import init_global_agent_registry
 from geenii.server.router import app_router
@@ -82,7 +82,8 @@ async def initialize_tool_registry():
     print("Initializing tool registry...")
     registry = ToolRegistry()
     init_builtin_tools(registry)
-    #await init_mcp_server_tools(registry)
+    # MCP discovery is blocking (spawns/connects to servers), so keep it off the event loop
+    await asyncio.to_thread(init_mcp_server_tools, registry)
     return registry
 
 
@@ -100,8 +101,6 @@ async def initialize_tool_registry():
 #     skill_registry.register_all_from_directory(f"{GEENII_DIR}/vendor/skills/anthropic/skills")
 #     print(f"Initialized {len(skill_registry.skills)} skills: {list(skill_registry.skills.keys())}")
 #     return skill_registry
-
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
