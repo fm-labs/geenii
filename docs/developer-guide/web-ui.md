@@ -119,6 +119,9 @@ command menu and voice input. It talks to a pluggable `ChatBackend`:
   cancels turns. Slash commands come from `/agents/{name}/commands`.
 - `createEchoBackend()` is an offline backend for UI work.
 
+`widget` content parts are drawn by the widgets in `parts/widgets/`; see
+[Widgets](widgets.md).
+
 Assistant messages that carry `usage` (see
 [messages.md](messages.md#modelmessage-geeniidatamodelspy)) show the call's
 total tokens in the message header, with input, cache, output and time in a

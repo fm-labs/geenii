@@ -15,6 +15,7 @@ import { KeyValueWidget } from './keyvalue.tsx'
 import { LineChartWidget } from './linechart.tsx'
 import { ListWidget } from './list.tsx'
 import { MatrixWidget } from './matrix.tsx'
+import { PostButtonWidget } from './postbutton.tsx'
 import { ProgressWidget } from './progress.tsx'
 import { SnakeWidget } from './snake.tsx'
 import { StatWidget } from './stat.tsx'
@@ -25,11 +26,12 @@ import { TimelineWidget } from './timeline.tsx'
 
 export { BarChartWidget, ClockWidget, CodeWidget, CountdownWidget, CsvWidget, HtmlWidget, JsonWidget }
 export { KeyValueWidget, ListWidget, ProgressWidget, StatWidget, TableWidget }
-export { DiffWidget, FileTreeWidget, IframeWidget, LineChartWidget, StepsWidget, TimelineWidget }
+export { DiffWidget, FileTreeWidget, IframeWidget, LineChartWidget, PostButtonWidget, StepsWidget, TimelineWidget }
 export { DiceWidget, FortuneWidget, MatrixWidget, SnakeWidget, TerminalWidget }
 export { CopyButton } from './copy-button.tsx'
 export { cowsay } from './fortune.tsx'
 export { useReducedMotion } from './use-reduced-motion.ts'
+export { safeUrl } from './safe-url.ts'
 export { buildFileTree } from './filetree.tsx'
 export { parseCsv } from './csv.tsx'
 export { useNow } from './use-now.ts'
@@ -42,6 +44,7 @@ export const defaultWidgets: WidgetRenderers = {
   'geenii.barchart': BarChartWidget,
   'geenii.html': HtmlWidget,
   'geenii.iframe': IframeWidget,
+  'geenii.postbutton': PostButtonWidget,
   'geenii.progress': ProgressWidget,
   'geenii.keyvalue': KeyValueWidget,
   'geenii.stat': StatWidget,

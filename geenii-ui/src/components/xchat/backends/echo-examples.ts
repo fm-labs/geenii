@@ -242,6 +242,30 @@ export const sampleWidgetMessages = (): { level: SystemMessageLevel, content: Co
   {
     level: 'info',
     content: [
+      { type: 'text', text: 'The agent prepared a webhook call. Send it?' },
+      {
+        type: 'widget',
+        name: 'geenii.postbutton',
+        data: { url: 'https://httpbin.org/post', payload: { event: 'deploy', env: 'staging' }, label: 'Trigger deploy', confirm: 'Deploy to staging?' },
+        text: 'Webhook: POST https://httpbin.org/post {"event": "deploy", "env": "staging"}',
+      },
+    ],
+  },
+  {
+    level: 'warning',
+    content: [
+      { type: 'text', text: 'A webhook that answers 500, to show the failed state:' },
+      {
+        type: 'widget',
+        name: 'geenii.postbutton',
+        data: { url: 'https://httpbin.org/status/500', payload: { ping: true }, label: 'Ping' },
+        text: 'Webhook: POST https://httpbin.org/status/500',
+      },
+    ],
+  },
+  {
+    level: 'info',
+    content: [
       { type: 'text', text: 'Indexing the workspace…' },
       { type: 'widget', name: 'geenii.progress', data: { label: 'Indexing files', value: 42, max: 120 }, text: 'Indexing files: 42/120' },
     ],

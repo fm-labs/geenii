@@ -2,18 +2,9 @@ import React from 'react'
 import { ExternalLinkIcon, GlobeIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { WidgetRendererProps } from '@/components/xchat/chat.types.ts'
+import { safeUrl } from './safe-url.ts'
 
 type IframeData = { url: string; scripts?: boolean; trusted?: boolean; height?: number; title?: string }
-
-/** The url if it is http(s), else null (no javascript:, data:, file: …) */
-const safeUrl = (url?: string): URL | null => {
-  try {
-    const parsed = new URL(url ?? '', window.location.href)
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed : null
-  } catch {
-    return null
-  }
-}
 
 /**
  * Sandbox flags. Without `scripts` the page is static. With `scripts` a cross-origin page keeps its own

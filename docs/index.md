@@ -71,6 +71,8 @@ Internals for contributors and library consumers.
   MCP client and session caches, prompt caching, and the cache directory.
 - **[HTTP Server](developer-guide/server.md)** — the FastAPI `/api/v1` API:
   endpoints, error format, streamed agent chats, security.
+- **[Widgets](developer-guide/widgets.md)** — the `widget` content part:
+  built-in widgets and their data, rendering, security, adding your own.
 - **[Web UI](developer-guide/web-ui.md)** — the React/Tauri frontend: boot
   sequence, `useApi()`, and which views use which endpoints.
 - **[Building](developer-guide/building.md)** — dev setup, linting, testing,
