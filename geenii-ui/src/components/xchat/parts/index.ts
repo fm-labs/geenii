@@ -7,9 +7,11 @@ import {
   ToolCallPart,
   ToolCallResultPart,
 } from './tool-parts.tsx'
+import { WidgetPart } from './widget-parts.tsx'
 
 export * from './media-parts.tsx'
 export * from './tool-parts.tsx'
+export * from './widget-parts.tsx'
 
 /** Built-in renderer for every content part type. Override single types via <ChatProvider renderers={…}>. */
 export const defaultRenderers: Required<ContentPartRenderers> = {
@@ -24,4 +26,5 @@ export const defaultRenderers: Required<ContentPartRenderers> = {
   tool_call_result: ToolCallResultPart,
   interaction: InteractionPart,
   confirmation: ConfirmationPart,
+  widget: WidgetPart,
 }

@@ -1,7 +1,7 @@
 import React, { PropsWithChildren } from 'react'
-import { ChatContext, ChatRenderersContext } from './chat-context.tsx'
+import { ChatContext, ChatRenderersContext, ChatWidgetsContext } from './chat-context.tsx'
 import { ChatSession } from '@/components/xchat/chat-session.ts'
-import { ChatBackend, ChatMessage, ContentPartRenderers } from '@/components/xchat/chat.types.ts'
+import { ChatBackend, ChatMessage, ContentPartRenderers, WidgetRenderers } from '@/components/xchat/chat.types.ts'
 
 export type ChatProviderProps = PropsWithChildren<{
   backend: ChatBackend
@@ -13,6 +13,8 @@ export type ChatProviderProps = PropsWithChildren<{
   userId?: string
   /** Per content-type renderer overrides */
   renderers?: ContentPartRenderers
+  /** Widget components by name; added to (and overriding) the built-in widgets */
+  widgets?: WidgetRenderers
   onError?: (error: string) => void
 }>
 
@@ -20,7 +22,7 @@ export type ChatProviderProps = PropsWithChildren<{
  * Creates one ChatSession and shares it with all xchat components below.
  */
 const ChatProvider = (props: ChatProviderProps) => {
-  const { backend, contextId, model, renderers, onError, children } = props
+  const { backend, contextId, model, renderers, widgets, onError, children } = props
 
   const onErrorRef = React.useRef(onError)
   onErrorRef.current = onError
@@ -56,7 +58,9 @@ const ChatProvider = (props: ChatProviderProps) => {
   return (
     <ChatContext.Provider value={session}>
       <ChatRenderersContext.Provider value={renderers ?? emptyRenderers}>
-        {children}
+        <ChatWidgetsContext.Provider value={widgets ?? emptyRenderers}>
+          {children}
+        </ChatWidgetsContext.Provider>
       </ChatRenderersContext.Provider>
     </ChatContext.Provider>
   )

@@ -139,10 +139,22 @@ class UserInteractionContent(BaseContent):
         return f"UserInteraction (id={self.interaction_id}): choices=[{choices_str}] selected={self.choice!r}"
 
 
+class WidgetContent(BaseContent):
+    type: Literal["widget"] = "widget"
+    name: str  # Widget name in dot-notation, e.g. "geenii.table" or "geenii.clock"
+    data: dict | list | Any | None = None  # Passed to the widget as-is
+    title: str | None = None  # Shown in a small header above the widget
+    text: str | None = None  # Shown if the UI does not know the widget
+
+    def to_text(self) -> str:
+        text = self.text or f"[widget: {self.name}]"
+        return f"{self.title}\n{text}" if self.title else text
+
+
 ContentPart = Annotated[
     TextContent | ImageContent | AudioContent | FileContent | EmbedContent |
     FunctionCallContent | ToolCallContent | ToolCallResultContent | JsonContent |
-    UserInteractionContent | UserConfirmationContent,
+    UserInteractionContent | UserConfirmationContent | WidgetContent,
     Field(discriminator="type"),
 ]
 

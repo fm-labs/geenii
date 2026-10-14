@@ -101,6 +101,18 @@ export type UserConfirmationContent = {
   confirmed?: boolean | null
 }
 
+export type WidgetContent = {
+  type: 'widget'
+  /** Widget name in dot-notation, e.g. "geenii.table" or "geenii.clock" */
+  name: string
+  /** Passed to the widget as-is */
+  data?: unknown
+  /** Shown in a small header above the widget (also above the fallback) */
+  title?: string | null
+  /** Shown if the UI does not know the widget */
+  text?: string | null
+}
+
 export type ContentPart =
   | TextContent
   | ImageContent
@@ -113,6 +125,7 @@ export type ContentPart =
   | JsonContent
   | UserInteractionContent
   | UserConfirmationContent
+  | WidgetContent
 
 export type ContentPartType = ContentPart['type']
 
@@ -318,6 +331,16 @@ export type ContentPartRendererProps<T extends ContentPart = ContentPart> = {
 export type ContentPartRenderers = {
   [K in ContentPartType]?: ComponentType<ContentPartRendererProps<ContentPartOf<K>>>
 }
+
+export type WidgetRendererProps<D = unknown> = {
+  /** The widget part's `data` */
+  data: D
+  part: WidgetContent
+  message: ChatMessage
+}
+
+/** Widget components keyed by widget name (dot-notation, e.g. "geenii.clock"). Unknown widgets show their fallback text. */
+export type WidgetRenderers = Record<string, ComponentType<WidgetRendererProps<any>>>
 
 // ---------------------------------------------------------------------------
 // Type guards

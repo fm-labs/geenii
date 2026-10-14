@@ -21,9 +21,41 @@ discriminator.
 | `function`         | `FunctionCallContent`     | `name`, `arguments`, `result`                                     | Legacy function call (not used by the agent runtime)            |
 | `confirmation`     | `UserConfirmationContent` | `confirmation_id`, `text`, `confirmed`                            | HITL approval request/response                                  |
 | `interaction`      | `UserInteractionContent`  | `interaction_id`, `interaction_type`, `text`, `choices`, `choice` | Generic user interaction                                        |
+| `widget`           | `WidgetContent`           | `name` (dot-notation, e.g. `geenii.clock`), `data`, `title`, `text` | UI widget; the UI renders it if known, else shows `text` (fallback); `title` is a small header above either |
 
 The union type `ContentPart` is a Pydantic discriminated union over the `type`
 field. Every content part has a `.to_text()` method for serialization.
+
+### Built-in widgets
+
+The UI ships these widgets, one file each in `geenii-ui/src/components/xchat/parts/widgets/`;
+more can be registered via `<ChatProvider widgets={…}>`. Unknown widgets show `text`.
+
+| Name              | `data`                                                                  |
+|-------------------|-------------------------------------------------------------------------|
+| `geenii.clock`    | `{ timezone?, label? }`                                                 |
+| `geenii.table`    | `{ columns?, rows }`, rows are arrays or objects                        |
+| `geenii.list`     | `{ items, ordered? }`, items are strings or `{ text, description? }`    |
+| `geenii.barchart` | `{ title?, unit?, max?, items: [{ label, value }] }`                    |
+| `geenii.html`     | `{ html, height?, title? }`, rendered in a sandboxed iframe              |
+| `geenii.iframe`   | `{ url, scripts? = false, trusted? = false, height? = 320, title? }`, http(s) only; untrusted pages load on click; sandboxed, scripts only with `scripts`; "Open" button opens the url in a new window |
+| `geenii.progress` | `{ label?, value?, max? = 100, status? }`, no `value`: indeterminate; `status`: `running`, `done`, `error` |
+| `geenii.keyvalue` | `{ title?, items: [{ key, value }] }` or a plain object                 |
+| `geenii.stat`     | `{ items: [{ label, value, unit?, delta? }] }`, `delta` in percent      |
+| `geenii.code`     | `{ code, language?, filename? }`, with a copy button, no highlighting   |
+| `geenii.countdown`| `{ until, label? }`, `until` is an ISO datetime                         |
+| `geenii.json`     | `{ value, title?, expand? = 2 }`, collapsible tree; `expand`: levels opened initially |
+| `geenii.csv`      | `{ csv, delimiter?, header? = true, title? }`, rendered as a table; delimiter detected if omitted |
+| `geenii.steps`    | `{ title?, steps: [{ text, status? = pending, detail? }] }`; `status`: `pending`, `running`, `done`, `failed`, `skipped` |
+| `geenii.diff`     | `{ diff, filename? }`, `diff` is unified diff text, computed by the sender |
+| `geenii.linechart`| `{ title?, unit?, series: [{ name, points: [{ x, y }] }] }`, `x` is a number or an ISO date |
+| `geenii.timeline` | `{ title?, items: [{ time, title, description?, level? = info }] }`, `time` is an ISO datetime |
+| `geenii.filetree` | `{ root?, entries: [{ path, size?, type? }], expand? = 2 }`, `/`-separated paths; folders are created from the paths |
+| `geenii.matrix`   | `{ text?, height? = 160, seconds? }`, digital rain; `text` fades in; stops after `seconds` (default: never) |
+| `geenii.terminal` | `{ lines?, prompt? = 'C:\>', speed? = 30 }`, retro terminal that types `lines` (default: a boot sequence) |
+| `geenii.snake`    | `{ size? = 16, speed? = 120 }`, playable Snake: focus it, arrows/WASD, space to start/pause |
+| `geenii.fortune`  | `{ fortune?, width? = 40 }`, cowsay fortune; random if `fortune` is omitted |
+| `geenii.dice`     | `{ count? = 1, values? }`, rolling dice (max 10); `values` are pre-rolled results |
 
 ## ModelMessage (`geenii/datamodels.py`)
 

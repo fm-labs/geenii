@@ -16,6 +16,8 @@ import {
   sampleSvgBase64,
   sampleSvgDataUrl,
   sampleTextFile,
+  sampleEasterEggs,
+  sampleWidgetMessages,
 } from './echo-examples.ts'
 
 export type EchoBackendOptions = {
@@ -26,6 +28,9 @@ export type EchoBackendOptions = {
 
 /** Input that triggers the example turn (case-insensitive) */
 export const ECHO_EXAMPLE_TRIGGER = 'example'
+
+/** Input that triggers the widget turn (case-insensitive) */
+export const ECHO_WIDGETS_TRIGGER = 'widgets'
 
 const id = () => `${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`
 
@@ -45,7 +50,9 @@ const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, r
  * - Input starting with "tool" simulates an agent tool call that needs approval:
  *   it emits an interaction, waits for `respond`, then emits the tool call result.
  * - Input "example" streams one message per content type (text, image, audio, file, embed, json,
- *   function, tool_call + tool_call_result, interaction, confirmation) plus one system message per level.
+ *   function, tool_call + tool_call_result, interaction, confirmation, widget) plus one system message per level.
+ * - Input "widgets" streams only the widget examples: one system message per built-in widget.
+ * - Hidden easter eggs (not in listCommands): "matrix", "boot", "snake", "fortune", "dice".
  */
 export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend => {
   const delay = options.delay ?? 500
@@ -71,6 +78,9 @@ export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend
 
   const notify = (contextId: string, level: SystemMessageLevel, text: string): ChatEvent =>
     ({ type: 'message', message: message(contextId, 'system', [{ type: 'text', text }], level) })
+
+  const system = (contextId: string, level: SystemMessageLevel, content: ContentPart[]): ChatEvent =>
+    ({ type: 'message', message: message(contextId, 'system', content, level) })
 
   /** Wait until `respond` answers the interaction/confirmation with this id. */
   const waitForAnswer = (interactionId: string, signal: AbortSignal) => new Promise<string>((resolve, reject) => {
@@ -107,6 +117,14 @@ export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend
     yield { type: 'status', status: 'thinking' }
     await sleep(delay, signal)
     yield say(contextId, 'assistant', { type: 'text', text: allowed ? `Tool said: ${text}` : 'Ok, not calling the tool.' })
+  }
+
+  /** One system message per built-in widget, easter eggs included */
+  async function* widgetTurn(contextId: string, signal: AbortSignal): AsyncIterable<ChatEvent> {
+    for (const { level, content } of [...sampleWidgetMessages(), ...Object.values(sampleEasterEggs())]) {
+      yield system(contextId, level, content)
+      await sleep(Math.max(50, delay / 6), signal)
+    }
   }
 
   async function* exampleTurn(contextId: string, signal: AbortSignal): AsyncIterable<ChatEvent> {
@@ -150,6 +168,8 @@ export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend
       type: 'json',
       data: { kind: 'json', nested: { list: [1, 2, 3], ok: true }, text: SAMPLE_FILE_TEXT.trim() },
     })
+    await pause()
+    yield* widgetTurn(contextId, signal)
     await pause()
     yield say(contextId, 'assistant', { type: 'function', name: 'get_time', arguments: { tz: 'UTC' }, result: new Date().toISOString() })
     await pause()
@@ -207,9 +227,16 @@ export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend
       .join(' ')
     // the triggers work with and without a leading slash (slash commands)
     const command = text.trim().toLowerCase().replace(/^\//, '')
+    // hidden commands, not in listCommands
+    const easterEggs = sampleEasterEggs()
+    const easterEgg = Object.prototype.hasOwnProperty.call(easterEggs, command) ? easterEggs[command] : null
 
-    if (command === ECHO_EXAMPLE_TRIGGER) {
+    if (easterEgg) {
+      yield system(contextId, easterEgg.level, easterEgg.content)
+    } else if (command === ECHO_EXAMPLE_TRIGGER) {
       yield* exampleTurn(contextId, signal)
+    } else if (command === ECHO_WIDGETS_TRIGGER) {
+      yield* widgetTurn(contextId, signal)
     } else if (command.startsWith('tool')) {
       yield* toolTurn(contextId, text, signal)
     } else {
@@ -225,6 +252,7 @@ export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend
     send,
     listCommands: async () => [
       { command: ECHO_EXAMPLE_TRIGGER, description: 'Stream one example message of each content type' },
+      { command: ECHO_WIDGETS_TRIGGER, description: 'Stream one system message per built-in widget' },
       { command: 'tool', description: 'Simulate a tool call that needs your approval' },
     ],
     respond: async (_contextId: string, response: InteractionResponse) => {

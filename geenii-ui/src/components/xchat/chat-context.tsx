@@ -1,6 +1,12 @@
 import React from 'react'
 import { ChatSession } from '@/components/xchat/chat-session.ts'
-import { ChatBackend, ChatSessionActions, ChatSessionState, ContentPartRenderers } from '@/components/xchat/chat.types.ts'
+import {
+  ChatBackend,
+  ChatSessionActions,
+  ChatSessionState,
+  ContentPartRenderers,
+  WidgetRenderers,
+} from '@/components/xchat/chat.types.ts'
 
 /**
  * The shared chat context: every xchat component below a ChatProvider talks to the same ChatSession.
@@ -8,6 +14,8 @@ import { ChatBackend, ChatSessionActions, ChatSessionState, ContentPartRenderers
 export const ChatContext = React.createContext<ChatSession | null>(null)
 
 export const ChatRenderersContext = React.createContext<ContentPartRenderers>({})
+
+export const ChatWidgetsContext = React.createContext<WidgetRenderers>({})
 
 export const useChatSession = (): ChatSession => {
   const session = React.useContext(ChatContext)
@@ -52,3 +60,6 @@ export const useChatBackend = (): ChatBackend => {
 export const useChatActions = (): ChatSessionActions => useChatSession()
 
 export const useContentPartRenderers = (): ContentPartRenderers => React.useContext(ChatRenderersContext)
+
+/** Widget components registered on the ChatProvider (without the built-in ones). */
+export const useChatWidgets = (): WidgetRenderers => React.useContext(ChatWidgetsContext)
