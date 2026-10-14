@@ -5,15 +5,9 @@ import { Button } from '@/components/ui/button.tsx'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card.tsx'
 import { Skeleton } from '@/components/ui/skeleton.tsx'
 import { useApi } from '@/context/api-context.tsx'
-import { AgentType } from '@/app/agents/agent-types.ts'
+import { agentUrl, AgentType, shortToolName } from '@/app/agents/agent-types.ts'
 
 const MAX_VISIBLE_TOOLS = 5
-
-/** Strip the "mcp__<server>__" prefix from MCP tool names for display. */
-const shortToolName = (tool: string) => {
-  const match = tool.match(/^mcp__.+?__(.+)$/)
-  return match ? match[1] : tool
-}
 
 const AgentCard = ({ agent }: { agent: AgentType }) => {
   const tools = agent.tools || []
@@ -23,7 +17,8 @@ const AgentCard = ({ agent }: { agent: AgentType }) => {
   const hiddenTools = tools.slice(MAX_VISIBLE_TOOLS)
 
   return (
-    <Card className="gap-4 transition hover:shadow-md">
+    <a href={agentUrl(agent.name)} className="block rounded-xl focus-visible:outline-2 focus-visible:outline-ring">
+    <Card className="h-full gap-4 transition hover:shadow-md hover:border-foreground/20">
       <CardHeader>
         <div className="flex items-start gap-3">
           <div className="rounded-lg bg-muted p-2 text-muted-foreground">
@@ -78,6 +73,7 @@ const AgentCard = ({ agent }: { agent: AgentType }) => {
         </CardFooter>
       )}
     </Card>
+    </a>
   )
 }
 

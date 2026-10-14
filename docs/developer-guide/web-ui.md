@@ -99,7 +99,8 @@ expect. Both chat model selectors use it.
 
 | Route | View | Endpoints |
 |---|---|---|
-| `#/` (dashboard), `#/agents` | `agents/agents.view.tsx` — card grid of agents | `GET /agents/` |
+| `#/` (dashboard), `#/agents` | `agents/agents.view.tsx` — card grid of agents; each card links to the agent page | `GET /agents/` |
+| `#/agents/:name` | `agents/agent.view.tsx` + `agent-chat.tsx` — an xchat bound to this agent (no session list, "New chat" starts over), with the agent's short info (model, description, tool/MCP/skill counts) in the chat card header and a Details dialog for parameters, tool and skill descriptions and instructions | `GET /agents/{name}`, `/agents/{name}/commands`, `/tools/`, `/chats/*` |
 | `#/` (dashboard), `#/tools`, settings | `tools/tools.view.tsx` — tools as badges grouped by type; clicking one opens a pane with the parameter table, an rjsf form built from `parameters`, and Execute | `GET /tools/`, `POST /tools/{name}/execute` |
 | `#/xchat` | `xchat/xchat-demo-page-1.tsx` | `/chats/*`, `/agents/{name}/commands` |
 | `#/chat`, `#/completions`, `#/audio` | completion chat and quick generators | `/ai/*` |

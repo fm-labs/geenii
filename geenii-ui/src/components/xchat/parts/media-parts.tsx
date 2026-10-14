@@ -12,7 +12,7 @@ import {
 } from '@/components/xchat/chat.types.ts'
 
 // tailwind preflight resets markdown element styles; restore the basics for rendered markdown
-const markdownClass = [
+export const markdownClass = [
   'break-words',
   '[&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0',
   '[&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_ul]:my-2 [&_ol]:my-2',

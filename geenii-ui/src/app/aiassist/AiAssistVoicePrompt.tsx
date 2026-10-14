@@ -6,6 +6,8 @@ export interface AiAssistVoicePromptProps {
   onResponse?: (response: any) => void
   showProcessButton?: boolean
   showProcessingState?: boolean
+  /** Small recorder buttons, see AudioRecorder */
+  compact?: boolean
 }
 
 export const AiAssistVoicePrompt = ({ ...props }: AiAssistVoicePromptProps) => {
@@ -80,6 +82,7 @@ export const AiAssistVoicePrompt = ({ ...props }: AiAssistVoicePromptProps) => {
         enableAudioImport={false}
         enableDownload={false}
         enableAudioPlayer={true}
+        compact={props.compact}
       />
       {/*isRecording ? <p>Audio recorder is recording...</p> : <p>Not recording</p>*/}
       {props.showProcessButton && !isRecording && !isProcessing && audioBlob

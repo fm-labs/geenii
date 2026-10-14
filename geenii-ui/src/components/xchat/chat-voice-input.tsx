@@ -24,7 +24,7 @@ const ChatVoiceInput = ({ autoSubmit = false }: { autoSubmit?: boolean }) => {
     }
   }, [pendingSubmit, submit])
 
-  return <AiAssistVoicePrompt showProcessingState={true} onResponse={onResponse} />
+  return <AiAssistVoicePrompt compact showProcessingState={true} onResponse={onResponse} />
 }
 
 export default ChatVoiceInput

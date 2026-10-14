@@ -55,6 +55,7 @@ All paths are relative to `/api/v1`.
 | `GET /health` | `{"status": "ok"}` |
 | `GET /info` | App info (`get_app_info()`); the UI polls this as its liveness check |
 | `GET /agents/` | Bare array of agent specs (`name`, `label`, `description`, `model`, `system`, `tools`, `skills`, `mcp_servers`, `model_parameters`, `file_path`, `class_name`) |
+| `GET /agents/{name}` | One agent spec plus `instructions` (the markdown body of its spec file). 404 for unknown agents |
 | `GET /agents/{name}/commands` | `AgentCommand[]`: the built-in commands (`clear`, `compact`) followed by one per configured skill. 404 for unknown agents |
 | `GET /tools/` | Bare array of tool definitions (`name`, `type`, `description`, `parameters` as JSON Schema) |
 | `POST /tools/{name}/execute` | Body: the tool arguments as a JSON object. Returns the tool output. 404 for unknown tools |

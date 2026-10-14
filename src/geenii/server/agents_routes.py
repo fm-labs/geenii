@@ -29,6 +29,22 @@ def list_agents(agent_registry: AgentRegistry = Depends(dep_agent_registry)):
     return agents_list
 
 
+@router.get("/{name}", responses={404: {"model": Problem, "description": "Agent not found"}})
+def get_agent(name: str, agent_registry: AgentRegistry = Depends(dep_agent_registry)) -> dict:
+    """
+    The agent's spec plus its `instructions` (the markdown body of the spec file).
+    """
+    spec = agent_registry.get_config(name)
+    if spec is None:
+        raise HTTPException(status_code=404, detail=f"Agent '{name}' not found.")
+    try:
+        instructions = spec.instructions
+    except Exception as e:
+        logger.warning(f"Could not read instructions of agent '{name}': {e}")
+        instructions = ""
+    return {**spec.model_dump(), "instructions": instructions}
+
+
 @router.get("/{name}/commands", responses={404: {"model": Problem, "description": "Agent not found"}})
 def list_agent_commands(name: str, agent_registry: AgentRegistry = Depends(dep_agent_registry)) -> list[AgentCommand]:
     """

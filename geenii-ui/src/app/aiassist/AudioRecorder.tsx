@@ -19,13 +19,17 @@ export interface AudioRecorderProps {
   enableAudioImport?: boolean
   enableDownload?: boolean
   enableAudioPlayer?: boolean
+  /** Small icon buttons (16px icons), e.g. for chat input toolbars */
+  compact?: boolean
 }
 
-function IconButton({ children, ...props }: any) {
+function IconButton({ children, compact, ...props }: any) {
   return (
     <span
       {...props}
-      className="p-2 rounded hover:bg-gray-200 transition-colors"
+      className={compact
+        ? 'p-1.5 rounded-md cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground transition-colors'
+        : 'p-2 rounded hover:bg-gray-200 transition-colors'}
       style={{ display: 'inline-flex', alignItems: 'center' }}
     >
             {children}
@@ -40,6 +44,7 @@ export function AudioRecorder({ ...props }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false)
 
   const [showImport, setShowImport] = useState<boolean>(false)
+  const iconSize = props.compact ? 16 : 24
 
   const startRecording = async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -125,13 +130,13 @@ export function AudioRecorder({ ...props }: AudioRecorderProps) {
         <div className={'flex flex-row gap-2'}>
           <div>
             {!isRecording && (
-              <IconButton color={'error'} onClick={startRecording} title={'Click to start recording'} aria-label={'Record'}>
-                <MicOff />
+              <IconButton compact={props.compact} color={'error'} onClick={startRecording} title={'Click to start recording'} aria-label={'Record'}>
+                <MicOff size={iconSize} />
               </IconButton>
             )}
             {isRecording && (
-              <IconButton color={'success'} onClick={stopRecording} title={'Click to stop recording'} aria-label={'Stop'}>
-                <Mic />
+              <IconButton compact={props.compact} color={'success'} onClick={stopRecording} title={'Click to stop recording'} aria-label={'Stop'}>
+                <Mic size={iconSize} />
               </IconButton>
             )}
           </div>
@@ -142,25 +147,27 @@ export function AudioRecorder({ ...props }: AudioRecorderProps) {
         <div>
           {audioBlob && (
             <IconButton
+              compact={props.compact}
               onClick={() => setAudioBlob(undefined)}
               title={'Reset audio'}
               aria-label={'Reset'}
             >
-              <RotateCcw />
+              <RotateCcw size={iconSize} />
             </IconButton>
           )}
           {props.enableAudioImport && (
             <IconButton
+              compact={props.compact}
               onClick={() => setShowImport(!showImport)}
               title={'Import'}
               aria-label={'Import'}
             >
-              <Upload />
+              <Upload size={iconSize} />
             </IconButton>
           )}
           {props.enableDownload && audioBlob && (
-            <IconButton onClick={downloadAudio} title={'Download'} aria-label={'Download'}>
-              <Download />
+            <IconButton compact={props.compact} onClick={downloadAudio} title={'Download'} aria-label={'Download'}>
+              <Download size={iconSize} />
             </IconButton>
           )}
         </div>
