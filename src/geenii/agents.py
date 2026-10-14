@@ -14,6 +14,7 @@ from geenii.agent.tasks import (
     ClearMemoryTask,
     ToolCallTask,
 )
+from geenii.agent.info_commands import INFO_COMMANDS, InfoCommandTask
 from geenii.chat_models import ContentPart
 from geenii.core.process_tools import init_process_tools
 from geenii.pm.process_manager_client import ProcessManagerClient
@@ -29,6 +30,8 @@ class Agent(BaseAgent):
     BUILTIN_COMMANDS: dict[str, str] = {
         "clear": "Clear the conversation memory",
         "compact": "Summarize and compact the conversation memory",
+        # read-only info commands, answered without calling the model
+        **{name: description for name, (description, _) in INFO_COMMANDS.items()},
     }
 
     def __init__(self, *args, **kwargs):
@@ -97,6 +100,9 @@ class Agent(BaseAgent):
                     return True
                 elif skill_name == "compact":
                     self.enqueue_task(MemoryCompactionTask(agent=self, prompt=prompt))
+                    return True
+                elif skill_name in INFO_COMMANDS:
+                    self.enqueue_task(InfoCommandTask(agent=self, command=skill_name, args=prompt))
                     return True
                 # elif skill_name == "memo":
                 #     self.enqueue_task(StorePersistentMemoryTask(agent=self, message=prompt))

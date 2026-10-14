@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from geenii.agent.registry import AgentRegistry, AgentSpec
+from geenii.agents import Agent
 from geenii.server import agents_routes
 from geenii.server.server import app
 from geenii.skills import SkillSpec
@@ -37,9 +38,8 @@ def test_commands_are_builtins_then_skills(client):
     response = client.get("/api/v1/agents/default/commands")
 
     assert response.status_code == 200
-    assert response.json() == [
-        {"command": "clear", "description": "Clear the conversation memory"},
-        {"command": "compact", "description": "Summarize and compact the conversation memory"},
+    builtins = [{"command": c, "description": d} for c, d in Agent.BUILTIN_COMMANDS.items()]
+    assert response.json() == builtins + [
         # sorted; broken and missing skills are skipped, "clear" stays the built-in command
         {"command": "notes", "description": "Take notes"},
         {"command": "weather", "description": "Get the weather forecast"},
@@ -48,7 +48,10 @@ def test_commands_are_builtins_then_skills(client):
 
 def test_agent_without_skills_has_builtin_commands(client):
     commands = client.get("/api/v1/agents/plain/commands").json()
-    assert [c["command"] for c in commands] == ["clear", "compact"]
+    names = [c["command"] for c in commands]
+    assert names == list(Agent.BUILTIN_COMMANDS)
+    assert names[:2] == ["clear", "compact"]
+    assert {"self", "usage", "models", "tools", "context", "help"} <= set(names)
 
 
 def test_unknown_agent_is_404(client):

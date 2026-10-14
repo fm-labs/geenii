@@ -60,6 +60,7 @@ def list_agent_commands(name: str, agent_registry: AgentRegistry = Depends(dep_a
     for skill_name in sorted(spec.skills or []):
         # the macro handler matches lowercased names, and built-in commands win over skills
         if skill_name.lower() in Agent.BUILTIN_COMMANDS:
+            logger.warning(f"Skill '{skill_name}' of agent '{name}' is shadowed by the built-in command '/{skill_name.lower()}'.")
             continue
         try:
             skill = skills.load(skill_name)
