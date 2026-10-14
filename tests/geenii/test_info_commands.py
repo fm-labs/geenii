@@ -145,3 +145,36 @@ def test_help_lists_commands():
     text = _run(_agent(), "/help")
     for name in Agent.BUILTIN_COMMANDS:
         assert f"`/{name}`" in text
+
+
+def test_usage_tolerates_malformed_usage(isolated_cache_dir):
+    logs = isolated_cache_dir / "logs"
+    logs.mkdir()
+    entries = [
+        {"provider": "fake", "model": "test", "context_id": "ctx", "usage": {"input_tokens": "lots"}},
+        {"provider": "fake", "model": "test", "context_id": "ctx", "usage": {"input_tokens": 1, "output_tokens": 1}},
+    ]
+    (logs / "ai-usage-2026-10.log").write_text("\n".join(json.dumps(e) for e in entries) + "\n")
+
+    # the malformed call is counted without tokens; a missing total is input + output
+    assert "| `fake:test` | 2 | 1 | 1 | 2 |" in _run(_agent(), "/usage")
+
+
+def test_usage_reports_cache_share_across_versions(isolated_cache_dir):
+    logs = isolated_cache_dir / "logs"
+    logs.mkdir()
+    entries = [
+        # version 1 anthropic line: input_tokens left out the 600 cached tokens
+        {"provider": "anthropic", "model": "m", "context_id": "ctx",
+         "usage": {"input_tokens": 100, "output_tokens": 10, "total_tokens": 110,
+                   "cache_creation_input_tokens": 300, "cache_read_input_tokens": 300}},
+        # version 2 line
+        {"provider": "anthropic", "model": "m", "context_id": "ctx", "usage_version": 2,
+         "usage": {"input_tokens": 1000, "output_tokens": 10, "total_tokens": 1010,
+                   "cache_creation_input_tokens": 0, "cache_read_input_tokens": 900}},
+    ]
+    (logs / "ai-usage-2026-10.log").write_text("\n".join(json.dumps(e) for e in entries) + "\n")
+
+    text = _run(_agent(), "/usage")
+    assert "| `anthropic:m` | 2 | 1700 | 20 | 1720 |" in text
+    assert "1,200 of 1,700 input tokens (70%) were read from the prompt cache; 300 were written to it." in text

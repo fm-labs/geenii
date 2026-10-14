@@ -76,9 +76,9 @@ class TestFakeProvider:
 
         response = provider.generate_chat_completion(ChatCompletionRequest(prompt="x", model="fake:test"))
 
-        assert response.usage["input_tokens"] == 10
-        assert response.usage["output_tokens"] == 20
-        assert response.usage["total_tokens"] == 30
+        assert response.usage.input_tokens == 10
+        assert response.usage.output_tokens == 20
+        assert response.usage.total_tokens == 30
 
     def test_is_configured(self):
         provider = FakeProvider()

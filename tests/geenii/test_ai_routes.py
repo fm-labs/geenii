@@ -93,6 +93,7 @@ def test_completion_forwards_model_parameters(client, monkeypatch):
 
     assert response.status_code == 200
     assert calls == [{"model": "fake:test", "prompt": "hi", "stream": False,
+                      "source": "api", "task": "completion",
                       "system": ["be brief"], "temperature": 0.2, "max_tokens": 64}]  # unset (None) params dropped
 
 
