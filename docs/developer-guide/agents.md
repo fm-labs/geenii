@@ -86,6 +86,53 @@ name and `context_id`:
 The `/clear` and `/compact` macros clear the memory or summarise it into a new
 context (`MemoryCompactionTask`).
 
+## Info commands
+
+Read-only slash commands answer from the agent's own state without calling the
+model (`geenii/agent/info_commands.py`, `InfoCommandTask`):
+
+| Command | Shows |
+|---|---|
+| `/self` | Name, class, model, conversation ID, memory, approval controller, tool count, MCP servers, loaded skills, and the agent's in-memory usage counters (see [Usage](#usage)) |
+| `/usage` | Calls and tokens per model in this conversation, summed from `$CACHE_DIR/logs/ai-usage-*.log` over the conversation ID and its `-<n>` compaction successors, including skill selection and `/compact` calls. Handoffs are not counted; see [usage-tracking.md](usage-tracking.md) |
+| `/models` | Models of the configured providers, grouped by provider, with the agent's model highlighted |
+| `/tools` | Allowed tools with descriptions: built-in, MCP grouped by server, and configured tools that did not load |
+| `/context` | Message count by role, system prompt size, a rough token estimate (4 characters per token), number of compactions |
+| `/help` | All built-in commands and skills, plus the `@agent` and `:tool` prefixes |
+
+The reply is a markdown assistant message that is **not** added to memory, so
+it never reaches the model's context and is not part of the stored history.
+To add a command, write a `report_<name>(agent, args) -> str` function and
+register it in `INFO_COMMANDS`. `Agent.BUILTIN_COMMANDS` includes them, so they
+appear in `GET /agents/{name}/commands`. A built-in command wins over a skill of
+the same name; the route logs a warning for such skills.
+
+## Usage
+
+Every agent counts its own model calls: `agent.usage` (a `Usage`, summed with
+`+`) and `agent.model_calls`.
+
+- **How calls are counted:** all agent tasks make their model calls through
+  `_complete()` in `agent/tasks.py`. It tags the call for the usage log and
+  calls `agent.record_usage(response.usage)`. That covers turns, tool
+  follow-ups, skill and agent selection, tool filtering and `/compact`.
+- **What isn't counted:** failed calls raise before they are counted. Info
+  commands make no model calls.
+- **Handoffs:** a handoff (`@agent`) adds the sub-agent's totals with
+  `record_usage(sub.usage, calls=sub.model_calls)`, so the parent's counters
+  include it.
+- **Lifetime:** the counters belong to the agent **instance**. They grow
+  across turns and survive `/clear` and `/compact`, but they are not
+  persisted. In the server, a chat session's agent is rebuilt with fresh
+  counters after a restart or an LRU eviction.
+- **Where they show:** `/self` and the `agent.init` log entry (`to_dict()`).
+  For persistent per-conversation numbers, use `/usage`, which reads the
+  usage log ([usage-tracking.md](usage-tracking.md)).
+
+A new task that calls a model should use `_complete(self.agent, request,
+task=…)` rather than calling `generate_chat_completion` directly. Otherwise
+its calls are neither tagged nor counted.
+
 ## Human-in-the-loop (HITL)
 
 Every tool call passes through the agent's `HumanInTheLoopController`
@@ -122,8 +169,8 @@ threadpool, or use `await asyncio.to_thread(lambda: list(agent.process(msg)))`.
 The [server](server.md) does exactly this: `WebAgentRunner` runs each chat
 turn in its own thread and streams the messages as NDJSON events. It also
 lists agent specs (`GET /api/v1/agents/`) and each agent's slash commands
-(`GET /api/v1/agents/{name}/commands`: the `Agent.BUILTIN_COMMANDS` `clear`
-and `compact`, then one per configured skill).
+(`GET /api/v1/agents/{name}/commands`: the `Agent.BUILTIN_COMMANDS`, then one
+per configured skill).
 
 MCP tools are the one async dependency: `McpClient` exposes a sync API and runs
 every call on a single shared background event loop

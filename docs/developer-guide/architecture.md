@@ -134,6 +134,8 @@ and requests/responses plus token usage are appended to JSONL logs under
 | Function cache | SQLite via `@cached(ttl=...)` (`utils/cached.py`) | Used for model enumeration and MCP tool listings (1 h TTL); disable with `GEENII_CACHE_DISABLED=true` |
 | Model catalogs | `$GEENII_CACHE_DIR/{ollama,openai}.models.json` | Snapshots written on model enumeration |
 
+See [Caching](caching.md) for every cache, its scope, and how to invalidate it.
+
 ## Concurrency model
 
 The agent runtime is asyncio-based. Blocking provider SDK calls are pushed to a

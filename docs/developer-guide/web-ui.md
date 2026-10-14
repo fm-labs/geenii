@@ -118,3 +118,8 @@ command menu and voice input. It talks to a pluggable `ChatBackend`:
   sessions, reads the NDJSON turn stream, answers approval requests and
   cancels turns. Slash commands come from `/agents/{name}/commands`.
 - `createEchoBackend()` is an offline backend for UI work.
+
+Assistant messages that carry `usage` (see
+[messages.md](messages.md#modelmessage-geeniidatamodelspy)) show the call's
+total tokens in the message header, with input, cache, output and time in a
+tooltip (`chat-message-usage.tsx`).

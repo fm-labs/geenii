@@ -12,8 +12,11 @@ anthropic:claude-opus-4-6
 
 `geenii/ai.py` is the dispatch layer: it splits the model ID, instantiates the
 provider, and forwards the request. `generate_chat_completion()` additionally
-assigns a `context_id`, logs the request/response, and records token usage
-(see [Configuration](../user-guide/configuration.md) for log locations).
+assigns a `context_id` and logs the request/response. Both
+`generate_chat_completion()` and `generate_completion()` record token usage,
+including failed calls; see [usage-tracking.md](usage-tracking.md). A
+provider reports usage by filling the response's `usage` dict, for text
+completions too.
 
 ## Provider interfaces
 
@@ -116,8 +119,12 @@ Defined in `geenii/datamodels.py`:
 - `ChatCompletionRequest` — model, `system` (list of prompt parts), `prompt`,
   `messages` (history of `ModelMessage`s), `tools` (set of allowed tool names),
   `output_format`/`output_schema`, `model_parameters`, `context_id`.
-- `ChatCompletionResponse` — `output: list[ContentPart]`, `usage`, `context_id`,
-  the raw provider payload in `model_result`.
+- `CompletionResponse` — `output: list[ContentPart]`, `output_text`,
+  `usage: Usage | None` (token counts plus optional cache and timing fields,
+  see [usage-tracking.md](usage-tracking.md#the-usage-model)), and the raw
+  provider payload in `model_result`.
+- `ChatCompletionResponse` — a `CompletionResponse` plus `context_id` and
+  `tools_used`.
 
 The `output` list uses the content-part vocabulary from
 `geenii/chat_models.py`: `TextContent`, `JsonContent`, `ToolCallContent`,

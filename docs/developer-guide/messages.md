@@ -34,11 +34,29 @@ class ModelMessage:
     content: list[ContentPart]
     id: str            # auto-generated UUID
     timestamp: datetime
+    usage: Usage | None = None   # usage of the model call that produced it
 ```
 
 This is the canonical message format used throughout the agent runtime: in
 `BaseAgent.message_history`, yielded from tasks, and passed into
 `ChatCompletionRequest.messages`.
+
+`usage` is set on the **first** message created from each completion
+response, and only there. A response with two tool calls becomes two
+tool-call messages, and only the first carries the response's usage. So
+summing `usage` over a conversation's messages counts every model call once.
+User, tool-result and generated messages (errors, approval requests) have
+`None`.
+
+Messages with `usage` are:
+- the final answer of an `LLMTask`, and the first tool-call message of each tool-calling response (stored in history only, not streamed);
+- the `/compact` handover summary;
+- the assistant messages of `/ai/chat/completion`.
+
+`usage` is stored with the message by every `ChatMemory` and sent to `/chats`
+clients in the stream. Providers ignore it when they build the history for
+the model. See [usage-tracking.md](usage-tracking.md#the-usage-model) for the
+fields.
 
 ## Request/response models (`geenii/datamodels.py`)
 
@@ -66,7 +84,7 @@ This is the canonical message format used throughout the agent runtime: in
 | `output`           | list[ContentPart] | Parsed response parts                     |
 | `output_text`      | str               | Aggregated text output                    |
 | `reasoning_output` | str               | Thinking/reasoning content (if available) |
-| `usage`            | dict              | Token counts and timing                   |
+| `usage`            | Usage \| None     | Token counts, cache parts and timing      |
 | `model_result`     | dict              | Raw provider response                     |
 | `context_id`       | str               | Conversation context identifier           |
 

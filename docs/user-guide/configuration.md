@@ -6,8 +6,25 @@ time by `geenii/config.py`:
 1. `GEENII_WORKING_DIR` — the working directory (defaults to the current
    working directory).
 2. `GEENII_DIR` — the config directory (defaults to `$GEENII_WORKING_DIR/.geenii`).
-3. `$GEENII_DIR/.env` is loaded automatically via python-dotenv (with
-   `override=True`), so API keys can be kept next to the rest of the config.
+3. Two `.env` files are loaded automatically via python-dotenv:
+   - `$GEENII_DIR/.env`, for per-project settings
+   - `~/.geenii/.env` in your home directory, for settings shared by all
+     projects (e.g. API keys)
+
+   They act as defaults and never replace a variable that is already set.
+   When the same variable is set in more than one place, this order applies:
+
+   1. the shell / process environment (e.g. `OLLAMA_HOST=… geenii …`,
+      `docker run -e`, CI secrets)
+   2. the project `.env`
+   3. `~/.geenii/.env`
+
+   Either file may be missing. To let a `.env` value take effect, `unset` any
+   variable of the same name in your shell first.
+
+   `GEENII_WORKING_DIR` and `GEENII_DIR` are resolved *before* the `.env`
+   files are loaded, so they have to be set in the shell, not in a `.env`.
+   All other variables below can go in either file.
 
 ## The `.geenii/` directory
 
@@ -24,8 +41,12 @@ time by `geenii/config.py`:
 │   └── my-skill/
 │       ├── SKILL.md
 │       └── scripts/
-└── .cache/             # logs, model catalogs, SQLite caches (GEENII_CACHE_DIR)
 ```
+
+Logs, model catalogs and caches are not stored here. They go in
+`GEENII_CACHE_DIR`, which defaults to `~/.geenii/.cache` in your home
+directory and is shared by all working directories. See
+[Caching](../developer-guide/caching.md#cache-directory) for its contents.
 
 ## Environment variables
 
@@ -33,7 +54,7 @@ time by `geenii/config.py`:
 |---|---|---|
 | `GEENII_WORKING_DIR` | `os.getcwd()` | Base working directory |
 | `GEENII_DIR` | `$GEENII_WORKING_DIR/.geenii` | Config directory |
-| `GEENII_CACHE_DIR` | `$GEENII_DIR/.cache` | Cache and log directory |
+| `GEENII_CACHE_DIR` | `~/.geenii/.cache` | Cache and log directory (in the user's home, not `$GEENII_DIR`) |
 | `GEENII_CACHE_DISABLED` | `false` | Set `true` to disable the `@cached` function cache |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama API endpoint |
 | `OLLAMA_API_KEY` | _(empty)_ | Bearer token for Ollama (needed for Ollama Cloud) |
