@@ -18,7 +18,7 @@ from geenii.chat_models import (
     ToolCallContent,
     JsonContent,
 )
-from geenii.datamodels import ModelMessage, SystemMessage, ChatCompletionRequest
+from geenii.datamodels import ModelMessage, SystemMessage, ChatCompletionRequest, ChatCompletionResponse
 from geenii.g import init_global_agent_registry, init_agent_by_name
 from geenii.tool.registry import ToolRegistry
 from geenii.tool.tool_filter import ToolFilterSet
@@ -34,6 +34,18 @@ def _is_interaction_message(msg) -> bool:
 def _usage_source(agent: "BaseAgent") -> str:
     """The `source` of the agent's model calls in the usage log."""
     return f"agent:{agent.name}"
+
+
+def _complete(agent: "BaseAgent", request: ChatCompletionRequest, *, task: str,
+              tool_registry: ToolRegistry | None = None) -> ChatCompletionResponse:
+    """
+    A model call of an agent task: tagged with the agent and `task` for the usage log, and counted in the
+    agent's usage (`BaseAgent.record_usage`). Every agent task makes its model calls through this.
+    """
+    response = generate_chat_completion(request, tool_registry=tool_registry,
+                                        source=_usage_source(agent), task=task)
+    agent.record_usage(response.usage)
+    return response
 
 
 class ToolCallTask(BaseAgentTask):
@@ -383,13 +395,7 @@ class LLMTask(BaseAgentTask):
 
     def _request_completion(self, request):
         #print("_request_completions", request.messages)
-        response = generate_chat_completion(
-            request=request,
-            tool_registry=self.agent.tools,
-            source=_usage_source(self.agent),
-            task="llm",
-        )
-        return response
+        return _complete(self.agent, request, task="llm", tool_registry=self.agent.tools)
 
     def _build_system_prompt(self) -> list[str]:
         """
@@ -498,7 +504,7 @@ class ToolFilterTask(BaseAgentTask):
             # tools=tool_names,
             context_id=self.agent.context_id,  # attributes the usage to the conversation
         )
-        response = generate_chat_completion(request, source=_usage_source(self.agent), task="tool_filter")
+        response = _complete(self.agent, request, task="tool_filter")
         logger.info(
             f"Received model response for tool filtering with {len(response.output)} content parts."
         )
@@ -560,8 +566,12 @@ class HandoffTask(BaseAgentTask):
         # todo transfer conversation context and message history
         # self.sub.message_history.extend(list(self.agent.message_history[-6:]))  # transfer last 6 messages as context
 
-        for msg in self.sub.process(self.prompt):
-            yield msg
+        try:
+            for msg in self.sub.process(self.prompt):
+                yield msg
+        finally:
+            # the sub-agent's model calls count towards this agent, even if the handoff ends early
+            self.agent.record_usage(self.sub.usage, calls=self.sub.model_calls)
 
 
 class FindBestAgentTask(BaseAgentTask):
@@ -646,7 +656,7 @@ class FindBestAgentTask(BaseAgentTask):
             temperature=0.0,
             context_id=self.agent.context_id,  # attributes the usage to the conversation
         )
-        response = generate_chat_completion(request, source=_usage_source(self.agent), task="agent_select")
+        response = _complete(self.agent, request, task="agent_select")
         logger.info(
             f"Received model response for agent selection with {len(response.output)} content parts."
         )
@@ -827,7 +837,7 @@ class FindBestSkillTask(BaseAgentTask):
             output_schema=self.OUTPUT_SCHEMA,
             context_id=self.agent.context_id,  # attributes the usage to the conversation
         )
-        response = generate_chat_completion(request, source=_usage_source(self.agent), task="skill_select")
+        response = _complete(self.agent, request, task="skill_select")
         logger.info(
             f"Received model response for agent selection with {len(response.output)} content parts."
         )
@@ -1076,7 +1086,7 @@ Write in second person ("the user asked …", "you answered …") so the summary
             # the context being compacted; it is rotated to "<context_id>-<n>" afterwards
             context_id=self.agent.context_id,
         )
-        response = generate_chat_completion(request, source=_usage_source(self.agent), task="compact")
+        response = _complete(self.agent, request, task="compact")
 
         summary_text = ""
         if response.output:

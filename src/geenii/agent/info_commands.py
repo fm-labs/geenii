@@ -81,6 +81,19 @@ def _tool_description(agent: "BaseAgent", name: str) -> str | None:
     return None
 
 
+def _usage_summary(agent: "BaseAgent") -> str:
+    """The agent's in-memory usage counters (since this agent instance was created)."""
+    calls = getattr(agent, "model_calls", 0)
+    if not calls:
+        return "no model calls yet"
+    usage = agent.usage
+    text = (f"{usage.total_tokens:,} tokens ({usage.input_tokens:,} in, {usage.output_tokens:,} out) "
+            f"in {calls} model call{'s' if calls != 1 else ''}")
+    if usage.cache_read_input_tokens:
+        text += f", {usage.cache_read_input_tokens:,} input tokens from the cache"
+    return text + " since the agent was started"
+
+
 # -- reports ------------------------------------------------------------------
 
 def report_self(agent: "BaseAgent", args: str) -> str:
@@ -96,6 +109,7 @@ def report_self(agent: "BaseAgent", args: str) -> str:
         ["Tools", f"{len(agent.allowed_tools)} allowed"],
         ["MCP servers", ", ".join(sorted(agent.mcp_servers)) or "none"],
         ["Skills", ", ".join(f"**{s}** (active)" if s in active else s for s in skills) or "none loaded"],
+        ["Usage", _usage_summary(agent)],
     ]
     text = f"### {agent.name}\n\n"
     if agent.description:

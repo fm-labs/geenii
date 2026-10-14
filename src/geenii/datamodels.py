@@ -63,6 +63,16 @@ class Usage(pydantic.BaseModel):
             self.total_tokens = self.input_tokens + self.output_tokens
         return self
 
+    def __add__(self, other: "Usage") -> "Usage":
+        """Sum of two usages. An optional field stays None only if it is None on both sides."""
+        if not isinstance(other, Usage):
+            return NotImplemented
+        summed = {}
+        for name in type(self).model_fields:
+            a, b = getattr(self, name), getattr(other, name)
+            summed[name] = None if a is None and b is None else (a or 0) + (b or 0)
+        return Usage(**summed)
+
     @property
     def uncached_input_tokens(self) -> int:
         """Input tokens neither read from nor written to the prompt cache."""

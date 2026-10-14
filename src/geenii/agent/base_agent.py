@@ -13,7 +13,7 @@ from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT, BaseTask
 from geenii.bots import BotInterface
 from geenii.chat_models import ContentPart, TextContent
 from geenii.config import DEFAULT_COMPLETION_MODEL, CACHE_DIR, GEENII_MEMORY_ENGINE
-from geenii.datamodels import ModelMessage, SystemMessage
+from geenii.datamodels import ModelMessage, SystemMessage, Usage
 from geenii.hitl import HumanInTheLoopController, NoHumanInTheLoopController
 from geenii.memory import (
     ChatMemory,
@@ -51,6 +51,9 @@ class BaseAgent(BotInterface, abc.ABC):
         self.allowed_tools: Set[str] = allowed_tools or set()
         self.mcp_servers: Set[str] = mcp_servers or set()
         self.active_skills: list[str] = []
+        # usage of all model calls made by this agent instance (and agents it handed off to), see record_usage()
+        self.usage: Usage = Usage()
+        self.model_calls: int = 0
 
         self._tool_registry = tool_registry or ToolRegistry()
         self._skill_registry = skill_registry or SkillRegistry()
@@ -101,7 +104,9 @@ class BaseAgent(BotInterface, abc.ABC):
             "active_skills": list(self.active_skills),
             "hitl_class": self._hitl.__class__.__name__,
             "skills": list(self.skills.names()),
-            "tools": list(self.tools.list_tool_names())
+            "tools": list(self.tools.list_tool_names()),
+            "usage": self.usage.model_dump(exclude_none=True),
+            "model_calls": self.model_calls,
         }
 
     # def about_me(self):
@@ -133,6 +138,16 @@ class BaseAgent(BotInterface, abc.ABC):
     @property
     def hitl(self) -> HumanInTheLoopController:
         return self._hitl
+
+    def record_usage(self, usage: Usage | None, calls: int = 1) -> None:
+        """
+        Count model calls and their usage. Agent tasks call this for every successful completion
+        (`usage` may be None if the provider reported none); a handoff passes the sub-agent's totals.
+        The counters live as long as this agent instance; they are not persisted.
+        """
+        self.model_calls += calls
+        if usage is not None:
+            self.usage = self.usage + usage
 
     def enqueue_task(self, task: BaseTask):
         """Enqueue a task to be processed by the agent."""
