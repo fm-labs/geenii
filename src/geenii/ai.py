@@ -10,7 +10,7 @@ from geenii.datamodels import CompletionResponse, CompletionErrorResponse, \
     ChatCompletionRequest, ImageGenerationApiRequest, ImageGenerationApiResponse, \
     AudioGenerationApiRequest, AudioSpeechGenerationApiResponse, AudioTranscriptionApiRequest, \
     AudioTranscriptionApiResponse, \
-    ModelMessage, AIModelInfo, AIProviderInfo, ChatCompletionResponse
+    ModelMessage, AIModelInfo, AIProviderInfo, ChatCompletionResponse, Usage, USAGE_VERSION
 from geenii.provider.interfaces import AICompletionProvider, AIProvider, AIImageGeneratorProvider, \
     AISpeechGeneratorProvider, AIAudioTranscriptionProvider, AIAudioTranslationProvider, AIChatCompletionProvider
 from geenii.tool.registry import ToolRegistry
@@ -156,11 +156,17 @@ def get_ai_audio_translation_provider(model_id: str) -> tuple[AIAudioTranslation
     return get_ai_provider_from_model_id(model_id, AIAudioTranslationProvider)
 
 
-def generate_completion(model: str, prompt: str, stream: bool = False, **kwargs) -> CompletionResponse:
+def generate_completion(model: str, prompt: str, stream: bool = False, *,
+                        source: str | None = None, task: str | None = None, **kwargs) -> CompletionResponse:
     """
     Generate a completion using the specified AI provider and model.
+
+    Every call is recorded in the usage log (without a context id), like generate_chat_completion.
+    Failures are returned as a CompletionErrorResponse, not raised.
     """
     response = None
+    # best effort, for logging a call whose model id is invalid
+    provider, model_name = None, model
     try:
         #publish_event(["ai.completion.requested"], {"request": request.model_dump()})
 
@@ -178,12 +184,14 @@ def generate_completion(model: str, prompt: str, stream: bool = False, **kwargs)
         #publish_event(["ai.completion.completed"], {"response": response.model_dump()})
 
         #_log_request_response(request, response)
+        _ai_usage_log(provider, model_name, None, response.usage, source=source, task=task)
         return response
     except Exception as e:
         print(f"Error in {model} completion API: {str(e)}")
 
         # Publish the error event
         #publish_event(["ai.completion.error"], {"error": str(e), "request": request.model_dump()})
+        _log_failed_call(provider, model_name, model, None, e, source=source, task=task)
 
         return CompletionErrorResponse(error=str(e))
     finally:
@@ -253,17 +261,11 @@ def generate_chat_completion(request: ChatCompletionRequest, tool_registry: Tool
         # pass through context ID from request to response, if not set by the provider implementation
         response.context_id = response.context_id or request.context_id
         _ai_log("completion.response", response)
-        _ai_usage_log(provider_name, model_name, response.context_id, response.usage or {}, source=source, task=task)
+        _ai_usage_log(provider_name, model_name, response.context_id, response.usage, source=source, task=task)
         return response
     except Exception as e:
         print(f"Error in {request.model} assistant API: {str(e)}")
-        error = _error_text(e)
-        try:
-            _ai_log("completion.error", {"model": request.model, "context_id": request.context_id, "error": error})
-            _ai_usage_log(provider_name, model_name, request.context_id, {}, source=source, task=task, error=error)
-        except Exception as log_error:
-            # never hide the original error behind a logging failure
-            print(f"Could not log failed completion: {log_error}")
+        _log_failed_call(provider_name, model_name, request.model, request.context_id, e, source=source, task=task)
         #return ErrorApiResponse(error=str(e))
         raise e
 
@@ -320,12 +322,16 @@ def generate_audio_transcription(request: AudioTranscriptionApiRequest) -> Audio
 
 
 def _ai_log(what: str, data: dict | pydantic.BaseModel):
+    """Append a request/response/error entry to the daily log. Never raises, like _ai_usage_log."""
     date_formatted = datetime.now().strftime("%Y-%m-%d")
     log_file = f"{CACHE_DIR}/logs/ai-{date_formatted}.log"
-    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
-    if isinstance(data, pydantic.BaseModel):
-        data = data.model_dump(mode="json")
-    append_jsonl(log_file, {f"{what}": data})
+    try:
+        Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(data, pydantic.BaseModel):
+            data = data.model_dump(mode="json")
+        append_jsonl(log_file, {f"{what}": data})
+    except Exception as e:
+        print(f"Could not write AI log {log_file}: {e}")
 
 
 _MAX_ERROR_LENGTH = 500
@@ -337,13 +343,28 @@ def _error_text(e: Exception) -> str:
     return text if len(text) <= _MAX_ERROR_LENGTH else text[:_MAX_ERROR_LENGTH - 1] + "…"
 
 
-def _ai_usage_log(provider: str | None, model: str, context_id: str, usage: dict, *,
+def _log_failed_call(provider: str | None, model: str, model_id: str, context_id: str | None, e: Exception, *,
+                     source: str | None, task: str | None) -> None:
+    """Record a failed completion in the daily log and the usage log (empty usage plus `error`)."""
+    error = _error_text(e)
+    try:
+        _ai_log("completion.error", {"model": model_id, "context_id": context_id, "error": error})
+        _ai_usage_log(provider, model, context_id, None, source=source, task=task, error=error)
+    except Exception as log_error:
+        # never hide the original error behind a logging failure
+        print(f"Could not log failed completion: {log_error}")
+
+
+def _ai_usage_log(provider: str | None, model: str, context_id: str | None, usage: Usage | None, *,
                   source: str | None = None, task: str | None = None, error: str | None = None):
-    """Log AI usage data to a file for tracking and analysis. `error` is set for failed calls (with empty usage)."""
+    """
+    Log AI usage data to a file for tracking and analysis. `error` is set for failed calls (with no usage).
+    `usage` is written without its unset fields, and as `{}` if there is none.
+    Never raises: a failure to write the log must not turn a successful completion into an error.
+    """
     # UTC with offset ("…+00:00"); the monthly file uses the same instant, so a line is always in its month's file
     now = datetime.now(UTC)
     log_file = f"{CACHE_DIR}/logs/ai-usage-{now.strftime('%Y-%m')}.log"
-    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
     log_entry = {
         "timestamp": now.isoformat(),
         "provider": provider,
@@ -351,7 +372,13 @@ def _ai_usage_log(provider: str | None, model: str, context_id: str, usage: dict
         "model": model,
         "source": source,
         "task": task,
-        "usage": usage,
+        "usage": usage.model_dump(exclude_none=True) if usage is not None else {},
+        # convention of `usage`; read lines back with Usage.from_log_entry, which converts older versions
+        "usage_version": USAGE_VERSION,
         "error": error,
     }
-    append_jsonl(log_file, log_entry)
+    try:
+        Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+        append_jsonl(log_file, log_entry)
+    except Exception as e:
+        print(f"Could not write usage log {log_file}: {e}")

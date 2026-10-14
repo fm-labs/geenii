@@ -10,11 +10,29 @@ from geenii import config
 from geenii.chat_models import TextContent, ToolCallContent, ContentPart, ToolCallResultContent, JsonContent
 from geenii.config import CACHE_DIR
 from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest, AIModelInfo, \
-    ModelMessage
+    ModelMessage, Usage
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider
 from geenii.utils.json_util import write_json
 
 logger = logging.getLogger(__name__)
+
+
+def _usage_from_result(model_result) -> Usage:
+    """Usage and performance metrics of an Ollama chat or generate result. Durations are in milliseconds."""
+    def count(key: str) -> int:
+        return int(model_result.get(key) or 0)  # may be missing or None, e.g. for a cached prompt
+
+    def millis(key: str) -> int:
+        return int((model_result.get(key) or 0) / 1_000_000)  # nanoseconds -> milliseconds
+
+    return Usage(
+        input_tokens=count('prompt_eval_count'),
+        output_tokens=count('eval_count'),
+        load_duration=millis('load_duration'),
+        input_duration=millis('prompt_eval_duration'),
+        output_duration=millis('eval_duration'),
+        total_duration=millis('total_duration'),
+    )
 
 
 class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
@@ -307,17 +325,9 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                     logger.debug(f"Tool call requested: {name} with arguments {arguments} and call_id {call_id}")
 
             # Usage and performance metrics
-            usage = {
-                'input_tokens': int(model_result.get('prompt_eval_count', 0)),
-                'output_tokens': int(model_result.get('eval_count', 0)),
-                'total_tokens': int(model_result.get('prompt_eval_count', 0) + model_result.get('eval_count', 0)),
-                'load_duration': int(model_result.get('load_duration', 0) / 1_000_000),  # convert to milliseconds
-                'input_duration': int(model_result.get('prompt_eval_duration', 0) / 1_000_000),  # convert to milliseconds
-                'output_duration': int((model_result.get('eval_duration') or 0) / 1_000_000),  # convert to milliseconds
-                'total_duration': int(model_result.get('total_duration', 0) / 1_000_000),  # convert to milliseconds
-            }
+            usage = _usage_from_result(model_result)
             logger.info(
-                f"Tokens used in this chat completion: {usage['total_tokens']}, processing time: {usage['total_duration']} ms")
+                f"Tokens used in this chat completion: {usage.total_tokens}, processing time: {usage.total_duration} ms")
 
             logger.debug("OLLAMA: Chat completion generated with %d output parts", len(output_parts))
             # todo remove prompt from response
@@ -435,7 +445,8 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 # prompt=prompt,
                 output=[TextContent(text=response_text)],
                 output_text=str(response_text).strip(),
-                model_result=model_result.model_dump()
+                model_result=model_result.model_dump(),
+                usage=_usage_from_result(model_result),
             )
             return response
 

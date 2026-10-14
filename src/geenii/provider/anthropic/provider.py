@@ -7,10 +7,27 @@ from typing import List
 
 from geenii import config
 from geenii.chat_models import TextContent, ToolCallContent, ContentPart, ToolCallResultContent, JsonContent
-from geenii.datamodels import ChatCompletionResponse, ChatCompletionRequest, AIModelInfo, ModelMessage
+from geenii.datamodels import ChatCompletionResponse, ChatCompletionRequest, AIModelInfo, ModelMessage, Usage
 from geenii.provider.interfaces import AIProvider, AIChatCompletionProvider
 
 logger = logging.getLogger(__name__)
+
+
+def _usage_from_result(model_result) -> Usage:
+    """
+    Token usage of an Anthropic Messages API result, in the normalised convention.
+    Anthropic reports the uncached input in `input_tokens` and cache writes / reads separately;
+    our `input_tokens` is their sum.
+    """
+    usage = model_result.usage
+    cache_creation = getattr(usage, "cache_creation_input_tokens", 0) or 0
+    cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
+    return Usage(
+        input_tokens=usage.input_tokens + cache_creation + cache_read,
+        output_tokens=usage.output_tokens,
+        cache_creation_input_tokens=cache_creation,
+        cache_read_input_tokens=cache_read,
+    )
 
 KNOWN_MODELS = [
     "claude-fable-5",
@@ -151,16 +168,9 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
                     ))
                     logger.info(f"Tool call requested: {block.name} with call_id {block.id}")
 
-            cache_creation = getattr(model_result.usage, "cache_creation_input_tokens", 0) or 0
-            cache_read = getattr(model_result.usage, "cache_read_input_tokens", 0) or 0
-            usage = {
-                "input_tokens": model_result.usage.input_tokens,
-                "output_tokens": model_result.usage.output_tokens,
-                "total_tokens": model_result.usage.input_tokens + model_result.usage.output_tokens,
-                "cache_creation_input_tokens": cache_creation,
-                "cache_read_input_tokens": cache_read,
-            }
-            logger.info(f"Tokens used: {usage['total_tokens']} (cache write: {cache_creation}, cache read: {cache_read})")
+            usage = _usage_from_result(model_result)
+            logger.info(f"Tokens used: {usage.total_tokens} (cache write: {usage.cache_creation_input_tokens}, "
+                        f"cache read: {usage.cache_read_input_tokens})")
 
             response = ChatCompletionResponse(
                 id=model_result.id,

@@ -11,13 +11,32 @@ from geenii import config
 from geenii.chat_models import TextContent, ToolCallContent, JsonContent, ImageContent
 from geenii.config import CACHE_DIR
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, ChatCompletionRequest, \
-    ChatCompletionResponse, AIModelInfo, AudioTranscriptionApiResponse
+    ChatCompletionResponse, AIModelInfo, AudioTranscriptionApiResponse, Usage
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider, \
     AIImageGeneratorProvider, AIAudioTranscriptionProvider
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.json_util import write_json
 
 logger = logging.getLogger(__name__)
+
+
+def _usage_from_result(model_result) -> Usage | None:
+    """
+    Token usage of an OpenAI Responses API result; None if the result has none.
+    OpenAI's input_tokens already includes the cached input; the cached part is in input_tokens_details.
+    OpenAI does not report cache writes.
+    """
+    usage = getattr(model_result, "usage", None)
+    if usage is None:
+        return None
+    details = getattr(usage, "input_tokens_details", None)
+    return Usage(
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        total_tokens=usage.total_tokens,
+        cache_read_input_tokens=getattr(details, "cached_tokens", None),
+    )
+
 
 class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider, AIImageGeneratorProvider,
                      AIAudioTranscriptionProvider):
@@ -173,7 +192,8 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             # the aggregated text output from all output_text items in the output array
             output_text=model_result.output_text,
             # the full model result for debugging
-            model_result=model_result.model_dump()
+            model_result=model_result.model_dump(),
+            usage=_usage_from_result(model_result),
         )
         return response
 
@@ -309,13 +329,9 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
                 output_parts.append(TextContent(text=f"Unsupported OpenAI response item type: {output_item.type}"))
 
         # Usage
-        usage = {
-            "input_tokens": model_result.usage.input_tokens,
-            "output_tokens": model_result.usage.output_tokens,
-            "total_tokens": model_result.usage.total_tokens,
-        }
+        usage = _usage_from_result(model_result)
         logger.info(
-            f"Tokens used in this chat completion: {usage['total_tokens']}, processing time approx: {time_end - time_start:.8f} seconds")
+            f"Tokens used in this chat completion: {usage.total_tokens if usage else 'unknown'}, processing time approx: {time_end - time_start:.8f} seconds")
 
         return ChatCompletionResponse(
             id=uuid.uuid4().hex,

@@ -27,7 +27,7 @@ def completion(model, temperature, output_format, prompt):
     """Generate a response from a single prompt."""
     click.echo(f"Generating with prompt: {prompt}")
     response = generate_completion(prompt=prompt, model=model, temperature=temperature,
-                                   output_format=output_format)
+                                   output_format=output_format, source="cli", task="completion")
     print(response)
 
 @ai.command()

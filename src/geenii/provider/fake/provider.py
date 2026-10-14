@@ -11,6 +11,7 @@ from geenii.datamodels import (
     ChatCompletionRequest,
     ChatCompletionResponse,
     CompletionResponse,
+    Usage,
 )
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider
 
@@ -90,6 +91,7 @@ class FakeProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
             output=[TextContent(text=text)],
             output_text=text,
             model_result={},
+            usage=Usage(input_tokens=10, output_tokens=20),
         )
 
     def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry=None) -> ChatCompletionResponse:
@@ -100,8 +102,6 @@ class FakeProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
         else:
             output_parts = [TextContent(text=self.default_response)]
 
-        usage = {"input_tokens": 10, "output_tokens": 20, "total_tokens": 30}
-
         return ChatCompletionResponse(
             id=uuid.uuid4().hex,
             timestamp=int(time.time()),
@@ -109,7 +109,7 @@ class FakeProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
             prompt=request.prompt,
             output=output_parts,
             model_result={},
-            usage=usage,
+            usage=Usage(input_tokens=10, output_tokens=20),
         )
 
 

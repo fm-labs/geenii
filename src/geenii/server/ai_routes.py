@@ -109,6 +109,8 @@ def completion(request: CompletionRequest) -> CompletionResponse:
         model=request.model,
         prompt=request.prompt,
         stream=False,
+        source="api",
+        task="completion",
         **_model_kwargs(request),
     ))
 

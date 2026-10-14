@@ -14,13 +14,15 @@ import re
 from collections import Counter
 from typing import Callable, Iterator, TYPE_CHECKING
 
+import pydantic
+
 if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
 
 from geenii.agent.base import BaseAgentTask
 from geenii.chat_models import TextContent
 from geenii.config import CACHE_DIR
-from geenii.datamodels import ModelMessage
+from geenii.datamodels import ModelMessage, Usage
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +121,12 @@ def report_usage(agent: "BaseAgent", args: str) -> str:
                     if not pattern.match(str(entry.get("context_id") or "")):
                         continue
                     calls = Counter(calls=1, failed=1 if entry.get("error") else 0)
-                    for key, value in (entry.get("usage") or {}).items():
-                        if isinstance(value, (int, float)) and key.endswith("tokens"):
+                    try:
+                        usage = Usage.from_log_entry(entry)  # converts older log conventions
+                    except pydantic.ValidationError:
+                        usage = Usage()  # malformed usage: count the call, without tokens
+                    for key, value in usage.model_dump(exclude_none=True).items():
+                        if key.endswith("tokens"):
                             calls[key] += value
                     model = f"{entry.get('provider')}:{entry.get('model')}"
                     per_model.setdefault(model, Counter()).update(calls)
@@ -147,9 +153,11 @@ def report_usage(agent: "BaseAgent", args: str) -> str:
     total = sum(per_model.values(), Counter())
     if total["failed"]:
         text += f"\n\n{total['failed']} of {total['calls']} calls failed; they used no tokens."
-    cached = total["cache_read_input_tokens"]
-    if cached:
-        text += f"\n\n{cached} input tokens were read from the prompt cache."
+    cache_read, cache_write = total["cache_read_input_tokens"], total["cache_creation_input_tokens"]
+    if cache_read or cache_write:
+        share = f" ({cache_read * 100 // total['input_tokens']}%)" if total["input_tokens"] else ""
+        text += f"\n\n{cache_read:,} of {total['input_tokens']:,} input tokens{share} were read from the prompt cache"
+        text += f"; {cache_write:,} were written to it." if cache_write else "."
     text += "\n\nCounts all of the agent's model calls in this conversation, across compactions. Handoffs to other agents (`@agent`) are not included."
     return text
 
