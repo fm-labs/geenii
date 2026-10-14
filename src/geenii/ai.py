@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pydantic
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from geenii.config import CACHE_DIR
 from geenii.datamodels import CompletionResponse, CompletionErrorResponse, \
@@ -340,11 +340,12 @@ def _error_text(e: Exception) -> str:
 def _ai_usage_log(provider: str | None, model: str, context_id: str, usage: dict, *,
                   source: str | None = None, task: str | None = None, error: str | None = None):
     """Log AI usage data to a file for tracking and analysis. `error` is set for failed calls (with empty usage)."""
-    date_formatted = datetime.now().strftime("%Y-%m")
-    log_file = f"{CACHE_DIR}/logs/ai-usage-{date_formatted}.log"
+    # UTC with offset ("…+00:00"); the monthly file uses the same instant, so a line is always in its month's file
+    now = datetime.now(UTC)
+    log_file = f"{CACHE_DIR}/logs/ai-usage-{now.strftime('%Y-%m')}.log"
     Path(log_file).parent.mkdir(parents=True, exist_ok=True)
     log_entry = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": now.isoformat(),
         "provider": provider,
         "context_id": context_id,
         "model": model,

@@ -32,6 +32,19 @@ def test_usage_line_has_source_and_task(cache_dir):
     assert line["usage"]["total_tokens"] == 30
 
 
+def test_timestamp_is_utc_with_offset_and_matches_the_file(cache_dir):
+    from datetime import datetime, timedelta
+
+    ai.generate_chat_completion(ChatCompletionRequest(model="fake:test", prompt="hi"))
+
+    [path] = (cache_dir / "logs").glob("ai-usage-*.log")
+    [line] = _usage_lines(cache_dir)
+    timestamp = datetime.fromisoformat(line["timestamp"])
+    assert line["timestamp"].endswith("+00:00")
+    assert timestamp.utcoffset() == timedelta(0)
+    assert path.name == f"ai-usage-{timestamp.strftime('%Y-%m')}.log"
+
+
 def test_untagged_call_logs_nulls(cache_dir):
     ai.generate_chat_completion(ChatCompletionRequest(model="fake:test", prompt="hi"))
 
