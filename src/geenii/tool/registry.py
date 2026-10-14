@@ -128,6 +128,10 @@ class ToolRegistry:
         """Return OpenAI-compatible tool definitions for all tools."""
         return [t.to_definition() for t in self._tools.values()]
 
+    def get_tool_description(self, name: str) -> str:
+        """Return a tool description by name."""
+        return self._tools[name].description
+
     # -- invocation ---------------------------------------------------------
 
     def invoke(self, name: str, args: dict, **kwargs: Any) -> Any:

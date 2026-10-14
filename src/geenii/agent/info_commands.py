@@ -105,6 +105,7 @@ def report_usage(agent: "BaseAgent", args: str) -> str:
     root = _root_context_id(agent.context_id)
     pattern = re.compile(rf"^{re.escape(root)}(-\d+)*$")
     per_model: dict[str, Counter] = {}
+    per_task: dict[str, Counter] = {}
     for path in sorted(glob.glob(os.path.join(CACHE_DIR, "logs", "ai-usage-*.log"))):
         try:
             with open(path, "r") as f:
@@ -117,28 +118,39 @@ def report_usage(agent: "BaseAgent", args: str) -> str:
                         continue
                     if not pattern.match(str(entry.get("context_id") or "")):
                         continue
-                    model = f"{entry.get('provider')}:{entry.get('model')}"
-                    counter = per_model.setdefault(model, Counter())
-                    counter["calls"] += 1
+                    calls = Counter(calls=1, failed=1 if entry.get("error") else 0)
                     for key, value in (entry.get("usage") or {}).items():
                         if isinstance(value, (int, float)) and key.endswith("tokens"):
-                            counter[key] += value
+                            calls[key] += value
+                    model = f"{entry.get('provider')}:{entry.get('model')}"
+                    per_model.setdefault(model, Counter()).update(calls)
+                    # lines written before source/task were logged have neither
+                    per_task.setdefault(entry.get("task") or "untagged", Counter()).update(calls)
         except OSError as e:
             logger.warning(f"Could not read usage log {path}: {e}")
 
     if not per_model:
         return "### Usage\n\nNo model calls recorded for this conversation yet."
 
+    def rows(counters: dict[str, Counter], fmt: str) -> list[list]:
+        result = [[fmt.format(k), c["calls"], c["input_tokens"], c["output_tokens"], c["total_tokens"]]
+                  for k, c in sorted(counters.items())]
+        if len(counters) > 1:
+            total = sum(counters.values(), Counter())
+            result.append(["**Total**", total["calls"], total["input_tokens"], total["output_tokens"], total["total_tokens"]])
+        return result
+
+    columns = ["Calls", "Input tokens", "Output tokens", "Total"]
+    text = "### Usage\n\n" + _table(["Model", *columns], rows(per_model, "`{}`"))
+    if len(per_task) > 1:
+        text += "\n\n**By purpose**\n\n" + _table(["Task", *columns], rows(per_task, "{}"))
     total = sum(per_model.values(), Counter())
-    rows = [[f"`{m}`", c["calls"], c["input_tokens"], c["output_tokens"], c["total_tokens"]]
-            for m, c in sorted(per_model.items())]
-    if len(per_model) > 1:
-        rows.append(["**Total**", total["calls"], total["input_tokens"], total["output_tokens"], total["total_tokens"]])
-    text = "### Usage\n\n" + _table(["Model", "Calls", "Input tokens", "Output tokens", "Total"], rows)
+    if total["failed"]:
+        text += f"\n\n{total['failed']} of {total['calls']} calls failed; they used no tokens."
     cached = total["cache_read_input_tokens"]
     if cached:
         text += f"\n\n{cached} input tokens were read from the prompt cache."
-    text += "\n\nCounts the agent's model calls in this conversation, across compactions. Skill selection and `/compact` summary calls are not included."
+    text += "\n\nCounts all of the agent's model calls in this conversation, across compactions. Handoffs to other agents (`@agent`) are not included."
     return text
 
 

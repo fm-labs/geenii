@@ -62,6 +62,8 @@ class SimpleBot(BotInterface):
                 system=system_prompt,
                 messages=[],
                 tools=tools,
+                source=f"bot:{self.__class__.__name__}",
+                task="chat",
             )
 
             for content_part in response.output:

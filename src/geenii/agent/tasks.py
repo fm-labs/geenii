@@ -31,6 +31,11 @@ def _is_interaction_message(msg) -> bool:
     return isinstance(msg, ModelMessage) and any(isinstance(p, UserInteractionContent) for p in msg.content)
 
 
+def _usage_source(agent: "BaseAgent") -> str:
+    """The `source` of the agent's model calls in the usage log."""
+    return f"agent:{agent.name}"
+
+
 class ToolCallTask(BaseAgentTask):
     def __init__(
         self, agent: "BaseAgent", tool_name: str, arguments: dict, call_id: str = None
@@ -380,6 +385,8 @@ class LLMTask(BaseAgentTask):
         response = generate_chat_completion(
             request=request,
             tool_registry=self.agent.tools,
+            source=_usage_source(self.agent),
+            task="llm",
         )
         return response
 
@@ -488,8 +495,9 @@ class ToolFilterTask(BaseAgentTask):
             output_format="json",
             output_schema=output_schema,
             # tools=tool_names,
+            context_id=self.agent.context_id,  # attributes the usage to the conversation
         )
-        response = generate_chat_completion(request)
+        response = generate_chat_completion(request, source=_usage_source(self.agent), task="tool_filter")
         logger.info(
             f"Received model response for tool filtering with {len(response.output)} content parts."
         )
@@ -635,8 +643,9 @@ class FindBestAgentTask(BaseAgentTask):
             output_schema=output_schema,
             max_tokens=256,
             temperature=0.0,
+            context_id=self.agent.context_id,  # attributes the usage to the conversation
         )
-        response = generate_chat_completion(request)
+        response = generate_chat_completion(request, source=_usage_source(self.agent), task="agent_select")
         logger.info(
             f"Received model response for agent selection with {len(response.output)} content parts."
         )
@@ -815,8 +824,9 @@ class FindBestSkillTask(BaseAgentTask):
             messages=[],
             output_format="json",
             output_schema=self.OUTPUT_SCHEMA,
+            context_id=self.agent.context_id,  # attributes the usage to the conversation
         )
-        response = generate_chat_completion(request)
+        response = generate_chat_completion(request, source=_usage_source(self.agent), task="skill_select")
         logger.info(
             f"Received model response for agent selection with {len(response.output)} content parts."
         )
@@ -1062,8 +1072,10 @@ Write in second person ("the user asked …", "you answered …") so the summary
             system=[self.SYSTEM_PROMPT],
             prompt=f"Summarise the following conversation:\n\n{history_text}",
             messages=[],
+            # the context being compacted; it is rotated to "<context_id>-<n>" afterwards
+            context_id=self.agent.context_id,
         )
-        response = generate_chat_completion(request)
+        response = generate_chat_completion(request, source=_usage_source(self.agent), task="compact")
 
         summary_text = ""
         if response.output:

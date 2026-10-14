@@ -146,7 +146,7 @@ def chat_completion(request: ChatCompletionRequest) -> ChatCompletionResponse:
         _request.system = [DEFAULT_CHAT_SYSTEM_PROMPT]
 
     try:
-        response = ai.generate_chat_completion(request=_request)
+        response = ai.generate_chat_completion(request=_request, source="api", task="chat_completion")
     except Exception as e:
         logger.error(f"Error during chat completion for context_id={context_id}: {e}")
         raise HTTPException(status_code=502, detail=str(e))

@@ -68,6 +68,52 @@ def test_usage_sums_conversation_and_compactions(isolated_cache_dir):
     assert "999" not in text
 
 
+def test_usage_by_purpose(isolated_cache_dir):
+    logs = isolated_cache_dir / "logs"
+    logs.mkdir()
+    usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
+    entries = [
+        {"provider": "fake", "model": "test", "context_id": "ctx", "source": "agent:tester", "task": "llm", "usage": usage},
+        {"provider": "fake", "model": "test", "context_id": "ctx", "source": "agent:tester", "task": "llm", "usage": usage},
+        {"provider": "fake", "model": "test", "context_id": "ctx", "source": "agent:tester", "task": "skill_select", "usage": usage},
+        {"provider": "fake", "model": "test", "context_id": "ctx", "usage": usage},  # written before tagging
+    ]
+    (logs / "ai-usage-2026-10.log").write_text("\n".join(json.dumps(e) for e in entries) + "\n")
+
+    text = _run(_agent(), "/usage")
+    assert "| `fake:test` | 4 | 40 | 20 | 60 |" in text
+    assert "**By purpose**" in text
+    assert "| llm | 2 | 20 | 10 | 30 |" in text
+    assert "| skill_select | 1 | 10 | 5 | 15 |" in text
+    assert "| untagged | 1 | 10 | 5 | 15 |" in text
+    assert "| **Total** | 4 | 40 | 20 | 60 |" in text
+
+
+def test_usage_hides_purpose_table_for_a_single_task(isolated_cache_dir):
+    logs = isolated_cache_dir / "logs"
+    logs.mkdir()
+    entry = {"provider": "fake", "model": "test", "context_id": "ctx", "task": "llm",
+             "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}}
+    (logs / "ai-usage-2026-10.log").write_text(json.dumps(entry) + "\n")
+    assert "By purpose" not in _run(_agent(), "/usage")
+
+
+def test_usage_counts_failed_calls(isolated_cache_dir):
+    logs = isolated_cache_dir / "logs"
+    logs.mkdir()
+    entries = [
+        {"provider": "fake", "model": "test", "context_id": "ctx", "task": "llm",
+         "usage": {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}, "error": None},
+        {"provider": "fake", "model": "test", "context_id": "ctx", "task": "llm", "usage": {},
+         "error": "RuntimeError: provider down"},
+    ]
+    (logs / "ai-usage-2026-10.log").write_text("\n".join(json.dumps(e) for e in entries) + "\n")
+
+    text = _run(_agent(), "/usage")
+    assert "| `fake:test` | 2 | 10 | 5 | 15 |" in text
+    assert "1 of 2 calls failed" in text
+
+
 def test_usage_without_calls():
     assert "No model calls" in _run(_agent(), "/usage")
 

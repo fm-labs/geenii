@@ -117,14 +117,18 @@ def test_chat_completion_forwards_system_and_parameters(client, sessions_dir, mo
     requests = []
     real = ai_routes.ai.generate_chat_completion
 
+    tags = []
+
     def spy(request, **kwargs):
         requests.append(request)
+        tags.append(kwargs)
         return real(request, **kwargs)
 
     monkeypatch.setattr(ai_routes.ai, "generate_chat_completion", spy)
 
     assert _chat(client, "c1").status_code == 200
     assert requests[-1].system == [ai_routes.DEFAULT_CHAT_SYSTEM_PROMPT]
+    assert tags[-1] == {"source": "api", "task": "chat_completion"}
 
     response = client.post("/api/v1/ai/chat/completion", json={
         "model": "fake:test", "prompt": "again", "context_id": "c1", "system": ["custom"], "temperature": 0.7,

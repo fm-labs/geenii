@@ -72,7 +72,8 @@ def chat(model, temperature, output_format, prompt):
                                                        tool_registry=tool_registry,
                                                        tools={"get_weather", "bash"},
                                                        temperature=temperature,
-                                                       output_format=output_format)
+                                                       output_format=output_format,
+                                                       source="cli", task="chat")
         # print the assistant response
         # print(response)
 

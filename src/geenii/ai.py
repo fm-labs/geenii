@@ -203,9 +203,12 @@ def generate_chat_completion_deprecated(model: str,
                                         output_format: str = None,
                                         output_schema: dict = None,
                                         stream: bool = False,
+                                        source: str | None = None,
+                                        task: str | None = None,
                                         **kwargs) -> CompletionResponse:
     """
     Generate an assistant completion using the specified AI provider and model.
+    `source` and `task` are passed to the usage log (see generate_chat_completion).
     """
     request = ChatCompletionRequest(
         model=model,
@@ -218,21 +221,30 @@ def generate_chat_completion_deprecated(model: str,
         stream=stream,
         # model_parameters=kwargs
     )
-    return generate_chat_completion(request, tool_registry=tool_registry)
+    return generate_chat_completion(request, tool_registry=tool_registry, source=source, task=task)
 
 
-def generate_chat_completion(request: ChatCompletionRequest, tool_registry: ToolRegistry = None) -> ChatCompletionResponse:
+def generate_chat_completion(request: ChatCompletionRequest, tool_registry: ToolRegistry = None, *,
+                             source: str | None = None, task: str | None = None) -> ChatCompletionResponse:
     """
     Generate an assistant completion using the specified AI provider and model.
+
+    `source` (who made the call, e.g. "agent:<name>", "api", "cli") and `task` (what for, e.g. "llm",
+    "skill_select", "compact") are only recorded in the usage log, so usage can be split by caller and purpose.
+    A failed call is logged too, with empty usage and an `error`, and the exception is re-raised.
     """
+    # enforce a context ID for all chat completions, if not provided in the request, generate a new one
+    # (before anything can fail, so a failed call is attributed to its conversation as well)
+    if not request.context_id:
+        request.context_id = str(uuid.uuid4())
+
+    # best effort, for logging a call whose model id is invalid
+    provider_name, model_name = None, request.model
     try:
         ai, provider_name, model_name = get_ai_completion_provider(request.model)
         if not isinstance(ai, AIChatCompletionProvider):
             raise RuntimeError(f"Invalid AI provider: {provider_name} does not support assistant completions.")
 
-        # enforce a context ID for all chat completions, if not provided in the request, generate a new one
-        if not request.context_id:
-            request.context_id = str(uuid.uuid4())
         _ai_log("completion.request", request)
 
         # generate completion
@@ -241,10 +253,17 @@ def generate_chat_completion(request: ChatCompletionRequest, tool_registry: Tool
         # pass through context ID from request to response, if not set by the provider implementation
         response.context_id = response.context_id or request.context_id
         _ai_log("completion.response", response)
-        _ai_usage_log(provider_name, model_name, response.context_id, response.usage or {})
+        _ai_usage_log(provider_name, model_name, response.context_id, response.usage or {}, source=source, task=task)
         return response
     except Exception as e:
         print(f"Error in {request.model} assistant API: {str(e)}")
+        error = _error_text(e)
+        try:
+            _ai_log("completion.error", {"model": request.model, "context_id": request.context_id, "error": error})
+            _ai_usage_log(provider_name, model_name, request.context_id, {}, source=source, task=task, error=error)
+        except Exception as log_error:
+            # never hide the original error behind a logging failure
+            print(f"Could not log failed completion: {log_error}")
         #return ErrorApiResponse(error=str(e))
         raise e
 
@@ -309,8 +328,18 @@ def _ai_log(what: str, data: dict | pydantic.BaseModel):
     append_jsonl(log_file, {f"{what}": data})
 
 
-def _ai_usage_log(provider: str, model: str, context_id: str, usage: dict):
-    """Log AI usage data to a file for tracking and analysis."""
+_MAX_ERROR_LENGTH = 500
+
+
+def _error_text(e: Exception) -> str:
+    """One-line error text for the logs, e.g. "RuntimeError: provider down"."""
+    text = " ".join(f"{type(e).__name__}: {e}".split())
+    return text if len(text) <= _MAX_ERROR_LENGTH else text[:_MAX_ERROR_LENGTH - 1] + "…"
+
+
+def _ai_usage_log(provider: str | None, model: str, context_id: str, usage: dict, *,
+                  source: str | None = None, task: str | None = None, error: str | None = None):
+    """Log AI usage data to a file for tracking and analysis. `error` is set for failed calls (with empty usage)."""
     date_formatted = datetime.now().strftime("%Y-%m")
     log_file = f"{CACHE_DIR}/logs/ai-usage-{date_formatted}.log"
     Path(log_file).parent.mkdir(parents=True, exist_ok=True)
@@ -319,6 +348,9 @@ def _ai_usage_log(provider: str, model: str, context_id: str, usage: dict):
         "provider": provider,
         "context_id": context_id,
         "model": model,
-        "usage": usage
+        "source": source,
+        "task": task,
+        "usage": usage,
+        "error": error,
     }
     append_jsonl(log_file, log_entry)
