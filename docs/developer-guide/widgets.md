@@ -118,12 +118,17 @@ fallback instead (see [How the UI renders a widget](#how-the-ui-renders-a-widget
 | `geenii.donut` | `{ title?, unit?, items: [{ label, value, color? }], hole? = true }` | Donut chart (`hole: false`: pie) with the total in the middle and a legend with values and percentages. Items with a value ≤ 0 are left out. Colors: `--chart-1`…`--chart-5`, repeating, unless `color` is set |
 | `geenii.gauge` | `{ value, min? = 0, max? = 100, label?, unit?, thresholds?: { warning?, error? } }` | Half-circle meter. Turns amber from `thresholds.warning` and red from `thresholds.error` (both in the same units as `value`) |
 | `geenii.heatmap` | `{ title?, unit?, weeks?, days: [{ date, value }] }` | GitHub-style activity grid: a column per week (Monday on top), ending with the latest date, month names on top, a tooltip per day. `date` is `YYYY-MM-DD` (invalid dates are skipped, values on the same day are added up). `weeks` defaults to the span of the data, at most 53. Four color steps relative to the highest value |
+| `geenii.scatter` | `{ title?, x?: { label?, unit? }, y?: { label?, unit? }, series: [{ name, points: [{ x, y, label?, size? }] }] }` | SVG scatter plot with min/max labels on both axes. `x` and `y` are numbers. A point with `size` becomes a bubble (area relative to the largest size); a point with `label` shows it next to the point. Tooltip per point, a legend for several series |
+| `geenii.funnel` | `{ title?, unit?, steps: [{ label, value }] }` | Centred bars, each as wide as its share of the largest step, with the share of the first step and, between steps, the share kept and the drop-off |
+| `geenii.treemap` | `{ title?, unit?, items: [{ label, value?, color?, children? }] }` | Rectangles sized by value (squarified layout), largest first, with a label where the tile is big enough and a tooltip on every tile. An item with `children` (one level) is split into them, shaded in the item's colour; its value is the sum of theirs. Items with a value ≤ 0 are left out |
+| `geenii.sparklines` | `{ title?, unit?, rows: [{ label, values: number[], unit?, description?, good? = up }] }` | A table with a small trend chart per row, the latest value and the change from the first to the last value. The change is green when it goes the `good` way (`up` or `down`, e.g. `down` for latency), red otherwise |
 | `geenii.stat` | `{ items: [{ label, value, unit?, delta? }] }` | Big-number tiles; `delta` is a percentage, shown as green ▲ or red ▼ |
 
 ### Status and time
 
 | Name | `data` | Notes |
 |---|---|---|
+| `geenii.status` | `{ title?, items: [{ name, status?, description?, uptime?, history?, url? }] }` | Status page: the worst state as the headline ("All systems operational", "1 system down"…), a row per service with a coloured dot, the uptime in % and an optional history bar (oldest first, the last 60 entries, `null` for no data). States: `up`, `degraded`, `down`, `maintenance`, `unknown` (also for anything else). `url` (http(s) only) links the name |
 | `geenii.progress` | `{ label?, value?, max? = 100, status? = running }` | `status`: `running`, `done` (green), `error` (red, "failed"). Without `value` the bar pulses (indeterminate) |
 | `geenii.steps` | `{ title?, steps: [{ text, status? = pending, detail? }] }` | A plan with a status icon per step: `pending`, `running`, `done`, `failed`, `skipped` |
 | `geenii.timeline` | `{ title?, items: [{ time, title, description?, level? = info }] }` | `time` is an ISO datetime; the dot color follows `level` (`info`, `warning`, `error`) |

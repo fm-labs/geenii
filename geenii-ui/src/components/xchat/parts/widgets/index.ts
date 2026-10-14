@@ -11,6 +11,7 @@ import { DonutWidget } from './donut.tsx'
 import { ErrorBoundaryTestWidget } from './errorboundarytest.tsx'
 import { FileTreeWidget } from './filetree.tsx'
 import { FormWidget } from './form.tsx'
+import { FunnelWidget } from './funnel.tsx'
 import { GaugeWidget } from './gauge.tsx'
 import { HeatmapWidget } from './heatmap.tsx'
 import { FortuneWidget } from './fortune.tsx'
@@ -25,13 +26,17 @@ import { MatrixWidget } from './matrix.tsx'
 import { PostButtonWidget } from './postbutton.tsx'
 import { ProgressWidget } from './progress.tsx'
 import { RatingWidget } from './rating.tsx'
+import { ScatterWidget } from './scatter.tsx'
 import { SnakeWidget } from './snake.tsx'
+import { SparklinesWidget } from './sparklines.tsx'
 import { StatWidget } from './stat.tsx'
+import { StatusWidget } from './status.tsx'
 import { StepsWidget } from './steps.tsx'
 import { TableWidget } from './table.tsx'
 import { TabsWidget } from './tabs.tsx'
 import { TerminalWidget } from './terminal.tsx'
 import { TimelineWidget } from './timeline.tsx'
+import { TreemapWidget } from './treemap.tsx'
 import { WeatherWidget } from './weather.tsx'
 
 export { BarChartWidget, ClockWidget, CodeWidget, CountdownWidget, CsvWidget, HtmlWidget, JsonWidget }
@@ -41,6 +46,8 @@ export { DiceWidget, FortuneWidget, MatrixWidget, SnakeWidget, TerminalWidget }
 export { ChoicesWidget, FormWidget, LinksWidget, RatingWidget, WeatherWidget }
 export { DonutWidget, GaugeWidget, HeatmapWidget }
 export { ErrorBoundaryTestWidget, TabsWidget }
+export { FunnelWidget, ScatterWidget, SparklinesWidget, StatusWidget, TreemapWidget }
+export { squarify } from './treemap.tsx'
 export { CopyButton } from './copy-button.tsx'
 export { formMessage } from './form.tsx'
 export { ratingMessage } from './rating.tsx'
@@ -81,6 +88,11 @@ export const defaultWidgets: WidgetRenderers = {
   'geenii.donut': DonutWidget,
   'geenii.gauge': GaugeWidget,
   'geenii.heatmap': HeatmapWidget,
+  'geenii.scatter': ScatterWidget,
+  'geenii.funnel': FunnelWidget,
+  'geenii.treemap': TreemapWidget,
+  'geenii.sparklines': SparklinesWidget,
+  'geenii.status': StatusWidget,
   'geenii.timeline': TimelineWidget,
   'geenii.filetree': FileTreeWidget,
   // easter eggs

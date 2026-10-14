@@ -153,6 +153,10 @@ const sampleActivity = (days: number) => Array.from({ length: days }, (_, i) => 
   return { date: date.toISOString().slice(0, 10), value: Math.floor(noise * (weekend ? 3 : 9)) }
 })
 
+/** A status history of `length` entries, 'up' except at the indexes in `bad`, which get `state` */
+const sampleUptime = (length: number, bad: number[], state: 'degraded' | 'down' | 'maintenance' = 'down') =>
+  Array.from({ length }, (_, i) => (bad.includes(i) ? state : 'up'))
+
 /** ISO dates of the last `days` days, oldest first */
 const daysAgo = (days: number) => Array.from({ length: days }, (_, i) => hoursAgo((days - 1 - i) * 24))
 
@@ -341,6 +345,109 @@ export const sampleWidgetMessages = (): SampleMessage[] => {
         ],
       },
       {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Benchmark: cost vs. quality (bubble size = tokens per second):' },
+          {
+            type: 'widget',
+            name: 'geenii.scatter',
+            data: {
+              x: { label: 'Cost', unit: '$ / M tokens' },
+              y: { label: 'Score', unit: '%' },
+              series: [
+                {
+                  name: 'hosted',
+                  points: [
+                    { x: 15, y: 91, label: 'opus', size: 60 },
+                    { x: 3, y: 86, label: 'sonnet', size: 90 },
+                    { x: 0.8, y: 74, label: 'haiku', size: 160 },
+                  ],
+                },
+                {
+                  name: 'local',
+                  points: [
+                    { x: 0.1, y: 62, label: 'llama3.2', size: 40 },
+                    { x: 0.2, y: 68, label: 'qwen', size: 35 },
+                  ],
+                },
+              ],
+            },
+            text: 'Benchmark: opus 91% ($15), sonnet 86% ($3), haiku 74% ($0.80), qwen 68%, llama3.2 62%.',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          {
+            type: 'widget',
+            name: 'geenii.funnel',
+            heading: 'Agent runs this week',
+            data: {
+              unit: 'runs',
+              steps: [
+                { label: 'Started', value: 1240 },
+                { label: 'Planned', value: 1180 },
+                { label: 'Tools approved', value: 910 },
+                { label: 'Completed', value: 842 },
+                { label: 'Rated 👍', value: 515 },
+              ],
+            },
+            text: 'Agent runs: 1240 started, 1180 planned, 910 tools approved, 842 completed, 515 rated 👍.',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Disk usage of the geenii data directory:' },
+          {
+            type: 'widget',
+            name: 'geenii.treemap',
+            data: {
+              unit: 'MB',
+              items: [
+                {
+                  label: 'models',
+                  children: [
+                    { label: 'llama3.2', value: 2020 },
+                    { label: 'whisper-base', value: 142 },
+                    { label: 'embeddings', value: 274 },
+                  ],
+                },
+                {
+                  label: 'conversations',
+                  children: [{ label: '2026', value: 312 }, { label: '2025', value: 488 }, { label: 'attachments', value: 220 }],
+                },
+                { label: 'index', value: 640 },
+                { label: 'logs', value: 96 },
+                { label: 'cache', value: 58 },
+              ],
+            },
+            text: 'Disk usage: models 2436 MB, conversations 1020 MB, index 640 MB, logs 96 MB, cache 58 MB.',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          {
+            type: 'widget',
+            name: 'geenii.sparklines',
+            heading: 'Last 24 hours',
+            data: {
+              rows: [
+                { label: 'Requests', description: 'per hour', values: [120, 98, 75, 60, 52, 80, 140, 210, 260, 280, 270, 300] },
+                { label: 'Latency', description: 'p95', unit: 'ms', good: 'down', values: [910, 880, 860, 900, 1020, 940, 870, 820, 790, 760, 780, 740] },
+                { label: 'Errors', unit: '%', good: 'down', values: [0.4, 0.3, 0.5, 0.2, 0.9, 1.6, 1.1, 0.6, 0.5, 0.6, 0.7, 0.8] },
+                { label: 'Tokens', unit: 'k', values: [42, 40, 38, 36, 35, 39, 48, 55, 61, 58, 60, 59] },
+              ],
+            },
+            text: 'Last 24 h: 300 requests/h (+150%), p95 latency 740 ms (−18.7%), errors 0.8% (+100%), 59k tokens.',
+          },
+        ],
+      },
+      {
         level: 'warning',
         content: [
           { type: 'text', text: 'This conversation is getting long; consider starting a new one.' },
@@ -359,6 +466,32 @@ export const sampleWidgetMessages = (): SampleMessage[] => {
       },
     ),
     ...group('Status and time',
+      {
+        level: 'warning',
+        content: [
+          {
+            type: 'widget',
+            name: 'geenii.status',
+            heading: 'Services',
+            data: {
+              items: [
+                { name: 'geenii server', status: 'up', uptime: 99.98, history: sampleUptime(40, []) },
+                { name: 'Ollama', description: 'localhost:11434', status: 'up', uptime: 99.2, history: sampleUptime(40, [12, 13]) },
+                {
+                  name: 'MCP: whisper',
+                  description: 'Slow responses since the last update',
+                  status: 'degraded',
+                  uptime: 97.5,
+                  history: sampleUptime(40, [30, 37, 38, 39], 'degraded'),
+                },
+                { name: 'MCP: weather', status: 'down', url: 'https://example.com/status', uptime: 91.3, history: sampleUptime(40, [36, 37, 38, 39], 'down') },
+                { name: 'Backups', status: 'maintenance', history: [...Array(30).fill(null), ...sampleUptime(10, [9], 'maintenance')] },
+              ],
+            },
+            text: 'Services: geenii server up, Ollama up, MCP whisper degraded, MCP weather down, backups in maintenance.',
+          },
+        ],
+      },
       {
         level: 'info',
         content: [
