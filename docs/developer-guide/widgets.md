@@ -115,6 +115,9 @@ fallback instead (see [How the UI renders a widget](#how-the-ui-renders-a-widget
 |---|---|---|
 | `geenii.barchart` | `{ title?, unit?, max?, items: [{ label, value }] }` | Horizontal CSS bars; `max` defaults to the largest value |
 | `geenii.linechart` | `{ title?, unit?, series: [{ name, points: [{ x, y }] }] }` | SVG; `x` is a number or an ISO date. Min/max labels, a tooltip per point, a legend for several series. Colors are the theme's `--chart-1`…`--chart-5` |
+| `geenii.donut` | `{ title?, unit?, items: [{ label, value, color? }], hole? = true }` | Donut chart (`hole: false`: pie) with the total in the middle and a legend with values and percentages. Items with a value ≤ 0 are left out. Colors: `--chart-1`…`--chart-5`, repeating, unless `color` is set |
+| `geenii.gauge` | `{ value, min? = 0, max? = 100, label?, unit?, thresholds?: { warning?, error? } }` | Half-circle meter. Turns amber from `thresholds.warning` and red from `thresholds.error` (both in the same units as `value`) |
+| `geenii.heatmap` | `{ title?, unit?, weeks?, days: [{ date, value }] }` | GitHub-style activity grid: a column per week (Monday on top), ending with the latest date, month names on top, a tooltip per day. `date` is `YYYY-MM-DD` (invalid dates are skipped, values on the same day are added up). `weeks` defaults to the span of the data, at most 53. Four color steps relative to the highest value |
 | `geenii.stat` | `{ items: [{ label, value, unit?, delta? }] }` | Big-number tiles; `delta` is a percentage, shown as green ▲ or red ▼ |
 
 ### Status and time
@@ -124,6 +127,7 @@ fallback instead (see [How the UI renders a widget](#how-the-ui-renders-a-widget
 | `geenii.progress` | `{ label?, value?, max? = 100, status? = running }` | `status`: `running`, `done` (green), `error` (red, "failed"). Without `value` the bar pulses (indeterminate) |
 | `geenii.steps` | `{ title?, steps: [{ text, status? = pending, detail? }] }` | A plan with a status icon per step: `pending`, `running`, `done`, `failed`, `skipped` |
 | `geenii.timeline` | `{ title?, items: [{ time, title, description?, level? = info }] }` | `time` is an ISO datetime; the dot color follows `level` (`info`, `warning`, `error`) |
+| `geenii.weather` | `{ location?, unit? = C, wind_unit? = km/h, current?: { temp, condition?, icon?, feels_like?, humidity?, wind? }, forecast?: [{ day, condition?, icon?, high?, low?, precip? }] }` | Current conditions and a forecast row. The emoji is derived from `condition` ("Light rain" → 🌧️) unless `icon` is given; `day` is a label or an ISO date (shown as weekday); `precip` in % |
 | `geenii.clock` | `{ timezone?, label? }` | Live clock; `timezone` is an IANA name such as `Europe/Vienna` |
 | `geenii.countdown` | `{ until, label? }` | `until` is an ISO datetime; shows the time left, then "Done" |
 
@@ -139,9 +143,34 @@ fallback instead (see [How the UI renders a widget](#how-the-ui-renders-a-widget
 
 | Name | `data` | Notes |
 |---|---|---|
+| `geenii.links` | `{ items: [{ title?, url, snippet?, source? }], limit? = 5 }` | Search or web results: source or host, linked title, two-line snippet. Shows `limit` items with a "Show all" toggle. Only `http(s)` urls become links |
 | `geenii.html` | `{ html, height? = 240, title? }` | `html` is shown in a sandboxed iframe (`srcDoc`); scripts run, but in an opaque origin without access to the app |
 | `geenii.iframe` | `{ url, scripts? = false, trusted? = false, height? = 320, title? }` | Embeds a page. Loads only after a click unless `trusted`; scripts only with `scripts`. "Open" opens the url in a new window |
 | `geenii.postbutton` | `{ url, payload?, label? = Send, expect? = 200, confirm?, repeat? = false, headers? }` | On click, POSTs `payload` as JSON. Success only on status `expect`. `confirm` asks a question first; after a success the button stays done unless `repeat` |
+
+### Layout
+
+| Name | `data` | Notes |
+|---|---|---|
+| `geenii.tabs` | `{ tabs: [{ label, widget?: { name, data?, heading?, text? }, text? }], active? = 0 }` | Tabs, each holding a nested widget or markdown `text`. Nested widgets go through the same rendering as top-level ones (lookup, heading, fallback, their own error boundary), so tabs can hold any widget, including custom ones and other tabs. Only the active tab is mounted: switching tabs resets the state of the widget left (a running game, a typed form). Arrow keys, Home and End move between tabs |
+
+### Replies
+
+These widgets answer in the chat: they send a **plain user message**, exactly
+as if the user had typed it, so they work with every backend and the agent
+reads the answer as normal input. They are disabled while a turn is running
+(the session handles one turn at a time).
+
+With `once` (the default), a widget locks as soon as the conversation has moved
+on: when any user message follows the widget's message, including one the user
+typed instead. This is derived from the history, so it also holds after
+reloading a conversation.
+
+| Name | `data` | Notes |
+|---|---|---|
+| `geenii.choices` | `{ options: (string \| { label, message? })[], once? = true }` | Suggested replies as buttons. A click sends the option's `message`, or its label. The option matching the answer is highlighted |
+| `geenii.rating` | `{ type? = stars, max? = 5, comment? = false, once? = true }` | `type`: `stars` (`max` 3–10) or `thumbs`. Without `comment` a click sends right away; with it, the click selects and "Send" sends the rating with an optional comment. Message: `Rating: ★★★★☆ (4/5)` or `Rating: 👍 helpful`, then `Comment: …` |
+| `geenii.form` | `{ fields: [{ name, label?, type? = text, required?, options?, default?, placeholder? }], submit? = Send, format? = text, once? = true }` | Types: `text`, `textarea`, `number`, `select` (with `options`), `checkbox`, `date`, `email`, `url`. Uses browser validation (`required`, number, email…). Sends one message: `Label: value` lines with empty fields left out (`format: text`), or a JSON code block with every field (`format: json`) |
 
 ### Easter eggs
 
@@ -155,6 +184,12 @@ fallback instead (see [How the UI renders a widget](#how-the-ui-renders-a-widget
 
 Animated widgets (matrix, terminal, dice) show their end state when the user
 has asked the OS for reduced motion.
+
+### Development aids
+
+| Name | `data` | Notes |
+|---|---|---|
+| `geenii.dev.errorboundarytest` | `{ message? = Widget crashed on purpose, delay? = 0 }` | Throws while rendering, to see the [error boundary](#how-the-ui-renders-a-widget) at work: the message shows the fallback `text` and a note. With `delay` (ms) it first renders a countdown and crashes on a later re-render |
 
 ## Security
 
@@ -171,6 +206,10 @@ treat it as untrusted:
   Without `scripts` the frame is fully sandboxed. With `scripts`, a page from
   another origin keeps its own origin; a page from the app's own origin does
   not, because scripts plus same-origin could lift the sandbox.
+- **`geenii.choices` and `geenii.form`** only send on a click, and what they
+  send is a visible user message in the chat, never a hidden request.
+- **`geenii.links`** only links `http(s)` urls, opened in a new window without
+  access back to the app (`noopener noreferrer`).
 - **`geenii.postbutton`** only acts on a click, shows the target
   (`POST host/path`) under the button, sends no cookies
   (`credentials: 'omit'`) and times out after 15 s. Use `confirm` for anything
@@ -234,7 +273,8 @@ Conventions the built-ins follow:
   overflow-auto`) rather than growing the chat.
 - **Clean up.** Clear timers and cancel animation frames and requests on
   unmount. Shared helpers: `useNow` (1 s clock), `useReducedMotion`,
-  `CopyButton`, `safeUrl` (http(s)-only url check).
+  `CopyButton`, `safeUrl` (http(s)-only url check), `useChatReply` (send a
+  reply, busy and answered state).
 - **Nothing happens without a click.** Widgets that load remote content or
   send requests wait for the user unless the sender opts in (`trusted`).
 
@@ -244,10 +284,14 @@ The offline echo backend (`backends/echo-backend.ts`) sends widgets as system
 messages:
 
 - `/widgets` streams one sample per built-in widget, plus an unknown widget
-  that shows its fallback text. `/example` includes them too.
+  that shows its fallback text, grouped like the reference above. Each group
+  starts with a small system text message naming the group and its widgets.
+  `/example` includes them too.
 - Hidden commands, not listed in the command menu: `/matrix`, `/boot`
-  (terminal), `/snake`, `/fortune`, `/dice`.
+  (terminal), `/snake`, `/fortune`, `/dice`, and `/crash` (an
+  error-boundary test widget that crashes after 3 s).
 
-The samples are in `sampleWidgetMessages()` and `sampleEasterEggs()` in
+The samples are in `sampleWidgetMessages()` (built with a `group(title, …)`
+helper that adds the separator) and `sampleEasterEggs()` in
 `backends/echo-examples.ts`. The `geenii.iframe` and `geenii.postbutton`
 samples need network access (wikipedia.org, example.com, httpbin.org).

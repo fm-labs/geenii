@@ -52,7 +52,8 @@ const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, r
  * - Input "example" streams one message per content type (text, image, audio, file, embed, json,
  *   function, tool_call + tool_call_result, interaction, confirmation, widget) plus one system message per level.
  * - Input "widgets" streams only the widget examples: one system message per built-in widget.
- * - Hidden easter eggs (not in listCommands): "matrix", "boot", "snake", "fortune", "dice".
+ * - Hidden commands (not in listCommands): the easter eggs "matrix", "boot", "snake", "fortune", "dice",
+ *   and "crash" (a widget that crashes after 3 s, to see the widget error boundary).
  */
 export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend => {
   const delay = options.delay ?? 500
@@ -119,9 +120,9 @@ export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend
     yield say(contextId, 'assistant', { type: 'text', text: allowed ? `Tool said: ${text}` : 'Ok, not calling the tool.' })
   }
 
-  /** One system message per built-in widget, easter eggs included */
+  /** One system message per built-in widget (easter eggs included), in groups led by a text message */
   async function* widgetTurn(contextId: string, signal: AbortSignal): AsyncIterable<ChatEvent> {
-    for (const { level, content } of [...sampleWidgetMessages(), ...Object.values(sampleEasterEggs())]) {
+    for (const { level, content } of sampleWidgetMessages()) {
       yield system(contextId, level, content)
       await sleep(Math.max(50, delay / 6), signal)
     }

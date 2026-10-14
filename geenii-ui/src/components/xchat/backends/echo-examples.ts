@@ -66,7 +66,7 @@ export const SAMPLE_SYSTEM_MESSAGES: { level: SystemMessageLevel, text: string }
   { level: 'error', text: 'An error occurred while processing the task: connection refused.' },
 ]
 
-/** Easter-egg widget messages, keyed by the (hidden) echo command that sends them */
+/** Easter-egg (and dev) widget messages, keyed by the hidden echo command that sends them */
 export const sampleEasterEggs = (): Record<string, { level: SystemMessageLevel, content: ContentPart[] }> => ({
   matrix: {
     level: 'info',
@@ -106,6 +106,16 @@ export const sampleEasterEggs = (): Record<string, { level: SystemMessageLevel, 
       text: '🥠 It works on my machine.',
     }],
   },
+  crash: {
+    level: 'info',
+    content: [{
+      type: 'widget',
+      name: 'geenii.dev.errorboundarytest',
+      heading: 'Error boundary test',
+      data: { delay: 3000, message: 'Crashed after 3 seconds, on purpose' },
+      text: 'This widget crashed on purpose; the error boundary shows this fallback instead.',
+    }],
+  },
   dice: {
     level: 'info',
     content: [{
@@ -135,350 +145,591 @@ const SAMPLE_DIFF = `--- a/src/geenii/config.py
 
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString()
 
+/** Made-up daily activity for the last `days` days (deterministic: same pattern on every run), quieter on weekends */
+const sampleActivity = (days: number) => Array.from({ length: days }, (_, i) => {
+  const date = new Date(Date.now() - (days - 1 - i) * 86_400_000)
+  const weekend = date.getUTCDay() === 0 || date.getUTCDay() === 6
+  const noise = Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1
+  return { date: date.toISOString().slice(0, 10), value: Math.floor(noise * (weekend ? 3 : 9)) }
+})
+
 /** ISO dates of the last `days` days, oldest first */
 const daysAgo = (days: number) => Array.from({ length: days }, (_, i) => hoursAgo((days - 1 - i) * 24))
+
+type SampleMessage = { level: SystemMessageLevel, content: ContentPart[] }
+
+/** A group of samples, led by a small system text message with the group's title and widget names */
+const group = (title: string, ...messages: SampleMessage[]): SampleMessage[] => {
+  const names = [...new Set(messages.flatMap((m) => m.content)
+    .flatMap((p) => (p.type === 'widget' ? [p.name.replace(/^geenii\./, '')] : [])))]
+  return [{ level: 'info', content: [{ type: 'text', text: `**${title}**: ${names.join(', ')}` }] }, ...messages]
+}
 
 /**
  * System messages with one example per built-in widget (plus an unknown one, which shows its text),
  * as the server would send them. Built per call, since some data is relative to the current time.
  */
-export const sampleWidgetMessages = (): { level: SystemMessageLevel, content: ContentPart[] }[] => [
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'Scheduled task **daily-report** runs at 18:00 UTC. Current time:' },
-      { type: 'widget', name: 'geenii.clock', data: { timezone: 'UTC', label: 'UTC' }, text: 'Current time: see your clock (UTC).' },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'Connected MCP servers:' },
+export const sampleWidgetMessages = (): SampleMessage[] => {
+  const eggs = sampleEasterEggs()
+  return [
+    ...group('Data',
       {
-        type: 'widget',
-        name: 'geenii.table',
-        data: {
-          columns: ['server', 'tools', 'status'],
-          rows: [['filesystem', 7, 'ok'], ['weather', 2, 'ok'], ['whisper', 2, 'starting']],
-        },
-        text: 'MCP servers: filesystem (7 tools, ok), weather (2 tools, ok), whisper (2 tools, starting)',
-      },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'Skills loaded for this conversation:' },
-      {
-        type: 'widget',
-        name: 'geenii.list',
-        data: {
-          items: [
-            { text: 'summarize', description: 'Summarize long texts and documents' },
-            { text: 'translate', description: 'Translate between languages' },
-            'weather',
-          ],
-        },
-        text: '- summarize\n- translate\n- weather',
-      },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'Token usage of this conversation by model:' },
-      {
-        type: 'widget',
-        name: 'geenii.barchart',
-        data: {
-          unit: 'k',
-          items: [{ label: 'claude-sonnet-5-5', value: 48.2 }, { label: 'llama3.2', value: 12.7 }, { label: 'whisper', value: 3.1 }],
-        },
-        text: 'Token usage: claude-sonnet-5-5 48.2k, llama3.2 12.7k, whisper 3.1k',
-      },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'The agent rendered a preview:' },
-      {
-        type: 'widget',
-        name: 'geenii.html',
-        data: {
-          height: 120,
-          title: 'Preview',
-          html: '<body style="font-family:sans-serif;margin:12px"><h3 style="margin:0 0 8px">Sandboxed HTML</h3>'
-            + '<button onclick="this.textContent=\'Clicked!\'">Click me</button></body>',
-        },
-        text: 'An HTML preview (not shown).',
-      },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'The agent found a page (untrusted, loads on click):' },
-      {
-        type: 'widget',
-        name: 'geenii.iframe',
-        data: { url: 'https://en.wikipedia.org/wiki/Special:Random', scripts: true, height: 360 },
-        text: 'A random Wikipedia page: https://en.wikipedia.org/wiki/Special:Random',
-      },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'A trusted page, loaded right away without scripts:' },
-      {
-        type: 'widget',
-        name: 'geenii.iframe',
-        data: { url: 'https://example.com', trusted: true, height: 200, title: 'example.com' },
-        text: 'https://example.com',
-      },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'The agent prepared a webhook call. Send it?' },
-      {
-        type: 'widget',
-        name: 'geenii.postbutton',
-        data: { url: 'https://httpbin.org/post', payload: { event: 'deploy', env: 'staging' }, label: 'Trigger deploy', confirm: 'Deploy to staging?' },
-        text: 'Webhook: POST https://httpbin.org/post {"event": "deploy", "env": "staging"}',
-      },
-    ],
-  },
-  {
-    level: 'warning',
-    content: [
-      { type: 'text', text: 'A webhook that answers 500, to show the failed state:' },
-      {
-        type: 'widget',
-        name: 'geenii.postbutton',
-        data: { url: 'https://httpbin.org/status/500', payload: { ping: true }, label: 'Ping' },
-        text: 'Webhook: POST https://httpbin.org/status/500',
-      },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'Indexing the workspace…' },
-      { type: 'widget', name: 'geenii.progress', data: { label: 'Indexing files', value: 42, max: 120 }, text: 'Indexing files: 42/120' },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'widget', name: 'geenii.progress', heading: 'Model download', data: { label: 'Downloading model llama3.2' }, text: 'Downloading model llama3.2…' },
-    ],
-  },
-  {
-    level: 'error',
-    content: [
-      { type: 'text', text: 'Pulling the model failed.' },
-      { type: 'widget', name: 'geenii.progress', data: { label: 'Pulling mistral', value: 63, status: 'error' }, text: 'Pulling mistral failed at 63%.' },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      {
-        type: 'widget',
-        name: 'geenii.keyvalue',
-        data: {
-          title: 'Session',
-          items: [
-            { key: 'Agent', value: 'echo' },
-            { key: 'Model', value: 'claude-sonnet-5-5' },
-            { key: 'Context', value: 'a1b2c3d4' },
-            { key: 'Tools', value: { allowed: ['filesystem', 'weather'], approval: 'ask' } },
-          ],
-        },
-        text: 'Session: agent echo, model claude-sonnet-5-5',
-      },
-    ],
-  },
-  {
-    level: 'warning',
-    content: [
-      { type: 'text', text: 'This conversation is getting long; consider starting a new one.' },
-      {
-        type: 'widget',
-        name: 'geenii.stat',
-        data: {
-          items: [
-            { label: 'Context used', value: 182, unit: 'k tokens', delta: 24 },
-            { label: 'Avg. latency', value: 840, unit: 'ms', delta: -12 },
-          ],
-        },
-        text: 'Context used: 182k tokens (+24%), avg. latency 840 ms (-12%)',
-      },
-    ],
-  },
-  {
-    level: 'error',
-    content: [
-      { type: 'text', text: 'The hook script failed with exit code 1:' },
-      {
-        type: 'widget',
-        name: 'geenii.code',
-        data: { filename: 'hooks/hello.py', language: 'python', code: SAMPLE_CODE },
-        text: '```python\n' + SAMPLE_CODE + '```',
-      },
-    ],
-  },
-  {
-    level: 'warning',
-    content: [
-      { type: 'text', text: 'Rate limit reached. The next request is possible in:' },
-      {
-        type: 'widget',
-        name: 'geenii.countdown',
-        data: { until: new Date(Date.now() + 90_000).toISOString(), label: 'Rate limit reset' },
-        text: 'Rate limit resets in 90 seconds.',
-      },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'Configuration reloaded:' },
-      {
-        type: 'widget',
-        name: 'geenii.json',
-        data: {
-          title: 'geenii.json',
-          expand: 1,
-          value: {
-            agent: { name: 'echo', model: 'claude-sonnet-5-5', temperature: 0.7 },
-            mcp_servers: ['filesystem', 'weather', 'whisper'],
-            tools: { approval: 'ask', timeout: 30, debug: false, proxy: null },
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Connected MCP servers:' },
+          {
+            type: 'widget',
+            name: 'geenii.table',
+            data: {
+              columns: ['server', 'tools', 'status'],
+              rows: [['filesystem', 7, 'ok'], ['weather', 2, 'ok'], ['whisper', 2, 'starting']],
+            },
+            text: 'MCP servers: filesystem (7 tools, ok), weather (2 tools, ok), whisper (2 tools, starting)',
           },
-        },
-        text: 'Configuration reloaded.',
+        ],
       },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'Exported the task history:' },
       {
-        type: 'widget',
-        name: 'geenii.csv',
-        data: {
-          title: 'tasks.csv',
-          csv: 'task;status;duration\ndaily-report;done;12.4 s\n"index; workspace";running;\n"say ""hi""";failed;0.3 s\n',
-        },
-        text: 'Task history exported (3 tasks).',
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Skills loaded for this conversation:' },
+          {
+            type: 'widget',
+            name: 'geenii.list',
+            data: {
+              items: [
+                { text: 'summarize', description: 'Summarize long texts and documents' },
+                { text: 'translate', description: 'Translate between languages' },
+                'weather',
+              ],
+            },
+            text: '- summarize\n- translate\n- weather',
+          },
+        ],
       },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'Working on the task **refactor the config loader**:' },
       {
-        type: 'widget',
-        name: 'geenii.steps',
-        data: {
-          title: 'Plan',
-          steps: [
-            { text: 'Read the current config loader', status: 'done' },
-            { text: 'Write tests for the existing behavior', status: 'done', detail: '12 tests, all passing' },
-            { text: 'Split loading and validation', status: 'running' },
-            { text: 'Migrate the YAML loader', status: 'failed', detail: 'yaml module not installed' },
-            { text: 'Update the docs', status: 'skipped' },
-            { text: 'Run the full test suite' },
-          ],
-        },
-        text: 'Plan: 2 of 6 steps done, 1 running, 1 failed.',
+        level: 'info',
+        content: [
+          {
+            type: 'widget',
+            name: 'geenii.keyvalue',
+            data: {
+              title: 'Session',
+              items: [
+                { key: 'Agent', value: 'echo' },
+                { key: 'Model', value: 'claude-sonnet-5-5' },
+                { key: 'Context', value: 'a1b2c3d4' },
+                { key: 'Tools', value: { allowed: ['filesystem', 'weather'], approval: 'ask' } },
+              ],
+            },
+            text: 'Session: agent echo, model claude-sonnet-5-5',
+          },
+        ],
       },
-    ],
-  },
-  {
-    level: 'warning',
-    content: [
-      { type: 'text', text: 'The agent wants to change a file. Review the changes:' },
       {
-        type: 'widget',
-        name: 'geenii.diff',
-        data: { filename: 'src/geenii/config.py', diff: SAMPLE_DIFF },
-        text: 'Proposed change to src/geenii/config.py:\n```diff\n' + SAMPLE_DIFF + '```',
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Configuration reloaded:' },
+          {
+            type: 'widget',
+            name: 'geenii.json',
+            data: {
+              title: 'geenii.json',
+              expand: 1,
+              value: {
+                agent: { name: 'echo', model: 'claude-sonnet-5-5', temperature: 0.7 },
+                mcp_servers: ['filesystem', 'weather', 'whisper'],
+                tools: { approval: 'ask', timeout: 30, debug: false, proxy: null },
+              },
+            },
+            text: 'Configuration reloaded.',
+          },
+        ],
       },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'Token usage over the last 7 days:' },
       {
-        type: 'widget',
-        name: 'geenii.linechart',
-        data: {
-          unit: 'k',
-          series: [
-            { name: 'input', points: daysAgo(7).map((x, i) => ({ x, y: [42, 38, 55, 61, 47, 72, 66][i] })) },
-            { name: 'output', points: daysAgo(7).map((x, i) => ({ x, y: [12, 9, 18, 21, 14, 25, 19][i] })) },
-          ],
-        },
-        text: 'Token usage last 7 days: input 381k, output 118k.',
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Exported the task history:' },
+          {
+            type: 'widget',
+            name: 'geenii.csv',
+            data: {
+              title: 'tasks.csv',
+              csv: 'task;status;duration\ndaily-report;done;12.4 s\n"index; workspace";running;\n"say ""hi""";failed;0.3 s\n',
+            },
+            text: 'Task history exported (3 tasks).',
+          },
+        ],
       },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'Recent runs of the scheduled task **daily-report**:' },
+    ),
+    ...group('Charts and numbers',
       {
-        type: 'widget',
-        name: 'geenii.timeline',
-        data: {
-          items: [
-            { time: hoursAgo(50), title: 'Run completed', description: 'Report sent to 3 recipients.' },
-            { time: hoursAgo(26), title: 'Run completed with warnings', description: '1 data source was unavailable.', level: 'warning' },
-            { time: hoursAgo(2), title: 'Run failed', description: 'Connection refused.', level: 'error' },
-          ],
-        },
-        text: 'daily-report: last run failed (connection refused).',
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Token usage of this conversation by model:' },
+          {
+            type: 'widget',
+            name: 'geenii.barchart',
+            data: {
+              unit: 'k',
+              items: [{ label: 'claude-sonnet-5-5', value: 48.2 }, { label: 'llama3.2', value: 12.7 }, { label: 'whisper', value: 3.1 }],
+            },
+            text: 'Token usage: claude-sonnet-5-5 48.2k, llama3.2 12.7k, whisper 3.1k',
+          },
+        ],
       },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'text', text: 'Files found in the workspace:' },
       {
-        type: 'widget',
-        name: 'geenii.filetree',
-        data: {
-          root: '~/workspaces/geenii',
-          expand: 1,
-          entries: [
-            { path: 'README.md', size: 4210 },
-            { path: 'pyproject.toml', size: 1893 },
-            { path: 'src/geenii/__init__.py', size: 0 },
-            { path: 'src/geenii/config.py', size: 6120 },
-            { path: 'src/geenii/chat_models.py', size: 5480 },
-            { path: 'docs/developer-guide/messages.md', size: 9020 },
-            { path: 'data/', type: 'dir' },
-          ],
-        },
-        text: 'Workspace: README.md, pyproject.toml, src/, docs/, data/',
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Token usage over the last 7 days:' },
+          {
+            type: 'widget',
+            name: 'geenii.linechart',
+            data: {
+              unit: 'k',
+              series: [
+                { name: 'input', points: daysAgo(7).map((x, i) => ({ x, y: [42, 38, 55, 61, 47, 72, 66][i] })) },
+                { name: 'output', points: daysAgo(7).map((x, i) => ({ x, y: [12, 9, 18, 21, 14, 25, 19][i] })) },
+              ],
+            },
+            text: 'Token usage last 7 days: input 381k, output 118k.',
+          },
+        ],
       },
-    ],
-  },
-  {
-    level: 'info',
-    content: [
-      { type: 'widget', name: 'geenii.unknown', heading: 'Unknown widget', data: { any: 'thing' }, text: 'An *unknown* widget shows its fallback text.' },
-    ],
-  },
-]
+      {
+        level: 'info',
+        content: [
+          {
+            type: 'widget',
+            name: 'geenii.donut',
+            heading: 'Where did my tokens go?',
+            data: {
+              unit: 'k tokens',
+              items: [
+                { label: 'System prompt', value: 12.4 },
+                { label: 'Tool results', value: 61.8 },
+                { label: 'Conversation', value: 38.2 },
+                { label: 'Skills', value: 9.6 },
+                { label: 'Output', value: 21.5 },
+              ],
+            },
+            text: 'Tokens: tool results 61.8k, conversation 38.2k, output 21.5k, system prompt 12.4k, skills 9.6k.',
+          },
+        ],
+      },
+      {
+        level: 'warning',
+        content: [
+          { type: 'text', text: 'The context window is filling up.' },
+          {
+            type: 'widget',
+            name: 'geenii.gauge',
+            data: { value: 164, max: 200, unit: 'k', label: 'Context tokens used', thresholds: { warning: 140, error: 180 } },
+            text: 'Context: 164k of 200k tokens used.',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          {
+            type: 'widget',
+            name: 'geenii.heatmap',
+            heading: 'Chats per day',
+            data: { unit: 'chats', weeks: 26, days: sampleActivity(26 * 7) },
+            text: 'Chat activity over the last 26 weeks.',
+          },
+        ],
+      },
+      {
+        level: 'warning',
+        content: [
+          { type: 'text', text: 'This conversation is getting long; consider starting a new one.' },
+          {
+            type: 'widget',
+            name: 'geenii.stat',
+            data: {
+              items: [
+                { label: 'Context used', value: 182, unit: 'k tokens', delta: 24 },
+                { label: 'Avg. latency', value: 840, unit: 'ms', delta: -12 },
+              ],
+            },
+            text: 'Context used: 182k tokens (+24%), avg. latency 840 ms (-12%)',
+          },
+        ],
+      },
+    ),
+    ...group('Status and time',
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Indexing the workspace…' },
+          { type: 'widget', name: 'geenii.progress', data: { label: 'Indexing files', value: 42, max: 120 }, text: 'Indexing files: 42/120' },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          { type: 'widget', name: 'geenii.progress', heading: 'Model download', data: { label: 'Downloading model llama3.2' }, text: 'Downloading model llama3.2…' },
+        ],
+      },
+      {
+        level: 'error',
+        content: [
+          { type: 'text', text: 'Pulling the model failed.' },
+          { type: 'widget', name: 'geenii.progress', data: { label: 'Pulling mistral', value: 63, status: 'error' }, text: 'Pulling mistral failed at 63%.' },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Working on the task **refactor the config loader**:' },
+          {
+            type: 'widget',
+            name: 'geenii.steps',
+            data: {
+              title: 'Plan',
+              steps: [
+                { text: 'Read the current config loader', status: 'done' },
+                { text: 'Write tests for the existing behavior', status: 'done', detail: '12 tests, all passing' },
+                { text: 'Split loading and validation', status: 'running' },
+                { text: 'Migrate the YAML loader', status: 'failed', detail: 'yaml module not installed' },
+                { text: 'Update the docs', status: 'skipped' },
+                { text: 'Run the full test suite' },
+              ],
+            },
+            text: 'Plan: 2 of 6 steps done, 1 running, 1 failed.',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Recent runs of the scheduled task **daily-report**:' },
+          {
+            type: 'widget',
+            name: 'geenii.timeline',
+            data: {
+              items: [
+                { time: hoursAgo(50), title: 'Run completed', description: 'Report sent to 3 recipients.' },
+                { time: hoursAgo(26), title: 'Run completed with warnings', description: '1 data source was unavailable.', level: 'warning' },
+                { time: hoursAgo(2), title: 'Run failed', description: 'Connection refused.', level: 'error' },
+              ],
+            },
+            text: 'daily-report: last run failed (connection refused).',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Scheduled task **daily-report** runs at 18:00 UTC. Current time:' },
+          { type: 'widget', name: 'geenii.clock', data: { timezone: 'UTC', label: 'UTC' }, text: 'Current time: see your clock (UTC).' },
+        ],
+      },
+      {
+        level: 'warning',
+        content: [
+          { type: 'text', text: 'Rate limit reached. The next request is possible in:' },
+          {
+            type: 'widget',
+            name: 'geenii.countdown',
+            data: { until: new Date(Date.now() + 90_000).toISOString(), label: 'Rate limit reset' },
+            text: 'Rate limit resets in 90 seconds.',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          {
+            type: 'widget',
+            name: 'geenii.weather',
+            data: {
+              location: 'Vienna, Austria',
+              current: { temp: 14.6, condition: 'Partly cloudy', feels_like: 13, humidity: 72, wind: 18 },
+              // today and the next 4 days, as ISO dates (the widget shows weekday names)
+              forecast: ['Partly cloudy', 'Light rain', 'Thunderstorms', 'Overcast', 'Sunny'].map((condition, i) => ({
+                day: hoursAgo(-i * 24).slice(0, 10),
+                condition,
+                high: [16, 13, 15, 12, 18][i],
+                low: [9, 8, 10, 7, 9][i],
+                precip: [0, 80, 60, 10, 0][i],
+              })),
+            },
+            text: 'Vienna: 15°C, partly cloudy. Next days: light rain, thunderstorms, overcast, sunny.',
+          },
+        ],
+      },
+    ),
+    ...group('Code and files',
+      {
+        level: 'error',
+        content: [
+          { type: 'text', text: 'The hook script failed with exit code 1:' },
+          {
+            type: 'widget',
+            name: 'geenii.code',
+            data: { filename: 'hooks/hello.py', language: 'python', code: SAMPLE_CODE },
+            text: '```python\n' + SAMPLE_CODE + '```',
+          },
+        ],
+      },
+      {
+        level: 'warning',
+        content: [
+          { type: 'text', text: 'The agent wants to change a file. Review the changes:' },
+          {
+            type: 'widget',
+            name: 'geenii.diff',
+            data: { filename: 'src/geenii/config.py', diff: SAMPLE_DIFF },
+            text: 'Proposed change to src/geenii/config.py:\n```diff\n' + SAMPLE_DIFF + '```',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Files found in the workspace:' },
+          {
+            type: 'widget',
+            name: 'geenii.filetree',
+            data: {
+              root: '~/workspaces/geenii',
+              expand: 1,
+              entries: [
+                { path: 'README.md', size: 4210 },
+                { path: 'pyproject.toml', size: 1893 },
+                { path: 'src/geenii/__init__.py', size: 0 },
+                { path: 'src/geenii/config.py', size: 6120 },
+                { path: 'src/geenii/chat_models.py', size: 5480 },
+                { path: 'docs/developer-guide/messages.md', size: 9020 },
+                { path: 'data/', type: 'dir' },
+              ],
+            },
+            text: 'Workspace: README.md, pyproject.toml, src/, docs/, data/',
+          },
+        ],
+      },
+    ),
+    ...group('Layout',
+      {
+        level: 'info',
+        content: [
+          {
+            type: 'widget',
+            name: 'geenii.tabs',
+            heading: 'Session overview',
+            data: {
+              tabs: [
+                {
+                  label: 'Usage',
+                  widget: {
+                    name: 'geenii.stat',
+                    data: { items: [{ label: 'Tokens', value: '143.5', unit: 'k', delta: 12 }, { label: 'Tool calls', value: 27 }, { label: 'Cost', value: '0.42', unit: '$' }] },
+                  },
+                },
+                {
+                  label: 'Tokens',
+                  widget: {
+                    name: 'geenii.donut',
+                    data: { unit: 'k', items: [{ label: 'Input', value: 98.2 }, { label: 'Cache', value: 23.8 }, { label: 'Output', value: 21.5 }] },
+                  },
+                },
+                {
+                  label: 'Tools',
+                  widget: {
+                    name: 'geenii.table',
+                    data: { columns: ['tool', 'calls', 'errors'], rows: [['read_file', 14, 0], ['shell', 9, 1], ['weather', 4, 0]] },
+                  },
+                },
+                { label: 'Notes', text: 'Tabs can also hold **markdown**, and a tab whose widget is unknown shows that widget’s fallback text.' },
+                { label: 'Unknown', widget: { name: 'acme.dashboard', text: 'The *acme.dashboard* widget is not installed here.' } },
+              ],
+            },
+            text: 'Session overview: 143.5k tokens, 27 tool calls ($0.42). Tools: read_file 14, shell 9 (1 error), weather 4.',
+          },
+        ],
+      },
+    ),
+    ...group('Embedded content and actions',
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Web search results for **local-first ai agents**:' },
+          {
+            type: 'widget',
+            name: 'geenii.links',
+            data: {
+              limit: 3,
+              items: [
+                { title: 'Local-first software: you own your data', url: 'https://www.inkandswitch.com/local-first/', snippet: 'Seven ideals for local-first software: no spinners, your work is not trapped on one device, the network is optional…' },
+                { title: 'Ollama', url: 'https://ollama.com/', snippet: 'Get up and running with large language models, locally.' },
+                { title: 'Model Context Protocol', url: 'https://modelcontextprotocol.io/introduction', snippet: 'An open protocol that standardizes how applications provide context to LLMs.' },
+                { title: 'Example Domain', url: 'https://example.com/', source: 'example.com', snippet: 'This domain is for use in illustrative examples in documents.' },
+                { title: 'Not a web link', url: 'javascript:alert(1)', snippet: 'Unsafe urls are shown without a link.' },
+              ],
+            },
+            text: 'Results: inkandswitch.com/local-first, ollama.com, modelcontextprotocol.io, example.com',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'The agent rendered a preview:' },
+          {
+            type: 'widget',
+            name: 'geenii.html',
+            data: {
+              height: 120,
+              title: 'Preview',
+              html: '<body style="font-family:sans-serif;margin:12px"><h3 style="margin:0 0 8px">Sandboxed HTML</h3>'
+                + '<button onclick="this.textContent=\'Clicked!\'">Click me</button></body>',
+            },
+            text: 'An HTML preview (not shown).',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'The agent found a page (untrusted, loads on click):' },
+          {
+            type: 'widget',
+            name: 'geenii.iframe',
+            data: { url: 'https://en.wikipedia.org/wiki/Special:Random', scripts: true, height: 360 },
+            text: 'A random Wikipedia page: https://en.wikipedia.org/wiki/Special:Random',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'A trusted page, loaded right away without scripts:' },
+          {
+            type: 'widget',
+            name: 'geenii.iframe',
+            data: { url: 'https://example.com', trusted: true, height: 200, title: 'example.com' },
+            text: 'https://example.com',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'The agent prepared a webhook call. Send it?' },
+          {
+            type: 'widget',
+            name: 'geenii.postbutton',
+            data: { url: 'https://httpbin.org/post', payload: { event: 'deploy', env: 'staging' }, label: 'Trigger deploy', confirm: 'Deploy to staging?' },
+            text: 'Webhook: POST https://httpbin.org/post {"event": "deploy", "env": "staging"}',
+          },
+        ],
+      },
+      {
+        level: 'warning',
+        content: [
+          { type: 'text', text: 'A webhook that answers 500, to show the failed state:' },
+          {
+            type: 'widget',
+            name: 'geenii.postbutton',
+            data: { url: 'https://httpbin.org/status/500', payload: { ping: true }, label: 'Ping' },
+            text: 'Webhook: POST https://httpbin.org/status/500',
+          },
+        ],
+      },
+    ),
+    ...group('Replies',
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'The build passed. How do you want to continue?' },
+          {
+            type: 'widget',
+            name: 'geenii.choices',
+            data: {
+              options: [
+                { label: 'Deploy to staging', message: 'Yes, deploy the build to staging.' },
+                { label: 'Show the diff first', message: 'Show me the diff first.' },
+                'Cancel',
+              ],
+            },
+            text: 'Reply with: "Deploy to staging", "Show the diff first" or "Cancel".',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'To create the scheduled task, I need a few details:' },
+          {
+            type: 'widget',
+            name: 'geenii.form',
+            heading: 'New scheduled task',
+            data: {
+              submit: 'Create task',
+              fields: [
+                { name: 'name', label: 'Name', required: true, placeholder: 'daily-report' },
+                { name: 'schedule', label: 'Schedule', type: 'select', required: true, options: ['hourly', 'daily', 'weekly'], default: 'daily' },
+                { name: 'time', label: 'Time (UTC)', placeholder: '18:00' },
+                { name: 'retries', label: 'Retries', type: 'number', default: 2 },
+                { name: 'notify', label: 'Notify me on failure', type: 'checkbox', default: true },
+                { name: 'prompt', label: 'Prompt', type: 'textarea', placeholder: 'Summarize yesterday’s activity…' },
+              ],
+            },
+            text: 'Please reply with the task name, schedule (hourly, daily or weekly), time, retries, whether to notify on failure, and the prompt.',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          { type: 'text', text: 'Task done. How did I do?' },
+          {
+            type: 'widget',
+            name: 'geenii.rating',
+            data: { type: 'stars', comment: true },
+            text: 'Rate the answer from 1 to 5, optionally with a comment.',
+          },
+        ],
+      },
+      {
+        level: 'info',
+        content: [
+          {
+            type: 'widget',
+            name: 'geenii.rating',
+            heading: 'Was this answer helpful?',
+            data: { type: 'thumbs' },
+            text: 'Was this answer helpful? Reply with yes or no.',
+          },
+        ],
+      },
+    ),
+    ...group('Easter eggs', eggs.matrix, eggs.boot, eggs.snake, eggs.fortune, eggs.dice),
+    ...group('Development aids',
+      {
+        level: 'info',
+        content: [
+          {
+            type: 'widget',
+            name: 'geenii.dev.errorboundarytest',
+            heading: 'Error boundary test',
+            data: { message: 'Crashed on purpose' },
+            text: 'This widget crashed on purpose; the error boundary shows this fallback instead.',
+          },
+        ],
+      },
+      eggs.crash,
+      {
+        level: 'info',
+        content: [
+          { type: 'widget', name: 'geenii.unknown', heading: 'Unknown widget', data: { any: 'thing' }, text: 'An *unknown* widget shows its fallback text.' },
+        ],
+      },
+    ),
+  ]
+}
 
 export const SAMPLE_MARKDOWN =`## Markdown text
 
