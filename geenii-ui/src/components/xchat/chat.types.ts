@@ -121,6 +121,23 @@ export type ContentPartOf<T extends ContentPartType> = Extract<ContentPart, { ty
 
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool'
 
+/**
+ * Token usage of one model call (backend: Usage). `input_tokens` counts all input, cached or not;
+ * the cache fields are parts of it. Fields a provider does not report are null.
+ */
+export type Usage = {
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+  cache_creation_input_tokens?: number | null
+  cache_read_input_tokens?: number | null
+  /** timings in milliseconds (ollama) */
+  load_duration?: number | null
+  input_duration?: number | null
+  output_duration?: number | null
+  total_duration?: number | null
+}
+
 /** A message from/to a model (backend: ModelMessage) */
 export type ModelMessage = {
   type: 'message'
@@ -128,6 +145,8 @@ export type ModelMessage = {
   role: MessageRole
   content: ContentPart[]
   timestamp: IsoDateTime
+  /** usage of the model call that produced this message; only on the first message of each call */
+  usage?: Usage | null
 }
 
 export type SystemMessageLevel = 'info' | 'warning' | 'error'

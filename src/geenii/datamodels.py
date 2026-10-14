@@ -25,6 +25,63 @@ class AIModelInfo(pydantic.BaseModel):
     installed: bool = False
 
 
+# Version of the usage convention in the usage log (`usage_version` of a line). Lines without it are version 1,
+# where anthropic's input_tokens did not include cache reads and writes.
+USAGE_VERSION = 2
+
+
+class Usage(pydantic.BaseModel):
+    """
+    Token usage of one completion, normalised across providers.
+
+    - `input_tokens` counts *all* input tokens the model processed, cached or not.
+    - `cache_read_input_tokens` / `cache_creation_input_tokens` are the parts of `input_tokens` read from / written
+      to the prompt cache; None if the provider does not report them.
+    - `total_tokens` is input + output (so it includes cached input).
+
+    Providers map their own counts to this convention. Fields a provider does not report stay None;
+    `model_dump(exclude_none=True)` is the form written to the usage log.
+    """
+    model_config = pydantic.ConfigDict(extra="ignore")  # tolerate unknown keys, e.g. when reading old log lines
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+    # input + output when not given; providers that report their own total may pass it
+    total_tokens: int | None = None
+    # prompt caching: parts of input_tokens (anthropic: both; openai: reads only)
+    cache_creation_input_tokens: int | None = None
+    cache_read_input_tokens: int | None = None
+    # timings in milliseconds (ollama)
+    load_duration: int | None = None
+    input_duration: int | None = None
+    output_duration: int | None = None
+    total_duration: int | None = None
+
+    @pydantic.model_validator(mode="after")
+    def _default_total(self):
+        if self.total_tokens is None:
+            self.total_tokens = self.input_tokens + self.output_tokens
+        return self
+
+    @property
+    def uncached_input_tokens(self) -> int:
+        """Input tokens neither read from nor written to the prompt cache."""
+        return self.input_tokens - (self.cache_read_input_tokens or 0) - (self.cache_creation_input_tokens or 0)
+
+    @classmethod
+    def from_log_entry(cls, entry: dict) -> "Usage":
+        """
+        The usage of a usage log line, converted to the current convention.
+        Raises pydantic.ValidationError if the line's usage is malformed.
+        """
+        usage = cls.model_validate(entry.get("usage") or {})
+        if entry.get("usage_version") is None and entry.get("provider") == "anthropic":
+            # version 1: anthropic's input_tokens (and so total_tokens) left out the cached input
+            cached = (usage.cache_read_input_tokens or 0) + (usage.cache_creation_input_tokens or 0)
+            usage.input_tokens += cached
+            usage.total_tokens += cached
+        return usage
+
 
 class ModelMessage(pydantic.BaseModel):
     type: Literal["message"] = "message"
@@ -32,6 +89,10 @@ class ModelMessage(pydantic.BaseModel):
     content: list[ContentPart] = pydantic.Field(default_factory=list)
     id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex)
     timestamp: datetime = pydantic.Field(default_factory=lambda: datetime.now(UTC))
+    # Token usage of the model call that produced this message. Only the *first* message created from a
+    # completion response carries it (a response with several tool calls becomes several messages), so summing
+    # over a conversation's messages counts every call once. None for user, tool and generated messages.
+    usage: Usage | None = None
 
     def to_text(self) -> str:
         return "\n".join(part.to_text() for part in self.content)
@@ -137,64 +198,6 @@ class CompletionRequest(pydantic.BaseModel):
     # Streaming support
     stream: bool | None = False
     model_parameters: dict | None = pydantic.Field(default_factory=dict)
-
-
-# Version of the usage convention in the usage log (`usage_version` of a line). Lines without it are version 1,
-# where anthropic's input_tokens did not include cache reads and writes.
-USAGE_VERSION = 2
-
-
-class Usage(pydantic.BaseModel):
-    """
-    Token usage of one completion, normalised across providers.
-
-    - `input_tokens` counts *all* input tokens the model processed, cached or not.
-    - `cache_read_input_tokens` / `cache_creation_input_tokens` are the parts of `input_tokens` read from / written
-      to the prompt cache; None if the provider does not report them.
-    - `total_tokens` is input + output (so it includes cached input).
-
-    Providers map their own counts to this convention. Fields a provider does not report stay None;
-    `model_dump(exclude_none=True)` is the form written to the usage log.
-    """
-    model_config = pydantic.ConfigDict(extra="ignore")  # tolerate unknown keys, e.g. when reading old log lines
-
-    input_tokens: int = 0
-    output_tokens: int = 0
-    # input + output when not given; providers that report their own total may pass it
-    total_tokens: int | None = None
-    # prompt caching: parts of input_tokens (anthropic: both; openai: reads only)
-    cache_creation_input_tokens: int | None = None
-    cache_read_input_tokens: int | None = None
-    # timings in milliseconds (ollama)
-    load_duration: int | None = None
-    input_duration: int | None = None
-    output_duration: int | None = None
-    total_duration: int | None = None
-
-    @pydantic.model_validator(mode="after")
-    def _default_total(self):
-        if self.total_tokens is None:
-            self.total_tokens = self.input_tokens + self.output_tokens
-        return self
-
-    @property
-    def uncached_input_tokens(self) -> int:
-        """Input tokens neither read from nor written to the prompt cache."""
-        return self.input_tokens - (self.cache_read_input_tokens or 0) - (self.cache_creation_input_tokens or 0)
-
-    @classmethod
-    def from_log_entry(cls, entry: dict) -> "Usage":
-        """
-        The usage of a usage log line, converted to the current convention.
-        Raises pydantic.ValidationError if the line's usage is malformed.
-        """
-        usage = cls.model_validate(entry.get("usage") or {})
-        if entry.get("usage_version") is None and entry.get("provider") == "anthropic":
-            # version 1: anthropic's input_tokens (and so total_tokens) left out the cached input
-            cached = (usage.cache_read_input_tokens or 0) + (usage.cache_creation_input_tokens or 0)
-            usage.input_tokens += cached
-            usage.total_tokens += cached
-        return usage
 
 
 class BaseCompletionResponse(pydantic.BaseModel):

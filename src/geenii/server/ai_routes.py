@@ -155,7 +155,7 @@ def chat_completion(request: ChatCompletionRequest) -> ChatCompletionResponse:
 
     # Append the user message and assistant response to memory
     memory.append(ModelMessage(role="user", content=[TextContent(type="text", text=request.prompt)]))
-    memory.append(ModelMessage(role="assistant", content=response.output))
+    memory.append(ModelMessage(role="assistant", content=response.output, usage=response.usage))
 
     return response
 

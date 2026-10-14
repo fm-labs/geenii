@@ -261,7 +261,7 @@ class LLMTask(BaseAgentTask):
             logger.warning(
                 "Too many tool call recursion detected."
             )
-            bot_message = ModelMessage(role="assistant", content=response.output)
+            bot_message = ModelMessage(role="assistant", content=response.output, usage=response.usage)
             yield bot_message
             return
 
@@ -279,7 +279,7 @@ class LLMTask(BaseAgentTask):
                         "No tool calls detected in the model response. Proceeding to yield the final response."
                     )
 
-                bot_message = ModelMessage(role="assistant", content=response.output)
+                bot_message = ModelMessage(role="assistant", content=response.output, usage=response.usage)
                 yield bot_message
                 break  # no tool calls, we can proceed without re-generating the response.
 
@@ -304,13 +304,14 @@ class LLMTask(BaseAgentTask):
             # execute *all* tool calls in the response (the model may return several parallel
             # tool calls in a single response) before re-generating based on their results.
             tool_call_failed = False
-            for tool_call in tool_call_contents:
+            for n, tool_call in enumerate(tool_call_contents):
                 logger.debug(
                     f"Next tool call to process: {tool_call.name} and call ID {tool_call.call_id}"
                 )
                 # add the tool call to the message history before executing it, so that the tool result can be associated with the correct tool call in the message history
+                # (the response's usage goes on its first message only, so it is counted once)
                 self.agent.add_to_history(
-                    ModelMessage(role="assistant", content=[tool_call])
+                    ModelMessage(role="assistant", content=[tool_call], usage=response.usage if n == 0 else None)
                 )
 
                 tool_task = ToolCallTask(
@@ -1094,6 +1095,7 @@ Write in second person ("the user asked …", "you answered …") so the summary
         summary_message = ModelMessage(
             role="assistant",
             content=[TextContent(text=f"[Handover summary from context {self.agent.context_id}]\n\n{summary_text}")],
+            usage=response.usage,
         )
         new_memory.append(summary_message)
 

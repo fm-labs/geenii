@@ -3,6 +3,7 @@ import { AlertCircleIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'
 import { cn } from 'cn'
 import { ChatMessageRendererProps, SystemMessageLevel } from '@/components/xchat/chat.types.ts'
 import ChatContentPart, { useIsPartVisible } from '@/components/xchat/chat-content-part.tsx'
+import ChatMessageUsage from '@/components/xchat/chat-message-usage.tsx'
 
 const SYSTEM_LEVEL_STYLES: Record<SystemMessageLevel, { icon: typeof InfoIcon, className: string }> = {
   info: { icon: InfoIcon, className: 'border-transparent text-muted-foreground' },
@@ -26,6 +27,8 @@ const ChatMessage = ({ message }: ChatMessageRendererProps) => {
 
   const role = message.message.role
   const isUser = role === 'user'
+  // usage of the model call behind this message (only on the first message of each call)
+  const usage = message.message.type === 'message' ? message.message.usage : null
 
   if (message.message.type === 'system' || role === 'system') {
     // messages stored before the level field existed have none
@@ -49,6 +52,7 @@ const ChatMessage = ({ message }: ChatMessageRendererProps) => {
       <div className={'flex items-baseline gap-2 px-1 text-xs text-muted-foreground'}>
         {!isUser && <span className={'font-medium'}>{message.sender_id}</span>}
         <span className={'opacity-0 transition-opacity group-hover:opacity-100'}>{formatTime(message.timestamp)}</span>
+        {!isUser && usage && <ChatMessageUsage usage={usage} />}
       </div>
       <div className={cn(
         'flex flex-col gap-2 min-w-0',
