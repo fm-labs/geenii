@@ -683,6 +683,79 @@ export const sampleWidgetMessages = (): SampleMessage[] => {
           },
         ],
       },
+      {
+        level: 'info',
+        content: [
+          {
+            type: 'widget',
+            name: 'geenii.grid',
+            heading: 'Dashboard',
+            data: {
+              columns: 3,
+              items: [
+                { widget: { name: 'geenii.gauge', data: { value: 62, unit: '%', label: 'CPU' } } },
+                { widget: { name: 'geenii.gauge', data: { value: 81, unit: '%', label: 'Memory', thresholds: { warning: 75, error: 90 } } } },
+                { widget: { name: 'geenii.gauge', data: { value: 37, unit: '%', label: 'Disk' } } },
+                {
+                  wide: true,
+                  widget: {
+                    name: 'geenii.linechart',
+                    heading: 'Requests, last 7 days',
+                    data: { series: [{ name: 'requests', points: daysAgo(7).map((x, i) => ({ x, y: [310, 280, 420, 390, 450, 210, 180][i] })) }] },
+                  },
+                },
+                { text: 'Text cells hold **markdown**; `wide` items span the whole row.' },
+                { widget: { name: 'geenii.stat', data: { items: [{ label: 'Uptime', value: '12', unit: 'days' }] } } },
+              ],
+            },
+            text: 'Dashboard: CPU 62%, memory 81%, disk 37%; 2240 requests in the last 7 days.',
+          },
+        ],
+      },
+      {
+        level: 'error',
+        content: [
+          { type: 'text', text: 'The nightly build failed.' },
+          {
+            type: 'widget',
+            name: 'geenii.accordion',
+            data: {
+              sections: [
+                {
+                  title: 'Steps',
+                  badge: '3 of 4',
+                  open: true,
+                  widget: {
+                    name: 'geenii.steps',
+                    data: {
+                      steps: [
+                        { text: 'Checkout', status: 'done' },
+                        { text: 'Install', status: 'done' },
+                        { text: 'Test', status: 'done' },
+                        { text: 'Build', status: 'failed', detail: 'tsc: 2 errors' },
+                      ],
+                    },
+                  },
+                },
+                {
+                  title: 'Build log',
+                  badge: '2 errors',
+                  widget: {
+                    name: 'geenii.code',
+                    data: {
+                      language: 'text',
+                      code: "src/app.tsx(12,7): error TS2322: Type 'number' is not assignable to type 'string'.\n"
+                        + "src/app.tsx(40,1): error TS1128: Declaration or statement expected.",
+                    },
+                  },
+                },
+                { title: 'Changes since the last good build', badge: '4 commits', text: '- fix tabs\n- add treemap\n- add grid\n- *update docs*' },
+              ],
+            },
+            text: 'Nightly build failed at "Build" (tsc: 2 errors).',
+          },
+        ],
+      },
     ),
     ...group('Embedded content and actions',
       {

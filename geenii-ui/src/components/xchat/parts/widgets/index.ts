@@ -1,4 +1,5 @@
 import { WidgetRenderers } from '@/components/xchat/chat.types.ts'
+import { AccordionWidget } from './accordion.tsx'
 import { BarChartWidget } from './barchart.tsx'
 import { ChoicesWidget } from './choices.tsx'
 import { ClockWidget } from './clock.tsx'
@@ -13,6 +14,7 @@ import { FileTreeWidget } from './filetree.tsx'
 import { FormWidget } from './form.tsx'
 import { FunnelWidget } from './funnel.tsx'
 import { GaugeWidget } from './gauge.tsx'
+import { GridWidget } from './grid.tsx'
 import { HeatmapWidget } from './heatmap.tsx'
 import { FortuneWidget } from './fortune.tsx'
 import { HtmlWidget } from './html.tsx'
@@ -48,6 +50,9 @@ export { DonutWidget, GaugeWidget, HeatmapWidget }
 export { ErrorBoundaryTestWidget, TabsWidget }
 export { FunnelWidget, ScatterWidget, SparklinesWidget, StatusWidget, TreemapWidget }
 export { squarify } from './treemap.tsx'
+export { AccordionWidget, GridWidget }
+export { ChildContent } from './child-content.tsx'
+export type { ChildContentData, ChildWidget } from './child-content.tsx'
 export { CopyButton } from './copy-button.tsx'
 export { formMessage } from './form.tsx'
 export { ratingMessage } from './rating.tsx'
@@ -73,6 +78,8 @@ export const defaultWidgets: WidgetRenderers = {
   'geenii.form': FormWidget,
   'geenii.links': LinksWidget,
   'geenii.tabs': TabsWidget,
+  'geenii.grid': GridWidget,
+  'geenii.accordion': AccordionWidget,
   'geenii.rating': RatingWidget,
   'geenii.weather': WeatherWidget,
   'geenii.progress': ProgressWidget,

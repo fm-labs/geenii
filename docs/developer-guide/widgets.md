@@ -158,6 +158,11 @@ fallback instead (see [How the UI renders a widget](#how-the-ui-renders-a-widget
 | Name | `data` | Notes |
 |---|---|---|
 | `geenii.tabs` | `{ tabs: [{ label, widget?: { name, data?, heading?, text? }, text? }], active? = 0 }` | Tabs, each holding a nested widget or markdown `text`. Nested widgets go through the same rendering as top-level ones (lookup, heading, fallback, their own error boundary), so tabs can hold any widget, including custom ones and other tabs. Only the active tab is mounted: switching tabs resets the state of the widget left (a running game, a typed form). Arrow keys, Home and End move between tabs |
+| `geenii.grid` | `{ columns? = 2, min_width? = 200, items: [{ widget?, text?, wide? }] }` | Nested widgets side by side, e.g. a dashboard of gauges. At most `columns` (1–4) per row, fewer when a column would get narrower than `min_width` px, down to one column on narrow screens. `wide` items take a whole row; `text` cells are markdown in a bordered box |
+| `geenii.accordion` | `{ sections: [{ title, badge?, open?, widget?, text? }], multiple? = true }` | Collapsible sections holding a nested widget or markdown. `open` sections start expanded; `badge` is a small pill next to the title (e.g. "2 errors"). With `multiple: false`, opening a section closes the others. Closed sections are not mounted |
+
+All three render their children with `ChildContent` (`widgets/child-content.tsx`): a nested `widget` goes through
+`WidgetPart` like a top-level one; otherwise `text` is shown as markdown. Use it for your own layout widgets too.
 
 ### Replies
 

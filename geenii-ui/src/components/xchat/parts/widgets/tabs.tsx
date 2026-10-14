@@ -1,13 +1,8 @@
 import React from 'react'
-import { OutputDataMarkdown } from '@/components/output-data-markdown.tsx'
-import { WidgetContent, WidgetRendererProps } from '@/components/xchat/chat.types.ts'
-import { markdownClass } from '@/components/xchat/parts/media-parts.tsx'
-// circular (widget-parts → widgets/index → tabs → widget-parts), fine: WidgetPart is only used while rendering
-import { WidgetPart } from '@/components/xchat/parts/widget-parts.tsx'
+import { WidgetRendererProps } from '@/components/xchat/chat.types.ts'
+import { ChildContent, ChildContentData } from './child-content.tsx'
 
-type ChildWidget = { name: string; data?: unknown; heading?: string | null; text?: string | null }
-
-type Tab = { label: string; widget?: ChildWidget; text?: string }
+type Tab = ChildContentData & { label: string }
 
 /**
  * geenii.tabs — data: { tabs: { label, widget?: { name, data?, heading?, text? }, text? }[], active? = 0 }
@@ -33,10 +28,6 @@ export const TabsWidget = ({ data, message }: WidgetRendererProps<{ tabs: Tab[];
     tabRefs.current[next]?.focus()
   }
 
-  const child: WidgetContent | null = current.widget && typeof current.widget.name === 'string'
-    ? { type: 'widget', name: current.widget.name, data: current.widget.data, heading: current.widget.heading, text: current.widget.text }
-    : null
-
   return (
     <div className={'min-w-0 rounded-md border'}>
       <div role={'tablist'} onKeyDown={onKeyDown} className={'flex overflow-x-auto border-b px-1'}>
@@ -51,9 +42,7 @@ export const TabsWidget = ({ data, message }: WidgetRendererProps<{ tabs: Tab[];
         ))}
       </div>
       <div role={'tabpanel'} id={`${id}-panel`} aria-labelledby={`${id}-tab-${active}`} className={'min-w-0 p-3'}>
-        {child ? <WidgetPart key={active} part={child} message={message} />
-          : current.text ? <div className={markdownClass}><OutputDataMarkdown data={current.text} /></div>
-            : <div className={'text-sm text-muted-foreground'}>Empty tab</div>}
+        <ChildContent key={active} item={current} message={message} empty={'Empty tab'} />
       </div>
     </div>
   )
