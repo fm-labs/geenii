@@ -107,8 +107,8 @@ export type WidgetContent = {
   name: string
   /** Passed to the widget as-is */
   data?: unknown
-  /** Shown in a small header above the widget (also above the fallback) */
-  title?: string | null
+  /** Shown in a small header above the widget (also above the fallback); unlike titles inside `data` */
+  heading?: string | null
   /** Shown if the UI does not know the widget */
   text?: string | null
 }

@@ -19,15 +19,15 @@ export const WidgetFallback = ({ part }: { part: WidgetContent }) => {
   )
 }
 
-/** Renders a widget part with the widget registered under its name, or its fallback text, below its title. */
+/** Renders a widget part with the widget registered under its name, or its fallback text, below its heading. */
 export const WidgetPart = ({ part, message }: ContentPartRendererProps<WidgetContent>) => {
   const widgets = useChatWidgets()
   const Widget = widgets[part.name] ?? defaultWidgets[part.name]
   const body = Widget ? <Widget data={part.data ?? null} part={part} message={message} /> : <WidgetFallback part={part} />
-  if (!part.title) return body
+  if (!part.heading) return body
   return (
     <div className={'flex min-w-0 flex-col gap-1'} data-widget={part.name}>
-      <div className={'text-xs font-medium text-muted-foreground'}>{part.title}</div>
+      <div className={'text-xs font-medium text-muted-foreground'}>{part.heading}</div>
       {body}
     </div>
   )

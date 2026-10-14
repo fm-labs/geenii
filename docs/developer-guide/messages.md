@@ -21,7 +21,7 @@ discriminator.
 | `function`         | `FunctionCallContent`     | `name`, `arguments`, `result`                                     | Legacy function call (not used by the agent runtime)            |
 | `confirmation`     | `UserConfirmationContent` | `confirmation_id`, `text`, `confirmed`                            | HITL approval request/response                                  |
 | `interaction`      | `UserInteractionContent`  | `interaction_id`, `interaction_type`, `text`, `choices`, `choice` | Generic user interaction                                        |
-| `widget`           | `WidgetContent`           | `name` (dot-notation, e.g. `geenii.clock`), `data`, `title`, `text` | UI widget; the UI renders it if known, else shows `text` (fallback); `title` is a small header above either |
+| `widget`           | `WidgetContent`           | `name` (dot-notation, e.g. `geenii.clock`), `data`, `heading`, `text` | UI widget; the UI renders it if known, else shows `text` (fallback); `heading` is a small header above either (titles inside `data` are rendered by the widget itself) |
 
 The union type `ContentPart` is a Pydantic discriminated union over the `type`
 field. Every content part has a `.to_text()` method for serialization.

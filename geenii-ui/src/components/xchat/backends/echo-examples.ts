@@ -91,7 +91,7 @@ export const sampleEasterEggs = (): Record<string, { level: SystemMessageLevel, 
     content: [{
       type: 'widget',
       name: 'geenii.snake',
-      title: 'Snake',
+      heading: 'Snake',
       data: { size: 16, speed: 120 },
       text: '🐍 You found the snake. Try a client that supports widgets.',
     }],
@@ -101,7 +101,7 @@ export const sampleEasterEggs = (): Record<string, { level: SystemMessageLevel, 
     content: [{
       type: 'widget',
       name: 'geenii.fortune',
-      title: 'Fortune cookie',
+      heading: 'Fortune cookie',
       data: {},
       text: '🥠 It works on my machine.',
     }],
@@ -111,7 +111,7 @@ export const sampleEasterEggs = (): Record<string, { level: SystemMessageLevel, 
     content: [{
       type: 'widget',
       name: 'geenii.dice',
-      title: 'Dice',
+      heading: 'Dice',
       data: { count: 2 },
       text: '🎲 You rolled the dice.',
     }],
@@ -249,7 +249,7 @@ export const sampleWidgetMessages = (): { level: SystemMessageLevel, content: Co
   {
     level: 'info',
     content: [
-      { type: 'widget', name: 'geenii.progress', title: 'Model download', data: { label: 'Downloading model llama3.2' }, text: 'Downloading model llama3.2…' },
+      { type: 'widget', name: 'geenii.progress', heading: 'Model download', data: { label: 'Downloading model llama3.2' }, text: 'Downloading model llama3.2…' },
     ],
   },
   {
@@ -451,7 +451,7 @@ export const sampleWidgetMessages = (): { level: SystemMessageLevel, content: Co
   {
     level: 'info',
     content: [
-      { type: 'widget', name: 'geenii.unknown', title: 'Unknown widget', data: { any: 'thing' }, text: 'An *unknown* widget shows its fallback text.' },
+      { type: 'widget', name: 'geenii.unknown', heading: 'Unknown widget', data: { any: 'thing' }, text: 'An *unknown* widget shows its fallback text.' },
     ],
   },
 ]
