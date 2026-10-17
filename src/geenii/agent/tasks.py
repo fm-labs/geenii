@@ -221,7 +221,7 @@ class LLMTask(BaseAgentTask):
             str_len += len(message.to_text())
         # simple heuristic: 1 token ~ 4 characters
         max_tokens = str_len // 4
-        return int(max_tokens + 4096)
+        return int(max_tokens + 8 * 1024)
 
     def execute(self) -> Iterator[ModelMessage]:
         full_system_prompt = self._build_system_prompt()
