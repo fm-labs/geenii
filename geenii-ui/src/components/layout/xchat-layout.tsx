@@ -20,7 +20,7 @@ export default function XchatLayout(props: React.PropsWithChildren<{
   sidebarHeader?: React.ReactNode
 }>) {
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <XchatSidebar header={props.sidebarHeader} />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
@@ -32,11 +32,7 @@ export default function XchatLayout(props: React.PropsWithChildren<{
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/">Home</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/">XChat Demo</BreadcrumbLink>
+                <BreadcrumbLink href="/">Geenii</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
@@ -55,7 +51,10 @@ export default function XchatLayout(props: React.PropsWithChildren<{
         {/*    {props?.children}*/}
         {/*  </div>*/}
         {/*</div>*/}
-        {props?.children}
+        {/*<Headerbar />*/}
+        <div className={""}>
+          {props?.children}
+        </div>
       </SidebarInset>
     </SidebarProvider>
   )

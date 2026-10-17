@@ -1,17 +1,17 @@
 import React from 'react'
 import CompletionChatPage from '@/app/chat/completion-chat-page.tsx'
-import McpServersPage from '@/app/mcp-servers/mcp-servers-page.tsx'
-import DockerCatalogPage from '@/app/mcp-servers/docker-catalog-page.tsx'
 import CompletionsPage from '@/app/completion/completions-page.tsx'
-import SettingsPage from '@/app/settings/settings-page.tsx'
 import { NotFoundError } from '@/features/errors/not-found-error.tsx'
 import FlowsPage from '@/app/flows/flows-page.tsx'
 import AudioPage from '@/app/aiassist/audio-page.tsx'
 import ToolsPage from '@/app/tools/tools.page.tsx'
-import DashboardPage from '@/app/dashboard/dashboard.page.tsx'
 import AgentsPage from '@/app/agents/agents-page.tsx'
 import AgentPage from '@/app/agents/agent-page.tsx'
 import XchatDemoPage1 from '@/app/xchat/xchat-demo-page-1.tsx'
+import CatalogPage from '@/app/console/catalog-page.tsx'
+import ConsolePage from '@/app/console/console-page.tsx'
+import ManagedPage from '@/app/console/managed-page.tsx'
+import SystemPage from '@/app/console/system-page.tsx'
 
 
 
@@ -59,7 +59,8 @@ const AppRouter = () => {
     const routes: Route[] = [
       {
         path: '/',
-        element: <DashboardPage />,
+        element: <CompletionChatPage />,
+        //element: <AgentsPage />,
       },
       {
         path: '/chat',
@@ -71,24 +72,11 @@ const AppRouter = () => {
       },
       {
         path: '/agents',
-        //element: <AssistantChatsPage />,
         element: <AgentsPage />,
       },
       {
         path: '/agents/:name',
         element: <AgentPage />,
-      },
-      {
-        path: '/tools',
-        element: <ToolsPage />,
-      },
-      {
-        path: '/mcp',
-        element: <McpServersPage />,
-      },
-      {
-        path: '/mcp/docker',
-        element: <DockerCatalogPage />,
       },
       {
         path: '/flows',
@@ -98,25 +86,29 @@ const AppRouter = () => {
         path: '/audio',
         element: <AudioPage />,
       },
-      // {
-      //   path: '/wschat',
-      //   element: <WsChat />,
-      // },
       {
-        path: '/settings',
-        element: <SettingsPage />,
+        path: '/console/catalog/:section',
+        element: <CatalogPage />,
       },
-      // {
-      //   path: '/apps',
-      //   element: <AppsPage />,
-      // },
-      // {
-      //   path: '/apps/:appId',
-      //   element: <AppPage />,
-      // },
       {
-        path: '/xchat',
+        path: '/console/managed/:section',
+        element: <ManagedPage />,
+      },
+      {
+        path: '/console/system/:section',
+        element: <SystemPage />,
+      },
+      {
+        path: '/console/playground/tool-sandbox',
+        element: <ToolsPage />,
+      },
+      {
+        path: '/console/playground/xchat-sandbox',
         element: <XchatDemoPage1 />,
+      },
+      {
+        path: '/console',
+        element: <ConsolePage />,
       },
     ]
     return routes

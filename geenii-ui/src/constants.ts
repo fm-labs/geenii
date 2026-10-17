@@ -24,7 +24,7 @@ export const FEATURE_MCP_ENABLED = import.meta.env.VITE_FEATURE_MCP_ENABLED === 
 export const FEATURE_TOOLS_ENABLED = import.meta.env.VITE_FEATURE_TOOLS_ENABLED === 'true' || false;
 export const FEATURE_APPS_ENABLED = import.meta.env.VITE_FEATURE_APPS_ENABLED === 'true' || false;
 export const FEATURE_FLOWS_ENABLED = import.meta.env.VITE_FEATURE_FLOWS_ENABLED === 'true' || false;
-export const FEATURE_SETTINGS_ENABLED = import.meta.env.VITE_FEATURE_SETTINGS_ENABLED === 'true' || false;
+export const FEATURE_CONSOLE_ENABLED = import.meta.env.VITE_FEATURE_CONSOLE_ENABLED === 'true' || false;
 export const FEATURE_MESSAGE_INBOX_ENABLED = import.meta.env.VITE_FEATURE_MESSAGE_INBOX_ENABLED === 'true' || false;
 
 export const FEATURE_TAURI_ENABLED = import.meta.env.VITE_FEATURE_TAURI_ENABLED === 'true' || false;

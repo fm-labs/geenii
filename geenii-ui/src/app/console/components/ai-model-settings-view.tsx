@@ -1,4 +1,4 @@
-import OllamaModels from '@/app/settings/components/ollama-models.tsx'
+import OllamaModels from '@/app/console/components/ollama-models.tsx'
 import * as React from 'react'
 
 export const AiModelSettingsView = () => {

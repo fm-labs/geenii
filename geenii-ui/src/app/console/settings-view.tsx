@@ -1,11 +1,4 @@
 import * as React from 'react'
-import {
-  AudioWaveformIcon,
-  BrainIcon,
-  HammerIcon, InfoIcon, PackageIcon, PaletteIcon,
-  ServerIcon,
-  UserIcon,
-} from 'lucide-react'
 
 // import {
 //   Breadcrumb,
@@ -15,7 +8,6 @@ import {
 //   BreadcrumbPage,
 //   BreadcrumbSeparator,
 // } from '@/components/ui/breadcrumb'
-
 import {
   Sidebar,
   SidebarContent,
@@ -27,50 +19,11 @@ import {
   SidebarProvider,
 } from '@/components/ui/sidebar'
 
-import { SettingsFormView } from '@/app/settings/components/settings-form-view.tsx'
-import { McpServersSettingsView } from '@/app/settings/components/mcp-servers-settings-view.tsx'
-import { AiModelSettingsView } from '@/app/settings/components/ai-model-settings-view.tsx'
-import { settingsForms } from '@/app/settings/settings-forms.ts'
-import ToolsView from '@/app/tools/tools.view.tsx'
-import AppsSettings from '@/app/settings/components/apps-settings.tsx'
-import {
-  FEATURE_AI_ENABLED,
-  FEATURE_APPS_ENABLED,
-  FEATURE_MCP_ENABLED,
-  FEATURE_TOOLS_ENABLED,
-  FEATURE_AGENTS_ENABLED,
-} from '@/constants.ts'
+import { SettingsFormView } from '@/app/console/components/settings-form-view.tsx'
+import { settingsForms } from '@/app/console/settings-forms.ts'
 import Header from '@/components/header.tsx'
-import SystemInfoView from '@/app/settings/components/system-info-view.tsx'
-import AudioSettings from '@/app/settings/components/audio-settings.tsx'
-
-
-const data = {
-  nav: [
-    { name: "Profile", icon: UserIcon },
-    { name: "Appearance", icon: PaletteIcon },
-    //{ name: "Default Models", icon: BrainIcon },
-    { name: "Models", icon: BrainIcon },
-    { name: "Tools", icon: HammerIcon },
-    { name: "MCP", icon: ServerIcon },
-    { name: "Apps", icon: PackageIcon },
-    //{ name: "Notifications", icon: Bell },
-    //{ name: "Navigation", icon: Menu },
-    //{ name: "Home", icon: Home },
-    //{ name: "Appearance", icon: Paintbrush },
-    //{ name: "Messages & media", icon: MessageCircle },
-    //{ name: "Language & region", icon: Globe },
-    //{ name: "Accessibility", icon: Keyboard },
-    //{ name: "Mark as read", icon: Check },
-    //{ name: "Audio & video", icon: Video },
-    { name: "Audio", icon: AudioWaveformIcon },
-    //{ name: "Connected accounts", icon: Link },
-    //{ name: "Privacy & visibility", icon: Lock },
-    //{ name: "Advanced", icon: Settings },
-    { name: "System Info", icon: InfoIcon },
-  ],
-}
-
+import AudioSettings from '@/app/console/components/audio-settings.tsx'
+import { data } from '@/app/console/settings-navdata.tsx'
 
 
 const DisabledFeatureSettingsView = () => {
@@ -89,7 +42,7 @@ const DisabledFeatureSettingsView = () => {
 }
 
 const SettingsView = () => {
-  const [activeTab, setActiveTab] = React.useState("System Info");
+  const [activeTab, setActiveTab] = React.useState("Profile");
 
   const activeTabElement = React.useMemo(() => {
     switch (activeTab) {
@@ -97,33 +50,33 @@ const SettingsView = () => {
         return <SettingsFormView schema={settingsForms["appearance"][0]} uiSchema={settingsForms["appearance"][1]} />;
       case "Profile":
         return <SettingsFormView schema={settingsForms["profile"][0]} uiSchema={settingsForms["profile"][1]} />;
-      case "Default Models":
-        if (!FEATURE_AI_ENABLED) {
-          return <DisabledFeatureSettingsView />;
-        }
-        return <SettingsFormView schema={settingsForms["default_models"][0]} uiSchema={settingsForms["default_models"][1]} />;
-      case "MCP":
-        if (!FEATURE_MCP_ENABLED) {
-          return <DisabledFeatureSettingsView />;
-        }
-        return <McpServersSettingsView />;
-      case "Models":
-        if (!FEATURE_AI_ENABLED) {
-          return <DisabledFeatureSettingsView />;
-        }
-        return <AiModelSettingsView />;
-      case "Tools":
-        if (!FEATURE_TOOLS_ENABLED) {
-          return <DisabledFeatureSettingsView />;
-        }
-        return <ToolsView />
-      case "Apps":
-        if (!FEATURE_APPS_ENABLED) {
-          return <DisabledFeatureSettingsView />;
-        }
-        return <AppsSettings />
-      case "System Info":
-        return <SystemInfoView />
+      // case "Default Models":
+      //   if (!FEATURE_AI_ENABLED) {
+      //     return <DisabledFeatureSettingsView />;
+      //   }
+      //   return <SettingsFormView schema={settingsForms["default_models"][0]} uiSchema={settingsForms["default_models"][1]} />;
+      // case "MCP":
+      //   if (!FEATURE_MCP_ENABLED) {
+      //     return <DisabledFeatureSettingsView />;
+      //   }
+      //   return <McpServersSettingsView />;
+      // case "Models":
+      //   if (!FEATURE_AI_ENABLED) {
+      //     return <DisabledFeatureSettingsView />;
+      //   }
+      //   return <AiModelSettingsView />;
+      // case "Tools":
+      //   if (!FEATURE_TOOLS_ENABLED) {
+      //     return <DisabledFeatureSettingsView />;
+      //   }
+      //   return <ToolsView />
+      // case "Apps":
+      //   if (!FEATURE_APPS_ENABLED) {
+      //     return <DisabledFeatureSettingsView />;
+      //   }
+      //   return <AppsSettings />
+      // case "System Info":
+      //   return <SystemInfoView />
       case "Audio":
         return <AudioSettings />
       default:

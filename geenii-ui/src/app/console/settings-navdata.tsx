@@ -1,0 +1,36 @@
+import {
+  AudioWaveformIcon,
+  BrainIcon,
+  HammerIcon,
+  InfoIcon,
+  PackageIcon,
+  PaletteIcon,
+  ServerIcon,
+  UserIcon,
+} from 'lucide-react'
+
+export const data = {
+  nav: [
+    { name: 'Profile', icon: UserIcon },
+    { name: 'Appearance', icon: PaletteIcon },
+    //{ name: "Default Models", icon: BrainIcon },
+    //{ name: 'Models', icon: BrainIcon },
+    //{ name: 'Tools', icon: HammerIcon },
+    //{ name: 'MCP', icon: ServerIcon },
+    //{ name: 'Apps', icon: PackageIcon },
+    //{ name: "Notifications", icon: Bell },
+    //{ name: "Navigation", icon: Menu },
+    //{ name: "Home", icon: Home },
+    //{ name: "Appearance", icon: Paintbrush },
+    //{ name: "Messages & media", icon: MessageCircle },
+    //{ name: "Language & region", icon: Globe },
+    //{ name: "Accessibility", icon: Keyboard },
+    //{ name: "Mark as read", icon: Check },
+    //{ name: "Audio & video", icon: Video },
+    { name: 'Audio', icon: AudioWaveformIcon },
+    //{ name: "Connected accounts", icon: Link },
+    //{ name: "Privacy & visibility", icon: Lock },
+    //{ name: "Advanced", icon: Settings },
+    //{ name: 'System Info', icon: InfoIcon },
+  ],
+}
