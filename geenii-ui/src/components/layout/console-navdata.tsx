@@ -6,16 +6,20 @@ export const data = {
       url: '#',
       items: [
         {
-          title: 'Agent Sandbox',
-          url: '#/console/playground/agent-sandbox',
+          title: 'Completions Playground',
+          url: '#/console/playground/completions',
         },
         {
-          title: 'Tool Sandbox',
-          url: '#/console/playground/tool-sandbox',
+          title: 'Tools Playground',
+          url: '#/console/playground/tools',
         },
         {
-          title: 'Xchat Sandbox',
-          url: '#/console/playground/xchat-sandbox',
+          title: 'Xchat Playground',
+          url: '#/console/playground/xchat',
+        },
+        {
+          title: 'Agent Playground',
+          url: '#/console/playground/agents',
         },
       ],
     },
@@ -39,18 +43,18 @@ export const data = {
           title: 'Tools',
           url: '#/console/managed/tools',
         },
-        {
-          title: 'Environments',
-          url: '#/console/managed/environments',
-        },
-        {
-          title: 'Memory Stores',
-          url: '#/console/managed/memory-stores',
-        },
-        {
-          title: 'Vaults',
-          url: '#/console/managed/vaults',
-        },
+        // {
+        //   title: 'Environments',
+        //   url: '#/console/managed/environments',
+        // },
+        // {
+        //   title: 'Memory Stores',
+        //   url: '#/console/managed/memory-stores',
+        // },
+        // {
+        //   title: 'Vaults',
+        //   url: '#/console/managed/vaults',
+        // },
       ],
     },
     {
@@ -79,14 +83,14 @@ export const data = {
           title: 'Info',
           url: '#/console/system/info',
         },
-        {
-          title: 'Plugins',
-          url: '#/console/system/plugins',
-        },
+        // {
+        //   title: 'Plugins',
+        //   url: '#/console/system/plugins',
+        // },
         {
           title: 'Settings',
           url: '#/console/system/settings',
-          isActive: true,
+          //isActive: true,
         },
       ],
     },

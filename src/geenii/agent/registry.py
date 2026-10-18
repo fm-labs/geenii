@@ -82,6 +82,7 @@ def init_agent(agent_conf: AgentSpec, context_id: str | None = None, *,
         for tool in agent_conf.tools:
             if tool in ('read', 'write', 'bash'):
                 init_builtin_tools(tool_registry)
+                break
 
     if agent_conf.mcp_servers is not None and len(agent_conf.mcp_servers) > 0:
         mcp_servers = agent_conf.mcp_servers
@@ -92,8 +93,6 @@ def init_agent(agent_conf: AgentSpec, context_id: str | None = None, *,
         for skill in agent_conf.skills:
             logger.info(f"Adding skill '{skill}' to agent '{agent_conf.name}'.")
             skill_registry.load(skill)
-            #if skill_spec:
-            #    register_skill_scripts(skill_spec, tool_registry)
 
     agent_class_name = "geenii.agents.Agent"
     if agent_conf.class_name is not None:

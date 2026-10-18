@@ -35,6 +35,10 @@ export default function XchatLayout(props: React.PropsWithChildren<{
                 <BreadcrumbLink href="/">Geenii</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
+              <BreadcrumbItem className="hidden md:block">
+                <BreadcrumbLink href="#/console">Console</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
                 <BreadcrumbPage>New Chat</BreadcrumbPage>
               </BreadcrumbItem>

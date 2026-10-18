@@ -98,16 +98,20 @@ const AppRouter = () => {
         element: <SystemPage />,
       },
       {
-        path: '/console/playground/agent-sandbox',
+        path: '/console/playground/completions',
         element: <CompletionChatPage />,
       },
       {
-        path: '/console/playground/tool-sandbox',
+        path: '/console/playground/tools',
         element: <ToolsPage />,
       },
       {
-        path: '/console/playground/xchat-sandbox',
+        path: '/console/playground/xchat',
         element: <XchatDemoPage1 />,
+      },
+      {
+        path: '/console/playground/agents',
+        element: <AgentsPage />,
       },
       {
         path: '/console',
