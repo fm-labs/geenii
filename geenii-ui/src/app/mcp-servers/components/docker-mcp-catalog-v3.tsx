@@ -1,13 +1,13 @@
 import React from "react";
-import { useDockerMcpCatalog } from "@/app/mcp-servers/components/docker-mcp-catalog-provider.tsx";
+import { useDockerMcpCatalogV3 } from "@/app/mcp-servers/components/docker-mcp-catalog-v3-provider.tsx";
 import { Button } from "@/components/ui/button";
-import {RJSFSchema} from "@rjsf/utils";
 import { Input } from '@/components/ui/input.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
-import DockerMcpServerConfigBuilder from '@/app/mcp-servers/components/docker-mcp-server-config-builder.tsx'
+import DockerMcpCatalogV3ConfigBuilder from '@/app/mcp-servers/components/docker-mcp-catalog-v3-config-builder.tsx'
 
 /**
+ * DEPRECATED! Use the new DockerMcpCatalogOci component instead. This component is kept for backward compatibility and will be removed in future versions.
  * Render the docker MCP toolkit catalog
  *
  * Example data:
@@ -113,9 +113,10 @@ import DockerMcpServerConfigBuilder from '@/app/mcp-servers/components/docker-mc
  *
  *
  * @constructor
+ * @deprecated
  */
-const DockerMcpCatalog = () => {
-    const { catalog } = useDockerMcpCatalog()
+const DockerMcpCatalogV3 = () => {
+    const { catalog } = useDockerMcpCatalogV3()
     const [selectedServerKey, setSelectedServerKey] = React.useState<string | null>(null);
     const [selectedServer, setSelectedServer] = React.useState<any | null>(null);
 
@@ -308,8 +309,8 @@ const DockerMcpCatalog = () => {
                                     <DialogHeader>
                                         <DialogTitle>Connect {selectedServer?.title}</DialogTitle>
                                     </DialogHeader>
-                                    <DockerMcpServerConfigBuilder serverName={selectedServerKey}
-                                                                  serverDef={selectedServer} />
+                                    <DockerMcpCatalogV3ConfigBuilder serverName={selectedServerKey}
+                                                                     serverDef={selectedServer} />
                                 </DialogContent>
                             </Dialog>
                         </div>}
@@ -320,4 +321,4 @@ const DockerMcpCatalog = () => {
     );
 };
 
-export default DockerMcpCatalog;
+export default DockerMcpCatalogV3;

@@ -176,7 +176,7 @@ const AppRouter = () => {
       path: 'not-found',
       element: <NotFoundError />,
     }
-  }, [match, routes])
+  }, [match])
 
   // const currentRoute = React.useMemo(() => {
   //   return {

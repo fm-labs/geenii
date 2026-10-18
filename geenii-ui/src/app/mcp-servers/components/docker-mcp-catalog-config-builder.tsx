@@ -3,8 +3,9 @@ import Form from '@rjsf/shadcn'
 import validator from '@rjsf/validator-ajv8'
 import JsonView from '@/components/json-view.tsx'
 import { RJSFSchema } from '@rjsf/utils'
+import { DockerMcpCatalogServerDef } from '@/app/mcp-servers/components/docker-mcp-catalog-provider.tsx'
 
-const DockerMcpServerConfigBuilder = ({ serverName, serverDef }: { serverName: string, serverDef: any }) => {
+const DockerMcpCatalogConfigBuilder = ({ serverName, serverDef }: { serverName: string, serverDef: DockerMcpCatalogServerDef }) => {
 
   const [formData, setFormData] = React.useState<any | null>(null)
   //const [result, setResult] = React.useState<any | null>(null);
@@ -68,10 +69,10 @@ const DockerMcpServerConfigBuilder = ({ serverName, serverDef }: { serverName: s
 
     console.log('Creating MCP server inventory item:', result)
     return result
-  }, [serverDef, formData])
+  }, [serverDef, formData, serverName])
 
-  const buildConnectJsonSchemaForServer = (serverDef: any): RJSFSchema => {
-    const properties: any = {}
+  const buildConnectJsonSchemaForServer = (serverDef: DockerMcpCatalogServerDef): RJSFSchema => {
+    let properties: any = {}
 
     // env vars
     // const envs = serverDef?.env || []
@@ -85,7 +86,11 @@ const DockerMcpServerConfigBuilder = ({ serverName, serverDef }: { serverName: s
     console.log('serverDef:', serverDef)
     console.log('serverDef config:', serverDef?.config)
     const config = serverDef?.config && Array.isArray(serverDef?.config)
-      ? serverDef?.config[0] || {} : {}
+       ? serverDef?.config[0] || {} : {}
+    if (config?.properties) {
+      properties = config.properties
+    }
+    console.log("propereties after extending with config properties:", properties)
 
     // add secrets
     const secrets = serverDef?.secrets || []
@@ -97,13 +102,6 @@ const DockerMcpServerConfigBuilder = ({ serverName, serverDef }: { serverName: s
         description: `Secret (in env var ${secretVar.env})`,
       }
     })
-
-    if (config) {
-      config?.properties?.forEach((configVar: any) => {
-        const schema = configVar?.Schema || {}
-        properties[configVar.Name] = schema
-      })
-    }
 
     return {
       type: 'object',
@@ -136,4 +134,4 @@ const DockerMcpServerConfigBuilder = ({ serverName, serverDef }: { serverName: s
   )
 }
 
-export default DockerMcpServerConfigBuilder
+export default DockerMcpCatalogConfigBuilder
