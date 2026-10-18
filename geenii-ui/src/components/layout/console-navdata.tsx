@@ -24,36 +24,36 @@ export const data = {
       ],
     },
     {
-      title: 'Managed',
+      title: 'Configure',
       url: '#',
       items: [
         {
           title: 'Agents',
-          url: '#/console/managed/agents',
+          url: '#/console/configure/agents',
         },
         {
           title: 'Skills',
-          url: '#/console/managed/skills',
+          url: '#/console/configure/skills',
         },
         {
           title: 'MCP',
-          url: '#/console/managed/mcp-servers',
+          url: '#/console/configure/mcp-servers',
         },
         {
           title: 'Tools',
-          url: '#/console/managed/tools',
+          url: '#/console/configure/tools',
         },
         // {
         //   title: 'Environments',
-        //   url: '#/console/managed/environments',
+        //   url: '#/console/configure/environments',
         // },
         // {
         //   title: 'Memory Stores',
-        //   url: '#/console/managed/memory-stores',
+        //   url: '#/console/configure/memory-stores',
         // },
         // {
         //   title: 'Vaults',
-        //   url: '#/console/managed/vaults',
+        //   url: '#/console/configure/vaults',
         // },
       ],
     },

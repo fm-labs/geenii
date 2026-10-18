@@ -1,8 +1,8 @@
 import React from 'react'
 import ConsoleLayout from '@/components/layout/console-layout.tsx'
 import { useRoute } from '@/app-router.tsx'
-import { McpServersSettingsView } from '@/app/console/components/mcp-servers-settings-view.tsx'
 import { AiModelSettingsView } from '@/app/console/components/ai-model-settings-view.tsx'
+import { McpServersDockerView } from '@/app/console/components/mcp-servers-docker-view.tsx'
 
 const CatalogPage = () => {
   const { params } = useRoute()
@@ -10,7 +10,7 @@ const CatalogPage = () => {
   const getSectionContent = (section: string) => {
     switch (section) {
       case 'mcp':
-        return <McpServersSettingsView />
+        return <McpServersDockerView />
       case 'models':
         return <AiModelSettingsView />
       default:

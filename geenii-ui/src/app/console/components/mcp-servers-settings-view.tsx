@@ -1,7 +1,5 @@
 import * as React from 'react'
 import { McpServersProvider, useMcpServers } from '@/app/mcp-servers/components/mcp-servers-provider.tsx'
-import { DockerMcpCatalogProvider } from '@/app/mcp-servers/components/docker-mcp-catalog-provider.tsx'
-import DockerMcpCatalog from '@/app/mcp-servers/components/docker-mcp-catalog.tsx'
 import { McpServer } from '@/app/mcp-servers/components/mcp-server.tsx'
 import { McpServerProvider } from '@/app/mcp-servers/components/mcp-server-provider.tsx'
 
@@ -22,6 +20,7 @@ const McpServersAdminView = () => {
     ))}
   </div>
 }
+
 export const McpServersSettingsView = () => {
   return <div>
     <h2 className="text-2xl font-bold mb-4">Installed MCP Servers</h2>
@@ -31,13 +30,5 @@ export const McpServersSettingsView = () => {
     <McpServersProvider>
       <McpServersAdminView />
     </McpServersProvider>
-
-    <h2 className="text-2xl font-bold mb-4">MCP Server Catalog</h2>
-    <p className="text-gray-600 mb-4">
-      Browse and install MCP Servers from the Docker MCP Catalog.
-    </p>
-    <DockerMcpCatalogProvider>
-      <DockerMcpCatalog />
-    </DockerMcpCatalogProvider>
   </div>
 }

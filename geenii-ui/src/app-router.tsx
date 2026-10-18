@@ -10,7 +10,7 @@ import AgentPage from '@/app/agents/agent-page.tsx'
 import XchatDemoPage1 from '@/app/xchat/xchat-demo-page-1.tsx'
 import CatalogPage from '@/app/console/catalog-page.tsx'
 import ConsolePage from '@/app/console/console-page.tsx'
-import ManagedPage from '@/app/console/managed-page.tsx'
+import ConfigurePage from '@/app/console/configure-page.tsx'
 import SystemPage from '@/app/console/system-page.tsx'
 
 
@@ -90,8 +90,8 @@ const AppRouter = () => {
         element: <CatalogPage />,
       },
       {
-        path: '/console/managed/:section',
-        element: <ManagedPage />,
+        path: '/console/configure/:section',
+        element: <ConfigurePage />,
       },
       {
         path: '/console/system/:section',

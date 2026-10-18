@@ -5,7 +5,7 @@ import { McpServersSettingsView } from '@/app/console/components/mcp-servers-set
 import Header from '@/components/header.tsx'
 import AgentsView from '@/app/agents/agents.view.tsx'
 
-const ManagedPage = () => {
+const ConfigurePage = () => {
   const { params } = useRoute()
   const section = decodeURIComponent(params?.section || '')
 
@@ -28,4 +28,4 @@ const ManagedPage = () => {
   )
 }
 
-export default ManagedPage
+export default ConfigurePage
