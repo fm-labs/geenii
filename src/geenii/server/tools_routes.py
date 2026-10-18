@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request
 
+from geenii.tool.common import ToolCallResult
 from geenii.tool.registry import ToolRegistry
+from geenii.tools import invoke_tool
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 
@@ -16,10 +18,10 @@ def get_tools(registry: ToolRegistry = Depends(dep_tool_registry)):
     return definitions
 
 @router.post("/{tool_name}/execute")
-def execute_tool(tool_name: str, args: dict, registry: ToolRegistry = Depends(dep_tool_registry)):
+def execute_tool(tool_name: str, args: dict, registry: ToolRegistry = Depends(dep_tool_registry)) -> ToolCallResult:
     # sync endpoint: FastAPI runs it in its threadpool, so the blocking tool call doesn't stall the event loop
     try:
         tool = registry.get(tool_name)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found.")
-    return tool.invoke(args=args, env={})
+    return invoke_tool(tool, args=args, env={}, caller_id="web:tools")

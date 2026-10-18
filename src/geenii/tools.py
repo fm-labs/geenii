@@ -1,20 +1,27 @@
 from __future__ import annotations
 
-import time
+import dataclasses
+import json
+import traceback
+from datetime import datetime
+from pathlib import Path
 
+from geenii.config import CACHE_DIR
 from geenii.core.tools import init_core_tools
-from geenii.mcp_config import get_mcp_config
 from geenii.mcp_client import McpClient
+from geenii.mcp_config import get_mcp_config
+from geenii.tool.common import ToolCallResult, Tool
 from geenii.tool.computer import ComputerTool
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.cached import cached
+from geenii.utils.json_util import append_jsonl
 
 
 def init_builtin_tools(registry: ToolRegistry):
     registry.register(ComputerTool(
         name="bash",
         description="Execute a shell command on the local machine and return its output.",
-        parameters={
+        input_schema={
             "type": "object",
             "properties": {
                 "command": {"type": "string", "description": "The shell command to execute. The command must be a single-line string, e.g. 'ls -la /tmp'."}
@@ -25,7 +32,7 @@ def init_builtin_tools(registry: ToolRegistry):
     registry.register(ComputerTool(
         name="python",
         description="Execute a python script and return its output.",
-        parameters={
+        input_schema={
             "type": "object",
             "properties": {
                 "command": {"type": "string", "description": "The python command to execute without the binary name, e.g. '-m mymodule script.py'."}
@@ -34,6 +41,7 @@ def init_builtin_tools(registry: ToolRegistry):
         },
     ))
     init_core_tools(registry)
+
 
 # empty results are not cached: [] is also what a failed listing returns, and it would hide the server's tools for the full ttl
 @cached(ttl=3600, cache_if=bool)
@@ -45,13 +53,15 @@ def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
             tools = mcp_client.list_tools()
         except Exception as e:
             # try again after a short delay in case the server is still starting up
-            print(f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds...")
-            try:
-                time.sleep(1)
-                tools = mcp_client.list_tools()
-            except Exception as e:
-                print(f"Error listing tools from MCP server {server_name} on second attempt: {e}. Skipping this server.")
-                return []
+            #print(f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds...")
+            #try:
+            #    time.sleep(1)
+            #    tools = mcp_client.list_tools()
+            #except Exception as e:
+            #    print(f"Error listing tools from MCP server {server_name} on second attempt: {e}. Skipping this server.")
+            #    return []
+            print(f"Error listing tools from MCP server {server_name}: {e}.")
+            return []
 
         return tools
     except Exception as e:
@@ -83,24 +93,48 @@ def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] = None)
             print(f"Error connecting to MCP server {server_name}: {e}")
             continue
 
-# def init_mcp_server_tools_sync(registry: ToolRegistry):
-#     # wrapper for the async version of init_mcp_server_tools to be used in synchronous contexts
-#     #asyncio.run(init_mcp_server_tools(registry))
-#     async def initialize():
-#         await init_mcp_server_tools(registry)
-#
-#     loop = asyncio.get_event_loop()
-#     loop.run_until_complete(initialize())
+
+def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = None, caller_id: str = "anonymous") -> ToolCallResult:
+    result = None
+    try:
+        print(f"Invoking tool {tool.name}", args, env, cwd)
+        result = tool.invoke(args=args, env=env, cwd=cwd)
+        print("Tool result:", result)
+        return result
+    except Exception as e:
+        print(f"Error executing tool {tool.name}: {e}")
+        # traceback.print_exc()
+        result = e
+        raise e from e
+    finally:
+        _log_tool_call(tool.name, args, env, cwd, caller_id=caller_id, result=result)
 
 
-# async def execute_tool_call(registry: ToolRegistry, tool_name: str, args: dict[str,Any], **kwargs) -> Any:
-#     """Look up and execute a tool by name and given arguments."""
-#     tool = registry.get(tool_name)
-#     if tool is None:
-#         raise ValueError(f"Tool {tool_name!r} is not registered")
-#     return await tool.invoke(args=args, **kwargs)
-#
-#
-# def execute_tool_call_sync(registry: ToolRegistry, tool_name: str, args: dict[str,Any], **kwargs) -> Any:
-#     """Synchronous wrapper around execute_tool_call."""
-#     return asyncio.run(execute_tool_call(registry, tool_name, args, **kwargs))
+def _log_tool_call(tool_name, args: dict[str, str],
+                   env: dict[str, str],
+                   cwd: str | None,
+                   caller_id: str,
+                   result: ToolCallResult | Exception | None = None):
+
+    print("Logging tool call", tool_name, args, cwd)
+    now = datetime.now()
+    date_formatted = now.strftime("%Y-%m-%d")
+    log_file = f"{CACHE_DIR}/logs/tool-use-{date_formatted}.log"
+    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+
+    if isinstance(result, ToolCallResult):
+        result = dataclasses.asdict(result)
+    if isinstance(result, Exception):
+        result = {
+            "exception": str(result),
+            "traceback": traceback.format_exc(),
+        }
+    append_jsonl(log_file, {
+        "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S"),
+        "caller_id": caller_id,
+        "tool": tool_name,
+        "args": args,
+        "env": env,
+        "cwd": cwd,
+        "result": result,
+    })

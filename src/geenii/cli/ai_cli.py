@@ -55,7 +55,7 @@ def chat(model, temperature, output_format, prompt):
 
     tool_registry.register(
         PythonFunctionTool(name="get_weather", description="Get the weather from the given location.",
-                           parameters={"location": {"type": "string"}},
+                           input_schema={"location": {"type": "string"}},
                            handler=lambda x: f"The weather in {x['location']} is sunny with a high of 25°C."))
 
     continue_chat = True

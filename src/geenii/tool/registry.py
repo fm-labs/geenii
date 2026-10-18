@@ -45,7 +45,7 @@ class ToolRegistry:
         tool = PythonFunctionTool(
             name=tool_name,
             description=tool_desc,
-            parameters=tool_params,
+            input_schema=tool_params,
             handler=fn,
         )
         self.register(tool)
@@ -69,7 +69,7 @@ class ToolRegistry:
                 name=defn['name'],
                 mcp_server_id=mcp_server_id,
                 description=defn.get("description", ""), #.strip().split("\n")[0],
-                parameters=defn.get("inputSchema", {}),
+                input_schema=defn.get("input_schema", {}),
             )
             self.register(tool)
             registered.append(tool)
@@ -135,12 +135,12 @@ class ToolRegistry:
         return self._tools[name].description
 
     # -- invocation ---------------------------------------------------------
-
-    def invoke(self, name: str, args: dict, **kwargs: Any) -> Any:
-        """Look up a tool by *name* and call it with *args*."""
-        tool = self.get(name)
-        logger.info("invoking tool %r with %s", name, args)
-        return tool.invoke(args=args, **kwargs)
+    # def invoke(self, name: str, args: dict, env: dict, **kwargs: Any) -> ToolCallResult:
+    #     """Look up a tool by *name* and call it with *args*."""
+    #     tool = self.get(name)
+    #     logger.info("invoking tool %r with %s", name, args)
+    #     return tool.invoke(args=args, env=env, **kwargs)
+    #     #return invoke_tool(tool, args, env, **kwargs)
 
     # -- dunder -------------------------------------------------------------
 

@@ -1,7 +1,7 @@
 import click
 
 from geenii.tool.registry import ToolRegistry
-from geenii.tools import init_builtin_tools, init_mcp_server_tools
+from geenii.tools import init_builtin_tools, init_mcp_server_tools, invoke_tool
 
 
 def _init_tool_registry():
@@ -33,7 +33,7 @@ def inspect_tool(tool_name):
         tool = tool_registry.get(tool_name)
         click.echo(f"Name: {tool.name}")
         click.echo(f"Type: {tool.type}")
-        click.echo(f"Parameters: {tool.parameters}")
+        click.echo(f"Parameters: {tool.input_schema}")
         click.echo(f"Description: {tool.description}")
     except KeyError:
         click.echo(f"Tool {tool_name} not found.")
@@ -62,9 +62,14 @@ def call_tool(tool_name, **kwargs):
 
     try:
         tool_registry = _init_tool_registry()
-        result = tool_registry.invoke(tool_name, args=parsed_kwargs, **kwargs)
+        env = {}
+        #result = tool_registry.invoke(tool_name, args=parsed_kwargs, env=env, **kwargs)
+        tool = tool_registry.get(tool_name)
+        result = invoke_tool(tool, args=parsed_kwargs, env=env, caller_id="cli:tools")
         print("--- Result ---")
-        print(result)
+        print(f"Error: {result.is_error}")
+        print(result.text)
+        print(result.structured_content)
         print("--------------")
         click.echo(f"Tool {tool_name} executed successfully.")
     except Exception as e:

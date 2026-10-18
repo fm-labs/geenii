@@ -82,7 +82,7 @@ class DemoAgent(Agent):
         tool_registry = ToolRegistry()
         tool_registry.register(PythonFunctionTool(name="get_weather",
                                                   description="Get the weather from the given location.",
-                                                  parameters={
+                                                  input_schema={
                                                       "type": "object",
                                                       "properties": {
                                                           "location": {

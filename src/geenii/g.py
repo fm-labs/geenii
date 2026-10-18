@@ -28,7 +28,8 @@ def get_bot(botname: str) -> BotInterface:
         raise ValueError(f"Invalid bot name: {botname}. Bot names must start with 'geenii:bot:'")
 
     name = botname[len("geenii:bot:"):]
-    return init_agent_by_name(name)
+    # cwd = BOT_WORKING_DIR
+    return init_agent_by_name(name, cwd=None)
 
 
 def makedirs_safe(path: str):
@@ -84,26 +85,31 @@ def init_global_agent_registry() -> AgentRegistry:
     return _agents
 
 
-def locate_agent_md_file(agent_name: str) -> str|None:
-    for (agent_dir, _) in agent_paths():
+def locate_agent_md_file(agent_name: str) -> tuple[str, str] | tuple[None, None]:
+    for (agent_dir, scope) in agent_paths():
         md_file_path = f"{agent_dir}/{agent_name}.md"
         if os.path.exists(md_file_path):
-            return md_file_path
-    return None
+            return md_file_path, scope
+    return None, None
 
-def init_agent_by_name(name: str, context_id: str | None = None) -> BaseAgent:
+def init_agent_by_name(name: str, context_id: str | None = None, cwd: str | None = None) -> BaseAgent:
     """Load an agent configuration from a markdown file and create an Agent instance."""
-    md_file_path = locate_agent_md_file(name)
-    if md_file_path is None:
-        if name == "default":
-            return init_default_agent(context_id=context_id)
-        if name == "auto":
-            return init_routing_agent(context_id=context_id)
-        raise ValueError(f"Agent '{name}' not found.")
-
     try:
+        md_file_path, scope = locate_agent_md_file(name)
+        if md_file_path is None:
+            if name == "default":
+                return init_default_agent(context_id=context_id)
+            elif name == "auto":
+                return init_routing_agent(context_id=context_id)
+            else:
+                raise ValueError(f"Agent '{name}' not found.")
+
         print(f"Loading agent '{name}' (Context {context_id})")
         agent_conf = AgentSpec.from_md_file(md_file_path)
+        agent_conf.scope = scope
+
+        if cwd is not None:
+            agent_conf.working_dir = cwd
         return init_agent(agent_conf, context_id=context_id)
     except Exception as e:
         raise e
@@ -115,6 +121,7 @@ def init_default_agent(context_id: str | None = None) -> BaseAgent:
             class_name="geenii.agents.Agent",
             model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
             system=DEFAULT_AGENT_SYSTEM_PROMPT,
+            scope="global"
         )
         return init_agent(agent_conf, context_id=context_id)
     except Exception as e:
@@ -127,6 +134,7 @@ def init_routing_agent(context_id: str | None = None) -> BaseAgent:
             class_name="geenii.agents.RoutingAgent",
             model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
             system=DEFAULT_AGENT_SYSTEM_PROMPT,
+            scope="global"
         )
         return init_agent(agent_conf, context_id=context_id)
     except Exception as e:

@@ -5,7 +5,7 @@ import shlex
 import shutil
 from typing import Any, Literal
 
-from geenii.tool.common import Tool, expand_vars
+from geenii.tool.common import Tool, expand_vars, ToolCallResult
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class SandboxTool(Tool):
         self,
         name: str,
         description: str = "",
-        parameters: dict | None = None,
+        input_schema: dict | None = None,
         runtime: Literal["python", "node", "bash"] = "bash",
         network_mode: Literal["none", "bridge", "host"] = "none",
         cpu_limit: float = 0.5,
@@ -35,7 +35,7 @@ class SandboxTool(Tool):
         pid_limit: int = 100,
         timeout: int = 30,
     ):
-        super().__init__(name, description, parameters)
+        super().__init__(name, description, input_schema)
         self.type = "sandbox"
         self.runtime = runtime
         self.network_mode = network_mode
@@ -44,7 +44,7 @@ class SandboxTool(Tool):
         self.pid_limit = pid_limit
         self.timeout = timeout
 
-    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
+    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> ToolCallResult:
         command = args.get("command", "")
         if not command:
             raise ValueError(f"Missing 'command' argument for SandboxTool {self.name!r}")
@@ -63,7 +63,8 @@ class SandboxTool(Tool):
 
         sandbox_id = (env or {}).get("SKILL_NAME", "sandbox")
 
-        return self._run(app_dir=app_dir, command=command, sandbox_id=sandbox_id, env=env)
+        result = self._run(app_dir=app_dir, command=command, sandbox_id=sandbox_id, env=env)
+        return ToolCallResult(text=result)
 
     def _run(self, app_dir: str, command: str, sandbox_id: str, env: dict[str, str] | None) -> str:
         from geenii.sandbox import PythonSandbox, BashSandbox, NodeJsSandbox

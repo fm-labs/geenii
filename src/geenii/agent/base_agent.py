@@ -1,4 +1,5 @@
 import os
+import tempfile
 from pathlib import Path
 
 import abc
@@ -51,7 +52,12 @@ class BaseAgent(BotInterface, abc.ABC):
         self.context_id = context_id or uuid.uuid7().hex
         self.allowed_tools: Set[str] = allowed_tools or set()
         self.mcp_servers: Set[str] = mcp_servers or set()
-        self.cwd = cwd or Path.cwd()
+
+        if not cwd:
+            # create a temp agent dir
+            self._temp_dir = tempfile.TemporaryDirectory(prefix=f"geenii_agent_{self.name}_")
+            cwd = self._temp_dir.name
+        self.cwd = cwd
 
         # runtime
         self.active_skills: list[str] = []

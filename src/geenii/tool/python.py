@@ -7,7 +7,7 @@ import os
 import inspect
 from typing import Callable, Any
 
-from geenii.tool.common import Tool, expand_vars
+from geenii.tool.common import Tool, expand_vars, ToolCallResult
 from geenii.utils.async_bridge import run_sync
 
 logger = logging.getLogger(__name__)
@@ -20,14 +20,14 @@ class PythonFunctionTool(Tool):
             self,
             name: str,
             description: str = "",
-            parameters: dict | None = None,
+            input_schema: dict | None = None,
             handler: Callable[..., Any] | None = None,
     ):
-        super().__init__(name, description, parameters)
+        super().__init__(name, description, input_schema)
         self.type = "function"
         self.handler = handler
 
-    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
+    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> ToolCallResult:
         if self.handler is None:
             raise RuntimeError(f"No handler registered for tool {self.name!r}")
 
@@ -37,7 +37,7 @@ class PythonFunctionTool(Tool):
             result = run_sync(result)
 
         # print(f"Tool {self.name!r} returned:", result)
-        return result
+        return ToolCallResult(result)
 
 
 class PythonCliTool(Tool):
@@ -47,12 +47,12 @@ class PythonCliTool(Tool):
             self,
             name: str,
             description: str = "",
-            parameters: dict | None = None,
+            input_schema: dict | None = None,
     ):
-        super().__init__(name, description, parameters)
+        super().__init__(name, description, input_schema)
         self.type = "python"
 
-    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
+    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> ToolCallResult:
         command = args.get("command")
         if not command:
             raise ValueError(f"Missing 'command' argument for PythonTool {self.name!r}")
@@ -64,7 +64,7 @@ class PythonCliTool(Tool):
 
         result: str = self.run_subprocess(command, env)
         logger.info(f"PythonCliTool result: {str(result)}")
-        return result
+        return ToolCallResult(result)
 
     # helper method to run a subprocess and capture its output
     def run_subprocess(self, command: str, env: dict[str, str] | None) -> str:

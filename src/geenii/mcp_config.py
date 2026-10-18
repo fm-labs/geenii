@@ -48,6 +48,7 @@ def get_mcp_client_for_server(server_name: str) -> "McpClient":
     :return: An MCP Client instance for the specified server.
     """
     if server_name in _client_cache:
+        logger.warning(f"Using cached MCP client for server '{server_name}'")
         return _client_cache[server_name]
 
     server_config = get_mcp_config_for_server(server_name)
@@ -58,6 +59,7 @@ def get_mcp_client_for_server(server_name: str) -> "McpClient":
     _client_cache[server_name] = mcp_client
     logger.info(f"Created and cached MCP client for server '{server_name}'")
     return mcp_client
+
 
 
 def close_mcp_clients():

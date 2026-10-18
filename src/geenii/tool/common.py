@@ -1,18 +1,25 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from abc import ABC, abstractmethod
+
+@dataclass
+class ToolCallResult:
+    text: str
+    structured_content: dict[str, Any] | None = None
+    is_error: bool = False
 
 
 class Tool(ABC):
     """Abstract base for all tool types."""
 
-    def __init__(self, name: str, description: str = "", parameters: dict | None = None):
+    def __init__(self, name: str, description: str = "", input_schema: dict | None = None):
         self.type = "tool"
         self.name = name
         self.description = description
-        self.parameters = parameters or {}
+        self.input_schema = input_schema or {}
 
     #def __str__(self) -> str:
     #    return self.name
@@ -21,7 +28,7 @@ class Tool(ABC):
     #    return f"<{self.__class__.__name__} name={self.name!r}>"
 
     @abstractmethod
-    def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
+    def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, **kwargs: Any) -> ToolCallResult:
         ...
 
     @property
@@ -34,7 +41,7 @@ class Tool(ABC):
             "type": self.type,
             "name": self.name,
             "description": self.description,
-            "parameters": self.parameters,
+            "parameters": self.input_schema,
         }
 
     def to_openai(self) -> dict:
@@ -43,7 +50,7 @@ class Tool(ABC):
             "type": "function",
             "name": self.name,
             "description": self.description,
-            "parameters": self.parameters,
+            "parameters": self.input_schema,
         }
 
     def to_ollama(self) -> dict:
@@ -53,7 +60,7 @@ class Tool(ABC):
             "function": {
                 "name": self.name,
                 "description": self.description,
-                "parameters": self.parameters,
+                "parameters": self.input_schema,
             },
         }
 

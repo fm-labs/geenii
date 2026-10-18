@@ -227,7 +227,7 @@ def register_skill_scripts(skill: SkillSpec, tool_registry) -> list[str]:
             name=tool_name,
             description=f"Script from skill '{skill.name}': {script.stem}",
             script_path=str(resolved),
-            parameters={"type": "object", "properties": {"args": {"type": "string", "description": "The tool arguments"}}},
+            input_schema={"type": "object", "properties": {"args": {"type": "string", "description": "The tool arguments"}}},
         )
         tool_registry.register(tool)
         registered.append(tool_name)

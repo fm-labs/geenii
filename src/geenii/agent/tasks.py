@@ -3,7 +3,11 @@ from __future__ import annotations
 import copy
 import logging
 from datetime import datetime
-from typing import Iterator, Set, TYPE_CHECKING
+from typing import Iterator, Set, TYPE_CHECKING, Generator
+
+from geenii.tool.common import ToolCallResult
+from geenii.tool.mcp_tool import McpTool
+from geenii.tools import invoke_tool
 
 if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
@@ -70,7 +74,7 @@ class ToolCallTask(BaseAgentTask):
                 has_any = True
         return combined if has_any else None
 
-    def execute(self) -> Iterator[ModelMessage]:
+    def execute(self) -> Generator[ModelMessage, None, ToolCallResult]:
         tool_name = self.tool_name
         arguments = self.arguments
         call_id = self.call_id
@@ -96,7 +100,7 @@ class ToolCallTask(BaseAgentTask):
                 ],
             )
             yield msg
-            return
+            return ToolCallResult("Call blocked", is_error=True)
 
         # yield a message, requesting approval for the tool call before executing it
         tool_usage_request_message = ModelMessage(
@@ -133,24 +137,29 @@ class ToolCallTask(BaseAgentTask):
             )
             yield msg
             # self.agent.add_to_history(msg)
-            return
+            return ToolCallResult("Call rejected", is_error=True)
 
-        logger.info(f"Calling tool {tool_name} with arguments {arguments}")
         try:
-            # tool_result = execute_tool_call(self.agent.tools, tool_name=tool_name, args=arguments)
-
             tool_env = {}
             # if active_skills:
             #     tool_env["SKILL_NAME"] = ",".join(active_skills)
             #     first_skill = self.agent.skills.get(active_skills[0])
             #     if first_skill:
             #         tool_env["SKILL_DIR"] = first_skill.path
-            tool_result = tool.invoke(args=arguments, env=tool_env, cwd=self.agent.cwd)
+            # tool_result = execute_tool_call(self.agent.tools, tool_name=tool_name, args=arguments)
+            #logger.info(f"Tool invocation {tool_name} args={arguments} with cwd={self.agent.cwd}")
+            tool_result = invoke_tool(tool, args=arguments, env=tool_env, cwd=self.agent.cwd,
+                                      caller_id=f"agent:{self.agent.name}:{call_id}")
+            #logger.debug(f"Tool {tool_name} returned result: {tool_result}")
 
-            logger.debug(f"Tool {tool_name} returned result: {tool_result}")
+            if isinstance(tool, McpTool):
+                # todo check if the tool is an mcp app from its meta data and server capabilities
+                # todo load the ui resource
+                pass
+
         except Exception as e:
             logger.exception(f"Error executing tool {tool_name}", exc_info=e)
-            tool_result = {"error": str(e)}
+            tool_result = ToolCallResult(text=str(e), structured_content={"error": str(e)}, is_error=True)
 
         msg = ModelMessage(
             role="tool",
@@ -158,13 +167,14 @@ class ToolCallTask(BaseAgentTask):
                 ToolCallResultContent(
                     name=tool_name,
                     arguments=arguments,
-                    result=tool_result,
+                    result=tool_result.structured_content or tool_result.text,
                     call_id=call_id,
                 )
             ],
         )
         yield msg
         #self.agent.add_to_history(msg)
+        return tool_result
 
 
 class LLMTask(BaseAgentTask):
@@ -544,7 +554,7 @@ class HandoffTask(BaseAgentTask):
         self.target_agent_name = target_agent_name
         self.prompt = prompt or f"Handing off the conversation to {target_agent_name}."
 
-        sub = init_agent_by_name(target_agent_name)
+        sub = init_agent_by_name(target_agent_name, cwd=self.agent.cwd)
         if not sub:
             raise ValueError(
                 f"Target agent '{target_agent_name}' not found for handoff."
