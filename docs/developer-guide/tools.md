@@ -2,8 +2,10 @@
 
 A tool is a named, schema-described callable that the model can invoke during a
 chat completion. Tools are held in a `ToolRegistry` (`geenii/tool/registry.py`);
-each agent owns its own registry, populated at first prompt with the built-in
-tools and all configured MCP server tools.
+each agent owns its own registry, populated by `init_agent()` from the agent
+spec (see [agents.md](agents.md#runtime-model)). Registering a name that is
+already registered logs a warning and keeps the existing tool (it no longer
+raises).
 
 ## Tool types
 
@@ -26,7 +28,10 @@ style), `to_openai()`, and `to_ollama()` — providers pick the one they need.
 
 ## Built-in tools
 
-Registered by `init_builtin_tools()` (`geenii/tools.py`) on every agent:
+Registered by `init_builtin_tools()` (`geenii/tools.py`). `init_agent()` calls
+it only when the agent spec's `tools` list contains `read`, `write` or `bash`;
+in that case all of these are registered (the model still only sees the ones in
+`allowed_tools`):
 
 | Name | Type | Description |
 |---|---|---|
@@ -62,8 +67,10 @@ registered by default.
 ## MCP tools
 
 MCP servers are declared in `$GEENII_DIR/mcp.json` (see
-[configuration.md](../user-guide/configuration.md)). During agent initialization
-(`init_mcp_server_tools`):
+[configuration.md](../user-guide/configuration.md)). `init_agent()` calls
+`init_mcp_server_tools(registry, server_names)` with the agent spec's
+`mcp_servers`; servers not in that set are skipped, and an agent without
+`mcp_servers` gets no MCP tools. For each selected server:
 
 1. Each server is contacted through `McpClient` (a fastmcp wrapper) and its
    `tools/list` result is fetched — with one retry, and cached for 1 hour via

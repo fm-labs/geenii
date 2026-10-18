@@ -87,10 +87,10 @@ expect. Both chat model selectors use it.
 | Path | Contents |
 |---|---|
 | `src/app-router.tsx` | Route table; pages read `:params` via `useRoute()` |
-| `src/app/<feature>/` | One folder per feature: `*-page.tsx` (wrapped in `Layout`), views, local types |
+| `src/app/<feature>/` | One folder per feature: `*-page.tsx` (wrapped in `Layout`, or `ConsoleLayout` for console pages), views, local types |
 | `src/components/ui/` | shadcn primitives |
 | `src/components/xchat/` | Agent chat component library (see below) |
-| `src/components/layout/` | `Layout` (top nav, flag-driven), `MainContent` |
+| `src/components/layout/` | `Layout` (top nav, flag-driven; the gear icon links to `#/console`), `ConsoleLayout` + `console-navdata.tsx` (console sidebar), `MainContent` |
 | `src/components/tauri/` | Tauri title bar, panel and command helpers |
 | `src/context/` | `server-context`, `api-context`, `app-context` |
 | `src-tauri/` | Rust shell: plugins, tray, `geenii://` app protocol, sidecar |
@@ -101,9 +101,24 @@ expect. Both chat model selectors use it.
 |---|---|---|
 | `#/` (dashboard), `#/agents` | `agents/agents.view.tsx` — card grid of agents; each card links to the agent page | `GET /agents/` |
 | `#/agents/:name` | `agents/agent.view.tsx` + `agent-chat.tsx` — an xchat bound to this agent (no session list, "New chat" starts over), with the agent's short info (model, description, tool/MCP/skill counts) in the chat card header and a Details dialog for parameters, tool and skill descriptions and instructions | `GET /agents/{name}`, `/agents/{name}/commands`, `/tools/`, `/chats/*` |
-| `#/` (dashboard), `#/tools`, settings | `tools/tools.view.tsx` — tools as badges grouped by type; clicking one opens a pane with the parameter table, an rjsf form built from `parameters`, and Execute | `GET /tools/`, `POST /tools/{name}/execute` |
-| `#/xchat` | `xchat/xchat-demo-page-1.tsx` | `/chats/*`, `/agents/{name}/commands` |
-| `#/chat`, `#/completions`, `#/audio` | completion chat and quick generators | `/ai/*` |
+| `#/console/playground/tools` | `tools/tools.view.tsx` — tools as badges grouped by type; clicking one opens a pane with the parameter table, an rjsf form built from `parameters`, and Execute | `GET /tools/`, `POST /tools/{name}/execute` |
+| `#/console/playground/xchat` | `xchat/xchat-demo-page-1.tsx` | `/chats/*`, `/agents/{name}/commands` |
+| `#/console/playground/completions`, `#/chat`, `#/completions`, `#/audio` | completion chat and quick generators (completion pages use `ConsoleLayout`) | `/ai/*` |
+
+### Console
+
+`#/console` is the admin area; its sidebar comes from
+`src/components/layout/console-navdata.tsx`.
+
+| Route | Page | Sections |
+|---|---|---|
+| `#/console/playground/{completions,tools,xchat,agents}` | completion chat, tools view, xchat demo, agents grid | — |
+| `#/console/configure/:section` | `console/configure-page.tsx` (formerly `managed-page.tsx`, `#/console/managed/…`) | `agents`, `mcp-servers` (installed servers); `skills` and `tools` are in the nav but not rendered yet |
+| `#/console/catalog/:section` | `console/catalog-page.tsx` | `mcp` (Docker MCP Catalog, `McpServersDockerView`), `models` |
+| `#/console/system/:section` | `console/system-page.tsx` | `info`, `settings` |
+
+Environments, Memory Stores, Vaults and Plugins entries are commented out in
+the nav.
 
 Other pages (`#/mcp`, `#/flows`, parts of `#/settings`, apps) call endpoints the server does not have yet; see
 `geenii-ui/SUMMARY.md`.

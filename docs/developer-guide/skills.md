@@ -79,7 +79,8 @@ registering a duplicate name raises an error.
 ## How skills reach the model
 
 1. **Loading** — an agent's `skills` list (or the CLI `--skills` override)
-   loads each named skill into the agent's `SkillRegistry`.
+   loads each named skill into the agent's `SkillRegistry`. If a name
+   contains a comma, only the part before the first comma is used.
 2. **Selection** — on every prompt, `FindBestSkillTask` activates one or more
    skills on `agent.active_skills`. The selection follows a priority cascade:
    - **Single skill**: auto-selected, no LLM call.

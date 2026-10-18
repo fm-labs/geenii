@@ -25,12 +25,20 @@ tool `invoke()` and HITL controllers are plain (blocking) functions/generators.
 To run several agents concurrently, run each one in its own thread or process;
 a single agent instance is not meant to be shared between concurrent callers.
 
+The tool registry is populated by `init_agent()` (`geenii/agent/registry.py`)
+before the agent is constructed, based on its spec:
+
+- If the spec's `tools` list contains `read`, `write` or `bash`, all built-in
+  tools are registered (`init_builtin_tools()`).
+- If the spec lists `mcp_servers`, only the tools of those servers are
+  registered (`init_mcp_server_tools(registry, set(mcp_servers))`).
+- Each name in `skills` is loaded into the skill registry.
+
 On the first `process()` call, `BaseAgent._initialize()` runs once (lazily, so
-subclasses can finish their own `__init__` first). For `Agent` it registers the
-tools of the agent's configured MCP servers (`mcp_servers`) into its tool
-registry and warns about `allowed_tools` that are not registered. Which tools
-the model may actually call is controlled by `allowed_tools` (from the spec's
-`tools` list or the CLI `--tools` override).
+subclasses can finish their own `__init__` first). For `Agent` it only warns
+about `allowed_tools` that are not registered; it no longer loads MCP tools
+itself. Which tools the model may actually call is controlled by
+`allowed_tools` (from the spec's `tools` list or the CLI `--tools` override).
 
 ## The task queue
 
@@ -50,7 +58,7 @@ remaining tasks still run.
 
 | Task | Purpose |
 |---|---|
-| `LLMTask` | The main completion. Builds the full system prompt, sends the request (with the last `MAX_MESSAGE_HISTORY = 30` history messages), then drives the tool-call loop: all tool calls in a response are executed via `ToolCallTask`, then the completion is re-generated with the results. This repeats until the model answers without tool calls, bounded by `MAX_TOOL_CALLS = 10` per response and `MAX_RECURSION = 10` re-generations. |
+| `LLMTask` | The main completion. Builds the full system prompt, sends the request (with the last `MAX_MESSAGE_HISTORY = 30` history messages), then drives the tool-call loop: all tool calls in a response are executed via `ToolCallTask`, then the completion is re-generated with the results. This repeats until the model answers without tool calls, bounded by `MAX_TOOL_CALLS = 10` per response and `MAX_RECURSION = 10` re-generations. `max_tokens` is estimated per request as (system prompt + input characters) / 4 + 8192. |
 | `ToolCallTask` | Executes one tool call: emits an approval-request message, asks the HITL controller, invokes the tool (passing skill env vars), and appends the result to history. |
 | `FindBestSkillTask` | Activates one or more skills on `agent.active_skills`. Tries, in order: auto-select (single skill), pre-selection, deterministic trigger matching (keyword-based, no LLM call), and LLM fallback (JSON output, temperature 0.1). Also registers any executable scripts in activated skills' `scripts/` directories as namespaced tools (`{skill}__{script}`). |
 | `FindBestAgentTask` | LLM call that picks the best agent from the global registry, then yields a `HandoffTask`; falls back to a plain `LLMTask` when nothing fits. |

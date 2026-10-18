@@ -56,6 +56,7 @@ intended for tests, not enumeration).
 - Model parameters map to Ollama options: `temperature`, `max_tokens` →
   `num_ctx`, `top_p`, `top_k`. Streaming and thinking output are not yet
   surfaced.
+- **Defaults:** `temperature=0.1`, `max_tokens=8192`, model=`qwen:3b`.
 
 ### `openai`
 

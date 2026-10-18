@@ -37,10 +37,10 @@ tools:
 | `description` | str | Shown in listings; also used for automatic agent routing |
 | `label` | str | Display label |
 | `system` | str | Base system prompt (the markdown body is appended to it) |
-| `tools` | list[str] | Tool names the agent is allowed to call |
+| `tools` | list[str] | Tool names the agent is allowed to call. Listing `read`, `write` or `bash` loads the built-in tools |
 | `skills` | list[str] | Skill names to load into the agent |
 | `model_parameters` | dict | Reserved; not currently applied to requests |
-| `mcp_servers` | list[str] | Reserved; currently all configured MCP servers are loaded regardless |
+| `mcp_servers` | list[str] | Names of MCP servers (from `mcp.json`) whose tools are loaded; servers not listed are not loaded. Their tools (`mcp__<server>__<tool>`) must still be listed in `tools` to be callable |
 
 A built-in `default` agent (using `DEFAULT_COMPLETION_MODEL`) always exists;
 placing a `routing.md` in the agents directory overrides it.
