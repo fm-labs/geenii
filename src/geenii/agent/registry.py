@@ -2,6 +2,8 @@ from pathlib import Path
 
 import logging
 import os
+from typing import Literal
+
 import pydantic
 
 from geenii.agent.base_agent import BaseAgent
@@ -25,13 +27,14 @@ class AgentSpec(pydantic.BaseModel):
     system: str | None = None
     label: str | None = None
     description: str | None = None
-    tools: list[str] | None = pydantic.Field(default_factory=list)
-    skills: list[str] | None = pydantic.Field(default_factory=list)
+    tools: list[str] | None = pydantic.Field(default_factory=list)  # tools names
+    skills: list[str] | None = pydantic.Field(default_factory=list) # skill names
     model_parameters: dict | None = pydantic.Field(default_factory=dict)
     mcp_servers: list[str] | None = pydantic.Field(default_factory=list)
     class_name: str | None = None
-    #sandbox: str | None = None
-    #memory: Literal["short", "file", "sqlite"] | None = None
+    scope: Literal["builtin", "global", "project", "user"] = "user"
+    working_dir: str | None = None # only for project scope
+    allowed_dirs: list[str] | None = None # only for project scope
 
     # @property
     # def working_dir(self):
@@ -70,8 +73,11 @@ class AgentSpec(pydantic.BaseModel):
         return AgentSpec.model_validate(header)
 
 
-def init_agent(agent_conf: AgentSpec, context_id: str | None = None, *,
-               memory: ChatMemory | None = None, hitl: HumanInTheLoopController | None = None) -> BaseAgent:
+def init_agent(agent_conf: AgentSpec,
+               context_id: str | None = None,
+               *,
+               memory: ChatMemory | None = None,
+               hitl: HumanInTheLoopController | None = None) -> BaseAgent:
     """Create a new agent instance from its spec. `memory` and `hitl` override the agent's defaults."""
     # todo check model provider configuration
     # todo check model availability
@@ -183,7 +189,7 @@ class AgentRegistry:
         else:
             logger.warning(f"Agent configuration file not found at {config_path}. No agents loaded.")
 
-    def load_from_directory(self, directory: str) -> None:
+    def load_from_directory(self, directory: str, scope: str = 'global') -> None:
         base_path = Path(directory)
         if not base_path.is_dir():
             logger.warning(f"Agent directory '{directory}' does not exist or is not a directory.")
@@ -194,6 +200,7 @@ class AgentRegistry:
                 #logger.debug(f"Agent MD found at '{file_path}'")
                 try:
                     agent_conf = AgentSpec.from_md_file(str(file_path))
+                    agent_conf.scope = scope
                     self._agent_configs[agent_conf.name] = agent_conf
                     logger.debug(f"Agent config '{agent_conf.name}' loaded from file '{file_path}'.")
                 except Exception as e:

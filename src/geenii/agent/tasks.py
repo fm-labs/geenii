@@ -145,7 +145,7 @@ class ToolCallTask(BaseAgentTask):
             #     first_skill = self.agent.skills.get(active_skills[0])
             #     if first_skill:
             #         tool_env["SKILL_DIR"] = first_skill.path
-            tool_result = tool.invoke(args=arguments, env=tool_env)
+            tool_result = tool.invoke(args=arguments, env=tool_env, cwd=self.agent.cwd)
 
             logger.debug(f"Tool {tool_name} returned result: {tool_result}")
         except Exception as e:

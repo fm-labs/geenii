@@ -43,11 +43,11 @@ def make_app_directories():
     makedirs_safe(f"{CACHE_DIR}/logs")
 
 
-def agent_paths():
+def agent_paths() -> list[tuple[str, str]]:
     return [
-        f"{GEENII_WORKING_DIR}/.geenii/agents",
-        #f"{GEENII_DIR}/agents",
-        f"{get_user_home_dir()}/.geenii/agents",
+        (f"{GEENII_WORKING_DIR}/.geenii/agents", "project"),
+        (f"{get_user_home_dir()}/.geenii/agents", "user"),
+        ("/var/geenii/agents", "global"),
     ]
 
 
@@ -56,27 +56,31 @@ def init_global_agent_registry() -> AgentRegistry:
     # default
     _agents._agent_configs.update({"default": AgentSpec(
         name="default",
-        model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b"
+        model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
+        scope="global"
     )})
     # routing
     _agents._agent_configs.update({"routing": AgentSpec(
         name="routing",
         class_name="geenii.agents.RoutingAgent",
         model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
+        scope="global"
     )})
     # chatgpt
     _agents._agent_configs.update({"chatgpt": AgentSpec(
         name="chatgpt",
-        model="openai:gpt-3.5-turbo"
+        model="openai:gpt-3.5-turbo",
+        scope="global"
     )})
     # anthropic
     _agents._agent_configs.update({"claude": AgentSpec(
         name="claude",
-        model="anthropic:claude-opus-4-6"
+        model="anthropic:claude-opus-4-6",
+        scope="global"
     )})
 
-    for agent_dir in set(agent_paths()):
-        _agents.load_from_directory(agent_dir)
+    for (agent_dir, scope) in set(agent_paths()):
+        _agents.load_from_directory(agent_dir, scope=scope)
     return _agents
 
 

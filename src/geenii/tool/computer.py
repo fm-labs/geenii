@@ -27,24 +27,20 @@ class ComputerTool(Tool):
         self.command_template = command_template
 
     def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, **kwargs: Any) -> Any:
+        working_dir = kwargs.get("cwd", config.GEENII_WORKING_DIR)
+        # todo check if tool execution is permitted in given working_dir
+
         command = args.get("command")
         if not command:
             raise ValueError(f"Missing 'command' argument for ComputerTool {self.name!r}")
-
         if self.command_template is not None:
             command = self.command_template.format(command=command, **args)
 
-        logger.info(f"Executing ComputerTool command: {command}")
-
-        # expand environment variables in the command
+        logger.info(f"Executing ComputerTool command: {command} in working directory={working_dir}")
         command = expand_vars(command, env or {})
-
-        working_dir = config.GEENII_WORKING_DIR
-
-        result = self.run_subprocess(command, env, working_dir)
+        result = self.run_subprocess(command, env=env, cwd=working_dir)
         #logger.debug(f"Command result: {result}")
         return result
-
 
     def run_subprocess(self, command: str, env: dict[str, str] | None, cwd=None) -> str:
         subprocess_id = uuid.uuid4().hex[:8]

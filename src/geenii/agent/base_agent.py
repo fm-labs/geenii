@@ -36,20 +36,24 @@ class BaseAgent(BotInterface, abc.ABC):
                  allowed_tools: Set[str] | None = None,
                  mcp_servers: Set[str] | None = None,
                  context_id: str | None = None, memory: ChatMemory | None = None,
+                 cwd: str | None = None,
                  *,
                  tool_registry: ToolRegistry | None = None,
                  skill_registry: SkillRegistry | None = None,
                  hitl: HumanInTheLoopController | None = None):
 
+        # configuration
         self.name = name
         self.description = description
         self.model = model or DEFAULT_COMPLETION_MODEL
         self.system_prompt = system_prompt or DEFAULT_AGENT_SYSTEM_PROMPT
         self.developer_prompt = ""
         self.context_id = context_id or uuid.uuid7().hex
-        self.memory = memory or None
         self.allowed_tools: Set[str] = allowed_tools or set()
         self.mcp_servers: Set[str] = mcp_servers or set()
+        self.cwd = cwd or Path.cwd()
+
+        # runtime
         self.active_skills: list[str] = []
         # usage of all model calls made by this agent instance (and agents it handed off to), see record_usage()
         self.usage: Usage = Usage()
@@ -60,17 +64,13 @@ class BaseAgent(BotInterface, abc.ABC):
         self._tasks: deque[BaseTask] = deque()
         self._hitl = hitl or NoHumanInTheLoopController()
 
-        logger.info(f"Context ID: {self.context_id} ({context_id})")
-        self._init_memory()
+        logger.info(f"Agent constructed with Context ID: {self.context_id}")
+        self.memory = memory or self._create_memory(self.context_id)
         self._initialized = False
 
     def __repr__(self):
-        return f"Agent(name={self.name}, context_id={self.context_id}, model={self.model}, tools={self.allowed_tools}, skills={self.skills.names()})"
-
-    def _init_memory(self):
-        if self.memory is not None:
-            return
-        self.memory = self._create_memory(self.context_id)
+        return (f"Agent(name={self.name}, context_id={self.context_id}, model={self.model}, "
+                f"tools={self.allowed_tools}, skills={self.skills.names()}, active_skills={self.active_skills})")
 
     def _create_memory(self, context_id: str) -> ChatMemory:
         if GEENII_MEMORY_ENGINE == "file":
