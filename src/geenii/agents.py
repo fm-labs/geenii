@@ -4,6 +4,7 @@ import time
 
 from geenii.agent.base import message_to_prompt
 from geenii.agent.base_agent import BaseAgent
+from geenii.agent.info_commands import INFO_COMMANDS, InfoCommandTask
 from geenii.agent.tasks import (
     LLMTask,
     FindBestAgentTask,
@@ -14,11 +15,8 @@ from geenii.agent.tasks import (
     ClearMemoryTask,
     ToolCallTask,
 )
-from geenii.agent.info_commands import INFO_COMMANDS, InfoCommandTask
 from geenii.chat_models import ContentPart
-from geenii.core.process_tools import init_process_tools
 from geenii.pm.process_manager_client import ProcessManagerClient
-from geenii.tools import init_mcp_server_tools
 
 logger = logging.getLogger(__name__)
 
@@ -178,8 +176,8 @@ class ProcessManagerAgent(Agent):
             return
 
         #init_builtin_tools(self._tool_registry)
-        init_process_tools(self._tool_registry, self._pm)
-        if self.mcp_servers:
-            init_mcp_server_tools(self._tool_registry, self.mcp_servers)
+        #init_process_tools(self._tool_registry, self._pm)
+        #if self.mcp_servers:
+        #    init_mcp_server_tools(self._tool_registry, self.mcp_servers)
 
         self._initialized = True

@@ -19,7 +19,7 @@ _client_cache: dict[str, "McpClient"] = {}
 def get_mcp_config(reload: bool = False):
     global config
     if config is None or reload:
-        config = read_mcp_config_json()
+        config = read_mcp_config_files()
     return config
 
 
@@ -76,7 +76,7 @@ def close_mcp_clients():
 atexit.register(close_mcp_clients)
 
 
-def read_mcp_config_json() -> dict:
+def read_mcp_config_files() -> dict:
     """
     Read a configuration file and return its contents as a dictionary.
 
@@ -86,35 +86,18 @@ def read_mcp_config_json() -> dict:
         Path(get_user_home_dir()) / ".geenii" / MCP_CONFIG_FILE,
         Path(GEENII_WORKING_DIR) / ".geenii" / MCP_CONFIG_FILE
     ]
-    mcp_config = {"mcpServers": {}}
+    servers: dict = {}
     for filename in filenames:
         try:
             with open(filename, 'r') as f:
                 data = json.load(f)
-                mcp_config.update({
-                    "mcpServers": data.get("mcpServers", {})
-                })
+                servers.update(data.get("mcpServers", {}))
         except FileNotFoundError:
-            print(f"Configuration file {filename} not found.")
-            #return {}
+            logger.warning(f"Configuration file {filename} not found.")
         except json.JSONDecodeError:
-            print(f"Error decoding JSON from the file {filename}.")
-            #return {}
-    return mcp_config
+            logger.error(f"Error decoding JSON from the file {filename}.")
+    return {"mcpServers": servers}
 
-# def write_mcp_config_json(data: dict):
-#     """
-#     Update the MCP configuration file with new data.
-#
-#     :param data: A dictionary containing the new configuration data.
-#     """
-#     filename = Path(GEENII_DIR) / MCP_CONFIG_FILE
-#     try:
-#         with open(filename, 'w') as f:
-#             json.dump(data, f, indent=4)
-#         print(f"Configuration file {filename} updated successfully.")
-#     except Exception as e:
-#         print(f"Error updating configuration file {filename}: {e}")
 
 
 
