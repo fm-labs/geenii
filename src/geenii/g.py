@@ -85,7 +85,7 @@ def init_global_agent_registry() -> AgentRegistry:
 
 
 def locate_agent_md_file(agent_name: str) -> str|None:
-    for agent_dir in agent_paths():
+    for (agent_dir, _) in agent_paths():
         md_file_path = f"{agent_dir}/{agent_name}.md"
         if os.path.exists(md_file_path):
             return md_file_path
