@@ -5,8 +5,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
-from geenii.agent.registry import AgentRegistry, AgentSpec, init_agent
+from geenii.agent.registry import AgentRegistry, AgentSpec, logger
 from geenii.flows import FlowRegistry
+from geenii.hitl import HumanInTheLoopController
+from geenii.memory import ChatMemory
+from geenii.tool.registry import ToolRegistry
+from geenii.tools import init_builtin_tools, init_mcp_server_tools
 
 if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
@@ -113,6 +117,58 @@ def init_agent_by_name(name: str, context_id: str | None = None, cwd: str | None
         return init_agent(agent_conf, context_id=context_id)
     except Exception as e:
         raise e
+
+
+def init_agent(agent_conf: AgentSpec,
+               context_id: str | None = None,
+               *,
+               memory: ChatMemory | None = None,
+               hitl: HumanInTheLoopController | None = None) -> BaseAgent:
+    """Create a new agent instance from its spec. `memory` and `hitl` override the agent's defaults."""
+    # todo check model provider configuration
+    # todo check model availability
+    logger.info(f"Loading agent '{agent_conf.name}' with class '{agent_conf.class_name}'.")
+
+    tool_registry = ToolRegistry()
+    if agent_conf.tools is not None:
+        for tool in agent_conf.tools:
+            if tool in ('read', 'write', 'bash'):
+                init_builtin_tools(tool_registry)
+                break
+
+    if agent_conf.mcp_servers is not None and len(agent_conf.mcp_servers) > 0:
+        mcp_servers = agent_conf.mcp_servers
+        init_mcp_server_tools(tool_registry, set(mcp_servers))
+
+    skill_registry = SkillRegistry()
+    if agent_conf.skills is not None:
+        for skill in agent_conf.skills:
+            logger.info(f"Adding skill '{skill}' to agent '{agent_conf.name}'.")
+            skill_registry.load(skill)
+
+    agent_class_name = "geenii.agents.Agent"
+    if agent_conf.class_name is not None:
+        agent_class_name = agent_conf.class_name
+
+    cwd = agent_conf.working_dir
+
+    # instance from class path string
+    try:
+        module_path, class_name = agent_class_name.rsplit(".", 1)
+        module = __import__(module_path, fromlist=[class_name])
+        agent_class = getattr(module, class_name)
+
+        logger.info(f"Loading agent '{agent_conf.name}' with class '{agent_conf.class_name}' and Context '{context_id}'.")
+        agent = agent_class(name=agent_conf.name, description=agent_conf.description,
+                            model=agent_conf.model, system_prompt=agent_conf.full_instructions,
+                            allowed_tools=set(agent_conf.tools), mcp_servers=agent_conf.mcp_servers,
+                            tool_registry=tool_registry, skill_registry=skill_registry,
+                            context_id=context_id, memory=memory, hitl=hitl, cwd=cwd)
+        return agent
+    except Exception as e:
+        logger.error(f"Error loading agent class '{agent_class_name}': {str(e)}", exc_info=e)
+        raise ValueError(f"Error loading agent class '{agent_class_name}': {str(e)}")
+
 
 def init_default_agent(context_id: str | None = None) -> BaseAgent:
     try:

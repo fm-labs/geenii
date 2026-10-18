@@ -6,12 +6,6 @@ from typing import Literal
 import pydantic
 
 from geenii.agent.base_agent import BaseAgent
-from geenii.bots import BotInterface
-from geenii.hitl import HumanInTheLoopController
-from geenii.memory import ChatMemory
-from geenii.skills import SkillRegistry
-from geenii.tool.registry import ToolRegistry
-from geenii.tools import init_builtin_tools, init_mcp_server_tools
 from geenii.utils.mdfile import read_frontmatter_file
 
 logger = logging.getLogger(__name__)
@@ -31,7 +25,7 @@ class AgentSpec(pydantic.BaseModel):
     model_parameters: dict | None = pydantic.Field(default_factory=dict)
     mcp_servers: list[str] | None = pydantic.Field(default_factory=list)
     class_name: str | None = None
-    scope: Literal["builtin", "global", "project", "user"] = "user"
+    scope: Literal["global", "project", "user"] = "user"
     working_dir: str | None = None # only for project scope
     allowed_dirs: list[str] | None = None # only for project scope
 
@@ -72,57 +66,6 @@ class AgentSpec(pydantic.BaseModel):
         return AgentSpec.model_validate(header)
 
 
-def init_agent(agent_conf: AgentSpec,
-               context_id: str | None = None,
-               *,
-               memory: ChatMemory | None = None,
-               hitl: HumanInTheLoopController | None = None) -> BaseAgent:
-    """Create a new agent instance from its spec. `memory` and `hitl` override the agent's defaults."""
-    # todo check model provider configuration
-    # todo check model availability
-    logger.info(f"Loading agent '{agent_conf.name}' with class '{agent_conf.class_name}'.")
-
-    tool_registry = ToolRegistry()
-    if agent_conf.tools is not None:
-        for tool in agent_conf.tools:
-            if tool in ('read', 'write', 'bash'):
-                init_builtin_tools(tool_registry)
-                break
-
-    if agent_conf.mcp_servers is not None and len(agent_conf.mcp_servers) > 0:
-        mcp_servers = agent_conf.mcp_servers
-        init_mcp_server_tools(tool_registry, set(mcp_servers))
-
-    skill_registry = SkillRegistry()
-    if agent_conf.skills is not None:
-        for skill in agent_conf.skills:
-            logger.info(f"Adding skill '{skill}' to agent '{agent_conf.name}'.")
-            skill_registry.load(skill)
-
-    agent_class_name = "geenii.agents.Agent"
-    if agent_conf.class_name is not None:
-        agent_class_name = agent_conf.class_name
-
-    cwd = agent_conf.working_dir
-
-    # instance from class path string
-    try:
-        module_path, class_name = agent_class_name.rsplit(".", 1)
-        module = __import__(module_path, fromlist=[class_name])
-        agent_class = getattr(module, class_name)
-
-        logger.info(f"Loading agent '{agent_conf.name}' with class '{agent_conf.class_name}' and Context '{context_id}'.")
-        agent = agent_class(name=agent_conf.name, description=agent_conf.description,
-                            model=agent_conf.model, system_prompt=agent_conf.full_instructions,
-                            allowed_tools=set(agent_conf.tools), mcp_servers=agent_conf.mcp_servers,
-                            tool_registry=tool_registry, skill_registry=skill_registry,
-                            context_id=context_id, memory=memory, hitl=hitl, cwd=cwd)
-        return agent
-    except Exception as e:
-        logger.error(f"Error loading agent class '{agent_class_name}': {str(e)}", exc_info=e)
-        raise ValueError(f"Error loading agent class '{agent_class_name}': {str(e)}")
-
-
 class AgentRegistry:
     def __init__(self):
         self._agent_configs: dict[str, AgentSpec] = {}
@@ -140,19 +83,19 @@ class AgentRegistry:
         """Get the configuration for a agent by name. Returns None if no configuration is found."""
         return self._agent_configs.get(name)
 
-    def get_instance(self, name: str, context_id: str|None = None) -> BotInterface | None:
-        """Get a Agent instance by name. If the agent is not already loaded, it will be initialized from its configuration if available. Returns None if no agent instance can be found or initialized."""
-        if name in self._agents:
-            return self._agents[name]
-        elif name in self._agent_configs:
-            try:
-                agent = init_agent(self._agent_configs[name], context_id=context_id)
-                self._register_agent(agent)
-                return agent
-            except Exception as e:
-                logger.error(f"Error initializing agent '{name}': {str(e)}", exc_info=e)
-                return None
-        return self._agents.get(name)
+    # def get_instance(self, name: str, context_id: str|None = None) -> BotInterface | None:
+    #     """Get a Agent instance by name. If the agent is not already loaded, it will be initialized from its configuration if available. Returns None if no agent instance can be found or initialized."""
+    #     if name in self._agents:
+    #         return self._agents[name]
+    #     elif name in self._agent_configs:
+    #         try:
+    #             agent = init_agent(self._agent_configs[name], context_id=context_id)
+    #             self._register_agent(agent)
+    #             return agent
+    #         except Exception as e:
+    #             logger.error(f"Error initializing agent '{name}': {str(e)}", exc_info=e)
+    #             return None
+    #     return self._agents.get(name)
 
     def list_configured(self) -> set[str]:
         """Names of configured agents"""

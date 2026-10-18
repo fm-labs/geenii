@@ -647,8 +647,8 @@ class FindBestAgentTask(BaseAgentTask):
                 f"  tools: {tools}\n"
                 f"  skills: {skills}"
             )
-        agents_str = "\n".join(format_agent(a) for a in self.agent_registry._agent_configs.values())
-        agent_names = [a.name for a in self.agent_registry._agent_configs.values() if a.name != "default"] + ["NONE"]
+        agents_str = "\n".join(format_agent(a) for a in self.agent_registry.configs.values())
+        agent_names = [a.name for a in self.agent_registry.configs.values() if a.name != "default"] + ["NONE"]
         agents_str += "\n\nValid agent names:\n" + ", ".join(agent_names)
 
         output_schema = copy.deepcopy(self.OUTPUT_SCHEMA)
@@ -691,7 +691,7 @@ class FindBestAgentTask(BaseAgentTask):
                 # names the model is actually allowed to return -> canonical form
                 valid_agents = {
                     a.name.strip().lower(): a.name
-                    for a in self.agent_registry._agent_configs.values()
+                    for a in self.agent_registry.configs.values()
                     if a.name != "default"
                 }
                 canonical = valid_agents.get(raw.lower())

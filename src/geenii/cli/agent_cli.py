@@ -1,8 +1,9 @@
-import click
 import json
 import logging
 import sys
 import uuid
+
+import click
 
 from geenii.agent.base_agent import (
     BaseAgent,
@@ -10,7 +11,7 @@ from geenii.agent.base_agent import (
     dump_last_context_id,
 )
 from geenii.cli.cli_runner import CliAgentRunner
-from geenii.g import init_global_agent_registry
+from geenii.g import init_agent_by_name
 
 logger = logging.getLogger(__name__)
 
@@ -183,9 +184,9 @@ def agent_run(
     #             click.echo(f"Overriding agent '{name}' to '{agent_name}'")
     #             name = agent_name
     
-    _agents = init_global_agent_registry()
-    agent: BaseAgent | None = _agents.get_instance(name, context_id=context_id)
-    #agent: BaseAgent = init_agent_by_name(name, context_id=context_id)
+    #_agents = init_global_agent_registry()
+    #agent: BaseAgent | None = _agents.get_instance(name, context_id=context_id)
+    agent: BaseAgent = init_agent_by_name(name, context_id=context_id)
     if not agent:
         click.echo(
             f"Agent '{name}' not found. Please check the available agents with 'geenii agents list'."

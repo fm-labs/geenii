@@ -9,7 +9,8 @@ from pathlib import Path
 
 import pydantic
 
-from geenii.agent.registry import AgentRegistry, init_agent
+from geenii.agent.registry import AgentRegistry
+from geenii.g import init_agent
 from geenii.datamodels import ModelMessage
 from geenii.hitl import WebHumanInTheLoopController
 from geenii.memory import FileChatMemory
