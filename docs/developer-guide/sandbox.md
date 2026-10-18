@@ -196,7 +196,7 @@ from geenii.tool.sandbox import SandboxTool
 registry.register(SandboxTool(
     name="sandbox_python_network",
     description="Python sandbox with network access.",
-    parameters={...},
+    input_schema={...},
     runtime="python",
     network_mode="bridge",
     timeout=120,

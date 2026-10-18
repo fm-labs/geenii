@@ -20,6 +20,26 @@ Class hierarchy (`geenii/agent/`, `geenii/agents.py`):
 - `ProcessManagerAgent` — an `Agent` that additionally registers the process
   manager tools.
 
+Each agent instance has a `cwd` (constructor argument). `init_agent()` passes
+the spec's `working_dir`; `init_agent_by_name(name, cwd=...)` overrides it.
+When no `cwd` is given, the agent creates a temporary directory
+(`geenii_agent_<name>_*`, via `tempfile.TemporaryDirectory`) that is removed
+when the agent object is garbage-collected — so agents without a
+`working_dir` (including the built-in `default` and `routing` agents, and
+agents started by `geenii agent` or the chat server) no longer run tools in the
+process's cwd. `HandoffTask` passes the current agent's `cwd` to the target
+agent.
+
+`ToolCallTask` calls `invoke_tool(tool, ..., cwd=agent.cwd,
+caller_id="agent:<name>:<call_id>")` (see
+[tools.md](tools.md#invocation-and-logging)), and `ComputerTool` runs its
+subprocess there. Its `execute()` generator returns the `ToolCallResult`;
+blocked and rejected calls return one with `is_error=True`, and an exception
+becomes `ToolCallResult(text=str(e), structured_content={"error": ...},
+is_error=True)`. The `ToolCallResultContent` sent back to the model carries
+`structured_content` if present, otherwise `text`. Whether a tool may run in
+that directory (`allowed_dirs`) is not checked yet.
+
 The agent runtime is fully synchronous: `process()`, task `execute()` methods,
 tool `invoke()` and HITL controllers are plain (blocking) functions/generators.
 To run several agents concurrently, run each one in its own thread or process;

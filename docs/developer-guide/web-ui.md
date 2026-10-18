@@ -114,11 +114,27 @@ expect. Both chat model selectors use it.
 |---|---|---|
 | `#/console/playground/{completions,tools,xchat,agents}` | completion chat, tools view, xchat demo, agents grid | — |
 | `#/console/configure/:section` | `console/configure-page.tsx` (formerly `managed-page.tsx`, `#/console/managed/…`) | `agents`, `mcp-servers` (installed servers); `skills` and `tools` are in the nav but not rendered yet |
-| `#/console/catalog/:section` | `console/catalog-page.tsx` | `mcp` (Docker MCP Catalog, `McpServersDockerView`), `models` |
+| `#/console/catalog/:section` | `console/catalog-page.tsx` | `mcp` (Docker MCP Catalog, `McpDockerCatalogView`), `models` |
 | `#/console/system/:section` | `console/system-page.tsx` | `info`, `settings` |
 
 Environments, Memory Stores, Vaults and Plugins entries are commented out in
 the nav.
+
+### Docker MCP Catalog
+
+`McpDockerCatalogView` (console) and `mcp-servers/docker-catalog-page.tsx`
+both render `DockerMcpCatalogOci` inside `DockerMcpCatalogProvider`
+(`src/app/mcp-servers/components/`). The provider loads the OCI-format catalog
+from `public/assets/docker-mcp-catalog-oci.json` (`{ref, source, title,
+digest, servers[]}`, each server record holding its definition under
+`snapshot.server`) and looks servers up by name with `getServerDef()`.
+`DockerMcpCatalogConfigBuilder` shows the `mcpServers` entry to add to
+`mcp.json`; nothing is installed through the server yet.
+
+The components for the previous catalog format
+(`docker-mcp-catalog-v3.json`) are kept with a `V3` suffix
+(`DockerMcpCatalogV3`, `DockerMcpCatalogV3Provider`,
+`DockerMcpCatalogV3ConfigBuilder`) and are deprecated.
 
 Other pages (`#/mcp`, `#/flows`, parts of `#/settings`, apps) call endpoints the server does not have yet; see
 `geenii-ui/SUMMARY.md`.

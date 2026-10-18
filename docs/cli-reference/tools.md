@@ -34,7 +34,9 @@ parameters, and description.
 geenii tools call <TOOL_NAME> [OPTIONS]
 ```
 
-Invoke a tool directly with the provided arguments.
+Invoke a tool directly with the provided arguments. Prints the result's error
+flag, text and structured content. The call is logged to
+`$GEENII_CACHE_DIR/logs/tool-use-YYYY-MM-DD.log` with caller `cli:tools`.
 
 #### Options
 

@@ -5,9 +5,18 @@ determines how Geenii handles a prompt.
 
 ## Defining an agent
 
-Agents are markdown files with YAML frontmatter placed in
-`$GEENII_DIR/agents/<name>.md`. The markdown body is appended to the system
-instructions.
+Agents are markdown files with YAML frontmatter named `<name>.md`. The
+markdown body is appended to the system instructions. Agents are loaded from
+these directories, and each one sets the agent's `scope`:
+
+| Directory | Scope |
+|---|---|
+| `$GEENII_WORKING_DIR/.geenii/agents` | `project` |
+| `~/.geenii/agents` | `user` |
+| `/var/geenii/agents` | `global` |
+
+If two directories define the same agent name, which one wins is currently not
+defined (the directories are iterated as a set).
 
 ```markdown
 ---
@@ -40,10 +49,15 @@ tools:
 | `tools` | list[str] | Tool names the agent is allowed to call. Listing `read`, `write` or `bash` loads the built-in tools |
 | `skills` | list[str] | Skill names to load into the agent |
 | `model_parameters` | dict | Reserved; not currently applied to requests |
+| `scope` | `builtin` \| `global` \| `project` \| `user` | Set from the directory the file was loaded from (see above); a value in the frontmatter is overwritten. The built-in agents are `global` |
+| `working_dir` | str | Directory the agent's tools (`bash`, `python`) run in. Without it, each agent instance gets a fresh, empty temporary directory that is deleted when the agent goes away |
+| `allowed_dirs` | list[str] | Intended extra allowed directories for `project` agents. Stored and shown, not yet enforced |
 | `mcp_servers` | list[str] | Names of MCP servers (from `mcp.json`) whose tools are loaded; servers not listed are not loaded. Their tools (`mcp__<server>__<tool>`) must still be listed in `tools` to be callable |
 
-A built-in `default` agent (using `DEFAULT_COMPLETION_MODEL`) always exists;
-placing a `routing.md` in the agents directory overrides it.
+Built-in agents always exist: `default` and `routing` (both using
+`DEFAULT_COMPLETION_MODEL`), `chatgpt` (`openai:gpt-3.5-turbo`) and `claude`
+(`anthropic:claude-opus-4-6`). A file with the same name in an agents
+directory overrides it.
 
 ## Running an agent
 

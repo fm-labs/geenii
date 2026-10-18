@@ -126,9 +126,17 @@ Standard `mcpServers` map, passed to [fastmcp](https://github.com/jlowin/fastmcp
 }
 ```
 
-At agent initialization every configured server is contacted and its tools are
-registered under the name `mcp__<server>__<tool>` (results cached for 1 hour).
+At agent initialization the servers listed in the agent's `mcp_servers` are
+contacted and their tools are registered under the name
+`mcp__<server>__<tool>` (results cached for 1 hour).
 See [tools.md](../developer-guide/tools.md).
+
+Geenii uses the current MCP protocol version by default. For a server that
+only speaks an older protocol version, add `"legacy": true` to its entry:
+
+```json
+"old_server": { "command": "old-mcp-server", "legacy": true }
+```
 
 ## `scheduler.json` — scheduled tasks
 
@@ -151,4 +159,8 @@ Everything under `$GEENII_CACHE_DIR/logs/`:
   Note this includes full prompts and tool results; treat as sensitive.
 - `ai-usage-YYYY-MM.log` — JSONL per-call usage (provider, model, context id,
   token counts, durations).
+- `tool-use-YYYY-MM-DD.log` — JSONL of every tool call made by agents,
+  `geenii tools call` and the server's tool endpoint: caller, tool, arguments,
+  env (values of names containing `password`, `secret`, `api_key` or `token`
+  are redacted), working directory and result. Treat as sensitive.
 - `tools.log`, `scheduler.log`, `supervisor.log` — rotating component logs.

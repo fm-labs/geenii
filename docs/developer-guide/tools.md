@@ -10,18 +10,28 @@ raises).
 ## Tool types
 
 All tools subclass `Tool` (`geenii/tool/common.py`), which carries `name`,
-`description`, and a JSON-Schema `parameters` dict, and implements
-`async invoke(args, env, **kwargs)`.
+`description`, and a JSON-Schema `input_schema` dict (renamed from
+`parameters`; the constructor keyword changed too), and implements a
+synchronous `invoke(args, env, **kwargs) -> ToolCallResult`. Callers pass the
+working directory as the `cwd` keyword.
+
+`ToolCallResult` is a dataclass:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `text` | `str` | Text output |
+| `structured_content` | `dict \| None` | Parsed JSON output, if any |
+| `is_error` | `bool` | The call failed (non-zero exit, MCP error, blocked/rejected call) |
 
 | Class | `type` | Execution |
 |---|---|---|
-| `PythonFunctionTool` | `function` | Calls a Python callable (sync handlers run in the executor, async handlers awaited) |
-| `ComputerTool` | `computer` | Runs a shell command via `subprocess` (no shell interpretation; the command string is `shlex`-split). Supports an optional `command_template` |
+| `PythonFunctionTool` | `function` | Calls a Python callable (async handlers are run to completion with `run_sync`). The return value is wrapped as `ToolCallResult(text=<return value>)` |
+| `ComputerTool` | `computer` | Runs a shell command via `subprocess.run(..., shell=True)`. Supports an optional `command_template` |
 | `AppleScriptTool` | `computer` | `ComputerTool` with an `osascript -e '{command}'` template (macOS) |
 | `PythonCliTool` | `python` | Like `ComputerTool`, intended for running Python scripts |
 | `SandboxTool` | `sandbox` | Runs a command inside a Docker container with security hardening (see [sandbox.md](sandbox.md)) |
 | `McpTool` | `mcp_tool` | Forwards the call to an MCP server via fastmcp |
-| `ScriptTool` | `function` | Runs an executable script from a skill's `scripts/` directory. JSON is passed on stdin; stdout is returned. Auto-registered when a skill is activated, named `{skill}__{script_stem}`. See [skills.md](skills.md). |
+| `ScriptTool` | `function` | Runs an executable script from a skill's `scripts/` directory, with the `args` string (`shlex`-split) as its arguments and the script's directory as cwd. Returns stdout and stderr joined by a newline as `text`, parsed into `structured_content` if that is valid JSON; a non-zero exit sets `is_error`. Auto-registered when a skill is activated, named `{skill}__{script_stem}`. See [skills.md](skills.md). |
 
 `Tool` also provides definition mappers: `to_definition()` (internal/OpenAI
 style), `to_openai()`, and `to_ollama()` — providers pick the one they need.
@@ -49,13 +59,18 @@ registered by default.
 
 ### Command execution details
 
-- The command string is split with `shlex` and executed **without** a shell —
-  pipes, redirects, and `&&` do not work.
+- The command runs in the `cwd` passed to `invoke()` (the agent's `cwd`, see
+  [agents.md](agents.md#runtime-model)), or in `GEENII_WORKING_DIR` when none
+  is passed.
+- The command string is run through the shell (`shell=True`), so pipes,
+  redirects and `&&` work. The `shlex`-split argument list is only logged.
 - `${VAR}` / `$VAR` placeholders in the command are expanded from the tool
   invocation env (notably `SKILL_NAME` — the comma-separated list of active
   skill names — see [skills.md](skills.md)).
-- stdout is returned to the model; on a non-zero exit code, stderr and the exit
-  code are appended.
+- `text` is `stdout:\n<stdout>\nstderr:\n<stderr>`. On a non-zero exit code
+  `EXITED WITH NON-ZERO EXIT CODE: <code>` is appended and `is_error` is set.
+  On success, stdout that is valid JSON is also returned as
+  `structured_content`.
 - **Tool filters** can restrict which commands a tool is allowed to execute.
   See the *Tool filtering* section below and [skills.md](skills.md) for how
   `allowed-tools` with argument-level patterns work.
@@ -73,14 +88,67 @@ MCP servers are declared in `$GEENII_DIR/mcp.json` (see
 `mcp_servers` gets no MCP tools. For each selected server:
 
 1. Each server is contacted through `McpClient` (a fastmcp wrapper) and its
-   `tools/list` result is fetched — with one retry, and cached for 1 hour via
-   `@cached`, so a dead server doesn't stall every run.
+   `tools/list` result is fetched — without a retry (a failed listing logs an
+   error and skips the server), and cached for 1 hour via `@cached` (empty
+   results are not cached).
 2. Each advertised tool is registered as an `McpTool` named
    `mcp__<server>__<tool>` (e.g. `mcp__duckduckgo__search`).
 
-On invocation, a client for the owning server is created and
-`tools/call` is issued with the model-provided arguments. Connections are
-currently established per call, not pooled.
+On invocation, `get_mcp_client_for_server()` returns the cached `McpClient`
+for the owning server (one persistent connection per server, until
+`close_mcp_clients()`), and `tools/call` is issued with the model-provided
+arguments. The `CallToolResult` is mapped to a `ToolCallResult`:
+
+- `text` — the first content item, if it is `TextContent`.
+- `structured_content` — the result's `structured_content`, or else `text`
+  parsed as JSON when that works.
+- `is_error` — the MCP result's `is_error` flag, or `True` when the result is
+  not a `CallToolResult`.
+
+If connecting or calling the server raises, the exception is not re-raised:
+the tool returns `ToolCallResult(text=str(e), structured_content={"error":
+str(e)}, is_error=True)`.
+
+`McpClient` targets the current MCP protocol via fastmcp's `mode="auto"`; a
+server entry with `"legacy": true` in `mcp.json` uses `mode="legacy"`. Progress
+notifications are printed to stdout; the server log and message handlers are
+placeholders that do nothing yet. The client also exposes
+`list_server_capabilities()`, and reads resources with
+`get_resource_content()` / `download_resource()` (single-part text or blob
+resources only).
+
+## Invocation and logging
+
+`invoke_tool(tool, args, env, cwd=None, caller_id="anonymous")`
+(`geenii/tools.py`) wraps `tool.invoke()` and appends one JSON line per call to
+`$GEENII_CACHE_DIR/logs/tool-use-YYYY-MM-DD.log`:
+
+```json
+{"timestamp": "...", "caller_id": "agent:default:call_1", "tool": "bash",
+ "args": {...}, "env": {...}, "cwd": "...", "result": {"text": "...", "structured_content": null, "is_error": false}}
+```
+
+When the tool raises, `result` is `{"exception": ..., "traceback": ...}` and the
+exception is re-raised. Env values whose name contains `password`, `secret`,
+`api_key` or `token` (case-insensitive) are logged as `REDACTED`, here and in
+the `Invoking tool …` line `invoke_tool` writes to the Python logger before the
+call. Arguments and output are logged in full, so treat the log as sensitive.
+
+> **Known issue:** `_redact_env_vars()` overwrites the values in the `env` dict
+> it is given, and `invoke_tool` calls it before `tool.invoke()`. A tool
+> therefore receives `REDACTED` for those variables. All current callers pass
+> an empty env, so this has no effect yet.
+
+Callers and their `caller_id`:
+
+| Caller | `caller_id` |
+|---|---|
+| `ToolCallTask` | `agent:<agent name>:<call_id>` |
+| `geenii tools call` | `cli:tools` |
+| `POST /tools/{name}/execute` | `web:tools` |
+
+`ToolRegistry.invoke()` was removed; look the tool up with `registry.get(name)`
+and call `invoke_tool()`.
 
 ## Registering your own tools
 
@@ -199,7 +267,7 @@ The [server](server.md) keeps one `ToolRegistry` with the built-in tools
 | Method & path | Body | Response |
 |---|---|---|
 | `GET /api/v1/tools/` | — | Array of `{name, type, description, parameters}` |
-| `POST /api/v1/tools/{name}/execute` | Arguments as a JSON object | Tool output; 404 Problem for unknown tools, 500 Problem when the tool raises |
+| `POST /api/v1/tools/{name}/execute` | Arguments as a JSON object | `ToolCallResult` as `{text, structured_content, is_error}`; 404 Problem for unknown tools, 500 Problem when the tool raises |
 
 Execution skips tool filters and HITL approval, so it runs any command
 `bash`/`python` are given.

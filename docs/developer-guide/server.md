@@ -58,7 +58,7 @@ All paths are relative to `/api/v1`.
 | `GET /agents/{name}` | One agent spec plus `instructions` (the markdown body of its spec file). 404 for unknown agents |
 | `GET /agents/{name}/commands` | `AgentCommand[]`: the built-in commands (`clear`, `compact` and the read-only info commands `self`, `usage`, `models`, `tools`, `context`, `help`; see [agents.md](agents.md#info-commands)) followed by one per configured skill. 404 for unknown agents |
 | `GET /tools/` | Bare array of tool definitions (`name`, `type`, `description`, `parameters` as JSON Schema) |
-| `POST /tools/{name}/execute` | Body: the tool arguments as a JSON object. Returns the tool output. 404 for unknown tools |
+| `POST /tools/{name}/execute` | Body: the tool arguments as a JSON object. Returns a `ToolCallResult` (`text`, `structured_content`, `is_error`). The call is logged to the tool-use log with caller `web:tools`. 404 for unknown tools |
 | `GET /ai/models` | `AIModelInfo[]` |
 | `POST /ai/completion` | One-shot text completion |
 | `POST /ai/chat/completion` | Chat completion; history is kept per `context_id` |

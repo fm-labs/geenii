@@ -77,13 +77,14 @@ The HTTP server is described in [server.md](server.md), the frontend in
 What happens on `geenii agent -n my-agent "do something"`:
 
 ```
-CLI (cli/agent.py)
- └─ init_agent_by_name(name)           g.py: find <name>.md in $GEENII_DIR/agents/,
- │                                     parse AgentSpec, build Agent with its
+CLI (cli/agent_cli.py)
+ └─ init_global_agent_registry()       g.py: built-in specs + <name>.md files from
+ │                                     the project, user and global agents dirs
+ └─ registry.get_instance(name)        init_agent(spec): build Agent with its
  │                                     tool/skill registries
  └─ CliAgentRunner.run(prompt)
      └─ agent.process(prompt)          BaseAgent: lazy, run-once _initialize()
-         │                             registers the agent's MCP server tools
+         │                             checks allowed_tools against the registry
          ├─ _handle_message(prompt)    Agent enqueues:
          │    1. FindBestSkillTask     LLM call selecting the best skill (skipped
          │                             for 0 skills, auto-picked for exactly 1)
