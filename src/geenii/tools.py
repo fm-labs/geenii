@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import json
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +15,8 @@ from geenii.tool.registry import ToolRegistry
 from geenii.utils.cached import cached
 from geenii.utils.json_util import append_jsonl
 
+import logging
+logger = logging.getLogger(__name__)
 
 def init_builtin_tools(registry: ToolRegistry):
     registry.register(ComputerTool(
@@ -60,12 +61,12 @@ def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
             #except Exception as e:
             #    print(f"Error listing tools from MCP server {server_name} on second attempt: {e}. Skipping this server.")
             #    return []
-            print(f"Error listing tools from MCP server {server_name}: {e}.")
+            logger.error(f"Error listing tools from MCP server {server_name}: {e}.")
             return []
 
         return tools
     except Exception as e:
-        print(f"Error retrieving tools from MCP server {server_name}: {e}")
+        logger.error(f"Error retrieving tools from MCP server {server_name}: {e}")
         return []
     finally:
         mcp_client.close()
@@ -74,7 +75,7 @@ def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
 def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] = None):
     mcp_config = get_mcp_config()
     if not mcp_config or "mcpServers" not in mcp_config:
-        print("No MCP servers configured")
+        logger.warning("No MCP servers configured")
         return
 
     for server_name, server_conf in mcp_config["mcpServers"].items():
@@ -90,19 +91,19 @@ def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] = None)
                 tool_definitions=mcp_tools
             )
         except Exception as e:
-            print(f"Error connecting to MCP server {server_name}: {e}")
+            logger.error(f"Error connecting to MCP server {server_name}: {e}")
             continue
 
 
 def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = None, caller_id: str = "anonymous") -> ToolCallResult:
     result = None
     try:
-        print(f"Invoking tool {tool.name}", args, env, cwd)
+        logger.info(f"Invoking tool {tool.name} with args: {args}, env: {_redact_env_vars(env)}, cwd: {cwd}")
         result = tool.invoke(args=args, env=env, cwd=cwd)
-        print("Tool result:", result)
+        logger.info(f"Tool result for {tool.name}: {result}")
         return result
     except Exception as e:
-        print(f"Error executing tool {tool.name}: {e}")
+        logger.error(f"Error executing tool {tool.name}: {e}")
         # traceback.print_exc()
         result = e
         raise e from e
@@ -110,13 +111,21 @@ def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = N
         _log_tool_call(tool.name, args, env, cwd, caller_id=caller_id, result=result)
 
 
+_SENSITIVE_KEYS = ("password", "secret", "api_key", "token")
+
+def _redact_env_vars(env_vars: dict[str, str]) -> dict[str, str]:
+    for k in env_vars:
+        k_lower = k.lower()
+        if any(s in k_lower for s in _SENSITIVE_KEYS):
+            env_vars[k] = "REDACTED"
+    return env_vars
+
 def _log_tool_call(tool_name, args: dict[str, str],
                    env: dict[str, str],
                    cwd: str | None,
                    caller_id: str,
                    result: ToolCallResult | Exception | None = None):
 
-    print("Logging tool call", tool_name, args, cwd)
     now = datetime.now()
     date_formatted = now.strftime("%Y-%m-%d")
     log_file = f"{CACHE_DIR}/logs/tool-use-{date_formatted}.log"
@@ -134,7 +143,7 @@ def _log_tool_call(tool_name, args: dict[str, str],
         "caller_id": caller_id,
         "tool": tool_name,
         "args": args,
-        "env": env,
+        "env": _redact_env_vars(env),
         "cwd": cwd,
         "result": result,
     })

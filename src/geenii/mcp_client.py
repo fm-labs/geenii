@@ -35,14 +35,14 @@ class McpClient:
 
     def _init_client(self) -> Client:
 
-        server_config = self.server_config
+        server_config = self.server_config.copy()
         mode = "auto"
 
         if server_config.get("legacy", False):
             mode = "legacy"
             del server_config["legacy"]
 
-        print(f"Connecting to MCP server '{self.server_name}' mode: {mode}", server_config)
+        logger.info(f"Connecting to MCP server '{self.server_name}' mode: {mode}")
         return Client(
             transport=MCPConfig(mcpServers={self.server_name: server_config}),
             mode=mode,
@@ -53,13 +53,17 @@ class McpClient:
         )
 
     async def _logging_handler(self, message: LogMessage):
-        logger.info(f"Logging message: {message}")
+        # logger.info(f"Logging message: {message}")
+        # placeholder for later impl
+        pass
 
     async def _message_handler(self, message) -> None:
-        print(message)
-        if hasattr(message, "root"):
-            method = message.root.method
-            print("MCP Received:", method)
+        # print(message)
+        # if hasattr(message, "root"):
+        #     method = message.root.method
+        #     print("MCP Received:", method)
+        # placeholder for later impl
+        pass
 
     async def _progress_handler(self,
         progress: float, total: float | None, message: str | None

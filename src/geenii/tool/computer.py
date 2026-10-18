@@ -63,7 +63,7 @@ class ComputerTool(Tool):
         err = p.stderr.strip()
         _output = f"stdout:\n{out}\nstderr:\n{err}"
         if p.returncode != 0:
-            _output += f"EXITED WITH NON-ZERO EXIT CODE: { p.returncode}"
+            _output += f"\nEXITED WITH NON-ZERO EXIT CODE: { p.returncode}"
             return ToolCallResult(text=_output, is_error=True)
         return ToolCallResult(text=_output, is_error=False, structured_content=json_data)
 

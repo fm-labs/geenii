@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import subprocess
 import shlex
@@ -57,30 +58,31 @@ class PythonCliTool(Tool):
         if not command:
             raise ValueError(f"Missing 'command' argument for PythonTool {self.name!r}")
 
-        logger.info(f"Invoking PythonTool raw command: {command}")
-
         # expand environment variables in the command
         command = expand_vars(command, env or {})
-
-        result: str = self.run_subprocess(command, env)
-        logger.info(f"PythonCliTool result: {str(result)}")
-        return ToolCallResult(result)
-
-    # helper method to run a subprocess and capture its output
-    def run_subprocess(self, command: str, env: dict[str, str] | None) -> str:
-        logger.info(f"Spawn subprocess with command={command} environment={env}")
         _command = shlex.split(command)
-        print(_command)
 
         _env = os.environ.copy()
         if env:
             _env.update(env)
-        _result = subprocess.run(_command, shell=False, capture_output=True, text=True, env=_env, cwd=None)
-        logger.info(f"Return code: {_result.returncode}")
-        logger.info(f"Standard output: {_result.stdout}")
-        logger.info(f"Standard error: {_result.stderr}")
-        _output = _result.stdout.strip()
-        if _result.returncode != 0:
-            _output += "ERROR: " + _result.stderr.strip()
-        print("OUTPUT:", _output)
-        return _output
+
+        logger.info(f"Spawn python subprocess with command={_command}")
+        p = subprocess.run(_command, shell=False, capture_output=True, text=True, env=_env, cwd=None)
+        logger.info(f"Return code: {p.returncode}")
+        logger.info(f"Standard output: {p.stdout}")
+        logger.info(f"Standard error: {p.stderr}")
+
+        out = p.stdout.strip()
+        # attempt json parsing
+        json_data = None
+        try:
+            json_data = json.loads(out)
+        except json.decoder.JSONDecodeError:
+            pass
+
+        err = p.stderr.strip()
+        _output = f"stdout:\n{out}\nstderr:\n{err}"
+        if p.returncode != 0:
+            _output += f"\nEXITED WITH NON-ZERO EXIT CODE: { p.returncode}"
+            return ToolCallResult(text=_output, is_error=True)
+        return ToolCallResult(text=_output, is_error=False, structured_content=json_data)

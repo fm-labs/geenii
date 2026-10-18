@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import click
+from mcp_types import CallToolResult
 
 from geenii.config import CACHE_DIR
 from geenii.mcp_config import get_mcp_config, get_mcp_config_for_server, get_mcp_client_for_server
@@ -59,13 +60,12 @@ def server_info(server_id):
     client = get_mcp_client_for_server(server_id)
     try:
         info = client.info()
-        print(info)
         if not info:
             click.echo(f"No info found for server '{server_id}'.")
             return
         click.echo(json.dumps(info, indent=2, default=str))
     except Exception as e:
-        print(repr(e))
+        click.echo(repr(e))
         raise e
     finally:
         client.close()
@@ -78,16 +78,17 @@ def server_tools(server_id):
     client = get_mcp_client_for_server(server_id)
     try:
         tools = client.list_tools()
-        print(tools)
         if not tools:
             click.echo(f"No tools found for server '{server_id}'.")
             return
-        for tool in tools:
-            name = tool.get("name", "")
-            desc = tool.get("description", "")
-            click.echo(f"  {name:40s} {desc}")
+
+        click.echo(json.dumps(tools, indent=2, default=str))
+        # for tool in tools:
+        #     name = tool.get("name", "")
+        #     desc = tool.get("description", "")
+        #     click.echo(f"  {name:40s} {desc}")
     except Exception as e:
-        print(repr(e))
+        click.echo(repr(e))
         raise e
     finally:
         client.close()
@@ -111,7 +112,7 @@ def server_tool_info(server_id, tool_name):
                     break
         return None
     except Exception as e:
-        print(repr(e))
+        click.echo(repr(e))
         raise e
     finally:
         client.close()
@@ -140,14 +141,14 @@ def server_tool_exec(server_id, tool_name, arg, json_args):
 
     client = get_mcp_client_for_server(server_id)
     try:
-        result = client.call_tool(tool_name, args)
-        print(json.dumps(result, indent=2, default=str))
-        if hasattr(result, "content"):
-            for item in result.content:
-                if hasattr(item, "text"):
-                    click.echo(item.text)
-                else:
-                    click.echo(repr(item))
+        result: CallToolResult = client.call_tool(tool_name, args)
+        #click.echo(json.dumps(result.model_dump(), indent=2, default=str))
+        if hasattr(result, "content") and len(result.content) > 0:
+            content = result.content[0]
+            if hasattr(content, "text"):
+                click.echo(content.text)
+            if hasattr(content, "structured_content"):
+                click.echo(json.dumps(content.structured_content, indent=2, default=str))
         else:
             click.echo(json.dumps(result, indent=2, default=str))
     finally:

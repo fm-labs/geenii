@@ -26,7 +26,7 @@ class ScriptTool(Tool):
         cmd = [self.script_path]
         if arg_str:
             cmd.extend(shlex.split(arg_str))
-        print("ScriptTool CMD", cmd)
+        #print("ScriptTool CMD", cmd)
 
         _env = os.environ.copy()
         if env:

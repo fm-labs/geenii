@@ -30,17 +30,12 @@ class McpTool(Tool):
             client: McpClient = get_mcp_client_for_server(self.mcp_server_id)
             result = client.call_tool(self._mcp_fn_name, args=args)
         except Exception as e:
-            print("MCP tool error:", e)
             result = e
-            raise e
 
         if isinstance(result, Exception):
-            print("MCP tool exception:", result)
-            return ToolCallResult(text=str(result), structured_content=None, is_error=True)
+            return ToolCallResult(text=str(result), structured_content={"error": str(result)}, is_error=True)
 
-        text = ""
-        data = None
-        is_error = False
+        text, data, is_error = "", None, False
         if isinstance(result, CallToolResult):
             if result.content and len(result.content) > 0:
                 if isinstance(result.content[0], TextContent):
@@ -51,10 +46,11 @@ class McpTool(Tool):
                 # attempt to parse text as json
                 try:
                     data = json.loads(text)
-                except Exception:
+                except json.JSONDecodeError:
                     pass
+            is_error = result.is_error
         else:
+            text = "Unknown result type"
             is_error = True
-            text = "Unknown error during tool invocation: Unknown result type"
 
         return ToolCallResult(text, structured_content=data, is_error=is_error)
