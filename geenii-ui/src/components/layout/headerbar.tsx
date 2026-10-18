@@ -40,13 +40,14 @@ const Headerbar = () => {
             {FEATURE_APPS_ENABLED && <li className={navItemStyle}><a href="#/apps">Apps</a></li>}
             {FEATURE_FLOWS_ENABLED && <li className={navItemStyle}><a href="#/flows">Flows</a></li>}
             {/*FEATURE_CONSOLE_ENABLED && <li className={navItemStyle}><a href="#/console">Console</a></li>*/}
-            <SearchForm />
+            {/*<SearchForm />*/}
           </ul>}
         </div>
         <div className={"flex flex-row space-x-1"}>
-          <Button color={"secondary"}>
-            <a href="#/console"><SettingsIcon /></a>
-          </Button>
+          {/*<Button color={"secondary"}>*/}
+          {/*  <a href="#/console"><SettingsIcon /></a>*/}
+          {/*</Button>*/}
+          <a href="#/console"><SettingsIcon /></a>
           {/*<Button color={"transparent"}>*/}
           {/*  <UserIcon />*/}
           {/*</Button>*/}

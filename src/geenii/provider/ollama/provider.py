@@ -179,7 +179,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             # filter the registry to get the tool definitions for the requested tools
             tool_defs = tool_registry.list_definitions()
             openai_tools = [tool_def for tool_def in tool_defs if tool_def['name'] in tools]
-            # print("Mapped OpenAI tools:", openai_tools)
+            print("Mapped OpenAI tools:", openai_tools)
             ollama_tools = [map_openai_tool_to_ollama(tool_def) for tool_def in openai_tools]
             logger.info(
                 f"Mapped {len(openai_tools)} tools to Ollama format, {[tool['function']['name'] for tool in ollama_tools]}")

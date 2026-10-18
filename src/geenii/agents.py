@@ -43,8 +43,8 @@ class Agent(BaseAgent):
             return
 
         #init_builtin_tools(self._tool_registry)
-        if self.mcp_servers:
-            init_mcp_server_tools(self._tool_registry, self.mcp_servers)
+        #if self.mcp_servers:
+        #    init_mcp_server_tools(self._tool_registry, self.mcp_servers)
 
         #self._tool_registry.register_function(self.about_me, name="about_me")
         #self.allowed_tools.add("about_me")

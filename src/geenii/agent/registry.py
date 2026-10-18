@@ -10,6 +10,7 @@ from geenii.hitl import HumanInTheLoopController
 from geenii.memory import ChatMemory
 from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry
+from geenii.tools import init_builtin_tools, init_mcp_server_tools
 from geenii.utils.mdfile import read_frontmatter_file
 
 logger = logging.getLogger(__name__)
@@ -74,14 +75,17 @@ def init_agent(agent_conf: AgentSpec, context_id: str | None = None, *,
     """Create a new agent instance from its spec. `memory` and `hitl` override the agent's defaults."""
     # todo check model provider configuration
     # todo check model availability
+    logger.info(f"Loading agent '{agent_conf.name}' with class '{agent_conf.class_name}'.")
 
     tool_registry = ToolRegistry()
-    # init_builtin_tools(tool_registry)
-    # init_mcp_server_tools_sync(tool_registry)
-    # for tool in tools:
-    #    tool_registry.allow_tool(tool)
-    # for mcp_server_id, mcp_server_config in mcp_servers.items():
-    #    tool_registry.register_mcp_server(mcp_server_id, mcp_server_config)
+    if agent_conf.tools is not None:
+        for tool in agent_conf.tools:
+            if tool in ('read', 'write', 'bash'):
+                init_builtin_tools(tool_registry)
+
+    if agent_conf.mcp_servers is not None and len(agent_conf.mcp_servers) > 0:
+        mcp_servers = agent_conf.mcp_servers
+        init_mcp_server_tools(tool_registry, set(mcp_servers))
 
     skill_registry = SkillRegistry()
     if agent_conf.skills is not None:

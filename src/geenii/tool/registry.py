@@ -24,7 +24,9 @@ class ToolRegistry:
     def register(self, tool: Tool) -> None:
         """Register a tool instance. Raises ValueError on duplicate names."""
         if tool.name in self._tools:
-            raise ValueError(f"Tool {tool.name!r} is already registered")
+            #raise ValueError(f"Tool {tool.name!r} is already registered")
+            logger.warning(f"Tool {tool.name!r} already registered")
+            return
         self._tools[tool.name] = tool
         logger.info("Registered tool %r (%s)", tool.name, tool.__class__.__name__)
 

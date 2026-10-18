@@ -6,11 +6,10 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from rich.logging import RichHandler
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-
-from fastapi.staticfiles import StaticFiles
 
 from geenii.config import APP_VERSION, WWW_DIR
 from geenii.datamodels import Problem

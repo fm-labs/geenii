@@ -1,7 +1,7 @@
 import ChatContextProvider from './components/ChatContextProvider.tsx'
 import CompletionChat from './completion-chat.tsx'
 import React from 'react'
-import Layout from '../../components/layout/layout.tsx'
+import ConsoleLayout from '@/components/layout/console-layout.tsx'
 
 const CompletionChatPage = () => {
 
@@ -13,7 +13,7 @@ const CompletionChatPage = () => {
     files: [],
   }
 
-  return (<Layout>
+  return (<ConsoleLayout>
       <ChatContextProvider {...contextProps}>
         <div className="content">
           <div className="flex flex-col justify-center min-h-screen">
@@ -27,7 +27,7 @@ const CompletionChatPage = () => {
           </div>
         </div>
       </ChatContextProvider>
-    </Layout>
+    </ConsoleLayout>
   )
 }
 

@@ -87,6 +87,8 @@ class SkillRegistry:
         logger.info(f"Skill '{skill.path}' registered.")
 
     def load(self, skill_name: str) -> SkillSpec | None:
+        if "," in skill_name:
+            skill_name = skill_name.split(",")[0]
         try:
             skill = self.skills[skill_name] if skill_name in self.skills else None
             if skill:

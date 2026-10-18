@@ -59,8 +59,7 @@ const AppRouter = () => {
     const routes: Route[] = [
       {
         path: '/',
-        element: <CompletionChatPage />,
-        //element: <AgentsPage />,
+        element: <AgentsPage />,
       },
       {
         path: '/chat',
@@ -97,6 +96,10 @@ const AppRouter = () => {
       {
         path: '/console/system/:section',
         element: <SystemPage />,
+      },
+      {
+        path: '/console/playground/agent-sandbox',
+        element: <CompletionChatPage />,
       },
       {
         path: '/console/playground/tool-sandbox',
