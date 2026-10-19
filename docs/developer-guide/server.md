@@ -42,7 +42,7 @@ The `lifespan` in `server.py` builds the shared state once per process:
 
 | `app.state` | Built by | Contents |
 |---|---|---|
-| `agent_registry` | `init_global_agent_registry()` | All agent specs from `$GEENII_DIR/agents/` |
+| `agent_registry` | `init_global_agent_registry()` | All agent specs from `$GEENII_WORKING_DIR/.geenii/agents/`, `~/.geenii/agents/` and `/var/geenii/agents/` (`config.agent_paths()`) |
 | `tool_registry` | `init_builtin_tools()`, `init_mcp_server_tools()` | Built-in tools plus the tools of **all** servers in `mcp.json` (discovered in a worker thread, so startup waits for the slowest server). Agents still load their own MCP tools when they start |
 | `chat_sessions` | `dep_chat_sessions` (lazily, on first `/chats` request) | `ChatSessionStore` over `GEENII_CHAT_SESSIONS_DIR` |
 
@@ -73,7 +73,7 @@ All paths are relative to `/api/v1`.
 | `POST /mcp/servers/{name}/tool/call` | Body `{tool_name, arguments}`. Raw MCP `CallToolResult`. 404 unknown server, 502 on failure |
 | `GET /skills/` | The skills in the registry, sorted by name: `name`, `path`, `source` (the skill path it was loaded from), `description`, `triggers`, `allowed_tools`, `metadata`, `scripts`, `used_by` (agents listing it). Skills whose SKILL.md can't be parsed are skipped at startup |
 | `GET /skills/{name}` | The entry plus `instructions` (the markdown body of SKILL.md). 404 for unknown skills |
-| `GET /stats/usage` | Usage from `{CACHE_DIR}/logs/ai-usage-*.log` over a range of local days: `?days=30` (default; `0` for all days with usage), or `start`/`end` (ISO dates, `end` defaults to today). Returns `totals`, `daily` (every day of the range, with `tokens_by_provider`), `hourly` (calls per hour of day), and `by_provider` / `by_model` / `by_source` / `by_task` sorted by tokens. Each log file's per-day aggregates are cached in memory and in `{CACHE_DIR}/stats/`, keyed by the file's size and mtime; `?refresh=true` recalculates. 400 if `start` is after `end` |
+| `GET /stats/usage` | Usage from `{GEENII_CACHE_DIR}/logs/ai-usage-*.log` over a range of local days: `?days=30` (default; `0` for all days with usage), or `start`/`end` (ISO dates, `end` defaults to today). Returns `totals`, `daily` (every day of the range, with `tokens_by_provider`), `hourly` (calls per hour of day), and `by_provider` / `by_model` / `by_source` / `by_task` sorted by tokens. Each log file's per-day aggregates are cached in memory and in `{GEENII_CACHE_DIR}/stats/`, keyed by the file's size and mtime; `?refresh=true` recalculates. 400 if `start` is after `end` |
 | `GET /ai/models` | `AIModelInfo[]` |
 | `POST /ai/completion` | One-shot text completion |
 | `POST /ai/chat/completion` | Chat completion; history is kept per `context_id` |

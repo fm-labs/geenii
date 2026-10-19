@@ -66,12 +66,11 @@ needed, so edits take effect without restarting.
 
 ## Discovery
 
-`skill_paths()` searches, in order:
+`config.skill_paths()` searches, in order:
 
-1. `./.geenii/skills` (current working directory)
-2. `$GEENII_WORKING_DIR/.geenii/skills`
-3. `$GEENII_DIR/skills`
-4. Every directory listed in `skill_dirs` in `geenii.json`
+1. `$GEENII_WORKING_DIR/.geenii/skills` (project)
+2. `~/.geenii/skills` (user)
+3. Every directory listed in `skill_dirs` in `geenii.json`
 
 A skill is any subdirectory containing a `SKILL.md`. Names must be unique;
 registering a duplicate name raises an error.
@@ -133,7 +132,7 @@ When multiple skills are active:
 ```bash
 geenii skills list                    # all discoverable skills
 geenii skills inspect <name>          # metadata; add --instructions for the body
-geenii skills install <name> <source> # copy a skill into $GEENII_DIR/skills/<name>
+geenii skills install <name> <source> # copy a skill into $GEENII_WORKING_DIR/.geenii/skills/<name>
 ```
 
 `skills install` currently supports only local sources in the form

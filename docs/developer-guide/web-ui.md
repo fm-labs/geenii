@@ -87,22 +87,66 @@ expect. Both chat model selectors use it.
 | Path | Contents |
 |---|---|
 | `src/app-router.tsx` | Route table; pages read `:params` via `useRoute()` |
-| `src/app/<feature>/` | One folder per feature: `*-page.tsx` (wrapped in `Layout`, or `ConsoleLayout` for console pages), views, local types |
+| `src/app/<feature>/` | One folder per feature: `*-page.tsx` (wrapped in `MainLayout`, `XchatProvider` for the agent pages, or `ConsoleLayout` for console pages), views, local types |
 | `src/components/ui/` | shadcn primitives |
 | `src/components/xchat/` | Agent chat component library (see below) |
-| `src/components/layout/` | `Layout` (top nav, flag-driven; the gear icon links to `#/console`), `ConsoleLayout` + `console-navdata.tsx` (console sidebar), `MainContent` |
+| `src/components/layout/` | `MainLayout` + `AppSidebar` (main app shell, see below), `ConsoleLayout` + `console-navdata.tsx` (console sidebar), `MainContent`. The old `Layout`/`Headerbar` top nav is no longer used by any page |
 | `src/components/tauri/` | Tauri title bar, panel and command helpers |
 | `src/context/` | `server-context`, `api-context`, `app-context` |
 | `src-tauri/` | Rust shell: plugins, tray, `geenii://` app protocol, sidecar |
+
+## Main layout
+
+`MainLayout` (`components/layout/main-layout.tsx`) wraps every non-console
+page in a shadcn `SidebarProvider` (collapsed by default, `--sidebar-width`
+350px) with `AppSidebar` and a `SidebarInset` for the page. `AppSidebar` has
+two columns:
+
+- an icon rail with the nav items (Start `#/`, Agents `#/agents`, a
+  `#/console` link, and placeholder items) and `NavUser` in the footer;
+- a wider panel, shown when the sidebar is expanded, with the optional
+  `sidebarHeader` slot and the xchat session list
+  (`XchatSessionsSidebarGroup`, which needs a surrounding `ChatProvider`).
+
+`XchatProvider` (`app/xchat/xchat-provider.tsx`) is `MainLayout` inside a
+`ChatProvider`. It puts a `BackendSwitcher` (echo or any agent from
+`GET /agents/`, default `default`) in `sidebarHeader`, so the session list
+shows that backend's conversations. `#/agents` and `#/agents/:name` use it;
+the agent page adds its own sticky header with a `SidebarTrigger` and
+breadcrumb.
+
+Pages render inside `SidebarInset`; `MainContent` no longer offsets for a top
+nav.
+
+## Agent launcher (`#/`)
+
+`app/launcher/launcher.view.tsx` is the start page: an app-launcher grid of
+agents from `GET /agents/`, sorted by label.
+
+- A search field filters by name, label, description and model; Enter opens
+  the first match, Esc clears. While searching, all matches show in one grid.
+- Starred agents sit in a dock-style row with larger tiles above the grid
+  (and keep a small star badge in the grid). Stars live in `localStorage`
+  under `geenii.launcher.starred`; with nothing stored, `default` is starred.
+  The backend has no starred flag.
+- Each tile is a gradient squircle with the agent's initials; the hue is
+  derived from the name, so it is stable. Clicking a tile opens
+  `#/agents/<name>`.
+- Hovering a tile (about 450 ms) opens a details popover: label, name, scope,
+  description, model, tools, skills, MCP servers, working dir, a star toggle,
+  **Launch** and a link to `#/console/configure/agents`. The ⓘ button on the
+  tile pins the popover open until you click outside.
 
 ## Features backed by the current server
 
 | Route | View | Endpoints |
 |---|---|---|
-| `#/` (dashboard), `#/agents` | `agents/agents.view.tsx` — card grid of agents; each card links to the agent page | `GET /agents/` |
+| `#/` | `launcher/launcher.view.tsx` — agent launcher (see above) | `GET /agents/` |
+| `#/agents` | `agents/agents.view.tsx` — card grid of agents; each card links to the agent page | `GET /agents/` |
 | `#/agents/:name` | `agents/agent.view.tsx` + `agent-chat.tsx` — an xchat bound to this agent (no session list, "New chat" starts over), with the agent's short info (model, description, tool/MCP/skill counts) in the chat card header and a Details dialog for parameters, tool and skill descriptions and instructions | `GET /agents/{name}`, `/agents/{name}/commands`, `/tools/`, `/chats/*` |
 | `#/console/playground/tools` | `tools/tools.view.tsx` — tools as badges grouped by type; clicking one opens a pane with the parameter table, an rjsf form built from `parameters`, and Execute | `GET /tools/`, `POST /tools/{name}/execute` |
 | `#/console/configure/mcp-servers` | `console/components/mcp-servers-settings-view.tsx` — filterable server list; a details card with config (fields or raw JSON), the server's tools, and an rjsf form per tool; an editor to add, edit and delete servers (see [mcp.md](mcp.md#web-ui)) | `GET`/`POST /mcp/servers`, `GET`/`PUT`/`DELETE /mcp/servers/{name}`, `GET /mcp/servers/{name}/config`, `POST /mcp/servers/{name}/tool/call` |
+| `#/console/system/info` | `console/components/system-info-view.tsx` — tiles for version and uptime, CPU, memory and disk `/` (with usage bars); cards for directories (copyable), AI providers (configured or not), user, binaries found on `PATH`, environment variables (collapsed; only the allow-listed, redacted ones unless `DEV_MODE=1`) and the raw JSON (collapsed) | `GET /info` |
 | `#/console/playground/xchat` | `xchat/xchat-demo-page-1.tsx` | `/chats/*`, `/agents/{name}/commands` |
 | `#/console/playground/completions`, `#/chat`, `#/completions`, `#/audio` | completion chat and quick generators (completion pages use `ConsoleLayout`) | `/ai/*` |
 
@@ -113,10 +157,10 @@ expect. Both chat model selectors use it.
 
 | Route | Page | Sections |
 |---|---|---|
-| `#/console/playground/{completions,tools,xchat,agents}` | completion chat, tools view, xchat demo, agents grid | — |
-| `#/console/configure/:section` | `console/configure-page.tsx` (formerly `managed-page.tsx`, `#/console/managed/…`) | `agents`, `mcp-servers` (installed servers); `skills` and `tools` are in the nav but not rendered yet |
+| `#/console/playground/{completions,tools,xchat}` | completion chat, tools view, xchat demo | — |
+| `#/console/configure/:section` | `console/configure-page.tsx` (formerly `managed-page.tsx`, `#/console/managed/…`) | `agents`, `skills`, `mcp-servers` (installed servers), `models`; `tools` is in the nav but not rendered yet |
 | `#/console/catalog/:section` | `catalog/catalog-page.tsx` | `mcp` (Docker MCP Catalog, `DockerMcpCatalogView`), `models` |
-| `#/console/system/:section` | `console/system-page.tsx` | `info`, `settings` |
+| `#/console/system/:section` | `console/system-page.tsx` | `info`, `stats` (usage stats), `settings` |
 
 Environments, Memory Stores, Vaults and Plugins entries are commented out in
 the nav.

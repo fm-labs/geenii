@@ -14,8 +14,7 @@ The CLI scans these directories for app subdirectories (first match wins for
 a given name):
 
 1. `~/.geenii/apps` — user-global apps
-2. `.geenii/apps` — workspace-local apps (relative to `GEENII_WORKING_DIR`)
-3. `$GEENII_DIR/apps` — project apps
+2. `.geenii/apps` — project apps (relative to `GEENII_WORKING_DIR`)
 
 All commands accept `--dir` to add an extra directory to the search path.
 

@@ -36,8 +36,8 @@ selects a backend based on the `GEENII_MEMORY_ENGINE` config value
 
 | Engine value | Backend | Storage path |
 |---|---|---|
-| `"file"` (default) | `FileChatMemory` | `$CACHE_DIR/agents/<name>/memory.<context_id>.jsonl` |
-| `"sqlite"` | `SqliteChatMemory` | `$CACHE_DIR/agents/<name>/memory.<context_id>.db` |
+| `"file"` (default) | `FileChatMemory` | `$GEENII_CACHE_DIR/agents/<name>/memory.<context_id>.jsonl` |
+| `"sqlite"` | `SqliteChatMemory` | `$GEENII_CACHE_DIR/agents/<name>/memory.<context_id>.db` |
 | anything else | `ShortTermChatMemory` | in-memory only, no persistence |
 
 Each conversation gets its own file/database keyed by `context_id`, so
@@ -130,7 +130,7 @@ session. It does not use `ChatMemory` or the agent memory system.
 ## Agent event logging (not memory)
 
 `_agent_log()` in `base_agent.py` writes structured JSONL logs to
-`$CACHE_DIR/logs/<agent>-<date>.log`. These capture events (prompts, task
+`$GEENII_CACHE_DIR/logs/<agent>-<date>.log`. These capture events (prompts, task
 executions, results) for observability but are not loaded back as
 conversation context.
 

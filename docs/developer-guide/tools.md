@@ -84,7 +84,7 @@ registered by default.
 See [mcp.md](mcp.md) for the full MCP picture (config merging, client
 lifetimes, CLI, HTTP API, web UI).
 
-MCP servers are declared in `$GEENII_DIR/mcp.json` (see
+MCP servers are declared in `~/.geenii/mcp.json` and `$GEENII_WORKING_DIR/.geenii/mcp.json` (see
 [configuration.md](../user-guide/configuration.md)). `init_agent()` calls
 `init_mcp_server_tools(registry, server_names)` with the agent spec's
 `mcp_servers`; servers not in that set are skipped, and an agent without

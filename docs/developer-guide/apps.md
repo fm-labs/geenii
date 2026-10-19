@@ -31,11 +31,10 @@ apps/
 
 ## App discovery paths
 
-Apps are discovered from multiple directories (checked in order):
+Apps are discovered from these directories, in order (`config.apps_dirs()`):
 
 1. `~/.geenii/apps` — user-global apps
-2. `$GEENII_WORKING_DIR/.geenii/apps` — workspace-local apps
-3. `$GEENII_DIR/apps` — project apps
+2. `$GEENII_WORKING_DIR/.geenii/apps` — project apps
 
 The CLI also accepts `--dir` to add extra directories at runtime.
 

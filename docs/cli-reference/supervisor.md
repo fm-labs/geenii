@@ -17,7 +17,7 @@ file services come back.
 
 ## services.json
 
-By default the file is `$GEENII_DIR/services.json`; `geenii daemon start
+By default the file is `$GEENII_WORKING_DIR/.geenii/services.json`; `geenii daemon start
 --services-config PATH` chooses another one. `$VAR` in `cmd` and `cwd` is
 filled in from the daemon's environment, and `~` in `cwd` is expanded.
 

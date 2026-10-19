@@ -103,7 +103,7 @@ exception while writing and print it instead. A full disk or a read-only
 cache dir therefore neither turns a successful completion into an error nor
 replaces the original error of a failed one.
 
-Both files are in `$GEENII_CACHE_DIR/logs/` (default `~/.geenii/.cache/logs/`).
+Both files are in `$GEENII_CACHE_DIR/logs/` (default `~/.cache/geenii/logs/`).
 
 ### Usage log format
 

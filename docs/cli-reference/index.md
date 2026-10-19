@@ -10,8 +10,8 @@ Run from source with:
 uv run geenii --help
 ```
 
-The CLI operates on the `.geenii` directory resolved from the current working
-directory (or `GEENII_DIR` / `GEENII_WORKING_DIR`, see
+The CLI operates on the `.geenii` directory in the current working directory
+(or in `GEENII_WORKING_DIR`) and on `~/.geenii`, see
 [Configuration](../user-guide/configuration.md)).
 
 ## Global Options

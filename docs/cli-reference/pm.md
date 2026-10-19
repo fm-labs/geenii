@@ -33,7 +33,7 @@ geenii pm serve [--socket PATH]
 ```
 
 Alias for [`geenii daemon start`](daemon.md). It runs the whole daemon,
-including the scheduler (with `$GEENII_DIR/scheduler.json`, if it exists) and
+including the scheduler (with `$GEENII_WORKING_DIR/.geenii/scheduler.json`, if it exists) and
 the supervisor. Accepts an optional `--socket`/`-s` to set the listen path.
 
 ### start

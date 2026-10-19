@@ -27,11 +27,11 @@ geenii daemon start [--socket PATH] [--scheduler-config PATH] [--services-config
 Run the daemon in the foreground until SIGINT/SIGTERM or `geenii daemon stop`.
 
 - `--scheduler-config`/`-c`: the tasks to schedule. Default:
-  `$GEENII_DIR/scheduler.json`. If the file doesn't exist, the scheduler runs
+  `$GEENII_WORKING_DIR/.geenii/scheduler.json`. If the file doesn't exist, the scheduler runs
   without tasks.
 - `--services-config`: the services to supervise
   (see [supervisor](supervisor.md#servicesjson)). Default:
-  `$GEENII_DIR/services.json`. If the file doesn't exist, no services start.
+  `$GEENII_WORKING_DIR/.geenii/services.json`. If the file doesn't exist, no services start.
 - Startup order: process-manager recovery, then services, then the scheduler,
   and only then does the daemon accept connections.
 - Only one daemon can run per socket. Starting a second one fails with an
@@ -67,7 +67,7 @@ These older commands now start the daemon:
 | `geenii-scheduler CONFIG` | `geenii daemon start --scheduler-config CONFIG` |
 
 Both aliases start the whole daemon. In particular, `geenii pm serve` now also
-runs the tasks in `$GEENII_DIR/scheduler.json` if that file exists.
+runs the tasks in `$GEENII_WORKING_DIR/.geenii/scheduler.json` if that file exists.
 
 ## Examples
 

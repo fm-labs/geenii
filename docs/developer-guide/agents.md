@@ -122,7 +122,7 @@ model (`geenii/agent/info_commands.py`, `InfoCommandTask`):
 | Command | Shows |
 |---|---|
 | `/self` | Name, class, model, conversation ID, memory, approval controller, tool count, MCP servers, loaded skills, and the agent's in-memory usage counters (see [Usage](#usage)) |
-| `/usage` | Calls and tokens per model in this conversation, summed from `$CACHE_DIR/logs/ai-usage-*.log` over the conversation ID and its `-<n>` compaction successors, including skill selection and `/compact` calls. Handoffs are not counted; see [usage-tracking.md](usage-tracking.md) |
+| `/usage` | Calls and tokens per model in this conversation, summed from `$GEENII_CACHE_DIR/logs/ai-usage-*.log` over the conversation ID and its `-<n>` compaction successors, including skill selection and `/compact` calls. Handoffs are not counted; see [usage-tracking.md](usage-tracking.md) |
 | `/models` | Models of the configured providers, grouped by provider, with the agent's model highlighted |
 | `/tools` | Allowed tools with descriptions: built-in, MCP grouped by server, and configured tools that did not load |
 | `/context` | Message count by role, system prompt size, a rough token estimate (4 characters per token), number of compactions |

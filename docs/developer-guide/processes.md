@@ -37,7 +37,7 @@ event loop. They are reached through **one Unix socket**.
         │
   ProcessHost (daemon/host.py): owns the components, registers their RPC methods
         ├── ProcessManager   pm.*
-        ├── Scheduler        scheduler.*   (tasks from $GEENII_DIR/scheduler.json)
+        ├── Scheduler        scheduler.*   (tasks from $GEENII_WORKING_DIR/.geenii/scheduler.json)
         └── Supervisor       supervisor.*
 ```
 
@@ -303,7 +303,7 @@ written to the Python logger at `INFO` level as `[name][tag] msg`.
 
 `geenii/scheduler.py` runs tasks on a cron schedule (`cron:EXPR`) or once at a
 set time (`at:ISO_DATETIME`). Task definitions come from a JSON file (by
-default `$GEENII_DIR/scheduler.json`) or are added programmatically. Config
+default `$GEENII_WORKING_DIR/.geenii/scheduler.json`) or are added programmatically. Config
 format and usage are covered in the [user guide](../user-guide/scheduler.md);
 this section covers the internals.
 

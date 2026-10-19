@@ -83,7 +83,7 @@ Values must be picklable. A corrupt row or file is deleted and counts as a miss.
 ### Disabling
 
 - `GEENII_CACHE_DISABLED=true` in the environment or `.env`
-- `geenii --no-cache …` on the CLI (sets `config.CACHE_DISABLED` for that run)
+- `geenii --no-cache …` on the CLI (sets `config.GEENII_CACHE_DISABLED` for that run)
 
 Both skip reads **and** writes. The setting is checked on every call, so
 changing it at runtime works. To clear everything, delete
@@ -181,7 +181,7 @@ shown by `/usage`.
 
 ## Cache directory
 
-`GEENII_CACHE_DIR` (default `~/.geenii/.cache`) also holds files that are
+`GEENII_CACHE_DIR` (default `~/.cache/geenii`) also holds files that are
 stored state rather than caches:
 
 | Path | Contents |
