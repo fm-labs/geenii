@@ -4,6 +4,7 @@ import { useRoute } from '@/app-router.tsx'
 import { McpServersSettingsView } from '@/app/console/components/mcp-servers-settings-view.tsx'
 import { AgentsSettingsView } from '@/app/console/components/agents-settings-view.tsx'
 import { SkillsSettingsView } from '@/app/console/components/skills-settings-view.tsx'
+import { ModelsSettingsView } from '@/app/console/components/models-settings-view.tsx'
 import Header from '@/components/header.tsx'
 
 const ConfigurePage = () => {
@@ -12,6 +13,8 @@ const ConfigurePage = () => {
 
   const getSectionContent = (section: string) => {
     switch (section) {
+      case 'models':
+        return <ModelsSettingsView />
       case 'agents':
         return <AgentsSettingsView />
       case 'skills':
@@ -25,7 +28,7 @@ const ConfigurePage = () => {
 
   return (
     <ConsoleLayout>
-      <Header title={`Managed ${section}`} subtitle={`Manage your ${section} here.`} />
+      <Header title={`Manage your ${section}`} />
       {getSectionContent(section)}
     </ConsoleLayout>
   )

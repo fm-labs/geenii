@@ -43,6 +43,10 @@ export const data = {
           title: 'Tools',
           url: '#/console/configure/tools',
         },
+        {
+          title: 'Models',
+          url: '#/console/configure/models',
+        },
         // {
         //   title: 'Environments',
         //   url: '#/console/configure/environments',
