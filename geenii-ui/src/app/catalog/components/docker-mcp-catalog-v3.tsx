@@ -1,10 +1,10 @@
 import React from "react";
-import { useDockerMcpCatalogV3 } from "@/app/mcp-servers/components/docker-mcp-catalog-v3-provider.tsx";
-import { Button } from "@/components/ui/button";
+import { useDockerMcpCatalogV3 } from "@/app/catalog/components/docker-mcp-catalog-v3-provider.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { Input } from '@/components/ui/input.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
-import DockerMcpCatalogV3ConfigBuilder from '@/app/mcp-servers/components/docker-mcp-catalog-v3-config-builder.tsx'
+import DockerMcpCatalogV3ConfigBuilder from '@/app/catalog/components/docker-mcp-catalog-v3-config-builder.tsx'
 
 /**
  * DEPRECATED! Use the new DockerMcpCatalogOci component instead. This component is kept for backward compatibility and will be removed in future versions.

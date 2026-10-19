@@ -2,7 +2,7 @@ import React from 'react'
 import ConsoleLayout from '@/components/layout/console-layout.tsx'
 import { useRoute } from '@/app-router.tsx'
 import { AiModelSettingsView } from '@/app/console/components/ai-model-settings-view.tsx'
-import { McpDockerCatalogView } from '@/app/console/components/mcp-docker-catalog-view.tsx'
+import { DockerMcpCatalogView } from '@/app/catalog/docker-mcp-catalog-view.tsx'
 
 const CatalogPage = () => {
   const { params } = useRoute()
@@ -10,7 +10,7 @@ const CatalogPage = () => {
   const getSectionContent = (section: string) => {
     switch (section) {
       case 'mcp':
-        return <McpDockerCatalogView />
+        return <DockerMcpCatalogView />
       case 'models':
         return <AiModelSettingsView />
       default:

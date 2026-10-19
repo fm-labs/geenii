@@ -2,10 +2,10 @@ import React from "react";
 import MainContent from "@/components/layout/main-content.tsx";
 import Header from "@/components/header.tsx";
 import Layout from '@/components/layout/layout.tsx'
-import { DockerMcpCatalogProvider } from '@/app/mcp-servers/components/docker-mcp-catalog-provider.tsx'
-import DockerMcpCatalogOci from '@/app/mcp-servers/components/docker-mcp-catalog-oci.tsx'
+import { DockerMcpCatalogProvider } from '@/app/catalog/components/docker-mcp-catalog-provider.tsx'
+import DockerMcpCatalogOci from '@/app/catalog/components/docker-mcp-catalog-oci.tsx'
 
-const DockerCatalogPage = () => {
+const DockerMcpCatalogPage = () => {
     return (
       <Layout>
         <MainContent>
@@ -25,4 +25,4 @@ const DockerCatalogPage = () => {
     );
 };
 
-export default DockerCatalogPage;
+export default DockerMcpCatalogPage;

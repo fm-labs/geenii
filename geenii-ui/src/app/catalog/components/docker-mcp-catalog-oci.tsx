@@ -2,11 +2,11 @@ import React from 'react'
 import {
     DockerMcpCatalogServerDef,
     useDockerMcpCatalog,
-} from '@/app/mcp-servers/components/docker-mcp-catalog-provider.tsx'
-import { Button } from '@/components/ui/button'
+} from '@/app/catalog/components/docker-mcp-catalog-provider.tsx'
+import { Button } from '@/components/ui/button.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
-import DockerMcpCatalogConfigBuilder from '@/app/mcp-servers/components/docker-mcp-catalog-config-builder.tsx'
+import DockerMcpCatalogConfigBuilder from '@/app/catalog/components/docker-mcp-catalog-config-builder.tsx'
 
 /**
  * Render the docker MCP toolkit catalog

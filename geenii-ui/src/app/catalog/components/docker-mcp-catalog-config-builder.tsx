@@ -3,7 +3,7 @@ import Form from '@rjsf/shadcn'
 import validator from '@rjsf/validator-ajv8'
 import JsonView from '@/components/json-view.tsx'
 import { RJSFSchema } from '@rjsf/utils'
-import { DockerMcpCatalogServerDef } from '@/app/mcp-servers/components/docker-mcp-catalog-provider.tsx'
+import { DockerMcpCatalogServerDef } from '@/app/catalog/components/docker-mcp-catalog-provider.tsx'
 
 const DockerMcpCatalogConfigBuilder = ({ serverName, serverDef }: { serverName: string, serverDef: DockerMcpCatalogServerDef }) => {
 
