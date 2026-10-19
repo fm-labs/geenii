@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import time
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -8,7 +9,7 @@ from pathlib import Path
 from geenii.config import CACHE_DIR
 from geenii.core.tools import init_core_tools
 from geenii.mcp_client import McpClient
-from geenii.mcp_config import get_mcp_config
+from geenii.mcp_config import get_mcp_config, get_mcp_config_for_server
 from geenii.tool.common import ToolCallResult, Tool
 from geenii.tool.computer import ComputerTool
 from geenii.tool.registry import ToolRegistry
@@ -46,24 +47,27 @@ def init_builtin_tools(registry: ToolRegistry):
 
 # empty results are not cached: [] is also what a failed listing returns, and it would hide the server's tools for the full ttl
 @cached(ttl=3600, cache_if=bool)
-def read_mcp_server_tools(server_name, server_conf) -> list[dict]:
+def read_mcp_server_tools(server_name) -> list[dict]:
     # short-lived client for discovery only; tool calls use the cached client from get_mcp_client_for_server
+    server_conf = get_mcp_config_for_server(server_name, compile=True)
+    if server_conf is None:
+        logger.warning(f"No MCP servers configured for server '{server_name}'")
+        return []
     mcp_client = McpClient(server_name, server_conf)
     try:
         try:
             tools = mcp_client.list_tools()
         except Exception as e:
             # try again after a short delay in case the server is still starting up
-            #print(f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds...")
-            #try:
-            #    time.sleep(1)
-            #    tools = mcp_client.list_tools()
-            #except Exception as e:
-            #    print(f"Error listing tools from MCP server {server_name} on second attempt: {e}. Skipping this server.")
-            #    return []
-            logger.error(f"Error listing tools from MCP server {server_name}: {e}.")
-            return []
-
+            logger.warning(f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds...")
+            try:
+               time.sleep(1)
+               tools = mcp_client.list_tools()
+            except Exception as e:
+               logger.error(f"Error listing tools from MCP server {server_name} on second attempt: {e}. Skipping this server.")
+               return []
+            #logger.error(f"Error listing tools from MCP server {server_name}: {e}.")
+            #return []
         return tools
     except Exception as e:
         logger.error(f"Error retrieving tools from MCP server {server_name}: {e}")
@@ -78,22 +82,21 @@ def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] = None)
         logger.warning("No MCP servers configured")
         return
 
-    for server_name, server_conf in mcp_config["mcpServers"].items():
+    for server_name, _ in mcp_config["mcpServers"].items():
         if server_names is not None and server_name not in server_names:
             continue
 
         try:
-            mcp_tools = read_mcp_server_tools(server_name, server_conf)
-
-            # map the MCP tool definitions to the internal tool representation and register them in the registry
-            registry.register_mcp_tools(
-                mcp_server_id=server_name,
-                tool_definitions=mcp_tools
-            )
+            mcp_tools = read_mcp_server_tools(server_name)
+            if len(mcp_tools) > 0:
+                # map the MCP tool definitions to the internal tool representation and register them in the registry
+                registry.register_mcp_tools(
+                    mcp_server_id=server_name, tool_definitions=mcp_tools
+                )
         except Exception as e:
             logger.error(f"Error connecting to MCP server {server_name}: {e}")
             continue
-
+            
 
 def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = None, caller_id: str = "anonymous") -> ToolCallResult:
     result = None

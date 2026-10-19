@@ -81,6 +81,9 @@ registered by default.
 
 ## MCP tools
 
+See [mcp.md](mcp.md) for the full MCP picture (config merging, client
+lifetimes, CLI, HTTP API, web UI).
+
 MCP servers are declared in `$GEENII_DIR/mcp.json` (see
 [configuration.md](../user-guide/configuration.md)). `init_agent()` calls
 `init_mcp_server_tools(registry, server_names)` with the agent spec's
@@ -261,8 +264,10 @@ geenii tools call <name> -a key=value -a key2=value2
 
 ## HTTP API
 
-The [server](server.md) keeps one `ToolRegistry` with the built-in tools
-(no MCP tools) and exposes it to the web UI's tools view:
+The [server](server.md) keeps one `ToolRegistry` with the built-in tools and
+the tools of every server in `mcp.json`, and exposes it to the web UI's tools
+view. The MCP-specific `/api/v1/mcp/…` routes are described in
+[mcp.md](mcp.md#http-api).
 
 | Method & path | Body | Response |
 |---|---|---|

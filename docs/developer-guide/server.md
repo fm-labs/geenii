@@ -25,6 +25,7 @@ Interactive API docs are at `http://localhost:33311/docs` (OpenAPI at
 | `api_routes.py` | `/health`, `/info` |
 | `agents_routes.py` | `/agents` — agent configs and their slash commands |
 | `tools_routes.py` | `/tools` — tool definitions and direct execution |
+| `mcp_routes.py` | `/mcp` — configured MCP servers, their tools, and tool calls (see [mcp.md](mcp.md#http-api)) |
 | `ai_routes.py` | `/ai` — models, text/chat completion, image, speech, transcription |
 | `chat_routes.py` | `/chats` — agent chat sessions with streamed turns and tool approvals |
 | `chat_sessions.py` | `ChatSessionStore`: chat sessions on disk + per-session agent runners |
@@ -40,7 +41,7 @@ The `lifespan` in `server.py` builds the shared state once per process:
 | `app.state` | Built by | Contents |
 |---|---|---|
 | `agent_registry` | `init_global_agent_registry()` | All agent specs from `$GEENII_DIR/agents/` |
-| `tool_registry` | `init_builtin_tools()` | Built-in tools only. MCP server tools are not loaded here (`init_mcp_server_tools` is commented out); agents still load their own MCP tools when they start |
+| `tool_registry` | `init_builtin_tools()`, `init_mcp_server_tools()` | Built-in tools plus the tools of **all** servers in `mcp.json` (discovered in a worker thread, so startup waits for the slowest server). Agents still load their own MCP tools when they start |
 | `chat_sessions` | `dep_chat_sessions` (lazily, on first `/chats` request) | `ChatSessionStore` over `GEENII_CHAT_SESSIONS_DIR` |
 
 Route modules read this state through small `Depends()` helpers
@@ -59,6 +60,13 @@ All paths are relative to `/api/v1`.
 | `GET /agents/{name}/commands` | `AgentCommand[]`: the built-in commands (`clear`, `compact` and the read-only info commands `self`, `usage`, `models`, `tools`, `context`, `help`; see [agents.md](agents.md#info-commands)) followed by one per configured skill. 404 for unknown agents |
 | `GET /tools/` | Bare array of tool definitions (`name`, `type`, `description`, `parameters` as JSON Schema) |
 | `POST /tools/{name}/execute` | Body: the tool arguments as a JSON object. Returns a `ToolCallResult` (`text`, `structured_content`, `is_error`). The call is logged to the tool-use log with caller `web:tools`. 404 for unknown tools |
+| `GET /mcp/servers` | Configured MCP servers (`env` values masked); `?reload=true` re-reads `mcp.json` |
+| `POST /mcp/servers` | Body `{name, config}`. Adds the server to `~/.geenii/mcp.json`. 201, 400 invalid, 409 name taken |
+| `GET /mcp/servers/{name}` | Server summary plus `server_capabilities`, `tools`, `resources`. Connects to the server. 404 unknown, 502 unreachable |
+| `GET /mcp/servers/{name}/config` | Full `mcp.json` entry, `env` and `headers` values masked |
+| `PUT /mcp/servers/{name}` | Body: the full entry; `********` keeps a stored value. Writes `~/.geenii/mcp.json`. 400, 404, 409 if only in the project file |
+| `DELETE /mcp/servers/{name}` | Removes the server from `~/.geenii/mcp.json`. 204, 404, 409 if only in the project file |
+| `POST /mcp/servers/{name}/tool/call` | Body `{tool_name, arguments}`. Raw MCP `CallToolResult`. 404 unknown server, 502 on failure |
 | `GET /ai/models` | `AIModelInfo[]` |
 | `POST /ai/completion` | One-shot text completion |
 | `POST /ai/chat/completion` | Chat completion; history is kept per `context_id` |

@@ -8,6 +8,7 @@ from geenii.server.agents_routes import router as agents_router
 from geenii.server.tools_routes import router as tools_router
 from geenii.server.ai_routes import router as ai_router
 from geenii.server.chat_routes import router as chat_router
+from geenii.server.mcp_routes import router as mcp_router
 # from geeniid.server.routes.route_settings import router as settings_router
 # from geeniid.server.routes.route_skills import router as skills_router
 # from geeniid.server.routes.route_mcp_admin import router as mcp_router
@@ -29,7 +30,7 @@ app_router.include_router(agents_router, prefix=API_ROUTE_PREFIX, dependencies=[
 app_router.include_router(tools_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(ai_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(chat_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
-# app_router.include_router(mcp_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
+app_router.include_router(mcp_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 # app_router.include_router(skills_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 # app_router.include_router(chat_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 # app_router.include_router(supervisor_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])

@@ -38,13 +38,14 @@ src/
     │   ├── registry.py     # ToolRegistry
     │   ├── python.py       # PythonFunctionTool, PythonCliTool
     │   ├── computer.py     # ComputerTool (shell), AppleScriptTool
-    │   └── mcp.py          # McpTool (delegates to an MCP server)
+    │   └── mcp_tool.py     # McpTool (delegates to an MCP server)
     ├── tools.py            # Built-in tool registration + MCP server tool discovery
     ├── core/
     │   ├── tools.py        # Decorator-registered utility tools (file ops, notifications)
     │   └── tasks.py        # Functions runnable by the scheduler (cleanup, run_agent)
     ├── skills.py           # SkillSpec, SkillRegistry, skill discovery paths
-    ├── mcp.py              # MCP config file access + McpClient (fastmcp wrapper)
+    ├── mcp_config.py       # mcp.json access, cached McpClient per server
+    ├── mcp_client.py       # McpClient (sync fastmcp wrapper)
     ├── provider/
     │   ├── interfaces.py   # AIProvider + capability interfaces (completion, chat, image, TTS, STT)
     │   ├── ollama/         # Ollama (chat, tools, JSON output) — most complete

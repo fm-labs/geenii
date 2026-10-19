@@ -22,7 +22,7 @@ type ExecutionResult = {
 const problemMessage = (data: any) =>
   data && typeof data === 'object' ? (data.detail || data.error || data) : data
 
-const ParametersTable = ({ schema }: { schema?: ToolType['parameters'] }) => {
+export const ParametersTable = ({ schema }: { schema?: ToolType['parameters'] }) => {
   const properties = Object.entries((schema?.properties || {}) as Record<string, any>)
   const required: string[] = (schema?.required as string[]) || []
   if (properties.length === 0) {

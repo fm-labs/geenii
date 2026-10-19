@@ -102,6 +102,7 @@ expect. Both chat model selectors use it.
 | `#/` (dashboard), `#/agents` | `agents/agents.view.tsx` — card grid of agents; each card links to the agent page | `GET /agents/` |
 | `#/agents/:name` | `agents/agent.view.tsx` + `agent-chat.tsx` — an xchat bound to this agent (no session list, "New chat" starts over), with the agent's short info (model, description, tool/MCP/skill counts) in the chat card header and a Details dialog for parameters, tool and skill descriptions and instructions | `GET /agents/{name}`, `/agents/{name}/commands`, `/tools/`, `/chats/*` |
 | `#/console/playground/tools` | `tools/tools.view.tsx` — tools as badges grouped by type; clicking one opens a pane with the parameter table, an rjsf form built from `parameters`, and Execute | `GET /tools/`, `POST /tools/{name}/execute` |
+| `#/console/configure/mcp-servers` | `console/components/mcp-servers-settings-view.tsx` — filterable server list; a details card with config (fields or raw JSON), the server's tools, and an rjsf form per tool; an editor to add, edit and delete servers (see [mcp.md](mcp.md#web-ui)) | `GET`/`POST /mcp/servers`, `GET`/`PUT`/`DELETE /mcp/servers/{name}`, `GET /mcp/servers/{name}/config`, `POST /mcp/servers/{name}/tool/call` |
 | `#/console/playground/xchat` | `xchat/xchat-demo-page-1.tsx` | `/chats/*`, `/agents/{name}/commands` |
 | `#/console/playground/completions`, `#/chat`, `#/completions`, `#/audio` | completion chat and quick generators (completion pages use `ConsoleLayout`) | `/ai/*` |
 
@@ -114,7 +115,7 @@ expect. Both chat model selectors use it.
 |---|---|---|
 | `#/console/playground/{completions,tools,xchat,agents}` | completion chat, tools view, xchat demo, agents grid | — |
 | `#/console/configure/:section` | `console/configure-page.tsx` (formerly `managed-page.tsx`, `#/console/managed/…`) | `agents`, `mcp-servers` (installed servers); `skills` and `tools` are in the nav but not rendered yet |
-| `#/console/catalog/:section` | `console/catalog-page.tsx` | `mcp` (Docker MCP Catalog, `McpDockerCatalogView`), `models` |
+| `#/console/catalog/:section` | `catalog/catalog-page.tsx` | `mcp` (Docker MCP Catalog, `DockerMcpCatalogView`), `models` |
 | `#/console/system/:section` | `console/system-page.tsx` | `info`, `settings` |
 
 Environments, Memory Stores, Vaults and Plugins entries are commented out in
@@ -122,9 +123,9 @@ the nav.
 
 ### Docker MCP Catalog
 
-`McpDockerCatalogView` (console) and `mcp-servers/docker-catalog-page.tsx`
-both render `DockerMcpCatalogOci` inside `DockerMcpCatalogProvider`
-(`src/app/mcp-servers/components/`). The provider loads the OCI-format catalog
+`DockerMcpCatalogView` (`catalog/docker-mcp-catalog-view.tsx`) and
+`catalog/docker-mcp-catalog-page.tsx` both render `DockerMcpCatalogOci` inside
+`DockerMcpCatalogProvider` (`src/app/catalog/components/`). The provider loads the OCI-format catalog
 from `public/assets/docker-mcp-catalog-oci.json` (`{ref, source, title,
 digest, servers[]}`, each server record holding its definition under
 `snapshot.server`) and looks servers up by name with `getServerDef()`.

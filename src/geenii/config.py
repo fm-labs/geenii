@@ -10,9 +10,9 @@ from geenii.utils.os_util import get_user_home_dir
 
 APP_VERSION = "0.3.4"
 
-GEENII_WORKING_DIR = realpath(os.environ.get("GEENII_WORKING_DIR", os.getcwd()))
-GEENII_DIR = realpath(os.environ.get("GEENII_DIR", os.path.join(GEENII_WORKING_DIR, ".geenii")))
 GEENII_USER_HOME = get_user_home_dir()
+GEENII_WORKING_DIR = realpath(os.environ.get("GEENII_WORKING_DIR", os.getcwd()))
+GEENII_DIR = realpath(Path(GEENII_WORKING_DIR) / ".geenii")
 
 GEENII_CHAT_SESSIONS_DIR = Path(GEENII_USER_HOME) / ".geenii" / "chats"
 

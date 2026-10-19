@@ -55,6 +55,8 @@ Internals for contributors and library consumers.
   implemented providers, request/response models, and how to add a provider.
 - **[Tools](developer-guide/tools.md)** — tool types, built-ins, MCP server
   tools, and registering your own.
+- **[MCP Servers](developer-guide/mcp.md)** — `mcp.json`, the MCP client and
+  its caches, MCP tools, the `geenii mcp` CLI, the `/mcp` HTTP API and web UI.
 - **[Skills](developer-guide/skills.md)** — the `SKILL.md` format, discovery,
   selection, and how skill instructions reach the model.
 - **[Sandbox](developer-guide/sandbox.md)** — Docker-based code isolation,

@@ -138,6 +138,30 @@ only speaks an older protocol version, add `"legacy": true` to its entry:
 "old_server": { "command": "old-mcp-server", "legacy": true }
 ```
 
+To keep secrets out of individual entries, put them in a top-level `env` map
+and refer to them as `${NAME}` in `command`, `url`, `args`, and `env` or
+`headers` values:
+
+```json
+{
+  "env": { "API_TOKEN": "…" },
+  "mcpServers": {
+    "my_http_server": {
+      "url": "http://localhost:8000/mcp",
+      "headers": { "Authorization": "Bearer ${API_TOKEN}" }
+    }
+  }
+}
+```
+
+The values are filled in when geenii connects to the server. A name with no
+value is left as written. Values come only from this `env` map, not from your
+shell environment.
+
+You can also add, edit and delete servers in the web UI under
+Console → Configure → MCP. Those changes are saved to `~/.geenii/mcp.json`;
+servers defined in the project's `.geenii/mcp.json` can't be changed there.
+
 ## `scheduler.json` — scheduled tasks
 
 Read by the geenii daemon at startup (`geenii daemon start`). See
