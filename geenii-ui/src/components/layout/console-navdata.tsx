@@ -87,6 +87,10 @@ export const data = {
           title: 'Info',
           url: '#/console/system/info',
         },
+        {
+          title: 'Usage stats',
+          url: '#/console/system/stats',
+        },
         // {
         //   title: 'Plugins',
         //   url: '#/console/system/plugins',

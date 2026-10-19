@@ -4,6 +4,7 @@ import { useRoute } from '@/app-router.tsx'
 import Header from '@/components/header.tsx'
 import SystemInfoView from '@/app/console/components/system-info-view.tsx'
 import SettingsView from '@/app/console/settings-view.tsx'
+import UsageStatsView from '@/app/console/components/usage-stats-view.tsx'
 
 const SystemPage = () => {
   const { params } = useRoute()
@@ -15,6 +16,8 @@ const SystemPage = () => {
         return <SystemInfoView />
       case 'settings':
         return <SettingsView />
+      case 'stats':
+        return <UsageStatsView />
       default:
         return <div>Section {section} not found</div>
     }
