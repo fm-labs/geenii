@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import os
 import re
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,6 +14,12 @@ class ToolCallResult:
     text: str
     structured_content: dict[str, Any] | None = None
     is_error: bool = False
+
+@dataclass
+class ToolCallContext:
+    id: str = uuid.uuid4().hex
+    cwd: str | None = None
+    caller_id: str | None = None
 
 
 class Tool(ABC):
@@ -29,7 +38,7 @@ class Tool(ABC):
     #    return f"<{self.__class__.__name__} name={self.name!r}>"
 
     @abstractmethod
-    def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, **kwargs: Any) -> ToolCallResult:
+    def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, *, ctx: ToolCallContext) -> ToolCallResult:
         ...
 
     @property
@@ -77,3 +86,22 @@ def expand_vars(command: str, env: dict[str, str]) -> str:
 
     # one pass, matching whole names: $AB is never expanded as $A + "B", and values are not expanded again
     return _VAR_PATTERN.sub(replace, command)
+
+
+def to_tool_call_result(result: Any) -> ToolCallResult:
+    """Map a handler's return value to a ToolCallResult. `text` is always a string; dicts are also structured content."""
+    if isinstance(result, Exception):
+        return ToolCallResult(text=str(result), is_error=True)
+    if isinstance(result, ToolCallResult):
+        return result
+    if result is None:
+        return ToolCallResult(text="")
+    if isinstance(result, str):
+        return ToolCallResult(text=result)
+    if isinstance(result, bytes):
+        return ToolCallResult(text=result.decode("utf-8", errors="replace"))
+    if isinstance(result, dict):
+        return ToolCallResult(text=json.dumps(result, default=str), structured_content=result)
+    if isinstance(result, (list, tuple)):
+        return ToolCallResult(text=json.dumps(result, default=str))
+    return ToolCallResult(text=str(result))

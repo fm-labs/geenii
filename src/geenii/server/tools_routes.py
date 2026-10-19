@@ -24,4 +24,4 @@ def execute_tool(tool_name: str, args: dict, registry: ToolRegistry = Depends(de
         tool = registry.get(tool_name)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found.")
-    return invoke_tool(tool, args=args, env={}, caller_id="web:tools")
+    return invoke_tool(tool, args=args, env={}, cwd='/tmp', caller_id="web:tools")

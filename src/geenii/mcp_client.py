@@ -6,7 +6,14 @@ import os
 from fastmcp import Client
 from fastmcp.client.logging import LogMessage
 from fastmcp.mcp_config import MCPConfig
-from mcp_types import TextResourceContents, BlobResourceContents
+from mcp_types import (
+    TextResourceContents,
+    BlobResourceContents,
+    CallToolResult,
+    Prompt,
+    Tool,
+    Resource,
+)
 
 from geenii.config import MCP_INIT_TIMEOUT
 from geenii.utils.async_bridge import run_sync
@@ -42,7 +49,7 @@ class McpClient:
             mode = "legacy"
             del server_config["legacy"]
 
-        logger.info(f"Connecting to MCP server '{self.server_name}' mode: {mode}")
+        logger.info(f"MCP {self.server_name}: Connecting to MCP server '{self.server_name}' mode: {mode}")
         return Client(
             transport=MCPConfig(mcpServers={self.server_name: server_config}),
             mode=mode,
@@ -80,7 +87,7 @@ class McpClient:
                 await self._client.__aenter__()
                 self._connected = True
                 logger.info(
-                    f"Opened persistent MCP connection for '{self.server_name}'"
+                    f"MCP {self.server_name}: Opened persistent MCP connection for '{self.server_name}'"
                 )
 
     async def _close(self):
@@ -91,7 +98,7 @@ class McpClient:
                 pass
             self._connected = False
             self._info = None
-            logger.info(f"Closed MCP connection for '{self.server_name}'")
+            logger.info(f"MCP {self.server_name}: Closed MCP connection for '{self.server_name}'")
 
     async def _list(self, kind: str, fetch):
         await self._ensure_connected()
@@ -113,10 +120,10 @@ class McpClient:
 
     async def _call_tool(self, tool_name: str, args: dict) -> any:
         await self._ensure_connected()
-        logger.info(f"Calling tool '{tool_name}' with args {args}")
+        logger.info(f"MCP {self.server_name}: Calling tool '{tool_name}' with args {args}")
         result = await self._client.call_tool_mcp(tool_name, arguments=args)
         logger.info(
-            f"Tool call result for '{tool_name}' on '{self.server_name}': {result}"
+            f"MCP {self.server_name}: Tool call result for '{tool_name}': {result}"
         )
         return result
 
@@ -150,16 +157,16 @@ class McpClient:
             return data.model_dump()
         return None
 
-    def list_tools(self):
+    def list_tools(self) -> list[Tool]:
         return run_sync(self._list("tools", self._client.list_tools))
 
-    def list_resources(self):
+    def list_resources(self) -> list[Resource]:
         return run_sync(self._list("resources", self._client.list_resources))
 
-    def list_prompts(self):
+    def list_prompts(self) -> list[Prompt]:
         return run_sync(self._list("prompts", self._client.list_prompts))
 
-    def call_tool(self, tool_name: str, args: dict) -> any:
+    def call_tool(self, tool_name: str, args: dict) -> CallToolResult:
         return run_sync(self._call_tool(tool_name, args))
 
     def get_resource_content(self, resource_name: str) -> bytes | None:
@@ -168,7 +175,7 @@ class McpClient:
             return None
         if len(response) >= 2:
             logger.warning(
-                f"Multi-part resource not supported. ({len(response)} parts detected)"
+                f"MCP {self.server_name}: Multi-part resource not supported. ({len(response)} parts detected)"
             )
             return None
 

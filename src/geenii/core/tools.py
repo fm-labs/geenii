@@ -1,29 +1,33 @@
+import os
 from pathlib import Path
 
 import subprocess
 import logging
 
 from geenii import config
+from geenii.tool.common import ToolCallContext
 from geenii.tool.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
-def is_file_in_allowed_dirs(file_path: str|Path) -> bool:
-    dirs = [
-        config.GEENII_WORKING_DIR,
-    ]
+
+def is_file_in_allowed_dirs(file_path: str | Path, wd: str | None = None) -> bool:
+    dirs = [wd, config.GEENII_WORKING_DIR]
 
     user_settings = config.read_user_settings()
-    if "allowed_dirs" in user_settings and isinstance(user_settings["allowed_dirs"], list):
-        user_allowed_dirs = user_settings["allowed_dirs"]
-        dirs.extend(user_allowed_dirs)
+    if "allowed_dirs" in user_settings and isinstance(
+        user_settings["allowed_dirs"], list
+    ):
+        allowed_dirs = user_settings["allowed_dirs"]
+        dirs.extend(allowed_dirs)
 
     for _dir in dirs:
-        if is_file_in_allowed_dir(file_path, wd=_dir):
+        if _dir is not None and is_file_in_allowed_dir(file_path, wd=_dir):
             return True
     return False
 
-def is_file_in_allowed_dir(file_path: str|Path, wd: str) -> bool:
+
+def is_file_in_allowed_dir(file_path: str | Path, wd: str) -> bool:
     """Return True if file_path resolves to a location inside the working dir."""
     try:
         logger.debug(f"check is_file_in_working_dir file_path={file_path} wd={wd}")
@@ -37,7 +41,7 @@ def is_file_in_allowed_dir(file_path: str|Path, wd: str) -> bool:
 
 def init_core_tools(tool_registry: ToolRegistry) -> None:
 
-    #tool_registry = ToolRegistry()
+    # tool_registry = ToolRegistry()
 
     # @tool_registry.tool()
     # def file_exists(file_path: str) -> bool:
@@ -49,36 +53,45 @@ def init_core_tools(tool_registry: ToolRegistry) -> None:
     #     """
     #     return os.path.isfile(file_path)
 
+    def _normalize_path(path: str, base_dir: str) -> str:
+        if not Path(path).is_absolute():
+            path = Path(base_dir) / path
+        return str(path.resolve(strict=False).absolute())
 
     @tool_registry.tool(name="read")
-    def file_read(file_path: str) -> str:
+    def file_read(file_path: str, *, ctx: ToolCallContext) -> str:
         """
         Read and return the contents of a file.
 
         :param file_path: The path to the file to read.
         :return: The contents of the file as a string.
         """
-        file_path = Path(file_path).resolve(strict=False).absolute()
-        if not is_file_in_allowed_dirs(file_path):
-            logger.critical(f"SECURITY ALERT! Attempting to read file from {file_path}. wd={config.GEENII_WORKING_DIR}")
+        wd = ctx.cwd or os.getcwd()
+        file_path = _normalize_path(file_path, wd)
+        if not is_file_in_allowed_dirs(file_path, wd):
+            logger.critical(
+                f"SECURITY ALERT! Attempting to read file from {file_path}. wd={wd}"
+            )
             return "You are not allowed to read this file."
 
         logger.warning(f"file_read: {file_path}")
         with open(file_path, "r") as f:
             return f.read()
 
-
     @tool_registry.tool(name="write")
-    def file_write(file_path: str, contents: str) -> str:
+    def file_write(file_path: str, contents: str, *, ctx: ToolCallContext) -> str:
         """
         Write the contents to a file.
 
         :param file_path: The path to the file to write to.
         :param contents: The contents to write to the file.
         """
-        file_path = Path(file_path).resolve(strict=False).absolute()
-        if not is_file_in_allowed_dirs(file_path):
-            logger.critical(f"SECURITY ALERT! Attempting to write to {file_path}. wd={config.GEENII_WORKING_DIR}")
+        wd = ctx.cwd or os.getcwd()
+        file_path = _normalize_path(file_path, wd)
+        if not is_file_in_allowed_dirs(file_path, wd):
+            logger.critical(
+                f"SECURITY ALERT! Attempting to write to {file_path}. wd={wd}"
+            )
             return "You are not allowed to write this file."
 
         logger.warning(f"file_write: {file_path}")
@@ -87,132 +100,11 @@ def init_core_tools(tool_registry: ToolRegistry) -> None:
 
         return f"Contents successfully written to {file_path}"
 
-    #
-    # @tool_registry.tool()
-    # def bash(command: str, skill: str | None = None) -> str:
-    #     """
-    #     Execute a shell command on the local machine and return its output.
-    #
-    #     :param command: The shell command to execute. The command should be a single string, e.g. "ls -la /tmp".
-    #     :param skill: The name of the skill that is requesting the command execution.
-    #     :return: The output of the command as a string.
-    #     """
-    #     # todo: implement tool usage policy
-    #     #allowed_commands = ["ls", "pwd", "whoami", "date", "osascript", "echo", "cat", "head", "tail"]
-    #     #if not any(command.startswith(allowed) for allowed in allowed_commands):
-    #     #    return f"Error: Command '{command}' is not allowed."
-    #
-    #     working_directory = os.getcwd()
-    #     _env = {}
-    #     if skill:
-    #         skill_dir = locate_skill_path(skill)
-    #         #if os.path.isdir(skill_dir):
-    #         #    working_directory = skill_dir
-    #         _env.update({"SKILL_NAME": skill, "SKILL_DIR": skill_dir})
-    #
-    #     # Special handling of python commands to run them in a sandboxed environment
-    #     # if command.startswith("python3 ") or command.startswith("python "):
-    #     #     parts = shlex.split(command)
-    #     #     script_path = parts[1]
-    #     #     args = " ".join(parts[2:])
-    #     #     return python(script_path=script_path, args=args, skill=skill)
-    #
-    #
-    #     use_supervisor = os.environ.get("USE_SUPERVISOR", "false").lower()  == "true"
-    #     async def run_with_supervisor(cmd, env, cwd):
-    #         #supervisor = g.SUPERVISOR
-    #         _name = f"execute-command-{uuid.uuid4().hex}"
-    #         #await supervisor.ensure(name, ProcConfig(name=name,cmd=cmd, env=env, cwd=cwd, restart=False))
-    #         #await supervisor.run(cmd=cmd, env=env, cwd=cwd)
-    #         print(f">Supervisor command return code: {result.returncode}")
-    #         print(f">Supervisor command stdout: {result.stdout}")
-    #         print(f">Supervisor command stderr: {result.stderr}")
-    #         return result
-    #
-    #     if use_supervisor:
-    #         loop = asyncio.get_event_loop()
-    #         result = loop.run_until_complete(run_with_supervisor(command, _env, working_directory))
-    #     else:
-    #         result = subprocess.run(command, shell=True, capture_output=True, text=True, env=_env, cwd=working_directory)
-    #         # debug print the command, return code, stdout and stderr
-    #         print(f">Executed command: {command}", f"in directory: {working_directory}", f"with environment: { _env}")
-    #         print(f">Return code: {result.returncode}")
-    #         print(f">Standard output: {result.stdout}")
-    #         print(f">Standard error: {result.stderr}")
-    #
-    #     return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
-    #
-    #
-    # @tool_registry.tool()
-    # def applescript(script: str) -> str:
-    #     """
-    #     Execute an AppleScript command on MacOSX and return its output.
-    #
-    #     :param script: The AppleScript command to execute.
-    #     :return: The output of the command as a string.
-    #     """
-    #     command = f"""osascript -e '{script}'"""
-    #     print(">Executing AppleScript with command:", command)
-    #     result = subprocess.run(command, shell=True, capture_output=True, text=True)
-    #     print(f">Executed AppleScript: {script}")
-    #     print(f">Return code: {result.returncode}")
-    #     print(f">Standard output: {result.stdout}")
-    #     print(f">Standard error: {result.stderr}")
-    #
-    #     return result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
-    #
-    #
-    # @tool_registry.tool()
-    # def python(script_path: str, args: str = '') -> str:
-    #     """
-    #     Execute a Python script and return its output.
-    #
-    #     :param script_path: The path to the Python script to execute.
-    #     :param args: Additional arguments to pass to the Python script as a single string, e.g. "--option value".
-    #     :return: The output of the command as a string.
-    #     """
-    #     print(">Executing Python script with path:", script_path, "and args:", args)
-    #
-    #     # replace environment variables in the script path and args
-    #     script_path = os.path.expandvars(script_path)
-    #     args = os.path.expandvars(args)
-    #
-    #     script_dir = os.path.dirname(script_path)
-    #     script_name = os.path.basename(script_path)
-    #     script_args = shlex.split(args)
-    #     rc, stdout, stderr = run_docker_sandbox_python(script_dir, script_name,
-    #                                                    script_args=script_args,
-    #                                                    network_mode="bridge", timeout=10)
-    #
-    #     print(f">Return code: {rc}")
-    #     print(f">Standard output: {stdout}")
-    #     print(f">Standard error: {stderr}")
-    #
-    #     return stdout.strip() if rc == 0 else stderr.strip()
-
-
-    # @geenii_tools.tool()
-    # def schedule_command(command: str, delay_seconds: int) -> str:
-    #     """
-    #     Schedule a shell command to be executed after a specified delay.
-    #
-    #     :param command: The shell command to execute.
-    #     :param delay_seconds: The delay in seconds before executing the command.
-    #     :return: A message indicating that the command has been scheduled.
-    #     """
-    #     import threading
-    #     def delayed_execution():
-    #         print(f">Executing scheduled command after {delay_seconds} seconds: {command}")
-    #         bash(command)
-    #
-    #     timer = threading.Timer(delay_seconds, delayed_execution)
-    #     timer.start()
-    #
-    #     return f"Command '{command}' scheduled to run in {delay_seconds} seconds."
-
 
     @tool_registry.tool()
-    def display_desktop_notification(message: str, title: str = "Message from Geenii") -> str:
+    def display_desktop_notification(
+        message: str, title: str = "Message from Geenii"
+    ) -> str:
         """
         Show a desktop notification with the given title and message.
 
@@ -220,9 +112,15 @@ def init_core_tools(tool_registry: ToolRegistry) -> None:
         :param title: The title of the notification.
         :return: A message indicating that the notification has been sent.
         """
+
         def _escape_applescript(s: str) -> str:
-            return (s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-                    .replace("\r", "\\r").replace("\t", "\\t"))
+            return (
+                s.replace("\\", "\\\\")
+                .replace('"', '\\"')
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t")
+            )
 
         script = (
             f'display dialog "{_escape_applescript(message)}"'

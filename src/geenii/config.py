@@ -104,7 +104,8 @@ def read_user_settings():
         "notifications": True,
         "language": "en-US",
         "environment": {},
-        "skill_dirs": []
+        "skill_dirs": [],
+        "projects": {},  # "/path/to/project/dir": {"trusted": true}
     }
     if os.path.exists(user_settings_path):
         try:
@@ -126,6 +127,46 @@ def write_user_settings(settings: dict):
             json.dump(settings, f, indent=4)
     except Exception as e:
         print(f"Error writing user settings: {e}")
+
+
+def _normalize_dir(path: str) -> str:
+    return realpath(os.path.expanduser(path))
+
+
+def get_projects() -> dict[str, dict]:
+    """The `projects` section of the user settings, keyed by the resolved project directory.
+    Project directories must be absolute paths; others are skipped."""
+    projects = read_user_settings().get("projects") or {}
+    result = {}
+    for d, conf in projects.items():
+        if not os.path.isabs(d):
+            print(f"Warning: Project directory '{d}' is not an absolute path, ignoring it.")
+            continue
+        result[realpath(d)] = conf or {}
+    return result
+
+
+def project_paths() -> list[str]:
+    """The configured project directories (resolved, absolute)."""
+    return list(get_projects())
+
+
+def get_project_dir(path: str) -> str | None:
+    """The project directory that contains the path (or is the path itself), or None.
+    With nested projects the innermost one wins."""
+    target = Path(_normalize_dir(path))
+    matches = [d for d in get_projects() if target.is_relative_to(d)]
+    return max(matches, key=len, default=None)
+
+
+def is_project_dir(path: str) -> bool:
+    """Whether the directory is registered as a project in the user settings."""
+    return _normalize_dir(path) in get_projects()
+
+
+def is_project_dir_trusted(path: str) -> bool:
+    """Whether the directory is a registered project marked as `"trusted": true`."""
+    return get_projects().get(_normalize_dir(path), {}).get("trusted", False) is True
 
 
 def makedirs_safe(path: str):

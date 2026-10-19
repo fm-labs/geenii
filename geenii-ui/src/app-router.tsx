@@ -79,6 +79,10 @@ const AppRouter = () => {
         element: <AgentPage />,
       },
       {
+        path: '/agents/:name/:contextId',
+        element: <AgentPage />,
+      },
+      {
         path: '/flows',
         element: <FlowsPage />,
       },

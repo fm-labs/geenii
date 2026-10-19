@@ -7,7 +7,7 @@ import {
   createEchoBackend,
 } from '@/components/xchat'
 import MainLayout from '@/components/layout/main-layout.tsx'
-import { BackendSwitcher } from '@/components/backend-switcher.tsx'
+import { BackendSwitcher } from '@/components/xchat/backend-switcher.tsx'
 
 const ECHO = 'echo'
 
@@ -22,21 +22,23 @@ const useAgentNames = () => {
   return names
 }
 
-const XchatProvider = (props: PropsWithChildren) => {
+const XchatProvider = (props: PropsWithChildren<{
+  defaultBackend?: string
+}>) => {
   const notify = useNotification()
   const { apiBaseUrl } = useApi()
   const agentNames = useAgentNames()
-  const [selected, setSelected] = React.useState<string>('default')
+  const [selectedBackend, setSelectedBackend] = React.useState<string>(props.defaultBackend || 'default')
 
   const backend = React.useMemo(() => {
-    if (selected===ECHO || !apiBaseUrl) return createEchoBackend({ delay: 500 })
-    return createAgentBackend({ baseUrl: apiBaseUrl, agent: selected })
-  }, [selected, apiBaseUrl])
+    if (selectedBackend===ECHO || !apiBaseUrl) return createEchoBackend({ delay: 500 })
+    return createAgentBackend({ baseUrl: apiBaseUrl, agent: selectedBackend })
+  }, [selectedBackend, apiBaseUrl])
 
   return (
     <ChatProvider backend={backend} onError={(error) => notify.error(error)}>
       <MainLayout sidebarHeader={
-                     <BackendSwitcher backends={[ECHO, ...agentNames]} defaultBackend={selected} onChange={setSelected} />
+                     <BackendSwitcher backends={[ECHO, ...agentNames]} defaultBackend={selectedBackend} onChange={setSelectedBackend} />
                   }>
         {props.children}
       </MainLayout>

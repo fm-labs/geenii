@@ -30,9 +30,14 @@ class AgentSpec(pydantic.BaseModel):
     allowed_dirs: list[str] | None = None # only for project scope
 
     # @property
-    # def working_dir(self):
-    #     """The path to the agent's directory"""
-    #     return f"{USER_DIR}/agents/{self.name}/"
+    # def working_dir(self) -> str | None:
+    #     """The path to the agent's working directory"""
+    #     if self.scope == "project":
+    #         if self.working_dir:
+    #             return str(Path(self.working_dir).resolve().absolute())
+    #         elif self.file_path:
+    #             return str(Path(self.file_path).parent.parent.parent.resolve().absolute())
+    #     return None
 
     @property
     def instructions(self) -> str:
@@ -141,11 +146,13 @@ class AgentRegistry:
         for item in base_path.iterdir():
             if item.is_file() and item.name.endswith(".md"):
                 file_path = Path(base_path / item.name)
-                #logger.debug(f"Agent MD found at '{file_path}'")
+                logger.info(f"Agent MD found at '{file_path}'")
                 try:
                     agent_conf = AgentSpec.from_md_file(str(file_path))
                     agent_conf.scope = scope
+                    if scope == "project":
+                        agent_conf.working_dir = str(base_path.parent.parent.resolve().absolute())
                     self._agent_configs[agent_conf.name] = agent_conf
-                    logger.debug(f"Agent config '{agent_conf.name}' loaded from file '{file_path}'.")
+                    logger.info(f"Agent config '{agent_conf.name}' loaded from file '{file_path}'.")
                 except Exception as e:
                     logger.error(f"Error loading agent from config: {str(e)}", exc_info=e)

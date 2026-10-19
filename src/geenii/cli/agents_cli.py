@@ -17,7 +17,7 @@ def agents():
 def list_agents():
     """List all configured and loaded agents."""
     click.echo("Configured agents:")
-    _agents = init_global_agent_registry()
+    _agents = init_global_agent_registry(projects=True)
     for agent_name in sorted(list(_agents.list_configured())):
         click.echo(f"- {agent_name}")
 
@@ -36,7 +36,7 @@ def list_agents():
         conf = _agents.get_config(agent_name)
         if not conf:
             continue
-        desc = f"{conf.description[:100]}..." if conf.description is not None and len(conf.description) > 100 else (conf.description or "")
+        desc = f"{conf.description[:60]}..." if conf.description is not None and len(conf.description) > 60 else (conf.description or "")
         table.add_row(conf.name, desc, conf.scope, conf.class_name, conf.working_dir)
     console = Console()
     console.print(table)

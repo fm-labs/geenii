@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
-import subprocess
 import os
+import subprocess
 import uuid
 from typing import Any
 
-from geenii import config
-from geenii.tool.common import Tool, expand_vars, ToolCallResult
+from geenii.tool.common import Tool, expand_vars, ToolCallResult, ToolCallContext
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +25,8 @@ class ComputerTool(Tool):
         self.type = "computer"
         self.command_template = command_template
 
-    def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, **kwargs: Any) -> ToolCallResult:
-        working_dir = kwargs.get("cwd") or config.GEENII_WORKING_DIR
+    def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, *, ctx: ToolCallContext) -> ToolCallResult:
+        working_dir = ctx.cwd or os.getcwd()
         # todo check if tool execution is permitted in given working_dir
 
         command = args.get("command")
@@ -40,16 +39,16 @@ class ComputerTool(Tool):
         logger.info(f"Executing ComputerTool command: {command} in working directory={working_dir}")
         subprocess_id = uuid.uuid4().hex[:8]
         # logged before expansion and with env names only, since env may hold secrets
-        logger.info(f"Subprocess [{subprocess_id}] Spawning command={command!r} environment={sorted(env or {})} cwd={working_dir}")
+        logger.info(f"ComputerTool [{subprocess_id}] Spawning command={command!r} environment={sorted(env or {})} cwd={working_dir}")
         command = expand_vars(command, env or {})
 
         _env = os.environ.copy()
         if env:
             _env.update(env)
         p = subprocess.run(command, shell=True, capture_output=True, text=True, env=_env, cwd=working_dir)
-        logger.info(f"Subprocess [{subprocess_id}] Return code: {p.returncode}")
-        logger.info(f"Subprocess [{subprocess_id}] Standard output: {p.stdout}")
-        logger.info(f"Subprocess [{subprocess_id}] Standard error: {p.stderr}")
+        logger.info(f"ComputerTool [{subprocess_id}] Standard output: {p.stdout}")
+        logger.info(f"ComputerTool [{subprocess_id}] Standard error: {p.stderr}")
+        logger.info(f"ComputerTool [{subprocess_id}] Return code: {p.returncode}")
 
         out = p.stdout.strip()
         # attempt json parsing; only an object is structured content

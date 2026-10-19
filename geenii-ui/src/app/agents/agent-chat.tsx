@@ -26,11 +26,12 @@ const AgentChatHeader = ({ children, onNewChat }: { children: React.ReactNode, o
  * xchat bound to one agent: each conversation is a new /chats session with this agent.
  * There is no session list; "New chat" starts over (the previous session stays on the server).
  */
-const AgentChat = ({ agent, header, className }: {
+const AgentChat = ({ agent, header, className, contextId }: {
   agent: AgentType
   /** Left part of the card header, e.g. the agent's short info; defaults to the agent's name */
   header?: React.ReactNode
   className?: string
+  contextId?: string
 }) => {
   const { apiBaseUrl } = useApi()
   const notify = useNotification()
@@ -46,7 +47,7 @@ const AgentChat = ({ agent, header, className }: {
 
   return (
     <div className={`flex flex-col ${className ?? ''}`}>
-      <ChatProvider key={chatKey} backend={backend} onError={(error) => notify.error(error)}>
+      <ChatProvider key={chatKey} contextId={contextId} backend={backend} onError={(error) => notify.error(error)}>
         <AgentChatHeader onNewChat={() => setChatKey((k) => k + 1)}>
           {header ?? <h3 className="truncate text-sm font-semibold">{title}</h3>}
         </AgentChatHeader>

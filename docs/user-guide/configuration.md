@@ -99,13 +99,21 @@ Read by `config.read_user_settings()`. Recognized keys and their defaults:
   "notifications": true,
   "language": "en-US",
   "environment": {},
-  "skill_dirs": []
+  "skill_dirs": [],
+  "projects": {}
 }
 ```
 
 - **`skill_dirs`** — extra directories to search for skills, appended to the
   default skill search paths (see [skills.md](../developer-guide/skills.md)). This is the only
   key the core library consumes today.
+- **`projects`** — project directories, keyed by absolute path (symlinks are
+  resolved; relative paths and `~` are ignored with a warning), e.g. `{"/path/to/project/dir": {"trusted": true}}`. Checked with
+  `config.is_project_dir(path)` and `config.is_project_dir_trusted(path)` (exact
+  match); a project is only trusted when `trusted` is exactly `true`.
+  `config.project_paths()` lists the configured project directories.
+  `config.get_project_dir(path)` returns the project directory containing `path`
+  (the innermost one for nested projects), or `None`.
 - `theme`, `notifications`, `language`, `environment` are reserved for the
   UI/server. Example configs in the wild may contain additional keys
   (`providers`, `defaultProvider`, `skillRepositories`); these are currently

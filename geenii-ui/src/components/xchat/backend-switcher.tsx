@@ -8,12 +8,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu.tsx'
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from '@/components/ui/sidebar'
+} from '@/components/ui/sidebar.tsx'
+import { useChatBackend } from '@/components/xchat/chat-context.tsx'
 
 export function BackendSwitcher({
                                   backends,
@@ -24,6 +25,15 @@ export function BackendSwitcher({
   onChange: (selected: string) => void
 }) {
   const [selectedBackend, setSelectedBackend] = React.useState(defaultBackend)
+
+  const backend = useChatBackend()
+  React.useEffect(() => {
+    if (backend?.id?.startsWith('agent:')) {
+      setSelectedBackend(backend.id.substring('agent:'.length))
+    } else if (backend?.id) {
+      setSelectedBackend(backend.id)
+    }
+  }, [backend.id])
 
   return (
     <SidebarMenu>

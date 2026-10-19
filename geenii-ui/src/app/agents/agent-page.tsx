@@ -9,9 +9,10 @@ import { Separator } from '@/components/ui/separator.tsx'
 const AgentPage = () => {
   const { params } = useRoute()
   const name = decodeURIComponent(params?.name || '')
+  const contextId = decodeURIComponent(params?.contextId || '')
 
   return (
-    <XchatProvider>
+    <XchatProvider defaultBackend={name}>
 
       <header className="sticky top-0 flex shrink-0 items-center gap-2 border-b bg-background p-4">
         <SidebarTrigger className="-ml-1" />
@@ -31,7 +32,7 @@ const AgentPage = () => {
       <main className={"absolute top-14 left-0 w-full h-[calc(100vh-4rem)]"}>
         <div className="content mx-auto">
           <div className="flex flex-col py-4 px-4 flex-1">
-            <AgentView key={name} name={name} />
+            <AgentView key={name} name={name} contextId={contextId} />
           </div>
         </div>
       </main>

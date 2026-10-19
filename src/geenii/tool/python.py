@@ -8,7 +8,13 @@ import os
 import inspect
 from typing import Callable, Any
 
-from geenii.tool.common import Tool, expand_vars, ToolCallResult
+from geenii.tool.common import (
+    Tool,
+    expand_vars,
+    ToolCallResult,
+    to_tool_call_result,
+    ToolCallContext,
+)
 from geenii.utils.async_bridge import run_sync
 
 logger = logging.getLogger(__name__)
@@ -28,34 +34,21 @@ class PythonFunctionTool(Tool):
         self.type = "function"
         self.handler = handler
 
-    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> ToolCallResult:
+    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, *, ctx: ToolCallContext) -> ToolCallResult:
         if self.handler is None:
             raise RuntimeError(f"No handler registered for tool {self.name!r}")
 
-        # support sync and async handlers
-        result = self.handler(**args)
-        if inspect.isawaitable(result):
-            result = run_sync(result)
+        try:
+            # support sync and async handlers
+            result = self.handler(**args, ctx=ctx)
+            if inspect.isawaitable(result):
+                result = run_sync(result)
+        except Exception as e:
+            logger.error(f"Error during python fn tool {self.name!r}: {e}", exc_info=True)
+            result = e
 
         # print(f"Tool {self.name!r} returned:", result)
-        return _to_tool_call_result(result)
-
-
-def _to_tool_call_result(result: Any) -> ToolCallResult:
-    """Map a handler's return value to a ToolCallResult. `text` is always a string; dicts are also structured content."""
-    if isinstance(result, ToolCallResult):
-        return result
-    if result is None:
-        return ToolCallResult(text="")
-    if isinstance(result, str):
-        return ToolCallResult(text=result)
-    if isinstance(result, bytes):
-        return ToolCallResult(text=result.decode("utf-8", errors="replace"))
-    if isinstance(result, dict):
-        return ToolCallResult(text=json.dumps(result, default=str), structured_content=result)
-    if isinstance(result, (list, tuple)):
-        return ToolCallResult(text=json.dumps(result, default=str))
-    return ToolCallResult(text=str(result))
+        return to_tool_call_result(result)
 
 
 class PythonCliTool(Tool):
@@ -70,7 +63,7 @@ class PythonCliTool(Tool):
         super().__init__(name, description, input_schema)
         self.type = "python"
 
-    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> ToolCallResult:
+    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, *, ctx: ToolCallContext) -> ToolCallResult:
         command = args.get("command")
         if not command:
             raise ValueError(f"Missing 'command' argument for PythonTool {self.name!r}")
@@ -83,20 +76,22 @@ class PythonCliTool(Tool):
         if env:
             _env.update(env)
 
+        working_dir = ctx.cwd or os.getcwd()
         # the unexpanded command, since env may hold secrets
-        logger.info(f"Spawn python subprocess with command={args.get('command')!r}")
-        p = subprocess.run(_command, shell=False, capture_output=True, text=True, env=_env, cwd=None)
-        logger.info(f"Return code: {p.returncode}")
-        logger.info(f"Standard output: {p.stdout}")
-        logger.info(f"Standard error: {p.stderr}")
+        logger.info(f"Spawn python subprocess with command={args.get('command')!r} in directory: {working_dir!r}")
+        p = subprocess.run(_command, shell=False, capture_output=True, text=True, env=_env, cwd=working_dir)
+        logger.info(f"PythonCliTool output: {p.stdout}")
+        logger.info(f"PythonCliTool error: {p.stderr}")
+        logger.info(f"PythonCliTool rc: {p.returncode}")
 
         out = p.stdout.strip()
         # attempt json parsing
         json_data = None
-        try:
-            json_data = json.loads(out)
-        except json.decoder.JSONDecodeError:
-            pass
+        if p.returncode == 0 and len(out) > 0:
+            try:
+                json_data = json.loads(out)
+            except json.decoder.JSONDecodeError:
+                pass
 
         err = p.stderr.strip()
         _output = f"stdout:\n{out}\nstderr:\n{err}"

@@ -74,8 +74,14 @@ export const useChatSessions = (): ChatSessionsState => {
  * Lists the backend's conversations and switches between them. Renders nothing if the backend has no listSessions.
  */
 const ChatSessionList = ({ className }: { className?: string }) => {
+  const backend = useChatBackend()
   const { supported, canDelete, sessions, activeId, error, open, remove } = useChatSessions()
   if (!supported) return null
+
+  const filtered = React.useMemo(() =>
+    sessions.filter((s) =>
+      s.agent === backend.id.substring('agent:'.length)
+    ), [sessions, backend.id])
 
   return (
     <div className={cn('flex flex-col gap-1 text-sm', className)}>
@@ -83,7 +89,7 @@ const ChatSessionList = ({ className }: { className?: string }) => {
         <MessageSquarePlusIcon /> New chat
       </Button>
       {error && <div className={'text-destructive text-xs px-2'}>{error}</div>}
-      {sessions.map((s) => (
+      {filtered.map((s) => (
         <div key={s.id}
              className={cn('group flex items-center rounded-md hover:bg-accent', s.id === activeId && 'bg-accent font-medium')}>
           <button type={'button'} className={'flex min-w-0 flex-1 flex-col px-2 py-1.5 text-left'} onClick={() => open(s.id)}>

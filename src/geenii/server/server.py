@@ -76,7 +76,7 @@ logging.basicConfig(
 
 async def initialize_agent_registry():
     print("Initializing agent registry...")
-    return init_global_agent_registry()
+    return init_global_agent_registry(projects=True)
 
 async def initialize_tool_registry():
     print("Initializing tool registry...")

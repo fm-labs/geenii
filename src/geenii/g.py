@@ -25,6 +25,7 @@ from geenii.config import (
     skill_paths,
     flow_dirs,
     GEENII_USER_HOME,
+    project_paths,
 )
 from geenii.skills import SkillRegistry
 from geenii.utils.os_util import get_user_home_dir
@@ -44,7 +45,7 @@ def get_bot(botname: str) -> BotInterface:
     return init_agent_by_name(name, cwd=None)
 
 
-def init_global_agent_registry() -> AgentRegistry:
+def init_global_agent_registry(projects: bool = False) -> AgentRegistry:
     _agents = AgentRegistry()
     # default
     _agents._agent_configs.update({"default": AgentSpec(
@@ -74,6 +75,13 @@ def init_global_agent_registry() -> AgentRegistry:
 
     for (agent_dir, scope) in set(agent_paths()):
         _agents.load_from_directory(agent_dir, scope=scope)
+
+    # also load from all registered projects
+    if projects:
+        for project_dir in project_paths():
+            logger.info(f"Loading project '{project_dir}'")
+            _agents.load_from_directory(os.path.join(project_dir, ".geenii", "agents"), scope="project")
+
     return _agents
 
 

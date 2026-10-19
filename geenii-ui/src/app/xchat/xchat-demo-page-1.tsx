@@ -11,7 +11,7 @@ import {
   useChat,
 } from '@/components/xchat'
 import XchatLayout from '@/components/layout/xchat-layout.tsx'
-import { BackendSwitcher } from '@/components/backend-switcher.tsx'
+import { BackendSwitcher } from '@/components/xchat/backend-switcher.tsx'
 
 const ECHO = 'echo'
 

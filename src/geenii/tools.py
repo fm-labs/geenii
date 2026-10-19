@@ -10,7 +10,7 @@ from geenii.config import GEENII_CACHE_DIR
 from geenii.core.tools import init_core_tools
 from geenii.mcp_client import McpClient
 from geenii.mcp_config import get_mcp_config, get_mcp_config_for_server
-from geenii.tool.common import ToolCallResult, Tool
+from geenii.tool.common import ToolCallResult, Tool, ToolCallContext
 from geenii.tool.computer import ComputerTool
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.cached import cached
@@ -105,7 +105,8 @@ def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = N
     result = None
     try:
         logger.info(f"Invoking tool {tool.name} with args: {args}, env: {_redact_env_vars(env, secret_keys)}, cwd: {cwd}")
-        result = tool.invoke(args=args, env=env, cwd=cwd)
+        ctx = ToolCallContext(cwd=cwd)
+        result = tool.invoke(args=args, env=env, ctx=ctx)
         logger.info(f"Tool result for {tool.name}: {result}")
         return result
     except Exception as e:

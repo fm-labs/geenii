@@ -6,7 +6,7 @@ from mcp.types import CallToolResult, TextContent
 
 from geenii.mcp_config import get_mcp_client_for_server
 from geenii.mcp_client import McpClient
-from geenii.tool.common import Tool, ToolCallResult
+from geenii.tool.common import Tool, ToolCallResult, ToolCallContext
 
 
 class McpTool(Tool):
@@ -25,7 +25,7 @@ class McpTool(Tool):
         self.mcp_server_id = mcp_server_id
         self.type = "mcp_tool"
 
-    def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, **kwargs: Any) -> ToolCallResult:
+    def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, *, ctx: ToolCallContext) -> ToolCallResult:
         try:
             client: McpClient = get_mcp_client_for_server(self.mcp_server_id)
             result = client.call_tool(self._mcp_fn_name, args=args)
@@ -42,7 +42,7 @@ class McpTool(Tool):
                     text = result.content[0].text
             if result.structured_content:
                 data = result.structured_content
-            elif len(text) > 0:
+            elif len(text) > 0: # and result.is_error == False
                 # attempt to parse text as json
                 try:
                     data = json.loads(text)

@@ -73,6 +73,8 @@ geenii
 │   ├── kill PROCESS_ID           # kill a process
 │   ├── list                      # list background processes
 │   └── cleanup PROCESS_ID        # remove on-disk logs for a finished process
+├── projects
+│   └── list                      # projects configured in settings.json
 ├── scheduler
 │   ├── start                     # alias for `daemon start --scheduler-config`
 │   ├── status                    # live task state (or the config file offline)
@@ -106,6 +108,7 @@ geenii
 - [daemon](daemon.md) — run and control the geenii daemon
 - [flow](flow.md) — run and inspect flows (step pipelines)
 - [pm](pm.md) — manage background processes
+- [projects](projects.md) — list configured projects
 - [scheduler](scheduler.md) — manage and run the task scheduler
 - [supervisor](supervisor.md) — keep long-running processes up
 

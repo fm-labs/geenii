@@ -13,7 +13,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { AppSidebar } from '@/components/layout/app-sidebar.tsx'
+import { MainSidebar } from '@/components/layout/main-sidebar.tsx'
 
 const MainLayout = (props: PropsWithChildren<{
   /** Rendered at the top of the sidebar, above the chat list */
@@ -29,7 +29,7 @@ const MainLayout = (props: PropsWithChildren<{
       }
       defaultOpen={false}
     >
-      <AppSidebar sidebarHeader={props.sidebarHeader} />
+      <MainSidebar sidebarHeader={props.sidebarHeader} />
       <SidebarInset>
         {/*<header className="sticky top-0 flex shrink-0 items-center gap-2 border-b bg-background p-4">*/}
         {/*  <SidebarTrigger className="-ml-1" />*/}

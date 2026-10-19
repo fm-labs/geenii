@@ -291,7 +291,7 @@ const AgentDetailsDialog = ({ agent, commands, toolDescriptions, open, onOpenCha
  * One agent: a chat with it, whose header shows the agent's short info.
  * The full capabilities (model parameters, tools, skills, instructions) open in a dialog.
  */
-const AgentView = ({ name }: { name: string }) => {
+const AgentView = ({ name, contextId }: { name: string, contextId: string }) => {
   const { fetchJson } = useApi()
 
   const [agent, setAgent] = React.useState<AgentDetailType | null>(null)
@@ -323,7 +323,7 @@ const AgentView = ({ name }: { name: string }) => {
       ? Object.fromEntries(toolsResult.value.map((t) => [t.name, t.description]))
       : {})
     setLoading(false)
-  }, [fetchJson, name])
+  }, [fetchJson, name, setLoading, setError, setAgent, setCommands, setToolDescriptions])
 
   React.useEffect(() => {
     load()
@@ -345,6 +345,7 @@ const AgentView = ({ name }: { name: string }) => {
         <>
           <AgentChat
             key={agent.name}
+            contextId={contextId}
             agent={agent}
             className="min-h-80 flex-1"
             header={<AgentShortInfo agent={agent} onShowDetails={() => setDetailsOpen(true)} />}
