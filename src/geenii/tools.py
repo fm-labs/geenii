@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 import time
 import traceback
 from datetime import datetime
 from pathlib import Path
 
-from geenii.config import GEENII_CACHE_DIR
+from geenii.config import GEENII_CACHE_DIR, GEENII_WORKING_DIR
 from geenii.core.tools import init_core_tools
 from geenii.mcp_client import McpClient
 from geenii.mcp_config import get_mcp_config, get_mcp_config_for_server
 from geenii.tool.common import ToolCallResult, Tool, ToolCallContext
-from geenii.tool.computer import ComputerTool
+from geenii.tool.computer import ComputerTool, ReadTool, WriteTool
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.cached import cached
 from geenii.utils.json_util import append_jsonl
@@ -20,6 +21,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 def init_builtin_tools(registry: ToolRegistry):
+    registry.register(ReadTool())
+    registry.register(WriteTool())
     registry.register(ComputerTool(
         name="bash",
         description="Execute a shell command on the local machine and return its output.",
@@ -103,14 +106,15 @@ def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = N
                 secret_keys: set[str] | None = None) -> ToolCallResult:
     """`secret_keys` are env vars whose values are redacted in the logs, on top of the name-based redaction."""
     result = None
+    cwd = cwd or GEENII_WORKING_DIR
+    ctx = ToolCallContext(cwd=cwd, caller_id=caller_id)
     try:
-        logger.info(f"Invoking tool {tool.name} with args: {args}, env: {_redact_env_vars(env, secret_keys)}, cwd: {cwd}")
-        ctx = ToolCallContext(cwd=cwd)
+        logger.info(f"Invoking tool {tool.name} with args: {args}, env: {_redact_env_vars(env, secret_keys)}, cwd: {cwd}, tool_ctx_id: {ctx.id}")
         result = tool.invoke(args=args, env=env, ctx=ctx)
-        logger.info(f"Tool result for {tool.name}: {result}")
+        logger.info(f"Tool result for {tool.name}, tool_ctx_id: {ctx.id}: {result}")
         return result
     except Exception as e:
-        logger.error(f"Error executing tool {tool.name}: {e}")
+        logger.error(f"Error executing tool {tool.name}, tool_ctx_id: {ctx.id}: {e}")
         # traceback.print_exc()
         result = e
         raise e from e

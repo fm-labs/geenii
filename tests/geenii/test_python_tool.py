@@ -2,12 +2,14 @@ import json
 
 import pytest
 
-from geenii.tool.common import ToolCallResult
+from geenii.tool.common import ToolCallContext, ToolCallResult
 from geenii.tool.python import PythonFunctionTool
+
+CTX = ToolCallContext(cwd=".")
 
 
 def invoke(value):
-    return PythonFunctionTool(name="t", handler=lambda: value).invoke(args={})
+    return PythonFunctionTool(name="t", handler=lambda: value).invoke(args={}, ctx=CTX)
 
 
 @pytest.mark.parametrize("value, text", [
@@ -56,5 +58,5 @@ def test_async_handler_result_is_mapped_too():
     async def handler():
         return {"ok": True}
 
-    result = PythonFunctionTool(name="t", handler=handler).invoke(args={})
+    result = PythonFunctionTool(name="t", handler=handler).invoke(args={}, ctx=CTX)
     assert result.structured_content == {"ok": True}

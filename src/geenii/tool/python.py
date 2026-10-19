@@ -40,7 +40,7 @@ class PythonFunctionTool(Tool):
 
         try:
             # support sync and async handlers
-            result = self.handler(**args, ctx=ctx)
+            result = self.handler(**args)
             if inspect.isawaitable(result):
                 result = run_sync(result)
         except Exception as e:
@@ -76,7 +76,7 @@ class PythonCliTool(Tool):
         if env:
             _env.update(env)
 
-        working_dir = ctx.cwd or os.getcwd()
+        working_dir = ctx.cwd
         # the unexpanded command, since env may hold secrets
         logger.info(f"Spawn python subprocess with command={args.get('command')!r} in directory: {working_dir!r}")
         p = subprocess.run(_command, shell=False, capture_output=True, text=True, env=_env, cwd=working_dir)

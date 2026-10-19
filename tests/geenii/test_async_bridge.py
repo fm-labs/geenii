@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from geenii.mcp_client import McpClient
+from geenii.tool.common import ToolCallContext
 from geenii.tool.python import PythonFunctionTool
 from geenii.utils import async_bridge
 from geenii.utils.async_bridge import run_sync
@@ -69,8 +70,8 @@ def test_python_function_tool_supports_sync_and_async_handlers():
     sync_tool = PythonFunctionTool(name="sync_greet", handler=lambda name: f"hi {name}")
     async_tool = PythonFunctionTool(name="async_greet", handler=async_greet)
 
-    assert sync_tool.invoke(args={"name": "a"}).text == "hi a"
-    assert async_tool.invoke(args={"name": "b"}).text == "hello b"
+    assert sync_tool.invoke(args={"name": "a"}, ctx=ToolCallContext(cwd=".")).text == "hi a"
+    assert async_tool.invoke(args={"name": "b"}, ctx=ToolCallContext(cwd=".")).text == "hello b"
 
 
 MCP_SERVER = textwrap.dedent("""

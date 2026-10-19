@@ -5,9 +5,11 @@ import logging
 import os
 import subprocess
 import uuid
+from pathlib import Path
 from typing import Any
 
-from geenii.tool.common import Tool, expand_vars, ToolCallResult, ToolCallContext
+from geenii import config
+from geenii.tool.common import Tool, expand_vars, ToolCallResult, ToolCallContext, to_tool_call_result
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ class ComputerTool(Tool):
         self.command_template = command_template
 
     def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, *, ctx: ToolCallContext) -> ToolCallResult:
-        working_dir = ctx.cwd or os.getcwd()
+        working_dir = ctx.cwd
         # todo check if tool execution is permitted in given working_dir
 
         command = args.get("command")
@@ -79,3 +81,127 @@ class AppleScriptTool(ComputerTool):
         input_schema: dict | None = None,
     ):
         super().__init__(name, description, input_schema, command_template="osascript -e '{command}'")
+        
+
+class ReadTool(Tool):
+    """A Tool that reads data from a source."""
+
+    NAME = 'read'
+    DESCRIPTION = "Read data from a source"
+    INPUT_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "file_path": {"type": "string"},
+        },
+        "required": ["file_path"],
+    }
+
+    def __init__(self):
+        super().__init__(self.NAME, self.DESCRIPTION, self.INPUT_SCHEMA)
+
+    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, *,
+               ctx: ToolCallContext) -> ToolCallResult:
+        file_path = args.get("file_path")
+        try:
+            if not file_path or not isinstance(file_path, str):
+                raise ValueError(f"Invalid file_path argument for ReadTool {self.name!r}")
+
+            wd = ctx.cwd
+            file_path = _normalize_path(file_path, wd)
+            if not is_file_in_allowed_dirs(file_path, wd):
+                logger.critical(
+                    f"SECURITY ALERT! Attempting to read file from {file_path}. wd={wd}"
+                )
+                raise ValueError(f"You are not allowed to read this file: {file_path}")
+
+            logger.warning(f"file_read: {file_path}")
+            with open(file_path, "r") as f:
+                return to_tool_call_result(f.read())
+        except Exception as e:
+            logger.error(f"Error reading file {file_path}: {e}")
+            return to_tool_call_result(e)
+
+
+class WriteTool(Tool):
+    """A Tool that writes data to a source."""
+
+    NAME = 'write'
+    DESCRIPTION = "Write data to a source"
+    INPUT_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "file_path": {"type": "string"},
+            "contents": {"type": "string"},
+        },
+        "required": ["file_path", "contents"],
+    }
+
+    def __init__(self):
+        super().__init__(self.NAME, self.DESCRIPTION, self.INPUT_SCHEMA)
+        
+    def invoke(
+        self,
+        args: dict[str, Any],
+        env: dict[str, str] | None = None,
+        *,
+        ctx: ToolCallContext,
+    ) -> ToolCallResult:
+        file_path = args.get("file_path")
+        contents = args.get("contents", "")
+        try:
+            if not file_path or not isinstance(file_path, str):
+                raise ValueError(f"Invalid file_path argument for WriteTool {self.name!r}")
+
+            wd = ctx.cwd
+            file_path = _normalize_path(file_path, wd)
+
+            if not is_file_in_allowed_dirs(file_path, wd):
+                logger.critical(
+                    f"SECURITY ALERT! Attempting to write to {file_path}. wd={wd}"
+                )
+                raise ValueError(f"You are not allowed to write this file: {file_path}")
+
+            logger.warning(f"file_write: {file_path}")
+            with open(file_path, "w") as f:
+                f.write(contents)
+
+            return ToolCallResult(f"Contents successfully written to {file_path}")
+        except Exception as e:
+            logger.error(f"Error writing file {file_path}: {e}")
+            return to_tool_call_result(e)
+
+
+def _normalize_path(path: str, base_dir: str) -> str:
+    if not Path(path).is_absolute():
+        path = Path(base_dir) / path
+        return str(path.resolve(strict=False).absolute())
+    return str(Path(path).resolve(strict=False).absolute())
+
+
+def is_file_in_allowed_dirs(file_path: str | Path, wd: str | None = None) -> bool:
+    dirs = [wd, config.GEENII_WORKING_DIR]
+    user_settings = config.read_user_settings()
+    if "allowed_dirs" in user_settings and isinstance(
+        user_settings["allowed_dirs"], list
+    ):
+        allowed_dirs = user_settings["allowed_dirs"]
+        dirs.extend(allowed_dirs)
+
+    for _dir in dirs:
+        if _dir is not None and is_file_in_allowed_dir(file_path, wd=_dir):
+            return True
+    return False
+
+
+def is_file_in_allowed_dir(file_path: str | Path, wd: str) -> bool:
+    """Return True if file_path resolves to a location inside the working dir."""
+    try:
+        logger.debug(f"check is_file_in_working_dir file_path={file_path} wd={wd}")
+        wd = Path(wd).resolve(strict=False)
+        target = Path(file_path).resolve(strict=False)
+    except (OSError, ValueError):
+        # null bytes, embedded NULs, unresolvable paths, symlink loops
+        return False
+    return target != wd and wd in target.parents
+
+
