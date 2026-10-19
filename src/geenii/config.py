@@ -97,7 +97,7 @@ REDIS_URI = os.environ.get("REDIS_URI", "")
 
 
 def read_user_settings():
-    user_settings_path = os.path.join(GEENII_DIR, "geenii.json")
+    user_settings_path = os.path.join(GEENII_USER_HOME, ".geenii", "settings.json")
     default_settings = {
         "theme": "system",  # options: "light", "dark", "system"
         "notifications": True,
@@ -119,7 +119,7 @@ def read_user_settings():
 
 def write_user_settings(settings: dict):
     print(f"Saving settings: {settings}")
-    user_settings_path = os.path.join(GEENII_DIR, "geenii.json")
+    user_settings_path = os.path.join(GEENII_USER_HOME, ".geenii", "settings.json")
     try:
         with open(user_settings_path, "w") as f:
             json.dump(settings, f, indent=4)

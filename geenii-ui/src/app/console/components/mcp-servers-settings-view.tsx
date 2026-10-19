@@ -90,7 +90,7 @@ const McpServersAdminView = () => {
       )}
 
       <div className={cn('grid gap-6', selectedServer && 'lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]')}>
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           {loading && servers.length === 0 && [0, 1, 2].map((i) => <Skeleton key={i} className="h-14 w-full rounded-md" />)}
           {!loading && !error && filtered.length === 0 && (
             <p className="text-sm text-muted-foreground">{filter ? 'No servers match the filter.' : 'No MCP servers configured.'}</p>

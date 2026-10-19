@@ -26,6 +26,7 @@ Interactive API docs are at `http://localhost:33311/docs` (OpenAPI at
 | `agents_routes.py` | `/agents` — agent configs and their slash commands |
 | `tools_routes.py` | `/tools` — tool definitions and direct execution |
 | `mcp_routes.py` | `/mcp` — configured MCP servers, their tools, and tool calls (see [mcp.md](mcp.md#http-api)) |
+| `skills_routes.py` | `/skills` — skills in the app's `SkillRegistry` (`app.state.skill_registry`), read-only |
 | `ai_routes.py` | `/ai` — models, text/chat completion, image, speech, transcription |
 | `chat_routes.py` | `/chats` — agent chat sessions with streamed turns and tool approvals |
 | `chat_sessions.py` | `ChatSessionStore`: chat sessions on disk + per-session agent runners |
@@ -67,6 +68,8 @@ All paths are relative to `/api/v1`.
 | `PUT /mcp/servers/{name}` | Body: the full entry; `********` keeps a stored value. Writes `~/.geenii/mcp.json`. 400, 404, 409 if only in the project file |
 | `DELETE /mcp/servers/{name}` | Removes the server from `~/.geenii/mcp.json`. 204, 404, 409 if only in the project file |
 | `POST /mcp/servers/{name}/tool/call` | Body `{tool_name, arguments}`. Raw MCP `CallToolResult`. 404 unknown server, 502 on failure |
+| `GET /skills/` | The skills in the registry, sorted by name: `name`, `path`, `source` (the skill path it was loaded from), `description`, `triggers`, `allowed_tools`, `metadata`, `scripts`, `used_by` (agents listing it). Skills whose SKILL.md can't be parsed are skipped at startup |
+| `GET /skills/{name}` | The entry plus `instructions` (the markdown body of SKILL.md). 404 for unknown skills |
 | `GET /ai/models` | `AIModelInfo[]` |
 | `POST /ai/completion` | One-shot text completion |
 | `POST /ai/chat/completion` | Chat completion; history is kept per `context_id` |

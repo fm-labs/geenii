@@ -13,8 +13,9 @@ from starlette.responses import JSONResponse
 
 from geenii.config import APP_VERSION, WWW_DIR
 from geenii.datamodels import Problem
-from geenii.g import init_global_agent_registry
+from geenii.g import init_global_agent_registry, init_global_skill_registry
 from geenii.server.router import app_router
+from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry
 from geenii.tools import init_builtin_tools, init_mcp_server_tools
 
@@ -92,14 +93,11 @@ async def initialize_tool_registry():
 #     apps.load_apps_from_directory(f"{GEENII_DIR}/apps")
 #     print(f"Initialized {len(apps.apps)} apps: {list(apps.apps.keys())}")
 #     return apps
-#
-# async def initialize_skill_registry():
-#     print("Initializing skill registry...")
-#     skill_registry = SkillRegistry()
-#     skill_registry.register_all_from_directory(f"{GEENII_DIR}/skills")
-#     skill_registry.register_all_from_directory(f"{GEENII_DIR}/vendor/skills/anthropic/skills")
-#     print(f"Initialized {len(skill_registry.skills)} skills: {list(skill_registry.skills.keys())}")
-#     return skill_registry
+
+async def initialize_skill_registry():
+    print("Initializing skill registry...")
+    skill_registry = init_global_skill_registry()
+    return skill_registry
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -108,7 +106,7 @@ async def lifespan(app: FastAPI):
     # Tool Registry
     app.state.tool_registry = await initialize_tool_registry()
     # Skill Registry
-    # app.state.skill_registry = await initialize_skill_registry()
+    app.state.skill_registry = await initialize_skill_registry()
     # Apps
     # app.state.app_registry = await initialize_app_registry()
     # Supervisor
