@@ -110,10 +110,6 @@ const AppRouter = () => {
         element: <XchatDemoPage1 />,
       },
       {
-        path: '/console/playground/agents',
-        element: <AgentsPage />,
-      },
-      {
         path: '/console',
         element: <ConsolePage />,
       },

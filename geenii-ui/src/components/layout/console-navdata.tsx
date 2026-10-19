@@ -17,10 +17,6 @@ export const data = {
           title: 'Xchat Playground',
           url: '#/console/playground/xchat',
         },
-        {
-          title: 'Agent Playground',
-          url: '#/console/playground/agents',
-        },
       ],
     },
     {
