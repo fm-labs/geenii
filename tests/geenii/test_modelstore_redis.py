@@ -1,5 +1,5 @@
 import pytest
-from testcontainers.redis import RedisContainer
+from testcontainers.community.redis import RedisContainer
 
 from geenii.utils.redis import get_redis_client
 from geenii.utils.modelstore import RedisModelStore, ModelStore

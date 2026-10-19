@@ -6,8 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from geenii.agent import base_agent as base_agent_mod
-from geenii.agent import registry as registry_mod
 from geenii.agent import tasks as tasks_mod
+from geenii import g as g_mod
 from geenii.agent.registry import AgentRegistry, AgentSpec
 from geenii.chat_models import ToolCallResultContent, UserInteractionContent
 from geenii.datamodels import ChatMessageEvent
@@ -49,7 +49,7 @@ def add_tool(monkeypatch):
         registry.register(PythonFunctionTool(name="add", handler=add))
         return registry
 
-    monkeypatch.setattr(registry_mod, "ToolRegistry", make_registry)
+    monkeypatch.setattr(g_mod, "ToolRegistry", make_registry)
     return calls
 
 
@@ -250,7 +250,7 @@ def test_tool_call_waits_for_approval_and_runs_when_allowed(client, store, provi
     assert client.post(f"/api/v1/chats/{chat}/interactions/call-1", json={"choice": "Allow"}).status_code == 204
 
     result = _next_message(events).content[0]
-    assert isinstance(result, ToolCallResultContent) and result.result == 5
+    assert isinstance(result, ToolCallResultContent) and result.result == "5"
     assert add_tool == [(2, 3)]
     assert _next_message(events).content[0].text == "The answer is 5."
     list(events)

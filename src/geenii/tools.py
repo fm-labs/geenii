@@ -41,6 +41,7 @@ def init_builtin_tools(registry: ToolRegistry):
             },
             "required": ["command"]
         },
+        command_template="python3 {command}",
     ))
     init_core_tools(registry)
 

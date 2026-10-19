@@ -69,8 +69,8 @@ def test_python_function_tool_supports_sync_and_async_handlers():
     sync_tool = PythonFunctionTool(name="sync_greet", handler=lambda name: f"hi {name}")
     async_tool = PythonFunctionTool(name="async_greet", handler=async_greet)
 
-    assert sync_tool.invoke(args={"name": "a"}) == "hi a"
-    assert async_tool.invoke(args={"name": "b"}) == "hello b"
+    assert sync_tool.invoke(args={"name": "a"}).text == "hi a"
+    assert async_tool.invoke(args={"name": "b"}).text == "hello b"
 
 
 MCP_SERVER = textwrap.dedent("""
@@ -103,4 +103,4 @@ def test_mcp_client_reuses_connection_across_threads(mcp_client):
     # the persistent connection opened above is reused from other threads
     with ThreadPoolExecutor(max_workers=3) as pool:
         results = list(pool.map(lambda i: mcp_client.call_tool("add", {"a": i, "b": 1}), range(3)))
-    assert [r.structuredContent["result"] for r in results] == [1, 2, 3]
+    assert [r.structured_content["result"] for r in results] == [1, 2, 3]

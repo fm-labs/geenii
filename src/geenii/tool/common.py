@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -65,9 +66,14 @@ class Tool(ABC):
         }
 
 
+_VAR_PATTERN = re.compile(r"\$\{(\w+)\}|\$(\w+)")
+
+
 def expand_vars(command: str, env: dict[str, str]) -> str:
-    """Expand environment variables in a command string."""
-    for key, value in env.items():
-        command = command.replace(f"${{{key}}}", value)
-        command = command.replace(f"${key}", value)
-    return command
+    """Expand ${NAME} and $NAME from env in a command string. Unknown names are left for the shell."""
+    def replace(m: re.Match) -> str:
+        name = m.group(1) or m.group(2)
+        return str(env[name]) if name in env else m.group(0)
+
+    # one pass, matching whole names: $AB is never expanded as $A + "B", and values are not expanded again
+    return _VAR_PATTERN.sub(replace, command)

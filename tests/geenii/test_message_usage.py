@@ -153,7 +153,7 @@ def test_info_commands_are_not_counted(provider):
 def test_handoff_adds_the_sub_agents_usage(provider, monkeypatch):
     sub = _agent()
     sub.name = "helper"
-    monkeypatch.setattr(tasks_mod, "init_agent_by_name", lambda name: sub)
+    monkeypatch.setattr(tasks_mod, "init_agent_by_name", lambda name, **kwargs: sub)
     provider.enqueue("from the helper")
     agent = _agent()
 

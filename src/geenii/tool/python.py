@@ -38,7 +38,24 @@ class PythonFunctionTool(Tool):
             result = run_sync(result)
 
         # print(f"Tool {self.name!r} returned:", result)
-        return ToolCallResult(result)
+        return _to_tool_call_result(result)
+
+
+def _to_tool_call_result(result: Any) -> ToolCallResult:
+    """Map a handler's return value to a ToolCallResult. `text` is always a string; dicts are also structured content."""
+    if isinstance(result, ToolCallResult):
+        return result
+    if result is None:
+        return ToolCallResult(text="")
+    if isinstance(result, str):
+        return ToolCallResult(text=result)
+    if isinstance(result, bytes):
+        return ToolCallResult(text=result.decode("utf-8", errors="replace"))
+    if isinstance(result, dict):
+        return ToolCallResult(text=json.dumps(result, default=str), structured_content=result)
+    if isinstance(result, (list, tuple)):
+        return ToolCallResult(text=json.dumps(result, default=str))
+    return ToolCallResult(text=str(result))
 
 
 class PythonCliTool(Tool):

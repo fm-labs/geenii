@@ -138,7 +138,7 @@ def test_agent_runs_llm_tool_call_round_trip(monkeypatch):
     msgs = list(agent.process("what is 2 + 3?"))
 
     parts = [m.content[0] for m in msgs]
-    assert any(isinstance(p, ToolCallResultContent) and p.result == 5 for p in parts)
+    assert any(isinstance(p, ToolCallResultContent) and p.result == "5" for p in parts)
     assert isinstance(parts[-1], TextContent) and parts[-1].text == "The answer is 5."
     assert not any(isinstance(p, ToolCallContent) for p in parts)
     _assert_queue_settled(agent)

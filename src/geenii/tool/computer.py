@@ -4,7 +4,6 @@ import json
 import logging
 import subprocess
 import os
-import shlex
 import uuid
 from typing import Any
 
@@ -35,14 +34,14 @@ class ComputerTool(Tool):
         if not command:
             raise ValueError(f"Missing 'command' argument for ComputerTool {self.name!r}")
         if self.command_template is not None:
-            command = self.command_template.format(command=command, **args)
+            # `command` is in args too, so it must not be passed twice
+            command = self.command_template.format(**{**args, "command": command})
 
         logger.info(f"Executing ComputerTool command: {command} in working directory={working_dir}")
         command = expand_vars(command, env or {})
 
         subprocess_id = uuid.uuid4().hex[:8]
-        _command = shlex.split(command)
-        logger.info(f"Subprocess [{subprocess_id}] Spawning command={_command} environment={env} cwd={working_dir}")
+        logger.info(f"Subprocess [{subprocess_id}] Spawning command={command!r} environment={env} cwd={working_dir}")
 
         _env = os.environ.copy()
         if env:
@@ -53,12 +52,14 @@ class ComputerTool(Tool):
         logger.info(f"Subprocess [{subprocess_id}] Standard error: {p.stderr}")
 
         out = p.stdout.strip()
-        # attempt json parsing
+        # attempt json parsing; only an object is structured content
         json_data = None
         try:
             json_data = json.loads(out)
         except json.decoder.JSONDecodeError:
             pass
+        if not isinstance(json_data, dict): # and not isinstance(json_data, list):
+            json_data = None
 
         err = p.stderr.strip()
         _output = f"stdout:\n{out}\nstderr:\n{err}"
