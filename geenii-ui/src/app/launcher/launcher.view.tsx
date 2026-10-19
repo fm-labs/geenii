@@ -17,6 +17,8 @@ const STARRED_STORAGE_KEY = 'geenii.launcher.starred'
 const HOVER_OPEN_DELAY = 450
 const HOVER_CLOSE_DELAY = 150
 
+type TileSize = 'dock' | 'md'
+
 const useStarredAgents = () => {
   const [starred, setStarred] = React.useState<string[]>(() => {
     try {
@@ -59,15 +61,17 @@ const agentInitials = (agent: AgentType) => {
   return initials.toUpperCase()
 }
 
-const AgentIcon = ({ agent, size }: { agent: AgentType, size: 'lg' | 'md' }) => {
+const AgentIcon = ({ agent, size }: { agent: AgentType, size: TileSize }) => {
   const hue = agentHue(agent.name)
   return (
     <div
       className={cn(
         'flex items-center justify-center font-semibold text-white select-none',
         'shadow-[0_1px_2px_rgba(0,0,0,0.15),0_4px_12px_rgba(0,0,0,0.08)]',
-        'transition-transform duration-200 ease-out group-hover:scale-[1.06] group-active:scale-95',
-        size === 'lg' ? 'size-20 rounded-[22px] text-2xl' : 'size-16 rounded-[18px] text-xl',
+        'transition-transform duration-200 ease-out group-active:scale-95',
+        size === 'dock'
+          ? 'size-14 rounded-[16px] text-lg group-hover:-translate-y-1.5 group-hover:scale-110'
+          : 'size-20 rounded-[22px] text-2xl group-hover:scale-[1.06]',
       )}
       style={{
         background: `linear-gradient(145deg, hsl(${hue} 75% 62%), hsl(${(hue + 35) % 360} 70% 45%))`,
@@ -162,7 +166,7 @@ const AgentDetails = ({ agent, isStarred, onToggleStar }: {
 
 const AgentTile = ({ agent, size, isStarred, onToggleStar }: {
   agent: AgentType
-  size: 'lg' | 'md'
+  size: TileSize
   isStarred: boolean
   onToggleStar: () => void
 }) => {
@@ -203,17 +207,20 @@ const AgentTile = ({ agent, size, isStarred, onToggleStar }: {
     <PopoverPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <PopoverPrimitive.Anchor asChild>
         <div
-          className={cn('group relative flex flex-col items-center', size === 'lg' ? 'w-28' : 'w-24')}
+          className={cn('group relative flex flex-col items-center', size === 'dock' ? 'w-20' : 'w-28')}
           onMouseEnter={onHoverStart}
           onMouseLeave={onHoverEnd}
         >
           <a
             href={agentUrl(agent.name)}
-            className="flex flex-col items-center gap-2 rounded-2xl p-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(
+              'flex max-w-full flex-col items-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              size === 'dock' ? 'gap-1.5 px-1 pt-1' : 'gap-2 p-2',
+            )}
             title={agentTitle(agent)}
           >
             <AgentIcon agent={agent} size={size} />
-            <span className={cn('max-w-full truncate text-center', size === 'lg' ? 'text-sm font-medium' : 'text-xs')}>
+            <span className={cn('max-w-full truncate text-center', size === 'dock' ? 'text-[11px] text-muted-foreground' : 'text-sm')}>
               {agentTitle(agent)}
             </span>
           </a>
@@ -222,8 +229,9 @@ const AgentTile = ({ agent, size, isStarred, onToggleStar }: {
             onClick={onInfoClick}
             aria-label={`Details for ${agentTitle(agent)}`}
             className={cn(
-              'absolute top-0.5 right-1.5 rounded-full border bg-background p-0.5 text-muted-foreground shadow-sm',
+              'absolute rounded-full border bg-background p-0.5 text-muted-foreground shadow-sm',
               'opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-foreground',
+              size === 'dock' ? '-top-1 right-1' : 'top-0.5 right-1.5',
               open && pinned && 'opacity-100 text-foreground',
             )}
           >
@@ -236,8 +244,8 @@ const AgentTile = ({ agent, size, isStarred, onToggleStar }: {
       </PopoverPrimitive.Anchor>
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
-          side="bottom"
-          sideOffset={6}
+          side={size === 'dock' ? 'top' : 'bottom'}
+          sideOffset={size === 'dock' ? 14 : 6}
           collisionPadding={16}
           onOpenAutoFocus={(e) => e.preventDefault()}
           onMouseEnter={onHoverStart}
@@ -255,12 +263,66 @@ const AgentTile = ({ agent, size, isStarred, onToggleStar }: {
   )
 }
 
-const TileSkeleton = ({ size }: { size: 'lg' | 'md' }) => (
-  <div className={cn('flex flex-col items-center gap-2 p-2', size === 'lg' ? 'w-28' : 'w-24')}>
-    <Skeleton className={size === 'lg' ? 'size-20 rounded-[22px]' : 'size-16 rounded-[18px]'} />
-    <Skeleton className="h-3 w-14" />
+const TileSkeleton = ({ size }: { size: TileSize }) => (
+  <div className={cn('flex flex-col items-center', size === 'dock' ? 'w-20 gap-1.5 px-1 pt-1' : 'w-28 gap-2 p-2')}>
+    <Skeleton className={size === 'dock' ? 'size-14 rounded-[16px]' : 'size-20 rounded-[22px]'} />
+    <Skeleton className={size === 'dock' ? 'h-2.5 w-10' : 'h-3 w-14'} />
   </div>
 )
+
+/** Starred agents, docked to the bottom edge of the screen */
+const Dock = ({ agents, loading, onToggleStar }: {
+  agents: AgentType[]
+  loading: boolean
+  onToggleStar: (name: string) => void
+}) => (
+  <div className="pointer-events-none fixed inset-x-0 bottom-4 z-30 flex justify-center px-4">
+    <nav
+      aria-label="Starred agents"
+      className={cn(
+        'pointer-events-auto flex max-w-full items-end gap-1 overflow-x-auto rounded-[28px] px-3 pt-2.5 pb-2',
+        'border border-white/20 bg-background/60 shadow-[0_8px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150',
+        'dark:border-white/10',
+      )}
+    >
+      {loading
+        ? [0, 1, 2].map((i) => <TileSkeleton key={i} size="dock" />)
+        : agents.length > 0
+          ? agents.map((agent) => (
+            <AgentTile key={agent.name} agent={agent} size="dock" isStarred onToggleStar={() => onToggleStar(agent.name)} />
+          ))
+          : (
+            <p className="flex h-[78px] items-center gap-2 px-4 text-xs text-muted-foreground">
+              <StarIcon size={14} /> Star an agent to keep it here
+            </p>
+          )}
+      <div className="mx-1.5 mb-5 h-10 w-px self-end bg-border" aria-hidden />
+      <a
+        href="#/console/configure/agents"
+        title="Configure agents"
+        className="group flex w-16 flex-col items-center gap-1.5 rounded-2xl px-1 pt-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <div
+          className={cn(
+            'flex size-14 items-center justify-center rounded-[16px] border bg-muted text-muted-foreground',
+            'transition-transform duration-200 ease-out group-hover:-translate-y-1.5 group-hover:scale-110 group-active:scale-95',
+          )}
+        >
+          <SettingsIcon size={24} />
+        </div>
+        <span className="text-[11px] text-muted-foreground">Configure</span>
+      </a>
+    </nav>
+  </div>
+)
+
+/** Grid sections, broadest scope first; agents without a scope go last */
+const SCOPE_GROUPS: { scope: AgentType['scope'], label: string }[] = [
+  { scope: 'global', label: 'Global' },
+  { scope: 'user', label: 'User' },
+  { scope: 'project', label: 'Project' },
+  { scope: undefined, label: 'Other' },
+]
 
 const matchesQuery = (agent: AgentType, query: string) => {
   const q = query.trim().toLowerCase()
@@ -289,9 +351,8 @@ const LauncherView = () => {
   }, [fetchJson])
 
   const filtered = agents.filter((a) => matchesQuery(a, query))
-  const starredAgents = filtered.filter((a) => starred.includes(a.name))
-  // while searching, show every match in one grid so nothing hides in the dock
-  const gridAgents = query ? filtered : agents
+  // the dock ignores the search, so it stays put while typing
+  const starredAgents = agents.filter((a) => starred.includes(a.name))
 
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && filtered.length > 0) {
@@ -302,7 +363,8 @@ const LauncherView = () => {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-10 pt-6 pb-16">
+    // bottom padding keeps the last grid row scrollable clear of the dock
+    <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-10 pt-6 pb-40">
       <div className="relative w-full max-w-sm">
         <SearchIcon size={16} className="absolute top-1/2 left-3.5 -translate-y-1/2 text-muted-foreground" />
         <input
@@ -321,34 +383,45 @@ const LauncherView = () => {
         </div>
       )}
 
-      {!query && (loading || starredAgents.length > 0) && (
-        <section className="flex flex-wrap justify-center gap-2 rounded-[32px] border bg-muted/40 px-6 py-4 shadow-sm backdrop-blur">
-          {loading
-            ? [0, 1, 2].map((i) => <TileSkeleton key={i} size="lg" />)
-            : starredAgents.map((agent) => (
-              <AgentTile key={agent.name} agent={agent} size="lg" isStarred onToggleStar={() => toggleStar(agent.name)} />
-            ))}
+
+      {loading && (
+        <section className="flex w-full flex-wrap justify-center gap-x-4 gap-y-6">
+          {[0, 1, 2, 3, 4, 5].map((i) => <TileSkeleton key={i} size="md" />)}
         </section>
       )}
 
-      <section className="flex w-full flex-wrap justify-center gap-x-4 gap-y-6">
-        {loading && [0, 1, 2, 3, 4, 5].map((i) => <TileSkeleton key={i} size="md" />)}
-        {gridAgents.map((agent) => (
-          <AgentTile
-            key={agent.name}
-            agent={agent}
-            size="md"
-            isStarred={starred.includes(agent.name)}
-            onToggleStar={() => toggleStar(agent.name)}
-          />
-        ))}
-      </section>
+      {SCOPE_GROUPS.map(({ scope, label }) => {
+        const groupAgents = filtered.filter((a) => (a.scope || undefined) === scope)
+        if (groupAgents.length === 0) return null
+        return (
+          <section key={label} className="flex w-full flex-col gap-4">
+            <h2 className="flex items-center gap-3 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              {label}
+              <span className="font-normal normal-case tracking-normal">{groupAgents.length}</span>
+              <span className="h-px flex-1 bg-border" aria-hidden />
+            </h2>
+            <div className="flex flex-wrap gap-x-4 gap-y-6">
+              {groupAgents.map((agent) => (
+                <AgentTile
+                  key={agent.name}
+                  agent={agent}
+                  size="md"
+                  isStarred={starred.includes(agent.name)}
+                  onToggleStar={() => toggleStar(agent.name)}
+                />
+              ))}
+            </div>
+          </section>
+        )
+      })}
 
-      {!loading && !error && gridAgents.length === 0 && (
+      {!loading && !error && filtered.length === 0 && (
         <p className="text-sm text-muted-foreground">
           {query ? `No agents match “${query}”` : 'No agents configured yet.'}
         </p>
       )}
+
+      <Dock agents={starredAgents} loading={loading} onToggleStar={toggleStar} />
     </div>
   )
 }
