@@ -25,7 +25,7 @@ const SystemPage = () => {
 
   return (
     <ConsoleLayout>
-      <Header title={`System: ${section}`} subtitle={`System configuration`} />
+      <Header title={`System ${section}`} />
       {getSectionContent(section)}
     </ConsoleLayout>
   )
