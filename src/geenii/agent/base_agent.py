@@ -13,7 +13,7 @@ from typing import Set, List, Iterator
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT, BaseTask
 from geenii.bots import BotInterface
 from geenii.chat_models import ContentPart, TextContent
-from geenii.config import DEFAULT_COMPLETION_MODEL, CACHE_DIR, GEENII_MEMORY_ENGINE
+from geenii.config import DEFAULT_COMPLETION_MODEL, GEENII_CACHE_DIR, GEENII_MEMORY_ENGINE
 from geenii.datamodels import ModelMessage, SystemMessage, Usage
 from geenii.hitl import HumanInTheLoopController, NoHumanInTheLoopController
 from geenii.memory import (
@@ -85,11 +85,11 @@ class BaseAgent(BotInterface, abc.ABC):
 
     def _create_memory(self, context_id: str) -> ChatMemory:
         if GEENII_MEMORY_ENGINE == "file":
-            path = os.path.join(CACHE_DIR, "agents", self.name, f"memory.{context_id}.jsonl")
+            path = os.path.join(GEENII_CACHE_DIR, "agents", self.name, f"memory.{context_id}.jsonl")
             os.makedirs(os.path.dirname(path), exist_ok=True)
             return FileChatMemory(path)
         elif GEENII_MEMORY_ENGINE == "sqlite":
-            path = os.path.join(CACHE_DIR, "agents", self.name, f"memory.{context_id}.db")
+            path = os.path.join(GEENII_CACHE_DIR, "agents", self.name, f"memory.{context_id}.db")
             os.makedirs(os.path.dirname(path), exist_ok=True)
             return SqliteChatMemory(path)
         else:
@@ -278,7 +278,7 @@ class BaseAgent(BotInterface, abc.ABC):
 def _agent_log(agent_name: str, context_id: str, event_name: str, data: dict | pydantic.BaseModel):
     date_formatted = datetime.now().strftime("%Y-%m-%d")
     #log_file = f"{CACHE_DIR}/logs/{agent_name}/logs/{agent_name}-{date_formatted}.log"
-    log_file = f"{CACHE_DIR}/logs/{agent_name}-{date_formatted}.log"
+    log_file = f"{GEENII_CACHE_DIR}/logs/{agent_name}-{date_formatted}.log"
     Path(log_file).parent.mkdir(parents=True, exist_ok=True)
     if isinstance(data, pydantic.BaseModel):
         data = data.model_dump(mode="json")
@@ -287,7 +287,7 @@ def _agent_log(agent_name: str, context_id: str, event_name: str, data: dict | p
 
 
 def restore_last_context_id(name: str):
-    file_path = f"{CACHE_DIR}/agents/{name}/last_context_id"
+    file_path = f"{GEENII_CACHE_DIR}/agents/{name}/last_context_id"
     try:
         with open(file_path, "r") as f:
             last_context_id = f.read().strip()
@@ -298,7 +298,7 @@ def restore_last_context_id(name: str):
 
 
 def dump_last_context_id(name: str, context_id):
-    file_path = f"{CACHE_DIR}/agents/{name}/last_context_id"
+    file_path = f"{GEENII_CACHE_DIR}/agents/{name}/last_context_id"
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, "w") as f:
         f.write(str(context_id))

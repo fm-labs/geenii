@@ -17,7 +17,7 @@ from geenii.cli.skills_cli import skills as skills_cli
 from geenii.cli.supervisor_cli import supervisor as supervisor_cli
 from geenii.cli.tools_cli import tools as tools_cli
 from geenii import config
-from geenii.config import APP_VERSION, CACHE_DIR
+from geenii.config import APP_VERSION, GEENII_CACHE_DIR
 from geenii.logs import init_logging
 
 init_logging()
@@ -54,7 +54,7 @@ class FallbackGroup(click.Group):
 def geecli(no_cache, log_level):
     """Geenii CLI - A versatile command-line interface for AI agents, tools, and skills."""
     if no_cache:
-        config.CACHE_DISABLED = True
+        config.GEENII_CACHE_DISABLED = True
     if log_level:
         logging.getLogger("geenii").setLevel(log_level.upper())
         logging.getLogger("httpx").setLevel(log_level.upper())
@@ -116,7 +116,7 @@ geecli.add_command(flow_cli)
 
 def main():
     #init_app_directories()
-    os.makedirs(CACHE_DIR, exist_ok=True)
+    os.makedirs(GEENII_CACHE_DIR, exist_ok=True)
     geecli()
 
 

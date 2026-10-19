@@ -27,7 +27,7 @@ class HuggingFaceAIProvider(AISpeechGeneratorProvider):
         try:
             #tmp_output_file = tempfile.NamedTemporaryFile(delete=True)
             #tmp_file_handle, tmp_output_file = tempfile.mkstemp(suffix='.wav', prefix='xai_audio_')
-            output_file = os.path.realpath(os.path.join(config.CACHE_DIR, "tts", f"output_{time.time()}_{request_id}.wav"))
+            output_file = os.path.realpath(os.path.join(config.GEENII_CACHE_DIR, "tts", f"output_{time.time()}_{request_id}.wav"))
             #run_tts_pipeline(text, output_file, 'a')
             raise NotImplementedError("HuggingFaceAIProvider.generate_speech is not yet implemented.")
 

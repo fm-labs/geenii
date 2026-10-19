@@ -210,7 +210,8 @@ def graph(path, fmt, output, direction, processor_modules):
 @click.option("--json", "as_json", is_flag=True, default=False, help="Print the flows as JSON.")
 def list_flows(as_json):
     """List the flows in ~/.geenii/flows and the working directory's .geenii/flows."""
-    from geenii.g import flow_dirs, init_flow_registry
+    from geenii.g import init_flow_registry
+    from geenii.config import flow_dirs
 
     flows = init_flow_registry().flows
     if as_json:

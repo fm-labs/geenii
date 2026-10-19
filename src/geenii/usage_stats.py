@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pydantic
 
-from geenii.config import CACHE_DIR
+from geenii.config import GEENII_CACHE_DIR
 from geenii.datamodels import Usage
 
 logger = logging.getLogger(__name__)
@@ -42,11 +42,11 @@ DayAggregate = dict
 
 
 def _log_dir() -> str:
-    return os.path.join(CACHE_DIR, "logs")
+    return os.path.join(GEENII_CACHE_DIR, "logs")
 
 
 def _cache_dir() -> str:
-    return os.path.join(CACHE_DIR, "stats")
+    return os.path.join(GEENII_CACHE_DIR, "stats")
 
 
 def _row_key(entry: dict) -> str:

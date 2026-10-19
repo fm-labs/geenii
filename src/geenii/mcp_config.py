@@ -1,17 +1,13 @@
-from pathlib import Path
-
 import atexit
 import copy
 import json
 import os
 import re
 
-from geenii.config import MCP_CONFIG_FILE, GEENII_WORKING_DIR
+from geenii.config import get_root_mcp_config_path, get_mcp_config_paths
 from geenii.mcp_client import McpClient
 
 import logging
-
-from geenii.utils.os_util import get_user_home_dir
 
 logger = logging.getLogger(__name__)
 
@@ -70,19 +66,19 @@ def get_mcp_client_for_server(server_name: str) -> "McpClient":
     return mcp_client
 
 
+def expand_env_vars(q: str | None, env_vars: dict) -> str | None:
+    """replace all occurences of ${ENV_VAR} with their respective values.}"""
+    if q is None:
+        return None
+
+    # unknown variables are left untouched
+    return re.sub(
+        r"\$\{(\w+)\}", lambda m: str(env_vars.get(m.group(1), m.group(0))), q
+    )
+
 def _expand_env_vars_in_server_config(
     server_config: dict, env_vars: dict[str, str]
 ) -> dict:
-
-    def expand_env_vars(q: str | None, env_vars: dict) -> str | None:
-        """replace all occurences of ${ENV_VAR} with their respective values.}"""
-        if q is None:
-            return None
-
-        # unknown variables are left untouched
-        return re.sub(
-            r"\$\{(\w+)\}", lambda m: str(env_vars.get(m.group(1), m.group(0))), q
-        )
 
     # replace in strings
     for loc in ["command", "url"]:
@@ -122,19 +118,6 @@ def close_mcp_clients():
 atexit.register(close_mcp_clients)
 
 
-def get_root_mcp_config_path() -> Path:
-    """The user-level mcp.json; the base config that the working dir mcp.json overrides."""
-    return Path(get_user_home_dir()) / ".geenii" / MCP_CONFIG_FILE
-
-
-def get_mcp_config_paths() -> list[Path]:
-    """All mcp.json files, in the order they are merged (later files win)."""
-    return [
-        get_root_mcp_config_path(),
-        Path(GEENII_WORKING_DIR) / ".geenii" / MCP_CONFIG_FILE,
-    ]
-
-
 def read_mcp_config_files() -> dict:
     """
     Read a configuration file and return its contents as a dictionary.
@@ -142,18 +125,16 @@ def read_mcp_config_files() -> dict:
     :return: A dictionary containing the configuration data.
     """
     servers: dict = {}
-    env: dict = {}
     for filename in get_mcp_config_paths():
         try:
             with open(filename, "r") as f:
                 data = json.load(f)
                 servers.update(data.get("mcpServers", {}))
-                env.update(data.get("env", {}))
         except FileNotFoundError:
             logger.warning(f"Configuration file {filename} not found.")
         except json.JSONDecodeError:
             logger.error(f"Error decoding JSON from the file {filename}.")
-    return {"mcpServers": servers, "env": env}
+    return {"mcpServers": servers}
 
 
 def read_root_mcp_config() -> dict:

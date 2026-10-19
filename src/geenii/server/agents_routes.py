@@ -14,7 +14,7 @@ from starlette.requests import Request
 from geenii.agent.env import AgentEnvStore, validate_env_key
 from geenii.agent.registry import AgentRegistry, AgentSpec
 from geenii.agents import Agent
-from geenii.g import agent_paths
+from geenii.config import agent_paths
 from geenii.datamodels import AgentCommand, Problem
 from geenii.skills import SkillRegistry
 

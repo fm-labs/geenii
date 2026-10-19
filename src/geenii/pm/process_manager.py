@@ -43,11 +43,11 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from geenii import proc as proc_util
-from geenii.config import CACHE_DIR, PM_GC_MAX_AGE
+from geenii.config import GEENII_CACHE_DIR, PM_GC_MAX_AGE
 
 logger = logging.getLogger(__name__)
 
-PROCESSES_DIR = os.path.join(CACHE_DIR, "processes")
+PROCESSES_DIR = os.path.join(GEENII_CACHE_DIR, "processes")
 
 KILL_WAIT_S = 5.0        # how long kill() waits for the process to exit before returning
 TERMINATE_GRACE_S = proc_util.TERMINATE_GRACE_S  # SIGTERM → SIGKILL grace period used by shutdown()

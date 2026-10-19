@@ -11,9 +11,9 @@ import os
 import socket
 from typing import Any
 
-from geenii.config import CACHE_DIR
+from geenii.config import GEENII_CACHE_DIR
 
-DEFAULT_SOCKET_PATH = os.path.join(CACHE_DIR, "geenii.sock")
+DEFAULT_SOCKET_PATH = os.path.join(GEENII_CACHE_DIR, "geenii.sock")
 
 # Checked in order when no socket path is passed explicitly
 SOCKET_ENV_VARS = ("GEENII_SOCKET", "GEENII_PM_SOCKET")

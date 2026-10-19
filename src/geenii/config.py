@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from os.path import realpath
 
 import json
@@ -12,17 +14,16 @@ APP_VERSION = "0.3.4"
 
 GEENII_USER_HOME = get_user_home_dir()
 GEENII_WORKING_DIR = realpath(os.environ.get("GEENII_WORKING_DIR", os.getcwd()))
-GEENII_DIR = realpath(Path(GEENII_WORKING_DIR) / ".geenii")
 
 GEENII_CHAT_SESSIONS_DIR = Path(GEENII_USER_HOME) / ".geenii" / "chats"
 
 # Load environment variables from the project and user .env files, if they exist.
 # Without override the first source to set a variable wins: shell > project .env > user .env
-dotenv.load_dotenv(GEENII_DIR + "/.env", override=False, verbose=True)
-dotenv.load_dotenv(GEENII_USER_HOME + "/.geenii/.env", override=False, verbose=True)
+dotenv.load_dotenv(os.path.join(GEENII_WORKING_DIR, ".geenii", ".env"), override=False, verbose=True)
+dotenv.load_dotenv(os.path.join(GEENII_USER_HOME, ".geenii", ".env"), override=False, verbose=True)
 
-CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", GEENII_USER_HOME + "/.geenii/.cache")
-CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
+GEENII_CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", os.path.join(GEENII_USER_HOME, ".cache", "geenii"))
+GEENII_CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
 
 # Default minimum age (seconds since a process finished) before the process manager's gc removes it
 PM_GC_MAX_AGE = float(os.environ.get("GEENII_PM_GC_MAX_AGE", 7 * 24 * 3600))
@@ -125,3 +126,70 @@ def write_user_settings(settings: dict):
             json.dump(settings, f, indent=4)
     except Exception as e:
         print(f"Error writing user settings: {e}")
+
+
+def makedirs_safe(path: str):
+    try:
+        os.makedirs(path, exist_ok=True)
+    except Exception as e:
+        print(f"Error creating directory {path}: {e}")
+
+
+def make_app_directories():
+    # ensure internal directories exist
+    makedirs_safe(f"{GEENII_CACHE_DIR}")
+    makedirs_safe(f"{GEENII_CACHE_DIR}/logs")
+
+
+def agent_paths() -> list[tuple[str, str]]:
+    return [
+        (os.path.join(GEENII_WORKING_DIR, ".geenii", "agents"), "project"),
+        (os.path.join(GEENII_USER_HOME, ".geenii", "agents"), "user"),
+        ("/var/geenii/agents", "global"),
+    ]
+
+
+def get_root_mcp_config_path() -> Path:
+    """The user-level mcp.json; the base config that the working dir mcp.json overrides."""
+    return Path(GEENII_USER_HOME) / ".geenii" / MCP_CONFIG_FILE
+
+
+def get_mcp_config_paths() -> list[Path]:
+    """All mcp.json files, in the order they are merged (later files win)."""
+    return [
+        get_root_mcp_config_path(),
+        Path(GEENII_WORKING_DIR) / ".geenii" / MCP_CONFIG_FILE,
+    ]
+
+
+def skill_paths() -> list[str]:
+    _skill_paths = [
+        os.path.join(GEENII_WORKING_DIR, ".geenii", "skills"),
+        os.path.join(GEENII_USER_HOME, ".geenii", "skills"),
+    ]
+    _settings = read_user_settings()
+    for skill_dir in _settings.get("skill_dirs", []):
+        if os.path.isdir(skill_dir):
+            _skill_paths.append(skill_dir)
+        else:
+            print(f"Warning: Skill directory '{skill_dir}' does not exist or is not a directory.")
+
+
+    # remove duplicates
+    _skill_paths = list(dict.fromkeys(_skill_paths))
+    return _skill_paths
+
+
+def flow_dirs() -> list[str]:
+    """Directories flows are loaded from: the user's, then the working directory's (without duplicates)"""
+    dirs = [
+        Path(GEENII_USER_HOME, ".geenii", "flows"),
+        Path(GEENII_WORKING_DIR, ".geenii", "flows"),
+    ]
+    return list(dict.fromkeys(str(d.resolve()) for d in dirs))
+
+
+def apps_dirs() -> list[str]:
+    return [
+        os.path.join(GEENII_USER_HOME, ".geenii", "apps"),
+    ]

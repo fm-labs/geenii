@@ -9,7 +9,7 @@ import os
 import time
 from typing import Literal
 
-from geenii.config import CACHE_DIR
+from geenii.config import GEENII_CACHE_DIR
 
 SANDBOX_PYTHON3_BASEIMAGE = "python:3.13-slim"
 
@@ -62,7 +62,7 @@ def build_sandbox_image(
     :return:
     """
     # sandbox_docker_file = os.path.join(app_dir, "sandbox.Dockerfile")
-    sandbox_docker_file = os.path.join(CACHE_DIR, "sandboxes", sandbox_id, "Dockerfile")
+    sandbox_docker_file = os.path.join(GEENII_CACHE_DIR, "sandboxes", sandbox_id, "Dockerfile")
     os.makedirs(dirname(sandbox_docker_file), exist_ok=True)
     overwrite = True
     image_name = "geenii-sandbox-" + sandbox_id

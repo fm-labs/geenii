@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 from geenii.agent.base import BaseAgentTask
 from geenii.chat_models import TextContent
-from geenii.config import CACHE_DIR
+from geenii.config import GEENII_CACHE_DIR
 from geenii.datamodels import ModelMessage, Usage
 
 logger = logging.getLogger(__name__)
@@ -122,7 +122,7 @@ def report_usage(agent: "BaseAgent", args: str) -> str:
     pattern = re.compile(rf"^{re.escape(root)}(-\d+)*$")
     per_model: dict[str, Counter] = {}
     per_task: dict[str, Counter] = {}
-    for path in sorted(glob.glob(os.path.join(CACHE_DIR, "logs", "ai-usage-*.log"))):
+    for path in sorted(glob.glob(os.path.join(GEENII_CACHE_DIR, "logs", "ai-usage-*.log"))):
         try:
             with open(path, "r") as f:
                 for line in f:

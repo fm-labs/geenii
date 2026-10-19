@@ -5,7 +5,7 @@ import pydantic
 import uuid
 from datetime import UTC, datetime
 
-from geenii.config import CACHE_DIR
+from geenii.config import GEENII_CACHE_DIR
 from geenii.datamodels import CompletionResponse, CompletionErrorResponse, \
     ChatCompletionRequest, ImageGenerationApiRequest, ImageGenerationApiResponse, \
     AudioGenerationApiRequest, AudioSpeechGenerationApiResponse, AudioTranscriptionApiRequest, \
@@ -324,7 +324,7 @@ def generate_audio_transcription(request: AudioTranscriptionApiRequest) -> Audio
 def _ai_log(what: str, data: dict | pydantic.BaseModel):
     """Append a request/response/error entry to the daily log. Never raises, like _ai_usage_log."""
     date_formatted = datetime.now().strftime("%Y-%m-%d")
-    log_file = f"{CACHE_DIR}/logs/ai-{date_formatted}.log"
+    log_file = f"{GEENII_CACHE_DIR}/logs/ai-{date_formatted}.log"
     try:
         Path(log_file).parent.mkdir(parents=True, exist_ok=True)
         if isinstance(data, pydantic.BaseModel):
@@ -364,7 +364,7 @@ def _ai_usage_log(provider: str | None, model: str, context_id: str | None, usag
     """
     # UTC with offset ("…+00:00"); the monthly file uses the same instant, so a line is always in its month's file
     now = datetime.now(UTC)
-    log_file = f"{CACHE_DIR}/logs/ai-usage-{now.strftime('%Y-%m')}.log"
+    log_file = f"{GEENII_CACHE_DIR}/logs/ai-usage-{now.strftime('%Y-%m')}.log"
     log_entry = {
         "timestamp": now.isoformat(),
         "provider": provider,

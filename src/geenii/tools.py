@@ -6,7 +6,7 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-from geenii.config import CACHE_DIR
+from geenii.config import GEENII_CACHE_DIR
 from geenii.core.tools import init_core_tools
 from geenii.mcp_client import McpClient
 from geenii.mcp_config import get_mcp_config, get_mcp_config_for_server
@@ -117,7 +117,7 @@ def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = N
         _log_tool_call(tool.name, args, _redact_env_vars(env, secret_keys), cwd, caller_id=caller_id, result=result)
 
 
-_SENSITIVE_KEYS = ("password", "secret", "api_key", "token")
+_SENSITIVE_KEYS = ("password", "secret", "api_key", "token", "pass", "pat")
 
 def _redact_env_vars(env_vars: dict[str, str], secret_keys: set[str] | None = None) -> dict[str, str]:
     """A copy of env_vars with sensitive values redacted. The input is left untouched, since it is passed on to the tool."""
@@ -133,7 +133,7 @@ def _log_tool_call(tool_name, args: dict[str, str],
 
     now = datetime.now()
     date_formatted = now.strftime("%Y-%m-%d")
-    log_file = f"{CACHE_DIR}/logs/tool-use-{date_formatted}.log"
+    log_file = f"{GEENII_CACHE_DIR}/logs/tool-use-{date_formatted}.log"
     Path(log_file).parent.mkdir(parents=True, exist_ok=True)
 
     if isinstance(result, ToolCallResult):

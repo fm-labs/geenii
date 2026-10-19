@@ -244,8 +244,8 @@ def default_cache_key(func, args, kwargs):
 
 def default_cache_store():
     try:
-        os.makedirs(config.CACHE_DIR, exist_ok=True)
-        return SqliteCacheStore(f"{config.CACHE_DIR}/cache.sqlite")
+        os.makedirs(config.GEENII_CACHE_DIR, exist_ok=True)
+        return SqliteCacheStore(f"{config.GEENII_CACHE_DIR}/cache.sqlite")
     except Exception as e:
         logger.debug(f"Error initializing SqliteCacheStore: {e}")
         logger.debug("Falling back to InMemoryCacheStore (non-persistent, not shared across processes)")
@@ -260,7 +260,7 @@ def cache_store():
     return CACHE_STORE
 
 def _cache_read(func_name: str, key: str) -> tuple[bool, Any]:
-    if config.CACHE_DISABLED:
+    if config.GEENII_CACHE_DISABLED:
         return False, None
     v = cache_store().read_cache(key)
     if v is not None:
@@ -270,7 +270,7 @@ def _cache_read(func_name: str, key: str) -> tuple[bool, Any]:
 
 
 def _cache_write(func_name: str, key: str, result: Any, ttl: float | None) -> None:
-    if config.CACHE_DISABLED:
+    if config.GEENII_CACHE_DISABLED:
         return
     logger.debug(f"Caching result of {func_name} with key {key!r} and ttl {ttl}")
     cache_store().write_cache(key, result, ttl=ttl)

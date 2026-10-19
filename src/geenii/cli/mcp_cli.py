@@ -6,7 +6,7 @@ from pathlib import Path
 import click
 from mcp_types import CallToolResult
 
-from geenii.config import CACHE_DIR
+from geenii.config import GEENII_CACHE_DIR
 from geenii.mcp_config import get_mcp_config, get_mcp_config_for_server, get_mcp_client_for_server
 
 
@@ -190,4 +190,4 @@ def _resource_cache_path(server_id: str, resource_name: str) -> Path:
         resource_path = resource_name.split("://", 1)[1]
     else:
         resource_path = hashlib.md5(resource_name.encode('utf-8')).hexdigest()
-    return Path(CACHE_DIR) / "mcp" / server_id / "r" / resource_path
+    return Path(GEENII_CACHE_DIR) / "mcp" / server_id / "r" / resource_path

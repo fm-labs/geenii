@@ -1,10 +1,6 @@
-import os
-import shutil
-
 import click.core
 
-from geenii.cli.click_helper import click_success, click_error
-from geenii.config import GEENII_DIR
+from geenii.cli.click_helper import click_success
 from geenii.g import init_global_skill_registry
 
 
@@ -59,23 +55,25 @@ def install_skill(name: str, source: str):
     """
     Install a new skill from a given source (e.g., GitHub repo, local file).
     """
-    target_dir = f"{GEENII_DIR}/skills/{name}"
-
-    # validate source
-    if not source.startswith("file://"):
-        click_error("Currently only local file sources are supported. Please provide a source in the format 'file://path/to/skill'.")
-        return
-
-    src_dir = source[len("file://"):]
-    if not os.path.isdir(src_dir):
-        click_error(f"Dir '{src_dir}' does not exist.")
-        return
-
-    # make sure target directory does not already exist
-    if os.path.exists(target_dir):
-        click_error(f"Skill '{name}' already exists. Please choose a different name or remove the existing skill first.")
-        return
-
-    shutil.copytree(src_dir, target_dir)
-    click_success(f"Skill '{name}' installed successfully from '{source}'.")
+    # target_dir = f"{GEENII_DIR}/skills/{name}"
+    #
+    # # validate source
+    # if not source.startswith("file://"):
+    #     click_error("Currently only local file sources are supported. Please provide a source in the format 'file://path/to/skill'.")
+    #     return
+    #
+    # src_dir = source[len("file://"):]
+    # if not os.path.isdir(src_dir):
+    #     click_error(f"Dir '{src_dir}' does not exist.")
+    #     return
+    #
+    # # make sure target directory does not already exist
+    # if os.path.exists(target_dir):
+    #     click_error(f"Skill '{name}' already exists. Please choose a different name or remove the existing skill first.")
+    #     return
+    #
+    # shutil.copytree(src_dir, target_dir)
+    # click_success(f"Skill '{name}' installed successfully from '{source}'.")
+    print(f"Installing new skill from {source}... NOT IMPLEMENTED")
+    pass
 

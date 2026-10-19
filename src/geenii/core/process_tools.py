@@ -2,7 +2,6 @@
 import json
 import logging
 
-from geenii import config
 from geenii.pm.process_manager_client import ProcessManagerClient
 from geenii.tool.registry import ToolRegistry
 
@@ -25,7 +24,7 @@ def init_process_tools(tool_registry: ToolRegistry, client: ProcessManagerClient
         try:
             result = client.start(
                 command,
-                cwd=working_directory or config.GEENII_WORKING_DIR,
+                cwd=working_directory,
                 pid=process_id or None,
             )
             return json.dumps(result, indent=2)

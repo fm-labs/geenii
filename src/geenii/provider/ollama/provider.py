@@ -8,7 +8,7 @@ import ollama
 
 from geenii import config
 from geenii.chat_models import TextContent, ToolCallContent, ContentPart, ToolCallResultContent, JsonContent
-from geenii.config import CACHE_DIR
+from geenii.config import GEENII_CACHE_DIR
 from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest, AIModelInfo, \
     ModelMessage, Usage
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider
@@ -76,7 +76,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             ollama_models = self.ollama.list()
 
             cache_data = {"models": [model.model_dump(mode="json") for model in ollama_models.models]}
-            write_json(f"{CACHE_DIR}/ollama.models.json", cache_data)
+            write_json(f"{GEENII_CACHE_DIR}/ollama.models.json", cache_data)
         except Exception as e:
             logger.error(f"Error fetching models from Ollama: {e}")
             return models

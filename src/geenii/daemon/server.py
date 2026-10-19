@@ -24,15 +24,15 @@ import time
 from typing import Any, Optional
 
 from geenii import proc as proc_util
-from geenii.config import GEENII_DIR
+from geenii.config import GEENII_WORKING_DIR
 from geenii.daemon.client import default_socket_path
 from geenii.daemon.host import ProcessHost
 from geenii.scheduler import Scheduler
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SCHEDULER_CONFIG = os.path.join(GEENII_DIR, "scheduler.json")
-DEFAULT_SERVICES_CONFIG = os.path.join(GEENII_DIR, "services.json")
+DEFAULT_SCHEDULER_CONFIG = os.path.join(GEENII_WORKING_DIR, ".geenii", "scheduler.json")
+DEFAULT_SERVICES_CONFIG = os.path.join(GEENII_WORKING_DIR, ".geenii", "services.json")
 
 
 class DaemonAlreadyRunning(RuntimeError):

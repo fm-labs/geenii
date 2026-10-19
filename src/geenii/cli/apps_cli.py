@@ -1,30 +1,18 @@
-import sys
-
-import signal
-
-import time
-
 import os
+import signal
+import sys
+import time
 
 import click
 
 from geenii.apps import AppRegistry, read_manifest, write_manifest, infer_manifest
 from geenii.cli.click_helper import click_success, click_error, click_info, click_warning
-from geenii.config import GEENII_DIR, GEENII_WORKING_DIR
-from geenii.utils.os_util import get_user_home_dir
+from geenii.config import apps_dirs
 
 
-def _apps_dirs() -> list[str]:
-    return [
-        os.path.join(get_user_home_dir(), ".geenii", "apps"),
-        os.path.join(GEENII_WORKING_DIR, ".geenii", "apps"),
-        os.path.join(GEENII_DIR, "apps"),
-    ]
-
-
-def _load_registry(extra_dir: str | None = None) -> AppRegistry:
+def _init_app_registry(extra_dir: str | None = None) -> AppRegistry:
     registry = AppRegistry()
-    dirs = _apps_dirs()
+    dirs = apps_dirs()
     if extra_dir:
         dirs.append(extra_dir)
     for d in dirs:
@@ -34,7 +22,7 @@ def _load_registry(extra_dir: str | None = None) -> AppRegistry:
 
 
 def _resolve_apps_dir(name: str) -> str | None:
-    for d in _apps_dirs():
+    for d in apps_dirs():
         candidate = os.path.join(d, name)
         if os.path.isdir(candidate):
             return d
@@ -52,7 +40,7 @@ def apps():
 @click.option("--dir", "extra_dir", default=None, type=click.Path(exists=True), help="Additional apps directory.")
 def list_apps(status, extra_dir):
     """List all registered apps."""
-    registry = _load_registry(extra_dir)
+    registry = _init_app_registry(extra_dir)
     app_list = registry.list()
     if not app_list:
         click_warning("No apps found.")
@@ -74,7 +62,7 @@ def list_apps(status, extra_dir):
 @click.option("--dir", "extra_dir", default=None, type=click.Path(exists=True), help="Additional apps directory.")
 def info_app(name, extra_dir):
     """Show details for a specific app."""
-    registry = _load_registry(extra_dir)
+    registry = _init_app_registry(extra_dir)
     app = registry.get(name)
     if app is None:
         click_error(f"App '{name}' not found.")
@@ -92,7 +80,7 @@ def info_app(name, extra_dir):
 @click.option("--dir", "extra_dir", default=None, type=click.Path(exists=True), help="Additional apps directory.")
 def start_app(name, port, extra_dir):
     """Start an app."""
-    registry = _load_registry(extra_dir)
+    registry = _init_app_registry(extra_dir)
     try:
         app = registry.start_app(name, port=port)
     except KeyError:
@@ -123,7 +111,7 @@ def start_app(name, port, extra_dir):
 @click.option("--dir", "extra_dir", default=None, type=click.Path(exists=True), help="Additional apps directory.")
 def stop_app(name, extra_dir):
     """Stop a running app."""
-    registry = _load_registry(extra_dir)
+    registry = _init_app_registry(extra_dir)
     try:
         stopped = registry.stop_app(name)
     except KeyError:
@@ -181,7 +169,7 @@ def init_app(name, app_type, title, description, extra_dir):
               help="Apps directory to scan. Defaults to all known apps paths.")
 def init_all_apps(overwrite, apps_dir):
     """Generate manifest.json for all apps that lack one."""
-    dirs = [apps_dir] if apps_dir else [d for d in _apps_dirs() if os.path.isdir(d)]
+    dirs = [apps_dir] if apps_dir else [d for d in apps_dirs() if os.path.isdir(d)]
     if not dirs:
         click_error("No apps directories found.")
         return

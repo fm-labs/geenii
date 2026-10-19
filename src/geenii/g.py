@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
@@ -11,15 +10,23 @@ from geenii.flows import FlowRegistry
 from geenii.hitl import HumanInTheLoopController
 from geenii.memory import ChatMemory
 from geenii.tool.registry import ToolRegistry
-from geenii.tools import init_builtin_tools, init_mcp_server_tools
+from geenii.tools import init_builtin_tools, init_mcp_server_tools, _redact_env_vars
 
 if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
 from geenii.ai import enumerate_providers
 from geenii.bots import BotInterface
-from geenii.config import GEENII_DIR, APP_VERSION, DEFAULT_COMPLETION_MODEL, \
-    CACHE_DIR, GEENII_WORKING_DIR
-from geenii.skills import SkillRegistry, skill_paths
+from geenii.config import (
+    APP_VERSION,
+    DEFAULT_COMPLETION_MODEL,
+    GEENII_CACHE_DIR,
+    GEENII_WORKING_DIR,
+    agent_paths,
+    skill_paths,
+    flow_dirs,
+    GEENII_USER_HOME,
+)
+from geenii.skills import SkillRegistry
 from geenii.utils.os_util import get_user_home_dir
 from geenii.utils.system_util import get_system_report
 
@@ -35,26 +42,6 @@ def get_bot(botname: str) -> BotInterface:
     name = botname[len("geenii:bot:"):]
     # cwd = BOT_WORKING_DIR
     return init_agent_by_name(name, cwd=None)
-
-
-def makedirs_safe(path: str):
-    try:
-        os.makedirs(path, exist_ok=True)
-    except Exception as e:
-        print(f"Error creating directory {path}: {e}")
-
-def make_app_directories():
-    # ensure internal directories exist
-    makedirs_safe(f"{CACHE_DIR}")
-    makedirs_safe(f"{CACHE_DIR}/logs")
-
-
-def agent_paths() -> list[tuple[str, str]]:
-    return [
-        (f"{GEENII_WORKING_DIR}/.geenii/agents", "project"),
-        (f"{get_user_home_dir()}/.geenii/agents", "user"),
-        ("/var/geenii/agents", "global"),
-    ]
 
 
 def init_global_agent_registry() -> AgentRegistry:
@@ -220,9 +207,9 @@ def get_app_info() -> dict:
             "version": APP_VERSION,
             "cwd": os.getcwd(),
             "user_home_dir": get_user_home_dir(),
-            "geenii_dir": GEENII_DIR,
+            "geenii_user_home_dir": GEENII_USER_HOME,
             "geenii_working_dir": GEENII_WORKING_DIR,
-            "cache_dir": CACHE_DIR,
+            "cache_dir": GEENII_CACHE_DIR,
         },
         "providers": [provider.model_dump() for provider in ai_providers],
     })
@@ -230,18 +217,13 @@ def get_app_info() -> dict:
     # add system report
     # if not in DEV_MODE, remove the env variables from the report for security reasons
     report = get_system_report()
-    if not os.environ.get("DEV_MODE", "0") == "1":
-        if "env" in report:
+    if "env" in report:
+        report["env"] = _redact_env_vars(report["env"])
+        if not os.environ.get("DEV_MODE", "0") == "1":
             report["env"] = {k: v for k, v in report["env"].items() if k in allowed_env_vars}
     data.update({"system": report})
 
     return data
-
-
-def flow_dirs() -> list[str]:
-    """Directories flows are loaded from: the user's, then the working directory's (without duplicates)"""
-    dirs = [Path(get_user_home_dir(), ".geenii", "flows"), Path(GEENII_DIR, "flows")]
-    return list(dict.fromkeys(str(d.resolve()) for d in dirs))
 
 
 def init_flow_registry() -> FlowRegistry:

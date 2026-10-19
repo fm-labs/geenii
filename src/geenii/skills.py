@@ -6,9 +6,8 @@ from pathlib import Path
 
 import pydantic
 
-from geenii.config import read_user_settings, GEENII_WORKING_DIR
+from geenii.config import skill_paths
 from geenii.tool.tool_filter import ToolFilterSet
-from geenii.utils.os_util import get_user_home_dir
 from geenii.utils.mdfile import read_frontmatter_file
 
 logger = logging.getLogger(__name__)
@@ -158,25 +157,6 @@ class SkillRegistry:
 #                       description=skill_header.get("description"),
 #                       metadata=skill_header)
 #     return skill
-
-def skill_paths() -> list[str]:
-    _skill_paths = [
-        #os.path.join(GEENII_DIR, "skills"),
-        os.path.join(GEENII_WORKING_DIR, ".geenii", "skills"),
-        os.path.join(get_user_home_dir(), ".geenii", "skills"),
-    ]
-    _settings = read_user_settings()
-    if "skill_dirs" in _settings:
-        for skill_dir in _settings["skill_dirs"]:
-            if os.path.isdir(skill_dir):
-                _skill_paths.append(skill_dir)
-            else:
-                print(f"Warning: Skill directory '{skill_dir}' does not exist or is not a directory.")
-
-
-    # remove duplicates
-    _skill_paths = list(dict.fromkeys(_skill_paths))
-    return _skill_paths
 
 
 def locate_skill_path(skill_name: str) -> Path | None:

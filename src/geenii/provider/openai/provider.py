@@ -9,7 +9,7 @@ from openai import OpenAI
 
 from geenii import config
 from geenii.chat_models import TextContent, ToolCallContent, JsonContent, ImageContent
-from geenii.config import CACHE_DIR
+from geenii.config import GEENII_CACHE_DIR
 from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, ChatCompletionRequest, \
     ChatCompletionResponse, AIModelInfo, AudioTranscriptionApiResponse, Usage
 from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider, \
@@ -97,7 +97,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             openai_models = self.client.models.list()
 
             cache_data = {"models": [model.model_dump(mode="json") for model in openai_models.data]}
-            write_json(f"{CACHE_DIR}/openai.models.json", cache_data)
+            write_json(f"{GEENII_CACHE_DIR}/openai.models.json", cache_data)
         except Exception as e:
             print(f"Error fetching models from OpenAI: {e}")
             return models
