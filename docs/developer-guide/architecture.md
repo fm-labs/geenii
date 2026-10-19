@@ -81,6 +81,7 @@ What happens on `geenii agent -n my-agent "do something"`:
 CLI (cli/agent_cli.py)
  └─ init_global_agent_registry()       g.py: built-in specs + <name>.md files from
  │                                     the project, user and global agents dirs
+ │                                     (projects=True: also every registered project)
  └─ registry.get_instance(name)        init_agent(spec): build Agent with its
  │                                     tool/skill registries
  └─ CliAgentRunner.run(prompt)

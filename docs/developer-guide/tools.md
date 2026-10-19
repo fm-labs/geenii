@@ -12,8 +12,16 @@ raises).
 All tools subclass `Tool` (`geenii/tool/common.py`), which carries `name`,
 `description`, and a JSON-Schema `input_schema` dict (renamed from
 `parameters`; the constructor keyword changed too), and implements a
-synchronous `invoke(args, env, **kwargs) -> ToolCallResult`. Callers pass the
-working directory as the `cwd` keyword.
+synchronous `invoke(args, env, *, ctx: ToolCallContext) -> ToolCallResult`.
+
+`ToolCallContext` (`geenii/tool/common.py`) is a dataclass with the call's
+context; `invoke_tool()` builds it from its `cwd` argument:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `cwd` | `str` | Working directory of the call (the agent's `cwd`); required |
+| `id` | `str` | Call ID, a new hex UUID per context; logged by `invoke_tool()` as `tool_ctx_id` |
+| `caller_id` | `str \| None` | The `caller_id` passed to `invoke_tool()` |
 
 `ToolCallResult` is a dataclass:
 
@@ -25,13 +33,21 @@ working directory as the `cwd` keyword.
 
 | Class | `type` | Execution |
 |---|---|---|
-| `PythonFunctionTool` | `function` | Calls a Python callable (async handlers are run to completion with `run_sync`). The return value is wrapped as `ToolCallResult(text=<return value>)` |
+| `PythonFunctionTool` | `function` | Calls a Python callable as `handler(**args)` (async handlers are run to completion with `run_sync`; the handler does not get the `ToolCallContext`). The return value is mapped by `to_tool_call_result()` (see below); an exception raised by the handler is logged and returned as `ToolCallResult(text=str(e), is_error=True)` |
 | `ComputerTool` | `computer` | Runs a shell command via `subprocess.run(..., shell=True)`. Supports an optional `command_template` |
 | `AppleScriptTool` | `computer` | `ComputerTool` with an `osascript -e '{command}'` template (macOS) |
-| `PythonCliTool` | `python` | Like `ComputerTool`, intended for running Python scripts |
+| `ReadTool`, `WriteTool` | — | The built-in `read` and `write` tools (`geenii/tool/computer.py`), see [Built-in tools](#built-in-tools) |
+| `PythonCliTool` | `python` | Like `ComputerTool`, intended for running Python scripts. Runs without a shell, in `ctx.cwd` |
 | `SandboxTool` | `sandbox` | Runs a command inside a Docker container with security hardening (see [sandbox.md](sandbox.md)) |
 | `McpTool` | `mcp_tool` | Forwards the call to an MCP server via fastmcp |
 | `ScriptTool` | `function` | Runs an executable script from a skill's `scripts/` directory, with the `args` string (`shlex`-split) as its arguments and the script's directory as cwd. Returns stdout and stderr joined by a newline as `text`, parsed into `structured_content` if that is valid JSON; a non-zero exit sets `is_error`. Auto-registered when a skill is activated, named `{skill}__{script_stem}`. See [skills.md](skills.md). |
+
+`to_tool_call_result(result)` (`geenii/tool/common.py`) maps a handler's
+return value: a `ToolCallResult` is passed through, `None` becomes empty text,
+`str` is the text, `bytes` are decoded as UTF-8, a `dict` becomes JSON text
+plus `structured_content`, a list or tuple becomes JSON text, an `Exception`
+becomes `is_error=True` with the message as text, and anything else is
+`str()`-ed.
 
 `Tool` also provides definition mappers: `to_definition()` (internal/OpenAI
 style), `to_openai()`, and `to_ollama()` — providers pick the one they need.
@@ -47,21 +63,28 @@ in that case all of these are registered (the model still only sees the ones in
 |---|---|---|
 | `bash` | ComputerTool | Run a single-line shell command on the local machine |
 | `python` | ComputerTool | Run a python command line (e.g. `python3 script.py`) — note: this executes an arbitrary command, same mechanics as `bash` |
-| `read` | PythonFunctionTool | Read a text file |
-| `write` | PythonFunctionTool | Write a text file |
+| `read` | ReadTool | Read a text file |
+| `write` | WriteTool | Write a text file |
 | `display_desktop_notification` | PythonFunctionTool | Show a desktop notification (macOS, via `osascript`) |
 
-`read`, `write` and `display_desktop_notification` are registered by
-`init_core_tools()` in `geenii/core/tools.py`. `read` and `write` only accept
-paths inside `GEENII_WORKING_DIR` or a directory listed in the user
-settings' `allowed_dirs`. The sandbox tools (`SandboxTool`) are not
+`display_desktop_notification` is registered by `init_core_tools()` in
+`geenii/core/tools.py`. In `read` and `write`, relative paths are resolved
+against `ctx.cwd`, and only paths inside that directory, `GEENII_WORKING_DIR` or a
+directory listed in the user settings' `allowed_dirs` (a list; any other value
+is ignored) are accepted. The check runs on the fully resolved path, so `..`
+segments and symlinks that lead outside are rejected, and the directory itself
+(e.g. `.`) does not count as inside. A rejected path is an error result ("You
+are not allowed to … this file: <path>") and logs a `SECURITY ALERT`. Other
+failures (missing file, invalid or empty `file_path`) are error results too.
+`write` overwrites existing files, writes an empty file when `contents` is
+missing, and does not create parent directories. Both are tested in
+`tests/geenii/test_file_tools.py`. The sandbox tools (`SandboxTool`) are not
 registered by default.
 
 ### Command execution details
 
 - The command runs in the `cwd` passed to `invoke()` (the agent's `cwd`, see
-  [agents.md](agents.md#runtime-model)), or in `GEENII_WORKING_DIR` when none
-  is passed.
+  [agents.md](agents.md#runtime-model)) via `ctx.cwd`.
 - The command string is run through the shell (`shell=True`), so pipes,
   redirects and `&&` work. The `shlex`-split argument list is only logged.
 - `${VAR}` / `$VAR` placeholders in the command are expanded from the tool
@@ -70,7 +93,8 @@ registered by default.
 - `text` is `stdout:\n<stdout>\nstderr:\n<stderr>`. On a non-zero exit code
   `EXITED WITH NON-ZERO EXIT CODE: <code>` is appended and `is_error` is set.
   On success, stdout that is valid JSON is also returned as
-  `structured_content`.
+  `structured_content` (`PythonCliTool` only tries this for a zero exit code
+  and non-empty stdout).
 - **Tool filters** can restrict which commands a tool is allowed to execute.
   See the *Tool filtering* section below and [skills.md](skills.md) for how
   `allowed-tools` with argument-level patterns work.
@@ -123,7 +147,9 @@ resources only).
 ## Invocation and logging
 
 `invoke_tool(tool, args, env, cwd=None, caller_id="anonymous")`
-(`geenii/tools.py`) wraps `tool.invoke()` and appends one JSON line per call to
+(`geenii/tools.py`) builds a `ToolCallContext(cwd=cwd or GEENII_WORKING_DIR,
+caller_id=caller_id)`, wraps
+`tool.invoke(args=..., env=..., ctx=ctx)` and appends one JSON line per call to
 `$GEENII_CACHE_DIR/logs/tool-use-YYYY-MM-DD.log`:
 
 ```json
@@ -148,7 +174,7 @@ Callers and their `caller_id`:
 |---|---|
 | `ToolCallTask` | `agent:<agent name>:<call_id>` |
 | `geenii tools call` | `cli:tools` |
-| `POST /tools/{name}/execute` | `web:tools` |
+| `POST /tools/{name}/execute` | `web:tools` (runs in `GEENII_WORKING_DIR`) |
 
 `ToolRegistry.invoke()` was removed; look the tool up with `registry.get(name)`
 and call `invoke_tool()`.
@@ -172,6 +198,10 @@ registry.register_function(my_fn, name="my_tool", description="...", parameters=
 When `parameters` is omitted, a minimal JSON schema is derived from the
 function signature (str/int/float/bool/list/dict annotations; parameters
 without defaults become required).
+
+A function tool does not see the `ToolCallContext`. A tool that needs the
+call's working directory subclasses `Tool` and reads `ctx.cwd` in `invoke()`,
+like `ReadTool`.
 
 ## How tools reach the model
 

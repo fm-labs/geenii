@@ -27,6 +27,7 @@ Interactive API docs are at `http://localhost:33311/docs` (OpenAPI at
 | `tools_routes.py` | `/tools` — tool definitions and direct execution |
 | `mcp_routes.py` | `/mcp` — configured MCP servers, their tools, and tool calls (see [mcp.md](mcp.md#http-api)) |
 | `skills_routes.py` | `/skills` — skills in the app's `SkillRegistry` (`app.state.skill_registry`), read-only |
+| `projects_routes.py` | `/projects` — projects configured in the user settings, read-only |
 | `stats_routes.py` | `/stats` — AI usage statistics from the usage log, calculated in `geenii/usage_stats.py` |
 | `ai_routes.py` | `/ai` — models, text/chat completion, image, speech, transcription |
 | `chat_routes.py` | `/chats` — agent chat sessions with streamed turns and tool approvals |
@@ -42,7 +43,7 @@ The `lifespan` in `server.py` builds the shared state once per process:
 
 | `app.state` | Built by | Contents |
 |---|---|---|
-| `agent_registry` | `init_global_agent_registry()` | All agent specs from `$GEENII_WORKING_DIR/.geenii/agents/`, `~/.geenii/agents/` and `/var/geenii/agents/` (`config.agent_paths()`) |
+| `agent_registry` | `init_global_agent_registry(projects=True)` | All agent specs from `$GEENII_WORKING_DIR/.geenii/agents/`, `~/.geenii/agents/` and `/var/geenii/agents/` (`config.agent_paths()`), plus `<project>/.geenii/agents/` of every project in the user settings (`config.project_paths()`) |
 | `tool_registry` | `init_builtin_tools()`, `init_mcp_server_tools()` | Built-in tools plus the tools of **all** servers in `mcp.json` (discovered in a worker thread, so startup waits for the slowest server). Agents still load their own MCP tools when they start |
 | `chat_sessions` | `dep_chat_sessions` (lazily, on first `/chats` request) | `ChatSessionStore` over `GEENII_CHAT_SESSIONS_DIR` |
 
@@ -57,13 +58,13 @@ All paths are relative to `/api/v1`.
 |---|---|
 | `GET /health` | `{"status": "ok"}` |
 | `GET /info` | App info (`get_app_info()`); the UI polls this as its liveness check |
-| `GET /agents/` | Bare array of agent specs (`name`, `label`, `description`, `model`, `system`, `tools`, `skills`, `mcp_servers`, `model_parameters`, `file_path`, `class_name`) |
+| `GET /agents/` | Bare array of agent specs (`name`, `label`, `description`, `model`, `system`, `tools`, `skills`, `mcp_servers`, `model_parameters`, `file_path`, `class_name`, `scope`, `working_dir`, `allowed_dirs`) |
 | `GET /agents/{name}` | One agent spec plus `instructions` (the markdown body of its spec file). 404 for unknown agents |
 | `GET /agents/{name}/commands` | `AgentCommand[]`: the built-in commands (`clear`, `compact` and the read-only info commands `self`, `usage`, `models`, `tools`, `context`, `help`; see [agents.md](agents.md#info-commands)) followed by one per configured skill. 404 for unknown agents |
 | `POST /agents/` | Body `{spec, instructions, scope}`: `spec` is the frontmatter (`AgentSpecInput`: `AgentSpec` without `file_path`/`scope`), `instructions` the markdown body, `scope` `user` (default), `project` or `global`. Writes `<agent dir of scope>/<name>.md` and adds the agent to the registry. 201 with the agent like `GET /agents/{name}`; 400 invalid name, 409 name or file taken, 422 invalid spec |
 | `PUT /agents/{name}` | Body `{spec, instructions}`. Replaces the agent's spec file and reloads it into the registry. A built-in agent (no `file_path`) gets a new file in the user agent directory. 400 when `spec.name` differs (no renames), 404 unknown, 409 if that user file already exists |
 | `GET /tools/` | Bare array of tool definitions (`name`, `type`, `description`, `parameters` as JSON Schema) |
-| `POST /tools/{name}/execute` | Body: the tool arguments as a JSON object. Returns a `ToolCallResult` (`text`, `structured_content`, `is_error`). The call is logged to the tool-use log with caller `web:tools`. 404 for unknown tools |
+| `POST /tools/{name}/execute` | Body: the tool arguments as a JSON object. Returns a `ToolCallResult` (`text`, `structured_content`, `is_error`). The tool runs in `GEENII_WORKING_DIR`. The call is logged to the tool-use log with caller `web:tools`. 404 for unknown tools |
 | `GET /mcp/servers` | Configured MCP servers (`env` values masked); `?reload=true` re-reads `mcp.json` |
 | `POST /mcp/servers` | Body `{name, config}`. Adds the server to `~/.geenii/mcp.json`. 201, 400 invalid, 409 name taken |
 | `GET /mcp/servers/{name}` | Server summary plus `server_capabilities`, `tools`, `resources`. Connects to the server. 404 unknown, 502 unreachable |
@@ -73,6 +74,7 @@ All paths are relative to `/api/v1`.
 | `POST /mcp/servers/{name}/tool/call` | Body `{tool_name, arguments}`. Raw MCP `CallToolResult`. 404 unknown server, 502 on failure |
 | `GET /skills/` | The skills in the registry, sorted by name: `name`, `path`, `source` (the skill path it was loaded from), `description`, `triggers`, `allowed_tools`, `metadata`, `scripts`, `used_by` (agents listing it). Skills whose SKILL.md can't be parsed are skipped at startup |
 | `GET /skills/{name}` | The entry plus `instructions` (the markdown body of SKILL.md). 404 for unknown skills |
+| `GET /projects/` | `ProjectInfo[]`: the projects from the user settings' `projects` key (`config.get_projects()`): `path` (resolved), `trusted` (`"trusted": true`), `exists` (the directory exists) |
 | `GET /stats/usage` | Usage from `{GEENII_CACHE_DIR}/logs/ai-usage-*.log` over a range of local days: `?days=30` (default; `0` for all days with usage), or `start`/`end` (ISO dates, `end` defaults to today). Returns `totals`, `daily` (every day of the range, with `tokens_by_provider`), `hourly` (calls per hour of day), and `by_provider` / `by_model` / `by_source` / `by_task` sorted by tokens. Each log file's per-day aggregates are cached in memory and in `{GEENII_CACHE_DIR}/stats/`, keyed by the file's size and mtime; `?refresh=true` recalculates. 400 if `start` is after `end` |
 | `GET /ai/models` | `AIModelInfo[]` |
 | `POST /ai/completion` | One-shot text completion |

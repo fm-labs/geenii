@@ -15,6 +15,13 @@ these directories, and each one sets the agent's `scope`:
 | `~/.geenii/agents` | `user` |
 | `/var/geenii/agents` | `global` |
 
+`geenii agents list` and the HTTP server also load the agents of every
+project registered in the user settings (`projects`, see
+[configuration.md](configuration.md)) from `<project>/.geenii/agents`, with
+scope `project`. A `project` agent's `working_dir` is set to its project
+directory (the directory containing `.geenii/agents`), overriding a value in
+the frontmatter.
+
 If two directories define the same agent name, which one wins is currently not
 defined (the directories are iterated as a set).
 
@@ -50,7 +57,7 @@ tools:
 | `skills` | list[str] | Skill names to load into the agent |
 | `model_parameters` | dict | Reserved; not currently applied to requests |
 | `scope` | `builtin` \| `global` \| `project` \| `user` | Set from the directory the file was loaded from (see above); a value in the frontmatter is overwritten. The built-in agents are `global` |
-| `working_dir` | str | Directory the agent's tools (`bash`, `python`) run in. Without it, each agent instance gets a fresh, empty temporary directory that is deleted when the agent goes away |
+| `working_dir` | str | Directory the agent's tools (`bash`, `python`, `read`, `write`) run in; `read`/`write` may access files inside it. Set automatically for `project` agents (see above). Without it, each agent instance gets a fresh, empty temporary directory that is deleted when the agent goes away |
 | `allowed_dirs` | list[str] | Intended extra allowed directories for `project` agents. Stored and shown, not yet enforced |
 | `mcp_servers` | list[str] | Names of MCP servers (from `mcp.json`) whose tools are loaded; servers not listed are not loaded. Their tools (`mcp__<server>__<tool>`) must still be listed in `tools` to be callable |
 

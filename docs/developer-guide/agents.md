@@ -32,13 +32,16 @@ agent.
 
 `ToolCallTask` calls `invoke_tool(tool, ..., cwd=agent.cwd,
 caller_id="agent:<name>:<call_id>")` (see
-[tools.md](tools.md#invocation-and-logging)), and `ComputerTool` runs its
-subprocess there. Its `execute()` generator returns the `ToolCallResult`;
+[tools.md](tools.md#invocation-and-logging)), which passes it to the tool as
+`ctx.cwd` (`ToolCallContext`): `ComputerTool` and `PythonCliTool` run their
+subprocess there, and `read`/`write` resolve relative paths against it. Its `execute()` generator returns the `ToolCallResult`;
 blocked and rejected calls return one with `is_error=True`, and an exception
 becomes `ToolCallResult(text=str(e), structured_content={"error": ...},
 is_error=True)`. The `ToolCallResultContent` sent back to the model carries
-`structured_content` if present, otherwise `text`. Whether a tool may run in
-that directory (`allowed_dirs`) is not checked yet.
+`structured_content` if present, otherwise `text`. `read` and `write` only
+accept paths inside the agent's `cwd`, `GEENII_WORKING_DIR` or the user
+settings' `allowed_dirs`; the spec's `allowed_dirs` and shell commands are not
+checked yet.
 
 The agent runtime is fully synchronous: `process()`, task `execute()` methods,
 tool `invoke()` and HITL controllers are plain (blocking) functions/generators.

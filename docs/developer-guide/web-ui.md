@@ -90,7 +90,7 @@ expect. Both chat model selectors use it.
 | `src/app/<feature>/` | One folder per feature: `*-page.tsx` (wrapped in `MainLayout`, `XchatProvider` for the agent pages, or `ConsoleLayout` for console pages), views, local types |
 | `src/components/ui/` | shadcn primitives |
 | `src/components/xchat/` | Agent chat component library (see below) |
-| `src/components/layout/` | `MainLayout` + `AppSidebar` (main app shell, see below), `ConsoleLayout` + `console-navdata.tsx` (console sidebar), `MainContent`. The old `Layout`/`Headerbar` top nav is no longer used by any page |
+| `src/components/layout/` | `MainLayout` + `MainSidebar` (main app shell, see below), `ConsoleLayout` + `console-navdata.tsx` (console sidebar), `MainContent`. The old `Layout`/`Headerbar` top nav is no longer used by any page |
 | `src/components/tauri/` | Tauri title bar, panel and command helpers |
 | `src/context/` | `server-context`, `api-context`, `app-context` |
 | `src-tauri/` | Rust shell: plugins, tray, `geenii://` app protocol, sidecar |
@@ -99,7 +99,7 @@ expect. Both chat model selectors use it.
 
 `MainLayout` (`components/layout/main-layout.tsx`) wraps every non-console
 page in a shadcn `SidebarProvider` (collapsed by default, `--sidebar-width`
-350px) with `AppSidebar` and a `SidebarInset` for the page. `AppSidebar` has
+350px) with `MainSidebar` (`main-sidebar.tsx`) and a `SidebarInset` for the page. `MainSidebar` has
 two columns:
 
 - an icon rail with the nav items (Start `#/`, Agents `#/agents`, a
@@ -109,9 +109,12 @@ two columns:
   (`XchatSessionsSidebarGroup`, which needs a surrounding `ChatProvider`).
 
 `XchatProvider` (`app/xchat/xchat-provider.tsx`) is `MainLayout` inside a
-`ChatProvider`. It puts a `BackendSwitcher` (echo or any agent from
-`GET /agents/`, default `default`) in `sidebarHeader`, so the session list
-shows that backend's conversations. `#/agents` and `#/agents/:name` use it;
+`ChatProvider`. It puts a `BackendSwitcher` (`components/xchat/backend-switcher.tsx`;
+echo or any agent from `GET /agents/`, default `default` or the
+`defaultBackend` prop) in `sidebarHeader`. The switcher follows the active
+backend's ID, and the session list only shows the sessions whose `agent`
+matches it. `#/agents` and `#/agents/:name` use it (the agent page passes the
+agent's name as `defaultBackend`);
 the agent page adds its own sticky header with a `SidebarTrigger` and
 breadcrumb.
 
@@ -142,8 +145,8 @@ agents from `GET /agents/`, sorted by label.
 | Route | View | Endpoints |
 |---|---|---|
 | `#/` | `launcher/launcher.view.tsx` — agent launcher (see above) | `GET /agents/` |
-| `#/agents` | `agents/agents.view.tsx` — card grid of agents; each card links to the agent page | `GET /agents/` |
-| `#/agents/:name` | `agents/agent.view.tsx` + `agent-chat.tsx` — an xchat bound to this agent (no session list, "New chat" starts over), with the agent's short info (model, description, tool/MCP/skill counts) in the chat card header and a Details dialog for parameters, tool and skill descriptions and instructions | `GET /agents/{name}`, `/agents/{name}/commands`, `/tools/`, `/chats/*` |
+| `#/agents` | `agents/agents.view.tsx` — card grid of agents; each card links to the agent page and shows the scope badge and the working directory ("No directory access" without one). Scope tabs (All, Global, User, Project, with counts) and, when projects are configured, a project select (the innermost project containing the agent's `working_dir`) filter the grid. A failing projects request only hides the project filter | `GET /agents/`, `/projects/` |
+| `#/agents/:name`, `#/agents/:name/:contextId` | `agents/agent.view.tsx` + `agent-chat.tsx` — an xchat bound to this agent (`contextId` opens that chat session) (no session list, "New chat" starts over), with the agent's short info (model, description, tool/MCP/skill counts) in the chat card header and a Details dialog for parameters, tool and skill descriptions and instructions | `GET /agents/{name}`, `/agents/{name}/commands`, `/tools/`, `/chats/*` |
 | `#/console/playground/tools` | `tools/tools.view.tsx` — tools as badges grouped by type; clicking one opens a pane with the parameter table, an rjsf form built from `parameters`, and Execute | `GET /tools/`, `POST /tools/{name}/execute` |
 | `#/console/configure/mcp-servers` | `console/components/mcp-servers-settings-view.tsx` — filterable server list; a details card with config (fields or raw JSON), the server's tools, and an rjsf form per tool; an editor to add, edit and delete servers (see [mcp.md](mcp.md#web-ui)) | `GET`/`POST /mcp/servers`, `GET`/`PUT`/`DELETE /mcp/servers/{name}`, `GET /mcp/servers/{name}/config`, `POST /mcp/servers/{name}/tool/call` |
 | `#/console/system/info` | `console/components/system-info-view.tsx` — tiles for version and uptime, CPU, memory and disk `/` (with usage bars); cards for directories (copyable), AI providers (configured or not), user, binaries found on `PATH`, environment variables (collapsed; only the allow-listed, redacted ones unless `DEV_MODE=1`) and the raw JSON (collapsed) | `GET /info` |

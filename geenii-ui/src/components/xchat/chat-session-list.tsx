@@ -76,12 +76,13 @@ export const useChatSessions = (): ChatSessionsState => {
 const ChatSessionList = ({ className }: { className?: string }) => {
   const backend = useChatBackend()
   const { supported, canDelete, sessions, activeId, error, open, remove } = useChatSessions()
-  if (!supported) return null
 
   const filtered = React.useMemo(() =>
     sessions.filter((s) =>
-      s.agent === backend.id.substring('agent:'.length)
+      s.agent === (backend.id.startsWith('agent:') ? backend.id.substring('agent:'.length) : backend.id)
     ), [sessions, backend.id])
+
+  if (!supported) return null
 
   return (
     <div className={cn('flex flex-col gap-1 text-sm', className)}>
