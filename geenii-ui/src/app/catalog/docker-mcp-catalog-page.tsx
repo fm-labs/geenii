@@ -1,13 +1,13 @@
 import React from "react";
 import MainContent from "@/components/layout/main-content.tsx";
 import Header from "@/components/header.tsx";
-import Layout from '@/components/layout/layout.tsx'
+import MainLayout from '@/components/layout/main-layout.tsx'
 import { DockerMcpCatalogProvider } from '@/app/catalog/components/docker-mcp-catalog-provider.tsx'
 import DockerMcpCatalogOci from '@/app/catalog/components/docker-mcp-catalog-oci.tsx'
 
 const DockerMcpCatalogPage = () => {
     return (
-      <Layout>
+      <MainLayout>
         <MainContent>
           <Header title="Docker MCP Catalog"
                   subtitle="Safely run MCP server wrapped in docker containers" />
@@ -21,7 +21,7 @@ const DockerMcpCatalogPage = () => {
           {/*</DockerMcpCatalogV3Provider>*/}
 
         </MainContent>
-      </Layout>
+      </MainLayout>
     );
 };
 

@@ -1,15 +1,15 @@
 import React from 'react'
-import Layout from '@/components/layout/layout.tsx'
 import MainContent from '@/components/layout/main-content.tsx'
 import AgentsView from '@/app/agents/agents.view.tsx'
+import XchatProvider from '@/app/xchat/xchat-provider.tsx'
 
 const AgentsPage = () => {
   return (
-    <Layout>
+    <XchatProvider>
       <MainContent>
         <AgentsView />
       </MainContent>
-    </Layout>
+    </XchatProvider>
   )
 }
 

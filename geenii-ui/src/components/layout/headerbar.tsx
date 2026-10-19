@@ -1,6 +1,6 @@
 import React from 'react'
 import {
-  BotIcon, SettingsIcon, UserIcon,
+  BotIcon, LayoutGridIcon, SettingsIcon, UserIcon,
 } from 'lucide-react'
 import {
   FEATURE_AGENTS_ENABLED, FEATURE_APPS_ENABLED,
@@ -47,6 +47,7 @@ const Headerbar = () => {
           {/*<Button color={"secondary"}>*/}
           {/*  <a href="#/console"><SettingsIcon /></a>*/}
           {/*</Button>*/}
+          <a href="#/" title="Agent launcher (experimental)"><LayoutGridIcon /></a>
           <a href="#/console"><SettingsIcon /></a>
           {/*<Button color={"transparent"}>*/}
           {/*  <UserIcon />*/}

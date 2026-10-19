@@ -179,7 +179,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             # filter the registry to get the tool definitions for the requested tools
             tool_defs = tool_registry.list_definitions()
             openai_tools = [tool_def for tool_def in tool_defs if tool_def['name'] in tools]
-            print("Mapped OpenAI tools:", openai_tools)
+            #print("Mapped OpenAI tools:", openai_tools)
             ollama_tools = [map_openai_tool_to_ollama(tool_def) for tool_def in openai_tools]
             logger.info(
                 f"Mapped {len(openai_tools)} tools to Ollama format, {[tool['function']['name'] for tool in ollama_tools]}")
@@ -472,10 +472,10 @@ def model_messages_to_ollama_format(messages: List[ModelMessage]) -> List[dict]:
         for message in messages:
             role = message.role
             content = message.content
-            if not role or not content:
+            if not role or content is None:
                 logger.warning("Invalid message format, missing 'role' or 'content'")
-                print(message)
-                # continue
+                #print(message)
+                continue
 
             for content_item in content:
                 _message = None

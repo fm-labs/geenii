@@ -53,4 +53,5 @@ class McpTool(Tool):
             text = "Unknown result type"
             is_error = True
 
+        #print(text, data, is_error)
         return ToolCallResult(text, structured_content=data, is_error=is_error)

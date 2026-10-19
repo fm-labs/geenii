@@ -12,6 +12,7 @@ import CatalogPage from '@/app/catalog/catalog-page.tsx'
 import ConsolePage from '@/app/console/console-page.tsx'
 import ConfigurePage from '@/app/console/configure-page.tsx'
 import SystemPage from '@/app/console/system-page.tsx'
+import LauncherPage from '@/app/launcher/launcher-page.tsx'
 
 
 
@@ -59,7 +60,7 @@ const AppRouter = () => {
     const routes: Route[] = [
       {
         path: '/',
-        element: <AgentsPage />,
+        element: <LauncherPage />,
       },
       {
         path: '/chat',

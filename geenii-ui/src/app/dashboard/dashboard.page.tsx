@@ -1,5 +1,5 @@
 import React, { PropsWithChildren } from 'react'
-import Layout from '@/components/layout/layout.tsx'
+import MainLayout from '@/components/layout/main-layout.tsx'
 import AgentsView from '@/app/agents/agents.view.tsx'
 import ToolsView from '@/app/tools/tools.view.tsx'
 import { cn } from 'cn'
@@ -37,7 +37,7 @@ const DashboardSection = ({ title, className, children }: PropsWithChildren<{ ti
 
 const DashboardPage = () => {
   return (
-    <Layout>
+    <MainLayout>
       <div className={'pt-10'}>
         <DashboardSection title={"Your Agents"}>
           {/*<a href={'#/agents'} className={'text-sm mb-4 inline-block'}>Manage Agents</a>*/}
@@ -52,7 +52,7 @@ const DashboardPage = () => {
           <ToolsView />
         </DashboardSection>
       </div>
-    </Layout>
+    </MainLayout>
   )
 }
 

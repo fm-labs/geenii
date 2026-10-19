@@ -1,5 +1,5 @@
 import React from 'react'
-import Layout from '@/components/layout/layout.tsx'
+import MainLayout from '@/components/layout/main-layout.tsx'
 import MainContent from '@/components/layout/main-content.tsx'
 import Header from '@/components/header.tsx'
 import { Button } from '@/components/ui/button.tsx'
