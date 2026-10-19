@@ -15,7 +15,7 @@ from geenii.tool.registry import ToolRegistry
 
 @pytest.fixture(autouse=True)
 def isolated_cache_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(base_agent_mod, "CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(base_agent_mod, "GEENII_CACHE_DIR", str(tmp_path))
 
 
 @pytest.fixture

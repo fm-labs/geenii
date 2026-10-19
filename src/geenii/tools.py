@@ -117,12 +117,21 @@ def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = N
         _log_tool_call(tool.name, args, _redact_env_vars(env, secret_keys), cwd, caller_id=caller_id, result=result)
 
 
-_SENSITIVE_KEYS = ("password", "secret", "api_key", "token", "pass", "pat")
+# matched anywhere in a name
+_SENSITIVE_KEYS = ("password", "secret", "api_key", "token")
+# matched only as a whole `_`-separated part of a name, so that e.g. PATH or PATTERN are not redacted
+_SENSITIVE_NAME_PARTS = ("pass", "passwd", "pat")
+
+
+def _is_sensitive_env_var(name: str) -> bool:
+    name = name.lower()
+    return any(s in name for s in _SENSITIVE_KEYS) or any(p in _SENSITIVE_NAME_PARTS for p in name.split("_"))
+
 
 def _redact_env_vars(env_vars: dict[str, str], secret_keys: set[str] | None = None) -> dict[str, str]:
     """A copy of env_vars with sensitive values redacted. The input is left untouched, since it is passed on to the tool."""
     secret_keys = secret_keys or set()
-    return {k: "REDACTED" if k in secret_keys or any(s in k.lower() for s in _SENSITIVE_KEYS) else v
+    return {k: "REDACTED" if k in secret_keys or _is_sensitive_env_var(k) else v
             for k, v in env_vars.items()}
 
 def _log_tool_call(tool_name, args: dict[str, str],

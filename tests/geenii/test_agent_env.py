@@ -122,3 +122,10 @@ def test_init_agent_loads_env(monkeypatch, store):
     assert agent.env == {"REGION": "eu", "TOKEN": "t0k3n"}
     assert agent.secret_keys == {"TOKEN"}
     assert "t0k3n" not in str(agent.to_dict())
+
+
+def test_redact_env_vars_matches_short_names_only_as_whole_parts():
+    from geenii.tools import _redact_env_vars
+    env = {"PATH": "/bin", "PATTERN": "x", "GH_PAT": "p", "DB_PASS": "p", "PASSENGER": "x", "MY_API_KEY": "k", "HOME": "/h"}
+    assert _redact_env_vars(env) == {"PATH": "/bin", "PATTERN": "x", "GH_PAT": "REDACTED", "DB_PASS": "REDACTED",
+                                     "PASSENGER": "x", "MY_API_KEY": "REDACTED", "HOME": "/h"}

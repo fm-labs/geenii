@@ -192,4 +192,10 @@ def flow_dirs() -> list[str]:
 def apps_dirs() -> list[str]:
     return [
         os.path.join(GEENII_USER_HOME, ".geenii", "apps"),
+        os.path.join(GEENII_WORKING_DIR, ".geenii", "apps"),
     ]
+
+
+def project_skills_dir() -> str:
+    """Where `geenii skills install` puts skills"""
+    return os.path.join(GEENII_WORKING_DIR, ".geenii", "skills")

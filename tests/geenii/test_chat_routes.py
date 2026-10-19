@@ -24,7 +24,7 @@ from geenii.tool.registry import ToolRegistry
 @pytest.fixture(autouse=True)
 def isolated_cache_dir(tmp_path, monkeypatch):
     """Keep agent logs out of the real cache dir."""
-    monkeypatch.setattr(base_agent_mod, "CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setattr(base_agent_mod, "GEENII_CACHE_DIR", str(tmp_path / "cache"))
 
 
 @pytest.fixture

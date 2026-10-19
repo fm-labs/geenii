@@ -8,7 +8,7 @@ from geenii.datamodels import ChatCompletionRequest
 
 @pytest.fixture
 def cache_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(ai, "CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(ai, "GEENII_CACHE_DIR", str(tmp_path))
     return tmp_path
 
 

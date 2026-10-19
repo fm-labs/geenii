@@ -13,8 +13,8 @@ from geenii.memory import ShortTermChatMemory
 @pytest.fixture(autouse=True)
 def isolated_cache_dir(tmp_path, monkeypatch):
     """Keep agent logs out of the real cache dir, and read usage logs from it."""
-    monkeypatch.setattr(base_agent_mod, "CACHE_DIR", str(tmp_path))
-    monkeypatch.setattr(info_commands, "CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(base_agent_mod, "GEENII_CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(info_commands, "GEENII_CACHE_DIR", str(tmp_path))
     return tmp_path
 
 

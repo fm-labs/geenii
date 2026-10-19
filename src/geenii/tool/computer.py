@@ -27,7 +27,7 @@ class ComputerTool(Tool):
         self.command_template = command_template
 
     def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, **kwargs: Any) -> ToolCallResult:
-        working_dir = kwargs.get("cwd", None)
+        working_dir = kwargs.get("cwd") or config.GEENII_WORKING_DIR
         # todo check if tool execution is permitted in given working_dir
 
         command = args.get("command")

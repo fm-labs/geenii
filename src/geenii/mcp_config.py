@@ -125,16 +125,18 @@ def read_mcp_config_files() -> dict:
     :return: A dictionary containing the configuration data.
     """
     servers: dict = {}
+    env: dict = {}
     for filename in get_mcp_config_paths():
         try:
             with open(filename, "r") as f:
                 data = json.load(f)
                 servers.update(data.get("mcpServers", {}))
+                env.update(data.get("env", {}))
         except FileNotFoundError:
             logger.warning(f"Configuration file {filename} not found.")
         except json.JSONDecodeError:
             logger.error(f"Error decoding JSON from the file {filename}.")
-    return {"mcpServers": servers}
+    return {"mcpServers": servers, "env": env}
 
 
 def read_root_mcp_config() -> dict:

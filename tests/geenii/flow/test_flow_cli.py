@@ -183,6 +183,7 @@ def test_graph_renders_svg(runner, tmp_path):
 
 
 def test_list_flows(runner, tmp_path, monkeypatch):
+    import geenii.config
     import geenii.g
     user_dir, project_dir = tmp_path / "user", tmp_path / "project"
     user_dir.mkdir()
@@ -190,7 +191,9 @@ def test_list_flows(runner, tmp_path, monkeypatch):
     for name in ("b.yaml", "a.toml", "notes.txt"):
         (user_dir / name).write_text("")
     (project_dir / "c.json").write_text("{}")
-    monkeypatch.setattr(geenii.g, "flow_dirs", lambda: [str(user_dir), str(project_dir), str(tmp_path / "missing")])
+    dirs = lambda: [str(user_dir), str(project_dir), str(tmp_path / "missing")]
+    monkeypatch.setattr(geenii.config, "flow_dirs", dirs)
+    monkeypatch.setattr(geenii.g, "flow_dirs", dirs)
 
     result = runner.invoke(flow, ["list"])
     assert result.exit_code == 0, result.output
@@ -203,7 +206,9 @@ def test_list_flows(runner, tmp_path, monkeypatch):
 
 
 def test_list_flows_empty(runner, tmp_path, monkeypatch):
+    import geenii.config
     import geenii.g
+    monkeypatch.setattr(geenii.config, "flow_dirs", lambda: [str(tmp_path / "missing")])
     monkeypatch.setattr(geenii.g, "flow_dirs", lambda: [str(tmp_path / "missing")])
     result = runner.invoke(flow, ["list"])
     assert result.exit_code == 0

@@ -48,9 +48,9 @@ def daemon():
 @daemon.command(name="start")
 @click.option("--socket", "-s", default=None, envvar=list(SOCKET_ENV_VARS), help=SOCKET_OPTION_HELP)
 @click.option("--scheduler-config", "-c", default=None,
-              help="Scheduler config JSON. Default: $GEENII_DIR/scheduler.json (if it exists).")
+              help="Scheduler config JSON. Default: $GEENII_WORKING_DIR/.geenii/scheduler.json (if it exists).")
 @click.option("--services-config", default=None,
-              help="Supervised services JSON. Default: $GEENII_DIR/services.json (if it exists).")
+              help="Supervised services JSON. Default: $GEENII_WORKING_DIR/.geenii/services.json (if it exists).")
 def start(socket, scheduler_config, services_config):
     """Run the daemon in the foreground until SIGINT/SIGTERM."""
     from geenii.daemon.server import DEFAULT_SCHEDULER_CONFIG
