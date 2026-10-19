@@ -11,6 +11,10 @@ export type AgentType = {
   model_parameters?: Record<string, any>;
   mcp_servers?: string[];
   class_name?: string | null;
+  /** Set from the directory the spec was loaded from */
+  scope?: 'global' | 'project' | 'user';
+  working_dir?: string | null;
+  allowed_dirs?: string[] | null;
 }
 
 /** GET /api/v1/agents/{name}: the spec plus the markdown body of the spec file */

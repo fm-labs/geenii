@@ -1,11 +1,12 @@
 import * as React from 'react'
 import {
-  BotIcon, BracesIcon, BrainIcon, ChevronRightIcon, ExternalLinkIcon, ListIcon, PlugIcon, RefreshCwIcon,
+  BotIcon, BracesIcon, BrainIcon, ChevronRightIcon, ExternalLinkIcon, ListIcon, PencilIcon, PlugIcon, PlusIcon, RefreshCwIcon,
   ScrollTextIcon, SearchIcon, SparklesIcon, TerminalIcon, WrenchIcon, XIcon,
 } from 'lucide-react'
 import {
   AgentCommandType, AgentDetailType, AgentType, agentUrl, mcpServerOfTool, shortToolName,
 } from '@/app/agents/agent-types.ts'
+import AgentConfigEditor, { AgentConfigSubmit } from '@/app/agents/components/agent-config-editor.tsx'
 import JsonView from '@/components/json-view.tsx'
 import { OutputDataMarkdown } from '@/components/output-data-markdown.tsx'
 import { markdownClass } from '@/components/xchat/parts/media-parts.tsx'
@@ -180,7 +181,7 @@ export const AgentDescription = ({ description }: { description?: string | null 
 }
 
 /** Details of one agent; the spec from the list is shown at once, instructions and skill descriptions are fetched */
-const AgentConfigDetails = ({ agent, onClose }: { agent: AgentType, onClose: () => void }) => {
+const AgentConfigDetails = ({ agent, onClose, onEdit }: { agent: AgentType, onClose: () => void, onEdit: () => void }) => {
   const { fetchJson } = useApi()
   const [detail, setDetail] = React.useState<AgentDetailType | null>(null)
   const [commands, setCommands] = React.useState<AgentCommandType[]>([])
@@ -225,6 +226,9 @@ const AgentConfigDetails = ({ agent, onClose }: { agent: AgentType, onClose: () 
             </Button>
             <Button size="sm" variant="ghost" asChild title="Open the agent">
               <a href={agentUrl(agent.name)}><ExternalLinkIcon /> Open</a>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onEdit} title="Edit configuration">
+              <PencilIcon /> Edit
             </Button>
             <Button size="icon" variant="ghost" onClick={onClose} title="Close">
               <XIcon />
@@ -280,6 +284,24 @@ const AgentsAdminView = () => {
   const [error, setError] = React.useState<string | null>(null)
   const [filter, setFilter] = React.useState('')
   const [selectedName, setSelectedName] = React.useState<string | null>(null)
+  const [editorMode, setEditorMode] = React.useState<'create' | 'edit' | null>(null)
+
+  const select = (name: string | null) => {
+    setSelectedName(name)
+    setEditorMode(null)
+  }
+
+  // POST writes a new spec file, PUT replaces the agent's file; errors are shown in the editor
+  const saveAgent = async ({ spec, instructions, scope }: AgentConfigSubmit) => {
+    const isNew = editorMode === 'create'
+    await fetchJson(isNew ? '/api/v1/agents/' : `/api/v1/agents/${encodeURIComponent(spec.name)}`, {
+      method: isNew ? 'POST' : 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(isNew ? { spec, instructions, scope } : { spec, instructions }),
+    })
+    await fetchAgents()
+    select(spec.name)
+  }
 
   const fetchAgents = React.useCallback(async () => {
     setLoading(true)
@@ -321,6 +343,9 @@ const AgentsAdminView = () => {
           <Button size="sm" variant="ghost" onClick={fetchAgents} disabled={loading}>
             <RefreshCwIcon className={loading ? 'animate-spin' : ''} /> Refresh
           </Button>
+          <Button size="sm" onClick={() => { setSelectedName(null); setEditorMode('create') }} disabled={editorMode === 'create'}>
+            <PlusIcon /> New agent
+          </Button>
         </div>
       </div>
 
@@ -330,7 +355,8 @@ const AgentsAdminView = () => {
         </div>
       )}
 
-      <div className={cn('grid gap-6', selected && 'lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]')}>
+      <div className={cn('grid gap-6',
+        editorMode ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]' : selected && 'lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]')}>
         <div className="flex min-w-0 flex-col gap-2">
           {loading && agents.length === 0 && [0, 1, 2].map((i) => <Skeleton key={i} className="h-16 w-full rounded-md" />)}
           {!loading && !error && filtered.length === 0 && (
@@ -340,7 +366,7 @@ const AgentsAdminView = () => {
             <button key={agent.name} type="button"
                     className={cn('flex w-full cursor-pointer items-start gap-3 rounded-md border px-3 py-2 text-left hover:bg-muted/50',
                       agent.name === selectedName && 'border-primary bg-muted')}
-                    onClick={() => setSelectedName(agent.name === selectedName ? null : agent.name)}>
+                    onClick={() => select(agent.name === selectedName ? null : agent.name)}>
               <BotIcon size={16} className="mt-0.5 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2 text-sm font-medium">
@@ -364,10 +390,19 @@ const AgentsAdminView = () => {
           ))}
         </div>
 
-        {selected && (
+        {editorMode === 'create' && (
+          <AgentConfigEditor existingNames={agents.map((a) => a.name)} onSubmit={saveAgent} onCancel={() => setEditorMode(null)} />
+        )}
+        {editorMode === 'edit' && selected && (
+          // in edit mode the editor takes the place of the details card
+          <AgentConfigEditor key={selected.name} agentName={selected.name} existingNames={agents.map((a) => a.name)}
+                             onSubmit={saveAgent} onCancel={() => setEditorMode(null)} />
+        )}
+        {!editorMode && selected && (
           <div className="lg:sticky lg:top-20 lg:self-start">
             {/* keyed by name, so details are fetched once per selected agent */}
-            <AgentConfigDetails key={selected.name} agent={selected} onClose={() => setSelectedName(null)} />
+            <AgentConfigDetails key={selected.name} agent={selected} onClose={() => select(null)}
+                                onEdit={() => setEditorMode('edit')} />
           </div>
         )}
       </div>

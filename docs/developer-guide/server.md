@@ -23,7 +23,7 @@ Interactive API docs are at `http://localhost:33311/docs` (OpenAPI at
 | `server.py` | App setup: lifespan (registries), middleware, exception handlers, static web GUI mount |
 | `router.py` | Mounts every route module under `API_ROUTE_PREFIX = "/api/v1"` |
 | `api_routes.py` | `/health`, `/info` |
-| `agents_routes.py` | `/agents` — agent configs and their slash commands |
+| `agents_routes.py` | `/agents` — agent configs, their slash commands, and writing spec files |
 | `tools_routes.py` | `/tools` — tool definitions and direct execution |
 | `mcp_routes.py` | `/mcp` — configured MCP servers, their tools, and tool calls (see [mcp.md](mcp.md#http-api)) |
 | `skills_routes.py` | `/skills` — skills in the app's `SkillRegistry` (`app.state.skill_registry`), read-only |
@@ -59,6 +59,8 @@ All paths are relative to `/api/v1`.
 | `GET /agents/` | Bare array of agent specs (`name`, `label`, `description`, `model`, `system`, `tools`, `skills`, `mcp_servers`, `model_parameters`, `file_path`, `class_name`) |
 | `GET /agents/{name}` | One agent spec plus `instructions` (the markdown body of its spec file). 404 for unknown agents |
 | `GET /agents/{name}/commands` | `AgentCommand[]`: the built-in commands (`clear`, `compact` and the read-only info commands `self`, `usage`, `models`, `tools`, `context`, `help`; see [agents.md](agents.md#info-commands)) followed by one per configured skill. 404 for unknown agents |
+| `POST /agents/` | Body `{spec, instructions, scope}`: `spec` is the frontmatter (`AgentSpecInput`: `AgentSpec` without `file_path`/`scope`), `instructions` the markdown body, `scope` `user` (default), `project` or `global`. Writes `<agent dir of scope>/<name>.md` and adds the agent to the registry. 201 with the agent like `GET /agents/{name}`; 400 invalid name, 409 name or file taken, 422 invalid spec |
+| `PUT /agents/{name}` | Body `{spec, instructions}`. Replaces the agent's spec file and reloads it into the registry. A built-in agent (no `file_path`) gets a new file in the user agent directory. 400 when `spec.name` differs (no renames), 404 unknown, 409 if that user file already exists |
 | `GET /tools/` | Bare array of tool definitions (`name`, `type`, `description`, `parameters` as JSON Schema) |
 | `POST /tools/{name}/execute` | Body: the tool arguments as a JSON object. Returns a `ToolCallResult` (`text`, `structured_content`, `is_error`). The call is logged to the tool-use log with caller `web:tools`. 404 for unknown tools |
 | `GET /mcp/servers` | Configured MCP servers (`env` values masked); `?reload=true` re-reads `mcp.json` |
