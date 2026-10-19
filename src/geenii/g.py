@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
+from geenii.agent.env import AgentEnvStore
 from geenii.agent.registry import AgentRegistry, AgentSpec, logger
 from geenii.flows import FlowRegistry
 from geenii.hitl import HumanInTheLoopController
@@ -152,6 +153,10 @@ def init_agent(agent_conf: AgentSpec,
 
     cwd = agent_conf.working_dir
 
+    env_store = AgentEnvStore()
+    env = env_store.resolve(agent_conf.name)
+    secret_keys = set(env_store.secret_keys(agent_conf.name))
+
     # instance from class path string
     try:
         module_path, class_name = agent_class_name.rsplit(".", 1)
@@ -163,7 +168,8 @@ def init_agent(agent_conf: AgentSpec,
                             model=agent_conf.model, system_prompt=agent_conf.full_instructions,
                             allowed_tools=set(agent_conf.tools), mcp_servers=agent_conf.mcp_servers,
                             tool_registry=tool_registry, skill_registry=skill_registry,
-                            context_id=context_id, memory=memory, hitl=hitl, cwd=cwd)
+                            context_id=context_id, memory=memory, hitl=hitl, cwd=cwd,
+                            env=env, secret_keys=secret_keys)
         return agent
     except Exception as e:
         logger.error(f"Error loading agent class '{agent_class_name}': {str(e)}", exc_info=e)

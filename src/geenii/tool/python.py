@@ -83,7 +83,8 @@ class PythonCliTool(Tool):
         if env:
             _env.update(env)
 
-        logger.info(f"Spawn python subprocess with command={_command}")
+        # the unexpanded command, since env may hold secrets
+        logger.info(f"Spawn python subprocess with command={args.get('command')!r}")
         p = subprocess.run(_command, shell=False, capture_output=True, text=True, env=_env, cwd=None)
         logger.info(f"Return code: {p.returncode}")
         logger.info(f"Standard output: {p.stdout}")

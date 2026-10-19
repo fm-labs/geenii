@@ -39,6 +39,8 @@ class BaseAgent(BotInterface, abc.ABC):
                  context_id: str | None = None, memory: ChatMemory | None = None,
                  cwd: str | None = None,
                  *,
+                 env: dict[str, str] | None = None,
+                 secret_keys: set[str] | None = None,
                  tool_registry: ToolRegistry | None = None,
                  skill_registry: SkillRegistry | None = None,
                  hitl: HumanInTheLoopController | None = None):
@@ -52,6 +54,9 @@ class BaseAgent(BotInterface, abc.ABC):
         self.context_id = context_id or uuid.uuid7().hex
         self.allowed_tools: Set[str] = allowed_tools or set()
         self.mcp_servers: Set[str] = mcp_servers or set()
+        # environment passed to tool calls (vars and secrets); never exposed in to_dict()
+        self.env: dict[str, str] = env or {}
+        self.secret_keys: Set[str] = secret_keys or set()
 
         if not cwd:
             # create a temp agent dir

@@ -99,10 +99,12 @@ def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] = None)
             continue
             
 
-def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = None, caller_id: str = "anonymous") -> ToolCallResult:
+def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = None, caller_id: str = "anonymous",
+                secret_keys: set[str] | None = None) -> ToolCallResult:
+    """`secret_keys` are env vars whose values are redacted in the logs, on top of the name-based redaction."""
     result = None
     try:
-        logger.info(f"Invoking tool {tool.name} with args: {args}, env: {_redact_env_vars(env)}, cwd: {cwd}")
+        logger.info(f"Invoking tool {tool.name} with args: {args}, env: {_redact_env_vars(env, secret_keys)}, cwd: {cwd}")
         result = tool.invoke(args=args, env=env, cwd=cwd)
         logger.info(f"Tool result for {tool.name}: {result}")
         return result
@@ -112,17 +114,16 @@ def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = N
         result = e
         raise e from e
     finally:
-        _log_tool_call(tool.name, args, env, cwd, caller_id=caller_id, result=result)
+        _log_tool_call(tool.name, args, _redact_env_vars(env, secret_keys), cwd, caller_id=caller_id, result=result)
 
 
 _SENSITIVE_KEYS = ("password", "secret", "api_key", "token")
 
-def _redact_env_vars(env_vars: dict[str, str]) -> dict[str, str]:
-    for k in env_vars:
-        k_lower = k.lower()
-        if any(s in k_lower for s in _SENSITIVE_KEYS):
-            env_vars[k] = "REDACTED"
-    return env_vars
+def _redact_env_vars(env_vars: dict[str, str], secret_keys: set[str] | None = None) -> dict[str, str]:
+    """A copy of env_vars with sensitive values redacted. The input is left untouched, since it is passed on to the tool."""
+    secret_keys = secret_keys or set()
+    return {k: "REDACTED" if k in secret_keys or any(s in k.lower() for s in _SENSITIVE_KEYS) else v
+            for k, v in env_vars.items()}
 
 def _log_tool_call(tool_name, args: dict[str, str],
                    env: dict[str, str],
@@ -147,7 +148,7 @@ def _log_tool_call(tool_name, args: dict[str, str],
         "caller_id": caller_id,
         "tool": tool_name,
         "args": args,
-        "env": _redact_env_vars(env),
+        "env": env,
         "cwd": cwd,
         "result": result,
     })

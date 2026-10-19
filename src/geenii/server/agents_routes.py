@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.params import Depends
 from starlette.requests import Request
 
+from geenii.agent.env import AgentEnvStore, validate_env_key
 from geenii.agent.registry import AgentRegistry, AgentSpec
 from geenii.agents import Agent
 from geenii.g import agent_paths
@@ -54,8 +55,21 @@ class AgentUpdateRequest(pydantic.BaseModel):
     instructions: str = ""
 
 
+class AgentEnv(pydantic.BaseModel):
+    vars: dict[str, str]
+    secrets: list[str]  # names only, values are never returned
+
+
+class SecretValue(pydantic.BaseModel):
+    value: str
+
+
 def dep_agent_registry(request: Request) -> AgentRegistry:
     return request.app.state.agent_registry
+
+
+def dep_agent_env_store() -> AgentEnvStore:
+    return AgentEnvStore()
 
 @router.get("/")
 def list_agents(agent_registry: AgentRegistry = Depends(dep_agent_registry)):
@@ -191,3 +205,70 @@ def list_agent_commands(name: str, agent_registry: AgentRegistry = Depends(dep_a
             continue
         commands.append(AgentCommand(command=skill.name, description=skill.description))
     return commands
+
+
+def _require_agent(name: str, agent_registry: AgentRegistry) -> None:
+    if agent_registry.get_config(name) is None:
+        raise HTTPException(status_code=404, detail=f"Agent '{name}' not found.")
+
+
+def _agent_env(name: str, env_store: AgentEnvStore) -> AgentEnv:
+    return AgentEnv(vars=env_store.get_vars(name), secrets=sorted(env_store.secret_keys(name)))
+
+
+@router.get("/{name}/env", responses={404: {"model": Problem, "description": "Agent not found"}})
+def get_agent_env(name: str, agent_registry: AgentRegistry = Depends(dep_agent_registry),
+                  env_store: AgentEnvStore = Depends(dep_agent_env_store)) -> AgentEnv:
+    """
+    The agent's environment variables, and the names of its secrets. Applies to agent instances created afterwards.
+    """
+    _require_agent(name, agent_registry)
+    return _agent_env(name, env_store)
+
+
+@router.put("/{name}/env/vars", responses={
+    400: {"model": Problem, "description": "Invalid variable name"},
+    404: {"model": Problem, "description": "Agent not found"},
+})
+def set_agent_env_vars(name: str, values: dict[str, str], agent_registry: AgentRegistry = Depends(dep_agent_registry),
+                       env_store: AgentEnvStore = Depends(dep_agent_env_store)) -> AgentEnv:
+    """
+    Replace all environment variables of the agent.
+    """
+    _require_agent(name, agent_registry)
+    try:
+        env_store.set_vars(name, values)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return _agent_env(name, env_store)
+
+
+@router.put("/{name}/env/secrets/{key}", responses={
+    400: {"model": Problem, "description": "Invalid secret name"},
+    404: {"model": Problem, "description": "Agent not found"},
+})
+def set_agent_secret(name: str, key: str, secret: SecretValue,
+                     agent_registry: AgentRegistry = Depends(dep_agent_registry),
+                     env_store: AgentEnvStore = Depends(dep_agent_env_store)) -> AgentEnv:
+    """
+    Create or replace a secret of the agent.
+    """
+    _require_agent(name, agent_registry)
+    try:
+        validate_env_key(key)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    env_store.set_secret(name, key, secret.value)
+    return _agent_env(name, env_store)
+
+
+@router.delete("/{name}/env/secrets/{key}", responses={404: {"model": Problem, "description": "Agent or secret not found"}})
+def delete_agent_secret(name: str, key: str, agent_registry: AgentRegistry = Depends(dep_agent_registry),
+                        env_store: AgentEnvStore = Depends(dep_agent_env_store)) -> AgentEnv:
+    """
+    Delete a secret of the agent.
+    """
+    _require_agent(name, agent_registry)
+    if not env_store.delete_secret(name, key):
+        raise HTTPException(status_code=404, detail=f"Secret '{key}' not found.")
+    return _agent_env(name, env_store)

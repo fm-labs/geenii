@@ -38,10 +38,10 @@ class ComputerTool(Tool):
             command = self.command_template.format(**{**args, "command": command})
 
         logger.info(f"Executing ComputerTool command: {command} in working directory={working_dir}")
-        command = expand_vars(command, env or {})
-
         subprocess_id = uuid.uuid4().hex[:8]
-        logger.info(f"Subprocess [{subprocess_id}] Spawning command={command!r} environment={env} cwd={working_dir}")
+        # logged before expansion and with env names only, since env may hold secrets
+        logger.info(f"Subprocess [{subprocess_id}] Spawning command={command!r} environment={sorted(env or {})} cwd={working_dir}")
+        command = expand_vars(command, env or {})
 
         _env = os.environ.copy()
         if env:

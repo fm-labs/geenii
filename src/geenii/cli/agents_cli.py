@@ -1,5 +1,6 @@
 import click
 
+from geenii.agent.env import AgentEnvStore
 from geenii.cli.click_helper import click_error, click_info
 from geenii.g import init_global_agent_registry
 
@@ -67,3 +68,63 @@ def inspect_agent(name: str, instructions: bool):
         #click_info(f"System Instructions: {agent_config.system}")
         click_info(f"Full System Instructions: {agent_config.full_instructions}")
     # print(agent_config)
+
+
+@agents.group(name="env")
+def agent_env():
+    """Manage an agent's environment variables and secrets."""
+    pass
+
+
+@agent_env.command(name="list")
+@click.argument("name")
+def list_agent_env(name: str):
+    """List the agent's variables, and the names of its secrets."""
+    store = AgentEnvStore()
+    table = Table(show_header=True)
+    table.add_column("Name")
+    table.add_column("Value")
+    table.add_column("Type")
+    for key, value in store.get_vars(name).items():
+        table.add_row(key, value, "var")
+    for key in store.secret_keys(name):
+        table.add_row(key, "********", "secret")
+    Console().print(table)
+
+
+@agent_env.command(name="set")
+@click.argument("name")
+@click.argument("assignment")
+@click.option("--secret", is_flag=True, default=False, help="Store as a secret. The value is prompted for when omitted.")
+def set_agent_env(name: str, assignment: str, secret: bool):
+    """Set a variable or secret: KEY=VALUE, or just KEY with --secret to be prompted for the value."""
+    key, sep, value = assignment.partition("=")
+    if not sep:
+        if not secret:
+            click_error("Use KEY=VALUE, or --secret to be prompted for the value.")
+            return
+        value = click.prompt(f"Value of {key}", hide_input=True)
+    store = AgentEnvStore()
+    try:
+        if secret:
+            store.set_secret(name, key, value)
+        else:
+            store.set_var(name, key, value)
+    except ValueError as e:
+        click_error(str(e))
+        return
+    click_info(f"{'Secret' if secret else 'Variable'} {key} set for agent '{name}'.")
+
+
+@agent_env.command(name="unset")
+@click.argument("name")
+@click.argument("key")
+@click.option("--secret", is_flag=True, default=False, help="Remove a secret instead of a variable.")
+def unset_agent_env(name: str, key: str, secret: bool):
+    """Remove a variable or secret."""
+    store = AgentEnvStore()
+    removed = store.delete_secret(name, key) if secret else store.delete_var(name, key)
+    if not removed:
+        click_error(f"{'Secret' if secret else 'Variable'} {key} not found for agent '{name}'.")
+        return
+    click_info(f"{'Secret' if secret else 'Variable'} {key} removed from agent '{name}'.")

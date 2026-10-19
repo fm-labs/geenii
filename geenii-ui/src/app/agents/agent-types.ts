@@ -22,6 +22,12 @@ export type AgentDetailType = AgentType & {
   instructions?: string;
 }
 
+/** GET /api/v1/agents/{name}/env: variables, and the names of the secrets (their values are never returned) */
+export type AgentEnvType = {
+  vars: Record<string, string>;
+  secrets: string[];
+}
+
 /** GET /api/v1/agents/{name}/commands: built-in commands, then one per configured skill */
 export type AgentCommandType = {
   command: string;

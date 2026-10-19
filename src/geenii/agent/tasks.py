@@ -140,7 +140,7 @@ class ToolCallTask(BaseAgentTask):
             return ToolCallResult("Call rejected", is_error=True)
 
         try:
-            tool_env = {}
+            tool_env = dict(self.agent.env)
             # if active_skills:
             #     tool_env["SKILL_NAME"] = ",".join(active_skills)
             #     first_skill = self.agent.skills.get(active_skills[0])
@@ -149,7 +149,8 @@ class ToolCallTask(BaseAgentTask):
             # tool_result = execute_tool_call(self.agent.tools, tool_name=tool_name, args=arguments)
             #logger.info(f"Tool invocation {tool_name} args={arguments} with cwd={self.agent.cwd}")
             tool_result = invoke_tool(tool, args=arguments, env=tool_env, cwd=self.agent.cwd,
-                                      caller_id=f"agent:{self.agent.name}:{call_id}")
+                                      caller_id=f"agent:{self.agent.name}:{call_id}",
+                                      secret_keys=self.agent.secret_keys)
             #logger.debug(f"Tool {tool_name} returned result: {tool_result}")
 
             if isinstance(tool, McpTool):

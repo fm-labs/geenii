@@ -1,10 +1,11 @@
 import React from 'react'
 import {
-  AlertTriangleIcon, BotIcon, BrainIcon, CheckIcon, ChevronsUpDownIcon, CopyIcon, FileTextIcon, FolderIcon,
+  AlertTriangleIcon, BotIcon, BrainIcon, CheckIcon, ChevronsUpDownIcon, CopyIcon, FileTextIcon, FolderIcon, KeyRoundIcon,
   LoaderIcon, PlugIcon, PlusIcon, SaveIcon, ScrollTextIcon, SearchIcon, SettingsIcon, SparklesIcon, TerminalIcon,
   Trash2Icon, WrenchIcon, XIcon,
 } from 'lucide-react'
 import { AgentDetailType, mcpServerOfTool, shortToolName } from '@/app/agents/agent-types.ts'
+import AgentEnvEditor from '@/app/agents/components/agent-env-editor.tsx'
 import { ToolType } from '@/app/tools/tool-types.ts'
 import { AiModelInfo } from '@/api/xai.types.ts'
 import { OutputDataMarkdown } from '@/components/output-data-markdown.tsx'
@@ -73,7 +74,7 @@ type EditorState = {
   allowedDirs: string
 }
 
-type TabId = 'general' | 'model' | 'tools' | 'skills' | 'instructions' | 'preview'
+type TabId = 'general' | 'model' | 'tools' | 'skills' | 'instructions' | 'env' | 'preview'
 type Errors = Partial<Record<'name' | 'model' | 'params' | 'className', string>>
 
 /* ---------- constants & helpers ---------- */
@@ -460,6 +461,7 @@ const AgentConfigEditor = ({ agentName, existingNames = [], onSubmit, onCancel }
     { id: 'tools', label: 'MCP & Tools', icon: WrenchIcon, count: state.tools.length },
     { id: 'skills', label: 'Skills', icon: SparklesIcon, count: state.skills.length },
     { id: 'instructions', label: 'Instructions', icon: ScrollTextIcon },
+    { id: 'env', label: 'Environment', icon: KeyRoundIcon },
     { id: 'preview', label: 'Preview', icon: FileTextIcon },
   ]
 
@@ -833,6 +835,10 @@ const AgentConfigEditor = ({ agentName, existingNames = [], onSubmit, onCancel }
                   </div>
                 </div>
               )}
+
+              {tab === 'env' && (isNew
+                ? <p className="text-sm text-muted-foreground">Create the agent first, then set its variables and secrets here.</p>
+                : <AgentEnvEditor agentName={agentName} />)}
 
               {tab === 'preview' && (
                 <div className="flex flex-col gap-2">
