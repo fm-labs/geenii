@@ -103,6 +103,7 @@ class PythonCliTool(Tool):
             text=True,
             env=_env,
             cwd=working_dir,
+            check=False,
         )
         logger.info(f"PythonCliTool output: {p.stdout}")
         logger.info(f"PythonCliTool error: {p.stderr}")

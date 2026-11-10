@@ -38,6 +38,7 @@ def run_docker_subprocess(
             text=True,
             timeout=timeout,
             env=_env,
+            check=False,
         )
         return result.returncode, result.stdout, result.stderr
     except subprocess.TimeoutExpired:

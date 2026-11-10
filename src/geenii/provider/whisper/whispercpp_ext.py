@@ -71,7 +71,7 @@ def run_whisper_cli_transcribe(
     command += [WHISPERCPP_IMAGE, whisper_cmd]
     print(f"Running {' '.join(command)}")
 
-    p = subprocess.run(command, capture_output=True)
+    p = subprocess.run(command, capture_output=True, check=False)
     print(f"Return code: {p.returncode}")
     if p.returncode != 0:
         print(p.stderr.decode("utf-8"))
@@ -142,7 +142,7 @@ def run_whisper_server_in_docker(
     command += [WHISPERCPP_IMAGE, whisper_cmd]
     print(f"Running {' '.join(command)}")
 
-    p = subprocess.run(command, capture_output=True)
+    p = subprocess.run(command, capture_output=True, check=False)
     print(f"Return code: {p.returncode}")
     if p.returncode != 0:
         print(p.stderr.decode("utf-8"))

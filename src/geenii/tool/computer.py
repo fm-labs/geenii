@@ -73,6 +73,7 @@ class ComputerTool(Tool):
             text=True,
             env=_env,
             cwd=working_dir,
+            check=False,
         )
         logger.info(f"ComputerTool [{subprocess_id}] Standard output: {p.stdout}")
         logger.info(f"ComputerTool [{subprocess_id}] Standard error: {p.stderr}")

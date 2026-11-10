@@ -95,7 +95,7 @@ def init_core_tools(tool_registry: ToolRegistry) -> None:
             f' buttons {{"OK"}} giving up after 60'
         )
         result = subprocess.run(
-            ["osascript", "-e", script], capture_output=True, text=True
+            ["osascript", "-e", script], capture_output=True, text=True, check=False
         )
         if result.returncode != 0:
             return f"Failed to send notification: {result.stderr.strip()}"

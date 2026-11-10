@@ -286,7 +286,11 @@ def graph(path, fmt, output, direction, processor_modules):
                 "or use --format dot / mermaid"
             )
         proc = subprocess.run(
-            [dot, f"-T{fmt}", "-o", output], input=text, capture_output=True, text=True
+            [dot, f"-T{fmt}", "-o", output],
+            input=text,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if proc.returncode != 0:
             raise click.ClickException(f"dot failed: {proc.stderr.strip()}")

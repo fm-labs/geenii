@@ -21,7 +21,7 @@ def tts_say_cli(
     if voice:
         cmd.extend(["-v", voice])
     cmd.append(message)
-    subprocess.run(cmd)
+    subprocess.run(cmd, check=False)
 
 
 def tts_espeak_cli(
@@ -48,7 +48,7 @@ def tts_espeak_cli(
     if voice:
         cmd.extend(["-v", voice])
     cmd.append(message)
-    subprocess.run(cmd)
+    subprocess.run(cmd, check=False)
 
 
 # def tts_windows(message: str, max_length: int = 500, speaking_rate: float = 1.0, voice: str = None):

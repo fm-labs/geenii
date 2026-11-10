@@ -47,6 +47,7 @@ class ScriptTool(Tool):
             text=True,
             env=_env,
             cwd=str(Path(self.script_path).parent),
+            check=False,
         )
 
         logger.info("ScriptTool %s exited with code %d", self.name, result.returncode)
