@@ -9,10 +9,13 @@ import dotenv
 
 from geenii.utils.os_util import get_user_home_dir
 
+def _envvar(var: str, default: str | None = None) -> str | None:
+    return os.environ.get(var, default)
+
 APP_VERSION = "0.3.4"
 
 GEENII_USER_HOME = get_user_home_dir()
-GEENII_WORKING_DIR = realpath(os.environ.get("GEENII_WORKING_DIR", os.getcwd()))
+GEENII_WORKING_DIR = realpath(_envvar("GEENII_WORKING_DIR", os.getcwd()))
 
 GEENII_CHAT_SESSIONS_DIR = Path(GEENII_USER_HOME) / ".geenii" / "chats"
 
@@ -21,26 +24,26 @@ GEENII_CHAT_SESSIONS_DIR = Path(GEENII_USER_HOME) / ".geenii" / "chats"
 dotenv.load_dotenv(os.path.join(GEENII_WORKING_DIR, ".geenii", ".env"), override=False, verbose=True)
 dotenv.load_dotenv(os.path.join(GEENII_USER_HOME, ".geenii", ".env"), override=False, verbose=True)
 
-GEENII_CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", os.path.join(GEENII_USER_HOME, ".cache", "geenii"))
-GEENII_CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
+GEENII_CACHE_DIR = _envvar("GEENII_CACHE_DIR", os.path.join(GEENII_USER_HOME, ".cache", "geenii"))
+GEENII_CACHE_DISABLED = _envvar("GEENII_CACHE_DISABLED", "false").lower() == "true"
 
 # Default minimum age (seconds since a process finished) before the process manager's gc removes it
-PM_GC_MAX_AGE = float(os.environ.get("GEENII_PM_GC_MAX_AGE", str(7 * 24 * 3600)))
+PM_GC_MAX_AGE = float(_envvar("GEENII_PM_GC_MAX_AGE", str(7 * 24 * 3600)))
 
 # GEENII_BIN = os.getenv("GEENII_BIN", "geenii")
 
 # Static web GUI served by the API server (defaults to the repo's www/ folder)
-WWW_DIR = os.environ.get(
+WWW_DIR = _envvar(
     "GEENII_WWW_DIR",
     os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, "www"),
 )
 
 GEENII_MEMORY_ENGINE = "file"
 
-FERNET_SECRET_KEY = os.environ.get("FERNET_SECRET_KEY", "")
+FERNET_SECRET_KEY = _envvar("FERNET_SECRET_KEY", "")
 
 MCP_CONFIG_FILE = "mcp.json"
-MCP_INIT_TIMEOUT = float(os.environ.get("GEENII_MCP_INIT_TIMEOUT", "30"))
+MCP_INIT_TIMEOUT = float(_envvar("GEENII_MCP_INIT_TIMEOUT", "30"))
 
 # Completion models
 # DEFAULT_COMPLETION_MODEL= "openai:gpt-4o-mini"
@@ -57,28 +60,31 @@ DEFAULT_AUDIO_GENERATION_MODEL = "hf:llama-2:latest"
 DEFAULT_AUDIO_TRANSCRIPTION_MODEL = "openai:whisper-1"
 DEFAULT_AUDIO_TRANSLATION_MODEL = "whisper:whisper-1:latest"
 
+# Vendor specific
 WHISPERCPP_IMAGE = "whispercpp:latest"
 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+OPENAI_API_KEY = _envvar("OPENAI_API_KEY", "")
+OPENAI_CHATGPT_DEFAULT_MODEL = _envvar("OPENAI_CHATGPT_DEFAULT_MODEL", "gpt-4o-mini")
 
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")  # default Ollama API endpoint
-OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", "")
+ANTHROPIC_API_KEY = _envvar("ANTHROPIC_API_KEY", "")
+
+OLLAMA_HOST = _envvar("OLLAMA_HOST", "http://localhost:11434")  # default Ollama API endpoint
+OLLAMA_API_KEY = _envvar("OLLAMA_API_KEY", "")
 
 # Database settings
-MONGODB_URI = os.environ.get("MONGODB_URI", "")
-MONGODB_DB_NAME = os.environ.get("MONGODB_DB_NAME", "geenii_brain0")
+MONGODB_URI = _envvar("MONGODB_URI", "")
+MONGODB_DB_NAME = _envvar("MONGODB_DB_NAME", "geenii_brain0")
 
 # Redis settings
-REDIS_URI = os.environ.get("REDIS_URI", "")
+REDIS_URI = _envvar("REDIS_URI", "")
 
 # ### Chat settings ###
 # # Path to the SQLite database file for storing chat history and related data
-# CHAT_DB_PATH = os.environ.get("GEENII_CHAT_DB_PATH", f"{CACHE_DIR}/chat.db")
+# CHAT_DB_PATH = _envvar("GEENII_CHAT_DB_PATH", f"{CACHE_DIR}/chat.db")
 #
 # # A unique namespace UUID for generating deterministic UUIDs for DM room IDs.
-# CHAT_DM_NAMESPACE =  os.environ.get("GEENII_CHAT_DM_NAMESPACE", "a7f3c2e1-4b8d-5a9f-8c3e-2d1b6f0e4a7c")
-# CHAT_GROUP_NAMESPACE =  os.environ.get("GEENII_CHAT_GROUP_NAMESPACE", "b7f3c2e1-8b4d-5a9f-8c3e-2d1b6f0e4a7a")
+# CHAT_DM_NAMESPACE =  _envvar("GEENII_CHAT_DM_NAMESPACE", "a7f3c2e1-4b8d-5a9f-8c3e-2d1b6f0e4a7c")
+# CHAT_GROUP_NAMESPACE =  _envvar("GEENII_CHAT_GROUP_NAMESPACE", "b7f3c2e1-8b4d-5a9f-8c3e-2d1b6f0e4a7a")
 
 
 # def get_user_dir():
