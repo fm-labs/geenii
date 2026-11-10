@@ -23,11 +23,12 @@ jobs:
 
     - name: Upload scan result
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: repo-scan-result
         path: ${{ steps.scan.outputs.scan-file || '.repo-scan/scan-result.json' }}
         if-no-files-found: warn
+        archive: 'false'
 
     - name: Check scan status
       run: |
