@@ -1,4 +1,3 @@
-
 import click
 
 from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT

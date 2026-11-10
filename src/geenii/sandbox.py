@@ -48,7 +48,10 @@ def run_docker_subprocess(
 
 
 def build_sandbox_image(
-    sandbox_id: str, app_dir: str, env: dict | None = None, dockerlines: str | None = None
+    sandbox_id: str,
+    app_dir: str,
+    env: dict | None = None,
+    dockerlines: str | None = None,
 ) -> str:
     """
     Build a docker image from base python image + installing deps defined in pyproject.toml file.

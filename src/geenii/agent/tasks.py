@@ -67,7 +67,11 @@ def _complete(
 
 class ToolCallTask(BaseAgentTask):
     def __init__(
-        self, agent: BaseAgent, tool_name: str, arguments: dict, call_id: str | None = None
+        self,
+        agent: BaseAgent,
+        tool_name: str,
+        arguments: dict,
+        call_id: str | None = None,
     ):
         super().__init__(agent)
         self.tool_name = tool_name
@@ -589,7 +593,9 @@ class ToolFilterTask(BaseAgentTask):
 class HandoffTask(BaseAgentTask):
     """Task to hand off the conversation to another agent or agent"""
 
-    def __init__(self, agent: BaseAgent, target_agent_name: str, prompt: str | None = None):
+    def __init__(
+        self, agent: BaseAgent, target_agent_name: str, prompt: str | None = None
+    ):
         super().__init__(agent)
         self.target_agent_name = target_agent_name
         self.prompt = prompt or f"Handing off the conversation to {target_agent_name}."

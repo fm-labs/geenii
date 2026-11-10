@@ -252,16 +252,16 @@ def get_app_info() -> dict:
     ai_providers = enumerate_providers()
 
     data = {
-            "app": {
-                "version": APP_VERSION,
-                "cwd": os.getcwd(),
-                "user_home_dir": get_user_home_dir(),
-                "geenii_user_home_dir": GEENII_USER_HOME,
-                "geenii_working_dir": GEENII_WORKING_DIR,
-                "cache_dir": GEENII_CACHE_DIR,
-            },
-            "providers": [provider.model_dump() for provider in ai_providers],
-        }
+        "app": {
+            "version": APP_VERSION,
+            "cwd": os.getcwd(),
+            "user_home_dir": get_user_home_dir(),
+            "geenii_user_home_dir": GEENII_USER_HOME,
+            "geenii_working_dir": GEENII_WORKING_DIR,
+            "cache_dir": GEENII_CACHE_DIR,
+        },
+        "providers": [provider.model_dump() for provider in ai_providers],
+    }
 
     # add system report
     # if not in DEV_MODE, remove the env variables from the report for security reasons

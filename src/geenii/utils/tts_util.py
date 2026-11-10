@@ -2,7 +2,10 @@ import subprocess
 
 
 def tts_say_cli(
-    message: str, max_length: int = 500, speaking_rate: float = 1.0, voice: str | None = None
+    message: str,
+    max_length: int = 500,
+    speaking_rate: float = 1.0,
+    voice: str | None = None,
 ):
     """
     Execute the "say" command on MacOSX to speak the message.
@@ -25,7 +28,10 @@ def tts_say_cli(
 
 
 def tts_espeak_cli(
-    message: str, max_length: int = 500, speaking_rate: float = 1.0, voice: str | None = None
+    message: str,
+    max_length: int = 500,
+    speaking_rate: float = 1.0,
+    voice: str | None = None,
 ):
     """
     Execute the "espeak" command on Linux to speak the message.

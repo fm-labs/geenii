@@ -394,7 +394,9 @@ class ProcessManager:
                 pass
         return rp.info
 
-    async def list(self, *, include_finished: bool = False) -> builtins.list[ProcessInfo]:
+    async def list(
+        self, *, include_finished: bool = False
+    ) -> builtins.list[ProcessInfo]:
         """
         List tracked processes.
 

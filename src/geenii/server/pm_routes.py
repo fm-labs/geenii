@@ -130,9 +130,7 @@ def get_process_output(
     offset: int | None = Query(
         None, ge=0, description="Start reading at this byte position"
     ),
-    limit: int | None = Query(
-        None, ge=1, description="Read at most this many bytes"
-    ),
+    limit: int | None = Query(None, ge=1, description="Read at most this many bytes"),
     client: ProcessManagerClient = Depends(dep_pm_client),
 ) -> str:
     """Get the captured output of a background process.
