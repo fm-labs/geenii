@@ -227,9 +227,9 @@ def test_run_spawn_error_is_logged_and_raised(monkeypatch):
 
 # -- services config file --------------------------------------------------------
 
-import json  # noqa: E402
+import json
 
-from geenii.supervisor import read_services  # noqa: E402
+from geenii.supervisor import read_services
 
 
 def _services_file(tmp_path, services):

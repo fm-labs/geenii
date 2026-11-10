@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import copy
 import logging
-from datetime import datetime
-from typing import Iterator, Set, TYPE_CHECKING, Generator
+from collections.abc import Generator, Iterator
+from typing import TYPE_CHECKING
 
 from geenii.tool.common import ToolCallResult
 from geenii.tool.mcp_tool import McpTool
@@ -15,21 +15,20 @@ if TYPE_CHECKING:
 from geenii.agent.base import BaseAgentTask, BaseTask, message_to_prompt
 from geenii.ai import generate_chat_completion
 from geenii.chat_models import (
-    UserInteractionContent,
-    ToolCallResultContent,
     ContentPart,
+    JsonContent,
     TextContent,
     ToolCallContent,
-    JsonContent,
+    ToolCallResultContent,
+    UserInteractionContent,
 )
 from geenii.datamodels import (
-    ModelMessage,
-    SystemMessage,
     ChatCompletionRequest,
     ChatCompletionResponse,
-    ChatMessage,
+    ModelMessage,
+    SystemMessage,
 )
-from geenii.g import init_global_agent_registry, init_agent_by_name
+from geenii.g import init_agent_by_name, init_global_agent_registry
 from geenii.tool.registry import ToolRegistry
 from geenii.tool.tool_filter import ToolFilterSet
 from geenii.utils.json_util import parse_json_safe
@@ -43,13 +42,13 @@ def _is_interaction_message(msg) -> bool:
     )
 
 
-def _usage_source(agent: "BaseAgent") -> str:
+def _usage_source(agent: BaseAgent) -> str:
     """The `source` of the agent's model calls in the usage log."""
     return f"agent:{agent.name}"
 
 
 def _complete(
-    agent: "BaseAgent",
+    agent: BaseAgent,
     request: ChatCompletionRequest,
     *,
     task: str,
@@ -68,7 +67,7 @@ def _complete(
 
 class ToolCallTask(BaseAgentTask):
     def __init__(
-        self, agent: "BaseAgent", tool_name: str, arguments: dict, call_id: str = None
+        self, agent: BaseAgent, tool_name: str, arguments: dict, call_id: str | None = None
     ):
         super().__init__(agent)
         self.tool_name = tool_name
@@ -212,9 +211,9 @@ class LLMTask(BaseAgentTask):
 
     def __init__(
         self,
-        agent: "BaseAgent",
+        agent: BaseAgent,
         message: str | list[ContentPart],
-        allowed_tools: Set[str] | None = None,
+        allowed_tools: set[str] | None = None,
         output_format: str | None = None,
         output_schema: str | None = None,
     ):
@@ -523,7 +522,7 @@ class ToolFilterTask(BaseAgentTask):
         "additionalProperties": False,
     }
 
-    def __init__(self, agent: "BaseAgent", prompt: str, tool_registry: ToolRegistry):
+    def __init__(self, agent: BaseAgent, prompt: str, tool_registry: ToolRegistry):
         super().__init__(agent)
         self.prompt = prompt
         self.tool_registry = tool_registry
@@ -590,7 +589,7 @@ class ToolFilterTask(BaseAgentTask):
 class HandoffTask(BaseAgentTask):
     """Task to hand off the conversation to another agent or agent"""
 
-    def __init__(self, agent: "BaseAgent", target_agent_name: str, prompt: str = None):
+    def __init__(self, agent: BaseAgent, target_agent_name: str, prompt: str | None = None):
         super().__init__(agent)
         self.target_agent_name = target_agent_name
         self.prompt = prompt or f"Handing off the conversation to {target_agent_name}."
@@ -673,7 +672,7 @@ class FindBestAgentTask(BaseAgentTask):
         "additionalProperties": False,
     }
 
-    def __init__(self, agent: "BaseAgent", prompt: str):
+    def __init__(self, agent: BaseAgent, prompt: str):
         super().__init__(agent)
         self.prompt = prompt
         self.agent_registry = init_global_agent_registry()
@@ -784,7 +783,7 @@ class FindBestAgentTask(BaseAgentTask):
 
 
 class ActivateSkillTask(BaseAgentTask):
-    def __init__(self, agent: "BaseAgent", skill_name: str, prompt: str):
+    def __init__(self, agent: BaseAgent, skill_name: str, prompt: str):
         super().__init__(agent)
         self.prompt = prompt
         self.skill_name = skill_name
@@ -840,7 +839,7 @@ class FindBestSkillTask(BaseAgentTask):
         "additionalProperties": False,
     }
 
-    def __init__(self, agent: "BaseAgent", prompt: str, suggested: str | None = None):
+    def __init__(self, agent: BaseAgent, prompt: str, suggested: str | None = None):
         super().__init__(agent)
         self.prompt = prompt
         self.suggested = suggested  # pre-selected skills
@@ -1103,7 +1102,7 @@ class FindBestSkillTask(BaseAgentTask):
 class ClearMemoryTask(BaseAgentTask):
     """Clear the agent's memory."""
 
-    def __init__(self, agent: "BaseAgent"):
+    def __init__(self, agent: BaseAgent):
         super().__init__(agent)
 
     def execute(self) -> Iterator[ModelMessage | SystemMessage]:
@@ -1131,7 +1130,7 @@ Produce a concise **handover summary** that a successor assistant can use to con
 
 Write in second person ("the user asked …", "you answered …") so the summary reads as a briefing for the next assistant turn. Be concise but do not drop information that would cause the successor to ask the user to repeat themselves."""
 
-    def __init__(self, agent: "BaseAgent", prompt: str):
+    def __init__(self, agent: BaseAgent, prompt: str):
         super().__init__(agent)
         self.prompt = prompt
 

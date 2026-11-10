@@ -1,17 +1,15 @@
 import click
+from rich.console import Console
+from rich.table import Table
 
 from geenii.agent.env import AgentEnvStore
 from geenii.cli.click_helper import click_error, click_info
 from geenii.g import init_global_agent_registry
 
-from rich.table import Table
-from rich.console import Console
-
 
 @click.group()
 def agents():
     """Manage and run agents."""
-    pass
 
 
 @agents.command(name="list")
@@ -19,7 +17,7 @@ def list_agents():
     """List all configured and loaded agents."""
     click.echo("Configured agents:")
     _agents = init_global_agent_registry(projects=True)
-    for agent_name in sorted(list(_agents.list_configured())):
+    for agent_name in sorted(_agents.list_configured()):
         click.echo(f"- {agent_name}")
 
     # click.echo("Loaded agents:")
@@ -33,7 +31,7 @@ def list_agents():
     table.add_column("Class Name")
     table.add_column("Working Directory")
 
-    for agent_name in sorted(list(_agents.list_configured())):
+    for agent_name in sorted(_agents.list_configured()):
         conf = _agents.get_config(agent_name)
         if not conf:
             continue
@@ -82,7 +80,6 @@ def inspect_agent(name: str, instructions: bool):
 @agents.group(name="env")
 def agent_env():
     """Manage an agent's environment variables and secrets."""
-    pass
 
 
 @agent_env.command(name="list")

@@ -6,13 +6,13 @@ from geenii.agent.base import message_to_prompt
 from geenii.agent.base_agent import BaseAgent
 from geenii.agent.info_commands import INFO_COMMANDS, InfoCommandTask
 from geenii.agent.tasks import (
-    LLMTask,
+    ActivateSkillTask,
+    ClearMemoryTask,
     FindBestAgentTask,
     FindBestSkillTask,
     HandoffTask,
-    ActivateSkillTask,
+    LLMTask,
     MemoryCompactionTask,
-    ClearMemoryTask,
     ToolCallTask,
 )
 from geenii.chat_models import ContentPart

@@ -14,7 +14,6 @@ def _init_tool_registry():
 @click.group()
 def tools():
     """Manage and execute tools."""
-    pass
 
 
 @tools.command("list")

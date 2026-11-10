@@ -1,8 +1,8 @@
 import pytest
-from testcontainers.core.container import DockerContainer
+from test_modelstore import MyModel, TestModelStore
 from testcontainers.community.mongodb import MongoDbContainer
+from testcontainers.core.container import DockerContainer
 
-from test_modelstore import TestModelStore, MyModel
 from geenii.utils.modelstore import ModelStore, MongoDbModelStore
 
 

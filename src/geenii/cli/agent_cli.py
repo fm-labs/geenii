@@ -7,8 +7,8 @@ import click
 
 from geenii.agent.base_agent import (
     BaseAgent,
-    restore_last_context_id,
     dump_last_context_id,
+    restore_last_context_id,
 )
 from geenii.cli.cli_runner import CliAgentRunner
 from geenii.g import init_agent_by_name
@@ -168,7 +168,7 @@ def agent_run(
     system_instructions: str = "",
     developer_instructions: str = "",
     output_format: str = "text",
-    context_id: str = None,
+    context_id: str | None = None,
 ):
 
     click.echo(f"Running agent '{name}' (Context {context_id}) with prompt: {prompt}")
@@ -222,5 +222,5 @@ def agent_run(
             return
         agent.output_format = output_format
 
-    logger.info(f"Agent '{name}' loaded. {repr(agent)}")
+    logger.info(f"Agent '{name}' loaded. {agent!r}")
     CliAgentRunner(agent, interactive=interactive).run(prompt)

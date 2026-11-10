@@ -3,7 +3,7 @@ import shutil
 
 import click.core
 
-from geenii.cli.click_helper import click_success, click_error
+from geenii.cli.click_helper import click_error, click_success
 from geenii.config import project_skills_dir
 from geenii.g import init_global_skill_registry
 
@@ -11,7 +11,6 @@ from geenii.g import init_global_skill_registry
 @click.group()
 def skills():
     """Manage skills."""
-    pass
 
 
 @skills.command(name="list")

@@ -81,7 +81,6 @@ processor_module_option = click.option(
 @click.group()
 def flow():
     """Run and inspect flows (step pipelines)."""
-    pass
 
 
 @flow.command()
@@ -305,8 +304,8 @@ def graph(path, fmt, output, direction, processor_modules):
 )
 def list_flows(as_json):
     """List the flows in ~/.geenii/flows and the working directory's .geenii/flows."""
-    from geenii.g import init_flow_registry
     from geenii.config import flow_dirs
+    from geenii.g import init_flow_registry
 
     flows = init_flow_registry().flows
     if as_json:

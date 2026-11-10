@@ -1,10 +1,10 @@
 import json
+
 import pytest
 
 from geenii.chat_models import TextContent
 from geenii.datamodels import ModelMessage
 from geenii.memory import FileChatMemory
-
 
 # Adjust these imports to match your project structure:
 # from your_package.memory import FileChatMemory

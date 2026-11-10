@@ -38,10 +38,11 @@ import os
 import re
 import sys
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pydantic
 from croniter import croniter
@@ -144,9 +145,9 @@ class ScheduledTask:
         """Return the next execution time as a UTC datetime."""
         kind, value = parse_interval(self.interval)
         if kind == "at":
-            return datetime.fromisoformat(value).astimezone(timezone.utc)
-        base = after or datetime.now(timezone.utc)
-        return croniter(value, base).get_next(datetime).replace(tzinfo=timezone.utc)
+            return datetime.fromisoformat(value).astimezone(UTC)
+        base = after or datetime.now(UTC)
+        return croniter(value, base).get_next(datetime).replace(tzinfo=UTC)
 
     async def run(self, pm: ProcessManager | None = None) -> None:
         """Run the task: cmd as a process of pm, or the Python callable (run_fn).
@@ -162,7 +163,7 @@ class ScheduledTask:
         try:
             await asyncio.wait_for(self._execute(pm), timeout=self.timeout)
             logger.info("Task '%s' completed successfully", self.name)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error("Task '%s' timed out after %ss", self.name, self.timeout)
         except Exception:
             logger.exception("Task '%s' failed", self.name)
@@ -212,7 +213,7 @@ class ScheduledTask:
         return safe if safe[0].isalnum() else f"t{safe[:39]}"
 
     def _new_run_id(self) -> str:
-        return f"{self._run_id_prefix()}-{datetime.now(timezone.utc):%Y%m%dT%H%M%S}-{uuid.uuid4().hex[:4]}"
+        return f"{self._run_id_prefix()}-{datetime.now(UTC):%Y%m%dT%H%M%S}-{uuid.uuid4().hex[:4]}"
 
     async def _prune_runs(self, pm: ProcessManager) -> None:
         """Delete finished runs of this task beyond the newest RUNS_KEPT_PER_TASK."""
@@ -368,7 +369,7 @@ class Scheduler:
         return {
             "num_tasks": len(self.tasks),
             "running_tasks": len(self._running_tasks),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "status": "running" if self._task and not self._task.done() else "stopped",
             "tasks": [
                 {
@@ -429,7 +430,7 @@ class Scheduler:
         async with self._lock:
             old = {t.name: t for t in self.tasks}
             new = {t.name: t for t in new_tasks}
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             for name in set(old) - set(new):
                 self._schedule.pop(name, None)
                 self._last_run.pop(name, None)
@@ -503,7 +504,7 @@ class Scheduler:
                 task.interval,
                 task.next_run(),
             )
-            self._schedule[task.name] = task.next_run(after=datetime.now(timezone.utc))
+            self._schedule[task.name] = task.next_run(after=datetime.now(UTC))
 
     async def run_now(self, task_name: str) -> None:
         """Start a run of task_name immediately, outside its schedule (does not wait for it).
@@ -519,7 +520,7 @@ class Scheduler:
                 raise RuntimeError(f"Task '{task_name}' is already running")
             logger.info("Task '%s' started manually", task.name)
             self._launch(task)
-            self._last_run[task.name] = datetime.now(timezone.utc)
+            self._last_run[task.name] = datetime.now(UTC)
 
     async def remove_task(self, task_name: str) -> None:
         async with self._lock:
@@ -553,7 +554,7 @@ class Scheduler:
         )
 
         while not self._stop_event.is_set():
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             async with self._lock:
                 removals = []
                 for task in self.tasks:

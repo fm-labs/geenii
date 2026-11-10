@@ -3,7 +3,7 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -72,7 +72,7 @@ def test_stop_kills_running_command(tmp_path):
         await asyncio.sleep(
             0.05
         )  # let the main loop compute its initial schedule first
-        sched._schedule["long"] = datetime.now(timezone.utc) - timedelta(seconds=1)
+        sched._schedule["long"] = datetime.now(UTC) - timedelta(seconds=1)
         grandchild = int(await asyncio.to_thread(_wait_for_file, pidfile))
         await sched.stop()
         await sched.wait_until_stopped()
@@ -246,7 +246,7 @@ def test_overlapping_run_is_skipped(caplog):
         await asyncio.sleep(
             0.05
         )  # let the main loop compute its initial schedule first
-        past = datetime.now(timezone.utc) - timedelta(seconds=1)
+        past = datetime.now(UTC) - timedelta(seconds=1)
         sched._schedule["busy"] = past
         await asyncio.sleep(1.2)
         sched._schedule["busy"] = past

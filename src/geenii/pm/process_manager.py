@@ -30,6 +30,7 @@ Output directory layout (under CACHE_DIR/processes/<pid>/):
 from __future__ import annotations
 
 import asyncio
+import builtins
 import json
 import logging
 import os
@@ -41,7 +42,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from geenii import proc as proc_util
 from geenii.config import GEENII_CACHE_DIR, PM_GC_MAX_AGE
@@ -97,19 +98,19 @@ def validate_pid(pid: str) -> str:
 class ProcessInfo:
     pid: str
     system_pid: int
-    cmd: str | List[str]
+    cmd: str | list[str]
     state: ProcessState
-    cwd: Optional[str]
-    env: Optional[Dict[str, str]]
+    cwd: str | None
+    env: dict[str, str] | None
     started_at: float
     shell: bool = False
-    finished_at: Optional[float] = None
-    exit_code: Optional[int] = None
-    error: Optional[str] = None
+    finished_at: float | None = None
+    exit_code: int | None = None
+    error: str | None = None
     stdout_path: str = ""
     stderr_path: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "pid": self.pid,
             "system_pid": self.system_pid,
@@ -127,7 +128,7 @@ class ProcessInfo:
         }
 
     @classmethod
-    def from_meta(cls, meta: Dict[str, Any]) -> "ProcessInfo":
+    def from_meta(cls, meta: dict[str, Any]) -> ProcessInfo:
         return cls(
             pid=meta["pid"],
             system_pid=meta["system_pid"],
@@ -149,17 +150,17 @@ class ProcessInfo:
 class _RunningProcess:
     info: ProcessInfo
     proc: asyncio.subprocess.Process
-    waiter: Optional[asyncio.Task] = None
+    waiter: asyncio.Task | None = None
     kill_requested: bool = False
 
 
 class ProcessManager:
     """Manage background subprocesses with file-backed output capture (asyncio)."""
 
-    def __init__(self, processes_dir: Optional[str] = None) -> None:
+    def __init__(self, processes_dir: str | None = None) -> None:
         # Resolved at call time, so the module default can be redirected (e.g. in tests)
         self._processes_dir = processes_dir or PROCESSES_DIR
-        self._procs: Dict[str, _RunningProcess] = {}
+        self._procs: dict[str, _RunningProcess] = {}
         # Serializes the check-and-register part of start() across awaits
         self._start_lock = asyncio.Lock()
 
@@ -180,14 +181,14 @@ class ProcessManager:
             json.dump(info.to_dict(), f, indent=2)
         os.replace(tmp_path, meta_path)
 
-    def _read_meta(self, pid: str) -> Optional[Dict[str, Any]]:
+    def _read_meta(self, pid: str) -> dict[str, Any] | None:
         meta_path = os.path.join(self._proc_path(pid), "meta.json")
         if not os.path.isfile(meta_path):
             return None
         with open(meta_path, "r") as f:
             return json.load(f)
 
-    def recover(self) -> List[str]:
+    def recover(self) -> builtins.list[str]:
         """Mark processes left 'running' on disk by a previous manager instance as orphaned.
 
         Call once when the owning service starts (the daemon does). Not done in
@@ -195,7 +196,7 @@ class ProcessManager:
         local `geenii scheduler run`) must not touch the daemon's live records.
         Returns the IDs marked as orphaned.
         """
-        orphaned: List[str] = []
+        orphaned: list[str] = []
         if not os.path.isdir(self._processes_dir):
             return orphaned
         for name in os.listdir(self._processes_dir):
@@ -223,11 +224,11 @@ class ProcessManager:
 
     async def start(
         self,
-        cmd: str | List[str],
+        cmd: str | builtins.list[str],
         *,
-        env: Optional[Dict[str, str]] = None,
-        cwd: Optional[str] = None,
-        pid: Optional[str] = None,
+        env: dict[str, str] | None = None,
+        cwd: str | None = None,
+        pid: str | None = None,
     ) -> ProcessInfo:
         """
         Start a background process.
@@ -308,10 +309,10 @@ class ProcessManager:
         self,
         pid: str,
         stream: str = "stdout",
-        tail: Optional[int] = None,
+        tail: int | None = None,
         *,
-        offset: Optional[int] = None,
-        limit: Optional[int] = None,
+        offset: int | None = None,
+        limit: int | None = None,
     ) -> str:
         """
         Read captured output of a process.
@@ -347,7 +348,7 @@ class ProcessManager:
             self._read_log_chunk, pid, stream, log_file, offset or 0, limit
         )
 
-    async def wait(self, pid: str, timeout: Optional[float] = None) -> ProcessInfo:
+    async def wait(self, pid: str, timeout: float | None = None) -> ProcessInfo:
         """
         Wait until a process has finished and return its final ProcessInfo.
 
@@ -389,18 +390,18 @@ class ProcessManager:
         if rp.waiter:
             try:
                 await asyncio.wait_for(asyncio.shield(rp.waiter), timeout=KILL_WAIT_S)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
         return rp.info
 
-    async def list(self, *, include_finished: bool = False) -> List[ProcessInfo]:
+    async def list(self, *, include_finished: bool = False) -> builtins.list[ProcessInfo]:
         """
         List tracked processes.
 
         :param include_finished: If True, also scan disk for finished processes
                                  that are no longer in memory.
         """
-        by_pid: Dict[str, ProcessInfo] = {
+        by_pid: dict[str, ProcessInfo] = {
             pid: rp.info for pid, rp in self._procs.items()
         }
         if include_finished:
@@ -423,11 +424,11 @@ class ProcessManager:
 
     async def gc(
         self,
-        max_age: Optional[float] = None,
+        max_age: float | None = None,
         *,
-        states: Optional[List[str]] = None,
+        states: builtins.list[str] | None = None,
         dry_run: bool = False,
-    ) -> List[str]:
+    ) -> builtins.list[str]:
         """
         Remove the on-disk artifacts of processes that finished long enough ago.
 
@@ -508,7 +509,7 @@ class ProcessManager:
 
     @staticmethod
     def _read_log_chunk(
-        pid: str, stream: str, log_file: str, offset: int, limit: Optional[int]
+        pid: str, stream: str, log_file: str, offset: int, limit: int | None
     ) -> str:
         if not os.path.isfile(log_file):
             raise KeyError(f"No {stream} log for process {pid}")
@@ -536,7 +537,7 @@ class ProcessManager:
 
     def _gc(
         self, cutoff: float, states: frozenset, known_pids: set[str], dry_run: bool
-    ) -> List[str]:
+    ) -> builtins.list[str]:
         candidates = []
         # A directory without meta.json may belong to a process being started: skip it
         for info in self._scan_finished(known_pids):
@@ -554,7 +555,7 @@ class ProcessManager:
             removed.append(pid)
         return removed
 
-    def _scan_finished(self, known_pids: set[str]) -> List[ProcessInfo]:
+    def _scan_finished(self, known_pids: set[str]) -> builtins.list[ProcessInfo]:
         if not os.path.isdir(self._processes_dir):
             return []
         found = []

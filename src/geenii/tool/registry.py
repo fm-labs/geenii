@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from geenii.tool.common import Tool
 from geenii.tool.mcp_tool import McpTool

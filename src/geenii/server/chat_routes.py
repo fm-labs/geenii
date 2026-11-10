@@ -1,6 +1,6 @@
 import logging
 import threading
-from typing import Iterator
+from collections.abc import Iterator
 
 import pydantic
 from fastapi import APIRouter, Depends, HTTPException, Request, Response

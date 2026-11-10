@@ -34,11 +34,12 @@ import threading
 import time
 import tomllib
 import uuid
+from collections.abc import Callable, Generator
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Generator, Literal
+from typing import Any, ClassVar, Literal
 
 import pydantic
 import tomli_w
@@ -609,7 +610,7 @@ class Flow:
         running: dict[Future, FlowStepSpec] = {}
         status = "success"
         flow_dict = self.to_dict() if snapshot is not None else None
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
 
         def save_snapshot(snapshot_status: str):
             if snapshot is None:
@@ -620,7 +621,7 @@ class Flow:
                 input=input_data,
                 status=snapshot_status,
                 started_at=started_at,
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(UTC),
                 steps=[results[s.id] for s in order if s.id in results],
                 running=[s.id for s in running.values()],
                 pending=[s.id for s in pending],

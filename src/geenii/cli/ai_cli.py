@@ -1,21 +1,19 @@
-from typing import List
 
 import click
 
-from geenii.ai import generate_completion, generate_chat_completion_deprecated
+from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
+from geenii.ai import generate_chat_completion_deprecated, generate_completion
 from geenii.chat_models import TextContent
 from geenii.config import DEFAULT_COMPLETION_MODEL
 from geenii.datamodels import ModelMessage
-from geenii.tool.registry import ToolRegistry
 from geenii.tool.python import PythonFunctionTool
-from geenii.agent.base import DEFAULT_AGENT_SYSTEM_PROMPT
+from geenii.tool.registry import ToolRegistry
 from geenii.tools import init_builtin_tools, init_mcp_server_tools
 
 
 @click.group()
 def ai():
     """Run AI inference commands."""
-    pass
 
 
 @ai.command()
@@ -57,7 +55,7 @@ def chat(model, temperature, output_format, prompt):
     """Start an interactive chat session with an initial prompt."""
     click.echo(f"YOU: {prompt}")
 
-    memory: List[ModelMessage] = []
+    memory: list[ModelMessage] = []
 
     # Initialize chat history
     memory.append(
@@ -149,7 +147,7 @@ def chat(model, temperature, output_format, prompt):
         prompt = click.prompt("YOU> ", default="", show_default=False)
 
 
-def echo_model_messages(messages: List[ModelMessage]):
+def echo_model_messages(messages: list[ModelMessage]):
     output = ""
     for msg in messages:
         role = msg.role

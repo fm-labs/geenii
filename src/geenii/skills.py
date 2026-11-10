@@ -38,14 +38,14 @@ class SkillSpec(pydantic.BaseModel):
         if isinstance(skill_path, str):
             skill_path = Path(skill_path)
         md_path = skill_path / "SKILL.md"
-        skill_header, skill_body = read_frontmatter_file(str(md_path))
+        skill_header, _skill_body = read_frontmatter_file(str(md_path))
         if not skill_header or not isinstance(skill_header, dict):
             raise ValueError(
-                f"Malformed skill markdown file: missing or invalid header in '{str(md_path)}'"
+                f"Malformed skill markdown file: missing or invalid header in '{md_path!s}'"
             )
         if "name" not in skill_header or "description" not in skill_header:
             raise ValueError(
-                f"Malformed skill markdown file: missing required 'name' or 'description' fields in header of '{str(md_path)}'"
+                f"Malformed skill markdown file: missing required 'name' or 'description' fields in header of '{md_path!s}'"
             )
         raw_triggers = skill_header.get("triggers", "")
         if isinstance(raw_triggers, list):
@@ -100,7 +100,7 @@ class SkillRegistry:
         if "," in skill_name:
             skill_name = skill_name.split(",")[0]
         try:
-            skill = self.skills[skill_name] if skill_name in self.skills else None
+            skill = self.skills.get(skill_name, None)
             if skill:
                 logger.info(f"Skill '{skill_name}' already loaded.")
                 return skill
@@ -116,7 +116,7 @@ class SkillRegistry:
             self.register(skill)
             return skill
         except Exception as e:
-            logger.critical(f"Error while loading skill: {str(e)}", exc_info=False)
+            logger.critical(f"Error while loading skill: {e!s}", exc_info=False)
             # raise e
             return None
 
@@ -153,7 +153,7 @@ class SkillRegistry:
                         self.register(skill)
                     except Exception as e:
                         logger.critical(
-                            f"Error while loading skill from '{item}': {str(e)}",
+                            f"Error while loading skill from '{item}': {e!s}",
                             exc_info=False,
                         )
 

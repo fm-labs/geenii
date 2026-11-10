@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
-import os
+import logging
 import time
 import traceback
 from datetime import datetime
@@ -11,13 +11,11 @@ from geenii.config import GEENII_CACHE_DIR, GEENII_WORKING_DIR
 from geenii.core.tools import init_core_tools
 from geenii.mcp_client import McpClient
 from geenii.mcp_config import get_mcp_config, get_mcp_config_for_server
-from geenii.tool.common import ToolCallResult, Tool, ToolCallContext
+from geenii.tool.common import Tool, ToolCallContext, ToolCallResult
 from geenii.tool.computer import ComputerTool, ReadTool, WriteTool
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.cached import cached
 from geenii.utils.json_util import append_jsonl
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -96,13 +94,13 @@ def read_mcp_server_tools(server_name) -> list[dict]:
         mcp_client.close()
 
 
-def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] = None):
+def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] | None = None):
     mcp_config = get_mcp_config()
     if not mcp_config or "mcpServers" not in mcp_config:
         logger.warning("No MCP servers configured")
         return
 
-    for server_name, _ in mcp_config["mcpServers"].items():
+    for server_name in mcp_config["mcpServers"]:
         if server_names is not None and server_name not in server_names:
             continue
 

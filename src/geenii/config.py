@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from os.path import realpath
-
 import json
 import os
+from os.path import realpath
 from pathlib import Path
 
 import dotenv

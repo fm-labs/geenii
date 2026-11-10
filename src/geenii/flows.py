@@ -1,7 +1,6 @@
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,7 @@ class FlowSpec:
 
 @dataclass
 class FlowRegistry:
-    flows: List[FlowSpec] = field(default_factory=list)
+    flows: list[FlowSpec] = field(default_factory=list)
 
     def register(self, flow: FlowSpec):
         self.flows.append(flow)

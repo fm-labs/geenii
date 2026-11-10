@@ -1,6 +1,6 @@
+import logging
 import os
 import signal
-import logging
 import subprocess
 from enum import Enum
 

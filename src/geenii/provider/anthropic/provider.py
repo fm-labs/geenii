@@ -1,26 +1,26 @@
-import anthropic
 import json
 import logging
 import time
 import uuid
-from typing import List
+
+import anthropic
 
 from geenii import config
 from geenii.chat_models import (
+    ContentPart,
+    JsonContent,
     TextContent,
     ToolCallContent,
-    ContentPart,
     ToolCallResultContent,
-    JsonContent,
 )
 from geenii.datamodels import (
-    ChatCompletionResponse,
-    ChatCompletionRequest,
     AIModelInfo,
+    ChatCompletionRequest,
+    ChatCompletionResponse,
     ModelMessage,
     Usage,
 )
-from geenii.provider.interfaces import AIProvider, AIChatCompletionProvider
+from geenii.provider.interfaces import AIChatCompletionProvider, AIProvider
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +95,7 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
         self, request: ChatCompletionRequest, tool_registry=None
     ) -> ChatCompletionResponse:
         model = request.model or self.DEFAULT_MODEL
-        if model.startswith("anthropic:"):
-            model = model[len("anthropic:") :]
+        model = model.removeprefix("anthropic:")
 
         # TOOLS
         tools = request.tools or set()
@@ -153,13 +152,13 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
                 f"ANTHROPIC: Generating chat completion model={model} with {len(input_messages)} input messages"
             )
 
-            create_kwargs = dict(
-                model=model,
-                messages=input_messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                output_config=output_config,
-            )
+            create_kwargs = {
+                "model": model,
+                "messages": input_messages,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "output_config": output_config,
+            }
             print(create_kwargs)
 
             if system_blocks:
@@ -169,7 +168,7 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
 
             model_result = self.client.messages.create(**create_kwargs)
 
-            output_parts: List[ContentPart] = []
+            output_parts: list[ContentPart] = []
 
             for block in model_result.content:
                 if block.type == "text":
@@ -251,7 +250,7 @@ def _to_anthropic_tool(tool_def: dict) -> dict:
     }
 
 
-def _model_messages_to_anthropic_format(messages: List[ModelMessage]) -> List[dict]:
+def _model_messages_to_anthropic_format(messages: list[ModelMessage]) -> list[dict]:
     anthropic_messages = []
     for message in messages:
         role = message.role

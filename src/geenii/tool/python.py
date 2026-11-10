@@ -1,19 +1,20 @@
 from __future__ import annotations
 
+import inspect
 import json
 import logging
-import subprocess
-import shlex
 import os
-import inspect
-from typing import Callable, Any
+import shlex
+import subprocess
+from collections.abc import Callable
+from typing import Any
 
 from geenii.tool.common import (
     Tool,
-    expand_vars,
-    ToolCallResult,
-    to_tool_call_result,
     ToolCallContext,
+    ToolCallResult,
+    expand_vars,
+    to_tool_call_result,
 )
 from geenii.utils.async_bridge import run_sync
 

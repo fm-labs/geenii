@@ -1,32 +1,31 @@
 import json
+import logging
 import time
 import uuid
-from typing import List
-import logging
 
 import ollama
 
 from geenii import config
 from geenii.chat_models import (
+    ContentPart,
+    JsonContent,
     TextContent,
     ToolCallContent,
-    ContentPart,
     ToolCallResultContent,
-    JsonContent,
 )
 from geenii.config import GEENII_CACHE_DIR
 from geenii.datamodels import (
-    CompletionResponse,
-    ChatCompletionResponse,
-    ChatCompletionRequest,
     AIModelInfo,
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    CompletionResponse,
     ModelMessage,
     Usage,
 )
 from geenii.provider.interfaces import (
-    AIProvider,
-    AICompletionProvider,
     AIChatCompletionProvider,
+    AICompletionProvider,
+    AIProvider,
 )
 from geenii.utils.json_util import write_json
 
@@ -85,7 +84,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         return self._client
 
     def is_configured(self) -> bool:
-        return True if config.OLLAMA_HOST is not None else False
+        return config.OLLAMA_HOST is not None
 
     def get_capabilities(self) -> list[str]:
         return ["completion", "chat_completion", "tool_calling"]
@@ -108,7 +107,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
 
         if ollama_models and ollama_models.models:
             for model in ollama_models.models:
-                metadata = dict()
+                metadata = {}
                 metadata["size"] = model.size if model.size else None
                 metadata["digest"] = model.digest if model.digest else None
                 metadata["modified_at"] = (
@@ -196,8 +195,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         :return:
         """
         model = request.model or self.DEFAULT_MODEL
-        if model.startswith("ollama:"):
-            model = model[len("ollama:") :]
+        model = model.removeprefix("ollama:")
 
         # TOOLS
         tools = request.tools or set()
@@ -320,7 +318,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 )
 
             # Container for the parsed output parts from the model response
-            output_parts: List[ContentPart] = []
+            output_parts: list[ContentPart] = []
 
             # Thinking process
             thinking_content = message.get("thinking", None)
@@ -419,7 +417,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
 
         except Exception as e:
             logger.error("OLLAMA: Error generating chat completion: %s", str(e))
-            raise e
+            raise
 
     def generate_completion(self, prompt: str, **kwargs) -> CompletionResponse:
         """
@@ -527,10 +525,10 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
 
         except Exception as e:
             print("OLLAMA: Error generating completion:", str(e))
-            raise e
+            raise
 
 
-def model_messages_to_ollama_format(messages: List[ModelMessage]) -> List[dict]:
+def model_messages_to_ollama_format(messages: list[ModelMessage]) -> list[dict]:
     """
     Map our internal ModelMessage format to the format expected by the Ollama API.
 
@@ -585,7 +583,7 @@ def model_messages_to_ollama_format(messages: List[ModelMessage]) -> List[dict]:
                     _message = {
                         "role": "tool",
                         "tool_name": content_item.name,
-                        "content": f"Tool call result: {str(content_item.result)}",
+                        "content": f"Tool call result: {content_item.result!s}",
                     }
                 else:
                     logger.warning(f"Unknown content type: {content_item.type}")

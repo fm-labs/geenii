@@ -5,11 +5,11 @@ import time
 
 import click
 
-from geenii.apps import AppRegistry, read_manifest, write_manifest, infer_manifest
+from geenii.apps import AppRegistry, infer_manifest, read_manifest, write_manifest
 from geenii.cli.click_helper import (
-    click_success,
     click_error,
     click_info,
+    click_success,
     click_warning,
 )
 from geenii.config import apps_dirs
@@ -37,7 +37,6 @@ def _resolve_apps_dir(name: str) -> str | None:
 @click.group()
 def apps():
     """Manage GeeApps (micro applications)."""
-    pass
 
 
 @apps.command(name="list")

@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shlex
 import subprocess
 from pathlib import Path
-import shlex
 from typing import Any
 
 from geenii.tool.common import Tool, ToolCallResult

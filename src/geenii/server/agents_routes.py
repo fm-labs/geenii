@@ -3,7 +3,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Literal, Annotated
+from typing import Annotated, Literal
 
 import pydantic
 import yaml

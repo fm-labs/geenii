@@ -19,7 +19,8 @@ import asyncio
 import os
 import signal
 import subprocess
-from typing import IO, Callable, Mapping, Optional, Sequence, Union
+from collections.abc import Callable, Mapping, Sequence
+from typing import IO, Union
 
 USE_PROCESS_GROUPS = hasattr(os, "killpg")
 SIGKILL = getattr(signal, "SIGKILL", signal.SIGTERM)
@@ -29,7 +30,7 @@ STREAM_LINE_LIMIT = 1024 * 1024  # max length of a single output line for async 
 AnyProcess = Union[asyncio.subprocess.Process, subprocess.Popen]
 
 
-def merged_env(extra: Optional[Mapping[str, str]] = None) -> dict[str, str]:
+def merged_env(extra: Mapping[str, str] | None = None) -> dict[str, str]:
     """Return a copy of os.environ with extra variables applied on top."""
     env = os.environ.copy()
     if extra:
@@ -56,11 +57,11 @@ def signal_group(proc: AnyProcess, sig: int) -> None:
 async def spawn(
     cmd: Sequence[str],
     *,
-    env: Optional[Mapping[str, str]] = None,
-    cwd: Optional[str] = None,
+    env: Mapping[str, str] | None = None,
+    cwd: str | None = None,
     capture_output: bool = True,
-    stdout: Optional[IO] = None,
-    stderr: Optional[IO] = None,
+    stdout: IO | None = None,
+    stderr: IO | None = None,
     limit: int = STREAM_LINE_LIMIT,
 ) -> asyncio.subprocess.Process:
     """Start cmd (an argument vector, no shell) in its own process group.
@@ -86,7 +87,7 @@ async def spawn(
 
 async def terminate(
     proc: asyncio.subprocess.Process, grace: float = TERMINATE_GRACE_S
-) -> Optional[int]:
+) -> int | None:
     """Terminate proc's process group: SIGTERM, wait up to grace seconds, then SIGKILL.
 
     Returns the exit code.  A process that has already exited is left alone.
@@ -98,7 +99,7 @@ async def terminate(
     signal_group(proc, signal.SIGTERM)
     try:
         return await asyncio.wait_for(proc.wait(), timeout=grace)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         signal_group(proc, SIGKILL)
         return await proc.wait()
 
@@ -110,7 +111,7 @@ def shell_argv(command: str) -> list[str]:
 
 def terminate_sync(
     proc: subprocess.Popen, grace: float = TERMINATE_GRACE_S
-) -> Optional[int]:
+) -> int | None:
     """Blocking variant of terminate() for subprocess.Popen (start it with start_new_session=True)."""
     if proc.poll() is not None:
         return proc.returncode
@@ -135,7 +136,7 @@ async def pump_lines(
 
 def add_shutdown_handlers(
     on_signal: Callable[[], object],
-    loop: Optional[asyncio.AbstractEventLoop] = None,
+    loop: asyncio.AbstractEventLoop | None = None,
     signals: Sequence[int] = (signal.SIGINT, signal.SIGTERM),
 ) -> None:
     """Call on_signal (a plain callable, run in the loop) when the process receives SIGINT/SIGTERM.

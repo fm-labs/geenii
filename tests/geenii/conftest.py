@@ -1,8 +1,6 @@
 import pytest
 
-from geenii import ai
-from geenii import config
-from geenii import mcp_config
+from geenii import ai, config, mcp_config
 from geenii.pm import process_manager as pm_mod
 
 

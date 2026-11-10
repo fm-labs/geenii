@@ -5,7 +5,6 @@ import argparse
 import sys
 import urllib.request
 
-
 ASSETS = {
     "darwin-arm64": {"os": "macos", "cpu": "arm"},
     "darwin-amd64": {"os": "macos", "cpu": "intel"},

@@ -51,7 +51,6 @@ def _flags(task: dict) -> str:
 @click.group()
 def scheduler():
     """Manage and run the task scheduler (it runs inside the geenii daemon)."""
-    pass
 
 
 @scheduler.command(name="start")

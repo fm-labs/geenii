@@ -26,8 +26,7 @@ def read_jsonl(file_path: str) -> list[dict]:
 def write_jsonl(file_path: str, data: list[dict]) -> None:
     """Write a list of dictionaries to a JSONL file."""
     with open(file_path, "w") as f:
-        for item in data:
-            f.write(json.dumps(item) + "\n")
+        f.writelines(json.dumps(item) + "\n" for item in data)
 
 
 def append_jsonl(file_path: str, item: dict) -> None:

@@ -15,7 +15,6 @@ from geenii.config import APP_VERSION, WWW_DIR
 from geenii.datamodels import Problem
 from geenii.g import init_global_agent_registry, init_global_skill_registry
 from geenii.server.router import app_router
-from geenii.skills import SkillRegistry
 from geenii.tool.registry import ToolRegistry
 from geenii.tools import init_builtin_tools, init_mcp_server_tools
 

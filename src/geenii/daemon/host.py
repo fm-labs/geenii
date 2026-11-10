@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Awaitable, Callable, Dict, Optional
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from geenii.pm.process_manager import ProcessManager
 from geenii.scheduler import Scheduler
@@ -35,11 +36,11 @@ class ProcessHost:
 
     def __init__(
         self,
-        pm: Optional[ProcessManager] = None,
-        scheduler: Optional[Scheduler] = None,
-        supervisor: Optional[Supervisor] = None,
-        scheduler_config: Optional[str] = None,
-        services_config: Optional[str] = None,
+        pm: ProcessManager | None = None,
+        scheduler: Scheduler | None = None,
+        supervisor: Supervisor | None = None,
+        scheduler_config: str | None = None,
+        services_config: str | None = None,
     ) -> None:
         self.pm = pm or ProcessManager()
         self.scheduler = scheduler or Scheduler()
@@ -54,7 +55,7 @@ class ProcessHost:
         self.services_config = (
             os.path.abspath(services_config) if services_config else None
         )
-        self._methods: Dict[str, RpcMethod] = {
+        self._methods: dict[str, RpcMethod] = {
             "pm.start": self._pm_start,
             "pm.status": self._pm_status,
             "pm.output": self._pm_output,
@@ -77,7 +78,7 @@ class ProcessHost:
             self._methods[name] = self._methods[f"pm.{name}"]
 
     @property
-    def methods(self) -> Dict[str, RpcMethod]:
+    def methods(self) -> dict[str, RpcMethod]:
         return self._methods
 
     async def start(self) -> None:
@@ -107,7 +108,7 @@ class ProcessHost:
         await self.pm.shutdown()
         logger.info("Process host stopped")
 
-    async def info(self) -> Dict[str, Any]:
+    async def info(self) -> dict[str, Any]:
         sup = self.supervisor.status()
         return {
             "pm": {"running": len(await self.pm.list())},

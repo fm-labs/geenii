@@ -145,7 +145,7 @@ class AgentRegistry:
                 )
             except Exception as e:
                 logger.error(
-                    f"Error loading agent from config file '{config_path}': {str(e)}",
+                    f"Error loading agent from config file '{config_path}': {e!s}",
                     exc_info=e,
                 )
         else:
@@ -177,5 +177,5 @@ class AgentRegistry:
                     )
                 except Exception as e:
                     logger.error(
-                        f"Error loading agent from config: {str(e)}", exc_info=e
+                        f"Error loading agent from config: {e!s}", exc_info=e
                     )

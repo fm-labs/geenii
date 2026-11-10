@@ -4,27 +4,27 @@ import re
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from geenii import ai
 from geenii.ai import enumerate_models
 from geenii.chat_models import TextContent
 from geenii.config import DEFAULT_AUDIO_TRANSCRIPTION_MODEL, GEENII_CHAT_SESSIONS_DIR
 from geenii.datamodels import (
-    CompletionErrorResponse,
-    CompletionRequest,
-    CompletionResponse,
-    ChatCompletionRequest,
-    ChatCompletionResponse,
-    ImageGenerationApiResponse,
-    ImageGenerationApiRequest,
+    AIModelInfo,
     AudioGenerationApiRequest,
     AudioSpeechGenerationApiResponse,
     AudioTranscriptionApiRequest,
     AudioTranscriptionApiResponse,
-    AudioTranslationApiResponse,
     AudioTranslationApiRequest,
-    AIModelInfo,
+    AudioTranslationApiResponse,
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    CompletionErrorResponse,
+    CompletionRequest,
+    CompletionResponse,
+    ImageGenerationApiRequest,
+    ImageGenerationApiResponse,
     ModelMessage,
     Problem,
 )

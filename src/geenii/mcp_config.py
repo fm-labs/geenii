@@ -1,13 +1,12 @@
 import atexit
 import copy
 import json
+import logging
 import os
 import re
 
-from geenii.config import get_root_mcp_config_path, get_mcp_config_paths
+from geenii.config import get_mcp_config_paths, get_root_mcp_config_path
 from geenii.mcp_client import McpClient
-
-import logging
 
 logger = logging.getLogger(__name__)
 

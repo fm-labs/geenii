@@ -11,7 +11,6 @@ as aliases of pm.start, pm.status, ...
 from __future__ import annotations
 
 import sys
-from typing import Optional
 
 from geenii.daemon.client import DEFAULT_SOCKET_PATH  # noqa: F401  (re-exported)
 from geenii.daemon.host import ProcessHost
@@ -23,7 +22,7 @@ class ProcessManagerService(DaemonServer):
     """A daemon whose ProcessHost uses the given ProcessManager (and an idle scheduler)."""
 
     def __init__(
-        self, socket_path: Optional[str] = None, pm: Optional[ProcessManager] = None
+        self, socket_path: str | None = None, pm: ProcessManager | None = None
     ) -> None:
         super().__init__(ProcessHost(pm=pm), socket_path)
 

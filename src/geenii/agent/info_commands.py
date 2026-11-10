@@ -13,7 +13,8 @@ import logging
 import os
 import re
 from collections import Counter
-from typing import Callable, Iterator, TYPE_CHECKING
+from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING
 
 import pydantic
 
@@ -81,14 +82,14 @@ def _builtin_tools():
     return _builtin_tool_registry
 
 
-def _tool_description(agent: "BaseAgent", name: str) -> str | None:
+def _tool_description(agent: BaseAgent, name: str) -> str | None:
     for registry in (agent.tools, _builtin_tools()):
         if registry.has(name):
             return registry.get(name).description
     return None
 
 
-def _usage_summary(agent: "BaseAgent") -> str:
+def _usage_summary(agent: BaseAgent) -> str:
     """The agent's in-memory usage counters (since this agent instance was created)."""
     calls = getattr(agent, "model_calls", 0)
     if not calls:
@@ -106,7 +107,7 @@ def _usage_summary(agent: "BaseAgent") -> str:
 # -- reports ------------------------------------------------------------------
 
 
-def report_self(agent: "BaseAgent", args: str) -> str:
+def report_self(agent: BaseAgent, args: str) -> str:
     skills = sorted(agent.skills.names())
     active = set(agent.active_skills)
     rows = [
@@ -134,7 +135,7 @@ def report_self(agent: "BaseAgent", args: str) -> str:
     return text + _fields(rows)
 
 
-def report_usage(agent: "BaseAgent", args: str) -> str:
+def report_usage(agent: BaseAgent, args: str) -> str:
     root = _root_context_id(agent.context_id)
     pattern = re.compile(rf"^{re.escape(root)}(-\d+)*$")
     per_model: dict[str, Counter] = {}
@@ -226,7 +227,7 @@ def report_usage(agent: "BaseAgent", args: str) -> str:
     return text
 
 
-def report_models(agent: "BaseAgent", args: str) -> str:
+def report_models(agent: BaseAgent, args: str) -> str:
     from geenii.ai import enumerate_models
 
     models = enumerate_models()
@@ -251,7 +252,7 @@ def report_models(agent: "BaseAgent", args: str) -> str:
     return text
 
 
-def report_tools(agent: "BaseAgent", args: str) -> str:
+def report_tools(agent: BaseAgent, args: str) -> str:
     names = sorted(agent.allowed_tools)
     if not names:
         return "### Tools\n\nThis agent has no tools."
@@ -280,7 +281,7 @@ def report_tools(agent: "BaseAgent", args: str) -> str:
     return text
 
 
-def report_context(agent: "BaseAgent", args: str) -> str:
+def report_context(agent: BaseAgent, args: str) -> str:
     messages = list(agent.message_history)
     roles = Counter(m.role for m in messages)
     chars = sum(len(m.to_text()) for m in messages) + len(agent.system_prompt or "")
@@ -306,7 +307,7 @@ def report_context(agent: "BaseAgent", args: str) -> str:
     return text
 
 
-def report_help(agent: "BaseAgent", args: str) -> str:
+def report_help(agent: BaseAgent, args: str) -> str:
     commands = getattr(agent, "BUILTIN_COMMANDS", {})
     rows = [[f"`/{name}`", description] for name, description in commands.items()]
     for name in sorted(agent.skills.names()):
@@ -326,7 +327,7 @@ def report_help(agent: "BaseAgent", args: str) -> str:
 
 
 # name -> (description, report)
-INFO_COMMANDS: dict[str, tuple[str, Callable[["BaseAgent", str], str]]] = {
+INFO_COMMANDS: dict[str, tuple[str, Callable[[BaseAgent, str], str]]] = {
     "self": ("Show this agent's model, conversation, tools and skills", report_self),
     "usage": ("Show the tokens used in this conversation", report_usage),
     "models": ("List the available models", report_models),
@@ -339,7 +340,7 @@ INFO_COMMANDS: dict[str, tuple[str, Callable[["BaseAgent", str], str]]] = {
 class InfoCommandTask(BaseAgentTask):
     """Answer an info command with a markdown report. The reply is not stored in memory."""
 
-    def __init__(self, agent: "BaseAgent", command: str, args: str = ""):
+    def __init__(self, agent: BaseAgent, command: str, args: str = ""):
         super().__init__(agent)
         self.command = command
         self.args = args

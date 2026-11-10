@@ -11,7 +11,6 @@ from geenii import config
 @click.group()
 def projects():
     """Manage projects."""
-    pass
 
 
 @projects.command(name="list")

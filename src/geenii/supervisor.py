@@ -27,10 +27,11 @@ import os
 import time
 import uuid
 from collections import deque
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field, replace
 from functools import partial
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 import pydantic
 
@@ -58,12 +59,12 @@ TERMINATE_GRACE_S = (
 @dataclass
 class ProcConfig:
     name: str
-    cmd: List[str]
+    cmd: list[str]
     restart: bool = True
-    env: Optional[Dict[str, str]] = (
+    env: dict[str, str] | None = (
         None  # extra vars; merged into os.environ at spawn time
     )
-    cwd: Optional[str] = None
+    cwd: str | None = None
     capture_output: bool = True
 
 
@@ -73,15 +74,15 @@ class ServiceConfig(pydantic.BaseModel):
     model_config = {"extra": "allow"}
 
     name: str = pydantic.Field(min_length=1)
-    cmd: List[str] = pydantic.Field(min_length=1)
+    cmd: list[str] = pydantic.Field(min_length=1)
     restart: bool = True
-    env: Optional[Dict[str, str]] = None
-    cwd: Optional[str] = None
+    env: dict[str, str] | None = None
+    cwd: str | None = None
     capture_output: bool = True
     enabled: bool = True
 
 
-def read_services(config_path: str | Path) -> List[ProcConfig]:
+def read_services(config_path: str | Path) -> list[ProcConfig]:
     """Parse the enabled services of a services config file.
 
     `$VAR` in cmd and cwd is expanded from the daemon's environment, and `~`
@@ -96,7 +97,7 @@ def read_services(config_path: str | Path) -> List[ProcConfig]:
             f"{config_path}: expected a JSON object with a 'services' list"
         )
 
-    services: List[ProcConfig] = []
+    services: list[ProcConfig] = []
     names: set[str] = set()
     for entry in data.get("services", []):
         try:
@@ -131,25 +132,25 @@ def read_services(config_path: str | Path) -> List[ProcConfig]:
 
 
 class UpdateProcRequest(pydantic.BaseModel):
-    restart: Optional[bool] = None
-    env: Optional[Dict[str, str]] = None
-    cwd: Optional[str] = None
+    restart: bool | None = None
+    env: dict[str, str] | None = None
+    cwd: str | None = None
 
 
 @dataclass
 class ProcRuntime:
     proc: asyncio.subprocess.Process
     started_at: float = field(default_factory=time.time)
-    last_exit: Optional[Dict[str, Any]] = None
-    out_task: Optional[asyncio.Task] = None
-    err_task: Optional[asyncio.Task] = None
+    last_exit: dict[str, Any] | None = None
+    out_task: asyncio.Task | None = None
+    err_task: asyncio.Task | None = None
 
 
 @dataclass
 class RunResult:
     returncode: int
-    stdout: List[str]  # lines, no trailing newline
-    stderr: List[str]
+    stdout: list[str]  # lines, no trailing newline
+    stderr: list[str]
     duration_s: float
 
 
@@ -186,8 +187,8 @@ class LogBus:
 
     def __init__(self, maxlines: int = 400) -> None:
         self._maxlines = maxlines
-        self._buf: List[LogEvent] = []
-        self._subs: List[asyncio.Queue] = []
+        self._buf: list[LogEvent] = []
+        self._subs: list[asyncio.Queue] = []
 
     def append(self, event: LogEvent) -> None:
         self._buf.append(event)
@@ -199,7 +200,7 @@ class LogBus:
                 q.get_nowait()
             q.put_nowait(event)
 
-    def subscribe(self) -> "asyncio.Queue[LogEvent]":
+    def subscribe(self) -> asyncio.Queue[LogEvent]:
         q: asyncio.Queue[LogEvent] = asyncio.Queue(maxsize=SUBSCRIBER_QUEUE_SIZE)
         self._subs.append(q)
         return q
@@ -210,10 +211,10 @@ class LogBus:
         except ValueError:
             pass
 
-    def tail_text(self, n: int) -> List[str]:
+    def tail_text(self, n: int) -> list[str]:
         return [e.as_text() for e in self._buf[-max(1, n) :]]
 
-    def tail_events(self, n: int) -> List[LogEvent]:
+    def tail_events(self, n: int) -> list[LogEvent]:
         return list(self._buf[-max(1, n) :])
 
 
@@ -236,17 +237,17 @@ class Supervisor:
         self._stop_event = asyncio.Event()
         self._lock = asyncio.Lock()
 
-        self._configs: Dict[str, ProcConfig] = {}
-        self._runtime: Dict[str, ProcRuntime] = {}
-        self._watchers: Dict[str, asyncio.Task] = {}
-        self._logs: Dict[str, LogBus] = {}
+        self._configs: dict[str, ProcConfig] = {}
+        self._runtime: dict[str, ProcRuntime] = {}
+        self._watchers: dict[str, asyncio.Task] = {}
+        self._logs: dict[str, LogBus] = {}
         # Restart delay per process. Kept outside ProcRuntime because the
         # runtime entry is dropped on every exit.
-        self._backoff: Dict[str, float] = {}
+        self._backoff: dict[str, float] = {}
         # Names of finished one-shot run() jobs, oldest first; evicted ones lose their LogBus
         self._run_history: deque[str] = deque()
         # Services declared in the config file, as last applied (copies; see apply_services)
-        self._configured: Dict[str, ProcConfig] = {}
+        self._configured: dict[str, ProcConfig] = {}
 
     def is_active(self) -> bool:
         # True if a process is running or any watcher tasks are active; used for graceful shutdowns
@@ -258,12 +259,12 @@ class Supervisor:
 
     async def run(
         self,
-        cmd: List[str],
+        cmd: list[str],
         *,
-        env: Optional[Dict[str, str]] = None,
-        cwd: Optional[str] = None,
-        timeout: Optional[float] = None,
-        name: Optional[str] = None,  # visible in status/logs; auto-generated if omitted
+        env: dict[str, str] | None = None,
+        cwd: str | None = None,
+        timeout: float | None = None,
+        name: str | None = None,  # visible in status/logs; auto-generated if omitted
     ) -> RunResult:
         """
         Spawn a one-shot command, wait for it to finish, return its output.
@@ -284,10 +285,10 @@ class Supervisor:
             self._retire_run_log(job)
             raise
 
-        stdout_lines: List[str] = []
-        stderr_lines: List[str] = []
+        stdout_lines: list[str] = []
+        stderr_lines: list[str] = []
 
-        def collect(tag: Tag, buf: List[str], text: str) -> None:
+        def collect(tag: Tag, buf: list[str], text: str) -> None:
             buf.append(text)
             self._emit(job, tag, text)
 
@@ -373,7 +374,7 @@ class Supervisor:
             self._backoff[name] = BACKOFF_INITIAL
             self._ensure_watcher_locked(name)
 
-    async def apply_services(self, services: List[ProcConfig]) -> Dict[str, List[str]]:
+    async def apply_services(self, services: list[ProcConfig]) -> dict[str, list[str]]:
         """Make the config-file services match `services` (the file's current content).
 
         - new services, and file services not currently desired (e.g. stopped
@@ -410,7 +411,7 @@ class Supervisor:
         logger.info("Applied services config: %s", changes)
         return changes
 
-    async def update_config(self, name: str, req: "UpdateProcRequest") -> None:
+    async def update_config(self, name: str, req: UpdateProcRequest) -> None:
         async with self._lock:
             cfg = self._configs.get(name)
             if cfg is None:
@@ -423,8 +424,8 @@ class Supervisor:
             if "cwd" in req.model_fields_set:
                 cfg.cwd = req.cwd
 
-    def status(self) -> Dict[str, Any]:
-        out: Dict[str, Any] = {"desired": {}, "running": {}, "watchers": {}}
+    def status(self) -> dict[str, Any]:
+        out: dict[str, Any] = {"desired": {}, "running": {}, "watchers": {}}
         for name, cfg in self._configs.items():
             out["desired"][name] = {
                 "source": "config" if name in self._configured else "api",
@@ -450,7 +451,7 @@ class Supervisor:
             }
         return out
 
-    def logs(self, name: str, tail: int = 100) -> List[str]:
+    def logs(self, name: str, tail: int = 100) -> list[str]:
         bus = self._logs.get(name)
         if bus is None:
             raise KeyError(name)
@@ -469,7 +470,7 @@ class Supervisor:
                 try:
                     event = await asyncio.wait_for(q.get(), timeout=15)
                     yield event.as_text()
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     yield ""  # keepalive sentinel; route converts to SSE comment
         finally:
             bus.unsubscribe(q)
@@ -487,7 +488,7 @@ class Supervisor:
                 try:
                     event = await asyncio.wait_for(q.get(), timeout=15)
                     yield event
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     yield None  # type: ignore[misc]  # keepalive sentinel
         finally:
             bus.unsubscribe(q)
@@ -509,7 +510,7 @@ class Supervisor:
             watcher.cancel()
             await asyncio.gather(watcher, return_exceptions=True)
 
-    def _next_delay(self, name: str, rc: Optional[int], uptime: float) -> float:
+    def _next_delay(self, name: str, rc: int | None, uptime: float) -> float:
         """Return how long to wait before respawning, and update the stored backoff.
 
         Clean exits and processes that stayed up for BACKOFF_RESET_AFTER seconds

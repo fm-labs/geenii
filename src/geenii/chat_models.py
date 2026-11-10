@@ -1,10 +1,9 @@
 import json
 import uuid
-from typing import Annotated, Literal, Any
+from typing import Annotated, Any, Literal
 
 import pydantic
 from pydantic import BaseModel, Field
-
 
 # --- Content Part Models ---
 

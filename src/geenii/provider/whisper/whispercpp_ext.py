@@ -1,7 +1,7 @@
-import subprocess
-import os
-from os.path import realpath
 import json
+import os
+import subprocess
+from os.path import realpath
 
 from geenii.config import WHISPERCPP_IMAGE
 

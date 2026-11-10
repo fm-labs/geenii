@@ -210,13 +210,13 @@ def test_stale_socket_file_is_replaced(short_dir):
 
 # -- CLI commands backed by the daemon -----------------------------------------
 
-import json  # noqa: E402
+import json
 
-from click.testing import CliRunner  # noqa: E402
+from click.testing import CliRunner
 
-from geenii.cli.scheduler_cli import scheduler as scheduler_cli  # noqa: E402
-from geenii.cli.supervisor_cli import supervisor as supervisor_cli  # noqa: E402
-from geenii.daemon.server import build_host  # noqa: E402
+from geenii.cli.scheduler_cli import scheduler as scheduler_cli
+from geenii.cli.supervisor_cli import supervisor as supervisor_cli
+from geenii.daemon.server import build_host
 
 
 @pytest.fixture

@@ -8,7 +8,7 @@ functions and FastAPI runs them in its threadpool.
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Literal
 
 import pydantic
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -31,11 +31,11 @@ class StartProcessRequest(pydantic.BaseModel):
     command: str | list[str] = pydantic.Field(
         ..., description="A string runs through the shell; a list is executed directly"
     )
-    env: Optional[dict[str, str]] = pydantic.Field(
+    env: dict[str, str] | None = pydantic.Field(
         None, description="Extra environment variables"
     )
-    cwd: Optional[str] = pydantic.Field(None, description="Working directory")
-    pid: Optional[str] = pydantic.Field(
+    cwd: str | None = pydantic.Field(None, description="Working directory")
+    pid: str | None = pydantic.Field(
         None, description="Custom process ID (auto-generated if omitted)"
     )
 
@@ -97,13 +97,13 @@ def start_process(
 
 @router.post("/gc")
 def gc_processes(
-    max_age: Optional[float] = Query(
+    max_age: float | None = Query(
         None,
         ge=0,
         description="Minimum seconds since a process finished "
         "(default: GEENII_PM_GC_MAX_AGE, or 7 days)",
     ),
-    state: Optional[list[Literal["completed", "failed", "killed", "orphaned"]]] = Query(
+    state: list[Literal["completed", "failed", "killed", "orphaned"]] | None = Query(
         None, description="States to collect (default: completed, failed, killed)"
     ),
     dry_run: bool = Query(False, description="Only report what would be removed"),
@@ -126,11 +126,11 @@ def get_process(
 def get_process_output(
     process_id: str,
     stream: Literal["stdout", "stderr"] = "stdout",
-    tail: Optional[int] = Query(None, ge=0, description="Return only the last N lines"),
-    offset: Optional[int] = Query(
+    tail: int | None = Query(None, ge=0, description="Return only the last N lines"),
+    offset: int | None = Query(
         None, ge=0, description="Start reading at this byte position"
     ),
-    limit: Optional[int] = Query(
+    limit: int | None = Query(
         None, ge=1, description="Read at most this many bytes"
     ),
     client: ProcessManagerClient = Depends(dep_pm_client),
@@ -148,7 +148,7 @@ def get_process_output(
 @router.post("/processes/{process_id}/wait")
 def wait_process(
     process_id: str,
-    timeout: Optional[float] = Query(
+    timeout: float | None = Query(
         None, gt=0, description="Give up after this many seconds"
     ),
     client: ProcessManagerClient = Depends(dep_pm_client),

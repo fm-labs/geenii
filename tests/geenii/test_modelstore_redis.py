@@ -1,10 +1,9 @@
 import pytest
+from test_modelstore import MyModel, TestModelStore
 from testcontainers.community.redis import RedisContainer
 
+from geenii.utils.modelstore import ModelStore, RedisModelStore
 from geenii.utils.redis import get_redis_client
-from geenii.utils.modelstore import RedisModelStore, ModelStore
-
-from test_modelstore import TestModelStore, MyModel
 
 
 @pytest.fixture(scope="session")

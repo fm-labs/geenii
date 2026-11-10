@@ -1,8 +1,8 @@
 import click
-
-from geenii.ai import enumerate_models
 from rich.console import Console
 from rich.table import Table
+
+from geenii.ai import enumerate_models
 
 
 @click.group()

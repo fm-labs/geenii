@@ -1,12 +1,12 @@
-from typing import Iterator
+from collections.abc import Iterator
 
 from geenii.agents import Agent
 from geenii.ai import generate_chat_completion_deprecated
 from geenii.bots import BotInterface
 from geenii.chat_models import ContentPart, TextContent
 from geenii.datamodels import ModelMessage
-from geenii.tool.registry import ToolRegistry
 from geenii.tool.python import PythonFunctionTool
+from geenii.tool.registry import ToolRegistry
 
 
 class EchoBot(BotInterface):
@@ -70,8 +70,7 @@ class SimpleBot(BotInterface):
                 task="chat",
             )
 
-            for content_part in response.output:
-                yield content_part
+            yield from response.output
 
         except Exception:
             yield TextContent(text="Uuups, something went wrong :/")

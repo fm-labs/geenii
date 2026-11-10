@@ -10,7 +10,7 @@ from geenii.flows import FlowRegistry
 from geenii.hitl import HumanInTheLoopController
 from geenii.memory import ChatMemory
 from geenii.tool.registry import ToolRegistry
-from geenii.tools import init_builtin_tools, init_mcp_server_tools, _redact_env_vars
+from geenii.tools import _redact_env_vars, init_builtin_tools, init_mcp_server_tools
 
 if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
@@ -20,12 +20,12 @@ from geenii.config import (
     APP_VERSION,
     DEFAULT_COMPLETION_MODEL,
     GEENII_CACHE_DIR,
+    GEENII_USER_HOME,
     GEENII_WORKING_DIR,
     agent_paths,
-    skill_paths,
     flow_dirs,
-    GEENII_USER_HOME,
     project_paths,
+    skill_paths,
 )
 from geenii.skills import SkillRegistry
 from geenii.utils.os_util import get_user_home_dir
@@ -132,8 +132,8 @@ def init_agent_by_name(
         if cwd is not None:
             agent_conf.working_dir = cwd
         return init_agent(agent_conf, context_id=context_id)
-    except Exception as e:
-        raise e
+    except Exception:
+        raise
 
 
 def init_agent(
@@ -205,9 +205,9 @@ def init_agent(
         return agent
     except Exception as e:
         logger.error(
-            f"Error loading agent class '{agent_class_name}': {str(e)}", exc_info=e
+            f"Error loading agent class '{agent_class_name}': {e!s}", exc_info=e
         )
-        raise ValueError(f"Error loading agent class '{agent_class_name}': {str(e)}")
+        raise ValueError(f"Error loading agent class '{agent_class_name}': {e!s}")
 
 
 def init_default_agent(context_id: str | None = None) -> BaseAgent:
@@ -220,8 +220,8 @@ def init_default_agent(context_id: str | None = None) -> BaseAgent:
             scope="global",
         )
         return init_agent(agent_conf, context_id=context_id)
-    except Exception as e:
-        raise e
+    except Exception:
+        raise
 
 
 def init_routing_agent(context_id: str | None = None) -> BaseAgent:
@@ -234,8 +234,8 @@ def init_routing_agent(context_id: str | None = None) -> BaseAgent:
             scope="global",
         )
         return init_agent(agent_conf, context_id=context_id)
-    except Exception as e:
-        raise e
+    except Exception:
+        raise
 
 
 def init_global_skill_registry() -> SkillRegistry:
@@ -251,8 +251,7 @@ def get_app_info() -> dict:
 
     ai_providers = enumerate_providers()
 
-    data = dict(
-        {
+    data = {
             "app": {
                 "version": APP_VERSION,
                 "cwd": os.getcwd(),
@@ -263,14 +262,13 @@ def get_app_info() -> dict:
             },
             "providers": [provider.model_dump() for provider in ai_providers],
         }
-    )
 
     # add system report
     # if not in DEV_MODE, remove the env variables from the report for security reasons
     report = get_system_report()
     if "env" in report:
         report["env"] = _redact_env_vars(report["env"])
-        if not os.environ.get("DEV_MODE", "0") == "1":
+        if os.environ.get("DEV_MODE", "0") != "1":
             report["env"] = {
                 k: v for k, v in report["env"].items() if k in allowed_env_vars
             }

@@ -1,36 +1,36 @@
 import importlib
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pydantic
-import uuid
-from datetime import UTC, datetime
 
 from geenii.config import GEENII_CACHE_DIR
 from geenii.datamodels import (
-    CompletionResponse,
-    CompletionErrorResponse,
-    ChatCompletionRequest,
-    ImageGenerationApiRequest,
-    ImageGenerationApiResponse,
+    USAGE_VERSION,
+    AIModelInfo,
+    AIProviderInfo,
     AudioGenerationApiRequest,
     AudioSpeechGenerationApiResponse,
     AudioTranscriptionApiRequest,
     AudioTranscriptionApiResponse,
-    ModelMessage,
-    AIModelInfo,
-    AIProviderInfo,
+    ChatCompletionRequest,
     ChatCompletionResponse,
+    CompletionErrorResponse,
+    CompletionResponse,
+    ImageGenerationApiRequest,
+    ImageGenerationApiResponse,
+    ModelMessage,
     Usage,
-    USAGE_VERSION,
 )
 from geenii.provider.interfaces import (
-    AICompletionProvider,
-    AIProvider,
-    AIImageGeneratorProvider,
-    AISpeechGeneratorProvider,
     AIAudioTranscriptionProvider,
     AIAudioTranslationProvider,
     AIChatCompletionProvider,
+    AICompletionProvider,
+    AIImageGeneratorProvider,
+    AIProvider,
+    AISpeechGeneratorProvider,
 )
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.cached import cached
@@ -64,7 +64,7 @@ def enumerate_providers() -> list[AIProviderInfo]:
             configured = ai_provider.is_configured()
             providers.append(AIProviderInfo(name=provider_name, configured=configured))
         except Exception as e:
-            print(f"Error initializing provider '{provider_name}': {str(e)}")
+            print(f"Error initializing provider '{provider_name}': {e!s}")
     return providers
 
 
@@ -84,7 +84,7 @@ def enumerate_models() -> list[AIModelInfo]:
                 for model in provider_models:
                     models.append(model)
         except Exception as e:
-            print(f"Error initializing provider '{provider_name}': {str(e)}")
+            print(f"Error initializing provider '{provider_name}': {e!s}")
     return models
 
 
@@ -237,7 +237,7 @@ def generate_completion(
         )
         return response
     except Exception as e:
-        print(f"Error in {model} completion API: {str(e)}")
+        print(f"Error in {model} completion API: {e!s}")
 
         # Publish the error event
         # publish_event(["ai.completion.error"], {"error": str(e), "request": request.model_dump()})
@@ -257,10 +257,10 @@ def generate_chat_completion_deprecated(
     prompt: str,
     system: str | None = None,
     messages: list[ModelMessage] | None = None,
-    tools: set[str] = None,
+    tools: set[str] | None = None,
     tool_registry=None,
-    output_format: str = None,
-    output_schema: dict = None,
+    output_format: str | None = None,
+    output_schema: dict | None = None,
     stream: bool = False,
     source: str | None = None,
     task: str | None = None,
@@ -332,7 +332,7 @@ def generate_chat_completion(
         )
         return response
     except Exception as e:
-        print(f"Error in {request.model} assistant API: {str(e)}")
+        print(f"Error in {request.model} assistant API: {e!s}")
         _log_failed_call(
             provider_name,
             model_name,
@@ -343,7 +343,7 @@ def generate_chat_completion(
             task=task,
         )
         # return ErrorApiResponse(error=str(e))
-        raise e
+        raise
 
 
 def generate_image(
@@ -356,7 +356,7 @@ def generate_image(
         # Publish the image generation request event
         # publish_event(["ai.image.generate"], {"request": request.model_dump()})
 
-        ai, provider, model = get_ai_image_generator_provider(request.model)
+        ai, _provider, model = get_ai_image_generator_provider(request.model)
 
         args = request.model_dump(exclude={"model"})
         print("Generating image with args:", args)
@@ -380,7 +380,7 @@ def generate_speech(
     Generate speech from text using the specified AI provider and model.
     """
     try:
-        ai, provider, model = get_ai_audio_generator_provider(request.model)
+        ai, _provider, model = get_ai_audio_generator_provider(request.model)
         response = ai.generate_speech(model=model, text=request.text)
         return response
     except Exception as e:
@@ -394,7 +394,7 @@ def generate_audio_transcription(
     Generate a transcription from audio using the specified AI provider and model.
     """
     try:
-        ai, provider, model = get_ai_audio_transcription_provider(request.model)
+        ai, _provider, model = get_ai_audio_transcription_provider(request.model)
         response = ai.generate_audio_transcription(
             model=model, audio=request.input_file
         )

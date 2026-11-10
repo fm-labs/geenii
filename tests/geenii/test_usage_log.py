@@ -214,6 +214,7 @@ def test_usage_reads_old_log_lines():
 
 def test_anthropic_input_includes_cache_tokens():
     from types import SimpleNamespace
+
     from geenii.provider.anthropic.provider import _usage_from_result
 
     result = SimpleNamespace(
@@ -234,6 +235,7 @@ def test_anthropic_input_includes_cache_tokens():
 
 def test_anthropic_without_cache_fields():
     from types import SimpleNamespace
+
     from geenii.provider.anthropic.provider import _usage_from_result
 
     usage = _usage_from_result(
@@ -245,6 +247,7 @@ def test_anthropic_without_cache_fields():
 
 def test_openai_records_cached_tokens():
     from types import SimpleNamespace
+
     from geenii.provider.openai.provider import _usage_from_result
 
     result = SimpleNamespace(

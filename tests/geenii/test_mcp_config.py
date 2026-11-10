@@ -119,7 +119,7 @@ def test_project_file_overrides_root(mcp_dirs):
 
 
 def test_missing_and_invalid_files_are_skipped(mcp_dirs):
-    root, project = mcp_dirs
+    _root, project = mcp_dirs
     project.parent.mkdir(parents=True)
     project.write_text("{not json")
 

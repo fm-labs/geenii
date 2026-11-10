@@ -1,13 +1,13 @@
 from geenii.datamodels import (
+    AIModelInfo,
     ChatCompletionRequest,
     ChatCompletionResponse,
     CompletionResponse,
-    AIModelInfo,
 )
 from geenii.provider.interfaces import (
-    AIProvider,
-    AICompletionProvider,
     AIChatCompletionProvider,
+    AICompletionProvider,
+    AIProvider,
 )
 
 

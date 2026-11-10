@@ -1,12 +1,9 @@
-from os.path import dirname
-
-import uuid
-
 import abc
-
-import subprocess
 import os
+import subprocess
 import time
+import uuid
+from os.path import dirname
 from typing import Literal
 
 from geenii.config import GEENII_CACHE_DIR
@@ -37,8 +34,7 @@ def run_docker_subprocess(
     try:
         result = subprocess.run(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=timeout,
             env=_env,
@@ -47,11 +43,11 @@ def run_docker_subprocess(
     except subprocess.TimeoutExpired:
         return -1, "", f"Command timed out after {timeout} seconds"
     except Exception as e:
-        return -1, "", f"Error running command: {str(e)}"
+        return -1, "", f"Error running command: {e!s}"
 
 
 def build_sandbox_image(
-    sandbox_id: str, app_dir: str, env: dict | None = None, dockerlines: str = None
+    sandbox_id: str, app_dir: str, env: dict | None = None, dockerlines: str | None = None
 ) -> str:
     """
     Build a docker image from base python image + installing deps defined in pyproject.toml file.
@@ -95,15 +91,15 @@ class Sandbox(abc.ABC):
     def __init__(
         self,
         app_dir: str,
-        mounts: list[str] = None,
+        mounts: list[str] | None = None,
         network_mode: Literal["none", "bridge", "host"] = "none",
-        cap_add: list[str] = None,
+        cap_add: list[str] | None = None,
         cpu_limit: float = 0.5,
         mem_limit: str = "256m",
         pid_limit: int = 100,
         timeout: int = 30,
         env: dict | None = None,
-        sandbox_id: str = None,
+        sandbox_id: str | None = None,
     ):
         """
         Base docker-backed sandbox class.
@@ -255,7 +251,7 @@ class PythonSandbox(Sandbox):
         self,
         app_dir: str,
         script_name: str = "main.py",
-        script_args: list[str] = None,
+        script_args: list[str] | None = None,
         **kwargs,
     ):
         if "sandbox_id" not in kwargs or kwargs["sandbox_id"] is None:
@@ -293,7 +289,7 @@ class BashSandbox(Sandbox):
         app_dir: str,
         shell_command: str | None = None,
         script_name: str | None = None,
-        script_args: list[str] = None,
+        script_args: list[str] | None = None,
         **kwargs,
     ):
         if shell_command and script_name:
@@ -322,7 +318,7 @@ class NodeJsSandbox(Sandbox):
         self,
         app_dir: str,
         script_name: str = "index.js",
-        script_args: list[str] = None,
+        script_args: list[str] | None = None,
         **kwargs,
     ):
         super().__init__(app_dir=app_dir, **kwargs)

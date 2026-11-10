@@ -1,5 +1,6 @@
-import yaml
 import os
+
+import yaml
 
 
 class MarkdownFile:
@@ -44,7 +45,7 @@ class MarkdownFile:
             header_dict = yaml.safe_load(header_str)
         except yaml.YAMLError as e:
             raise ValueError(
-                f"Malformed skill markdown file: error parsing header YAML. {str(e)}"
+                f"Malformed skill markdown file: error parsing header YAML. {e!s}"
             )
         self.header = header_dict
 
@@ -84,7 +85,7 @@ def read_frontmatter_file(file_path: str) -> tuple[dict, str]:
         header_dict = yaml.safe_load(header)
     except yaml.YAMLError as e:
         raise ValueError(
-            f"Malformed frontmatter markdown file: error parsing header YAML. {str(e)}"
+            f"Malformed frontmatter markdown file: error parsing header YAML. {e!s}"
         )
 
     return header_dict, body

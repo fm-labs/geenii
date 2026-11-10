@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import abc
-from typing import Iterator, Any, TYPE_CHECKING
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
 
-from geenii.chat_models import TextContent, ContentPart
+from geenii.chat_models import ContentPart, TextContent
 from geenii.datamodels import ModelMessage
 
 DEFAULT_AGENT_SYSTEM_PROMPT = """
@@ -54,7 +55,7 @@ class BaseAgentTask(BaseTask, abc.ABC):
     The agent tasks has a reference to the agent instance and can access its tools, skills, memory, etc. to perform its work.
     """
 
-    def __init__(self, agent: "BaseAgent"):
+    def __init__(self, agent: BaseAgent):
         self.agent = agent
 
 

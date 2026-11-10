@@ -5,7 +5,7 @@ import shlex
 import shutil
 from typing import Any, Literal
 
-from geenii.tool.common import Tool, expand_vars, ToolCallResult
+from geenii.tool.common import Tool, ToolCallResult, expand_vars
 
 logger = logging.getLogger(__name__)
 
@@ -75,18 +75,18 @@ class SandboxTool(Tool):
     def _run(
         self, app_dir: str, command: str, sandbox_id: str, env: dict[str, str] | None
     ) -> str:
-        from geenii.sandbox import PythonSandbox, BashSandbox, NodeJsSandbox
+        from geenii.sandbox import BashSandbox, NodeJsSandbox, PythonSandbox
 
-        shared_kwargs = dict(
-            app_dir=app_dir,
-            network_mode=self.network_mode,
-            cpu_limit=self.cpu_limit,
-            mem_limit=self.mem_limit,
-            pid_limit=self.pid_limit,
-            timeout=self.timeout,
-            env=env,
-            sandbox_id=sandbox_id,
-        )
+        shared_kwargs = {
+            "app_dir": app_dir,
+            "network_mode": self.network_mode,
+            "cpu_limit": self.cpu_limit,
+            "mem_limit": self.mem_limit,
+            "pid_limit": self.pid_limit,
+            "timeout": self.timeout,
+            "env": env,
+            "sandbox_id": sandbox_id,
+        }
 
         if self.runtime == "bash":
             sandbox = BashSandbox(shell_command=command, **shared_kwargs)

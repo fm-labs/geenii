@@ -8,22 +8,20 @@ from mcp_types import CallToolResult
 
 from geenii.config import GEENII_CACHE_DIR
 from geenii.mcp_config import (
+    get_mcp_client_for_server,
     get_mcp_config,
     get_mcp_config_for_server,
-    get_mcp_client_for_server,
 )
 
 
 @click.group()
 def mcp():
     """Manage MCP servers and tools."""
-    pass
 
 
 @mcp.group("server")
 def server():
     """MCP server commands."""
-    pass
 
 
 @server.command("list")
@@ -70,7 +68,7 @@ def server_info(server_id):
         click.echo(json.dumps(info, indent=2, default=str))
     except Exception as e:
         click.echo(repr(e))
-        raise e
+        raise
     finally:
         client.close()
 
@@ -93,7 +91,7 @@ def server_tools(server_id):
         #     click.echo(f"  {name:40s} {desc}")
     except Exception as e:
         click.echo(repr(e))
-        raise e
+        raise
     finally:
         client.close()
 
@@ -114,10 +112,10 @@ def server_tool_info(server_id, tool_name):
                     # return tool
                     click.echo(json.dumps(tool, indent=2, default=str))
                     break
-        return None
+        return
     except Exception as e:
         click.echo(repr(e))
-        raise e
+        raise
     finally:
         client.close()
 

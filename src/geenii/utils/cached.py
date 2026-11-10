@@ -1,17 +1,16 @@
 import abc
-
 import hashlib
-import json
 import inspect
-import os
-import time
-import pickle
+import json
 import logging
+import os
+import pickle
+import sqlite3
+import time
+from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
-from typing import Any, Optional, Callable
-
-import sqlite3
+from typing import Any
 
 from geenii import config
 
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class CacheStore(abc.ABC):
     @abc.abstractmethod
-    def write_cache(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+    def write_cache(self, key: str, value: Any, ttl: float | None = None) -> None:
         pass
 
     @abc.abstractmethod
@@ -133,7 +132,7 @@ class SqliteCacheStore(CacheStore):
 
         return self._with_retry(op)
 
-    def write_cache(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+    def write_cache(self, key: str, value: Any, ttl: float | None = None) -> None:
         expiry = None if ttl is None else (time.time() + float(ttl))
         blob = sqlite3.Binary(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))
 
@@ -210,7 +209,7 @@ class FileCacheStore(CacheStore):
 
         return value
 
-    def write_cache(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+    def write_cache(self, key: str, value: Any, ttl: float | None = None) -> None:
         path = self._path_for_key(key)
         expiry = None if ttl is None else (time.time() + float(ttl))
 
@@ -236,7 +235,7 @@ class InMemoryCacheStore(CacheStore):
             return None
         return value
 
-    def write_cache(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+    def write_cache(self, key: str, value: Any, ttl: float | None = None) -> None:
         expiry = None if ttl is None else (time.time() + float(ttl))
         self.store[key] = (expiry, value)
 
@@ -317,7 +316,7 @@ def cache_fn(
     return result
 
 
-def cache_write(key, data, ttl: Optional[int] = None):
+def cache_write(key, data, ttl: int | None = None):
     cache_store().write_cache(key, data, ttl=ttl)
 
 

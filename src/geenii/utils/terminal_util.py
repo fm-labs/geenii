@@ -1,11 +1,11 @@
 import os
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import textwrap
-import stat
 
 
 def open_terminal(

@@ -1,7 +1,7 @@
 import logging
 import queue
 import threading
-from typing import Iterator
+from collections.abc import Iterator
 
 from geenii.agent.base_agent import BaseAgent
 from geenii.chat_models import (

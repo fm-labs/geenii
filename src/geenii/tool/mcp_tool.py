@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 from typing import Any
+
 from mcp.types import CallToolResult, TextContent
 
-from geenii.mcp_config import get_mcp_client_for_server
 from geenii.mcp_client import McpClient
-from geenii.tool.common import Tool, ToolCallResult, ToolCallContext
+from geenii.mcp_config import get_mcp_client_for_server
+from geenii.tool.common import Tool, ToolCallContext, ToolCallResult
 
 
 class McpTool(Tool):

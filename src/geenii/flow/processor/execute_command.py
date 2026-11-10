@@ -4,7 +4,8 @@ import shlex
 import subprocess
 import threading
 import time
-from typing import IO, Any, Generator
+from collections.abc import Generator
+from typing import IO, Any
 
 import pydantic
 

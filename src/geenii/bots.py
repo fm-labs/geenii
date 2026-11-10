@@ -1,5 +1,5 @@
 import abc
-from typing import Iterator
+from collections.abc import Iterator
 
 from geenii.chat_models import ContentPart, TextContent
 from geenii.datamodels import ModelMessage

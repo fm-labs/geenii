@@ -65,4 +65,4 @@ class HuggingFaceAIProvider(AISpeechGeneratorProvider):
                 # output=[{"base64": base64_audio}],
             )
         except Exception as e:
-            raise RuntimeError(f"Failed to generate audio: {str(e)}")
+            raise RuntimeError(f"Failed to generate audio: {e!s}")

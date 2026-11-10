@@ -12,7 +12,8 @@ import asyncio
 import atexit
 import logging
 import threading
-from typing import Any, Coroutine, TypeVar
+from collections.abc import Coroutine
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ def get_loop() -> asyncio.AbstractEventLoop:
         return _loop
 
 
-def run_sync(coro: Coroutine[Any, Any, T], timeout: float | None = None) -> T:
+def run_sync[T](coro: Coroutine[Any, Any, T], timeout: float | None = None) -> T:
     """
     Run a coroutine on the background loop and block until it returns.
 

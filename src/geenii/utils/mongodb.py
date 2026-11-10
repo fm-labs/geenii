@@ -1,4 +1,3 @@
-from typing import List
 
 from pymongo import MongoClient
 
@@ -37,7 +36,7 @@ def get_mongo_collection(mongo: MongoClient, db_name: str, collection_name: str)
     return mongo[db_name][collection_name]
 
 
-def mongodb_results_to_json(results: List[dict], strip_id=True) -> List[dict]:
+def mongodb_results_to_json(results: list[dict], strip_id=True) -> list[dict]:
     json_results = []
     for doc in results:
         if strip_id and "_id" in doc:

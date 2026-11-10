@@ -5,9 +5,9 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+from geenii import g as g_mod
 from geenii.agent import base_agent as base_agent_mod
 from geenii.agent import tasks as tasks_mod
-from geenii import g as g_mod
 from geenii.agent.registry import AgentRegistry, AgentSpec
 from geenii.chat_models import (
     ToolCallContent,

@@ -54,7 +54,6 @@ def start_daemon(
 @click.group()
 def daemon():
     """Run and control the geenii daemon (process manager, scheduler, supervisor)."""
-    pass
 
 
 @daemon.command(name="start")

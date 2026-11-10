@@ -22,7 +22,7 @@ import json
 import logging
 import os
 import time
-from typing import Any, Optional
+from typing import Any
 
 from geenii import proc as proc_util
 from geenii.config import GEENII_WORKING_DIR
@@ -41,7 +41,7 @@ class DaemonAlreadyRunning(RuntimeError):
 
 
 class DaemonServer:
-    def __init__(self, host: ProcessHost, socket_path: Optional[str] = None) -> None:
+    def __init__(self, host: ProcessHost, socket_path: str | None = None) -> None:
         self._host = host
         self._socket_path = socket_path or default_socket_path()
         self._server: asyncio.AbstractServer | None = None
@@ -189,8 +189,8 @@ class DaemonServer:
 
 
 def build_host(
-    scheduler_config: Optional[str] = DEFAULT_SCHEDULER_CONFIG,
-    services_config: Optional[str] = DEFAULT_SERVICES_CONFIG,
+    scheduler_config: str | None = DEFAULT_SCHEDULER_CONFIG,
+    services_config: str | None = DEFAULT_SERVICES_CONFIG,
 ) -> ProcessHost:
     """Create a ProcessHost for the given config files (each is optional and may not exist yet)."""
     scheduler = Scheduler()
@@ -213,16 +213,16 @@ def build_host(
 
 
 def run_daemon(
-    socket_path: Optional[str] = None,
-    scheduler_config: Optional[str] = DEFAULT_SCHEDULER_CONFIG,
-    services_config: Optional[str] = DEFAULT_SERVICES_CONFIG,
+    socket_path: str | None = None,
+    scheduler_config: str | None = DEFAULT_SCHEDULER_CONFIG,
+    services_config: str | None = DEFAULT_SERVICES_CONFIG,
 ) -> None:
     """Run the daemon in the foreground until SIGINT/SIGTERM or daemon.shutdown."""
     server = DaemonServer(build_host(scheduler_config, services_config), socket_path)
     asyncio.run(server.serve_forever())
 
 
-def main(argv: Optional[list[str]] = None) -> None:
+def main(argv: list[str] | None = None) -> None:
     from geenii.logs import init_logging
 
     init_logging()

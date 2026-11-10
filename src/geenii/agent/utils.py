@@ -24,7 +24,7 @@ def estimate_token_cost(
     """
     Estimate the cost of tokens for a given input and expected output based on a price per million tokens.
     """
-    it, ot, tt = estimate_token_count(input_text, expected_output_chars)
+    it, ot, _tt = estimate_token_count(input_text, expected_output_chars)
     input_cost = (it / 1_000_000) * price_per_million_tokens
     output_cost = (ot / 1_000_000) * price_per_million_tokens
     total_cost = input_cost + output_cost

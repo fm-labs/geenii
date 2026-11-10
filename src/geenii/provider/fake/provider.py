@@ -3,9 +3,8 @@
 import time
 import uuid
 from collections import deque
-from typing import List
 
-from geenii.chat_models import TextContent, ToolCallContent, ContentPart
+from geenii.chat_models import ContentPart, TextContent, ToolCallContent
 from geenii.datamodels import (
     AIModelInfo,
     ChatCompletionRequest,
@@ -14,9 +13,9 @@ from geenii.datamodels import (
     Usage,
 )
 from geenii.provider.interfaces import (
-    AIProvider,
-    AICompletionProvider,
     AIChatCompletionProvider,
+    AICompletionProvider,
+    AIProvider,
 )
 
 
@@ -41,7 +40,7 @@ class FakeProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
 
     def __init__(self, **kwargs):
         super().__init__(name="fake")
-        self._responses: deque[List[ContentPart]] = deque()
+        self._responses: deque[list[ContentPart]] = deque()
         self.requests: list[ChatCompletionRequest] = []
         self.default_response = "I am a fake model."
 
@@ -49,7 +48,7 @@ class FakeProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
         """Queue a plain-text response."""
         self._responses.append([TextContent(text=text)])
 
-    def enqueue_parts(self, parts: List[ContentPart]) -> None:
+    def enqueue_parts(self, parts: list[ContentPart]) -> None:
         """Queue a response with arbitrary content parts."""
         self._responses.append(parts)
 

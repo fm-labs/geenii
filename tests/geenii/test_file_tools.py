@@ -14,7 +14,7 @@ def dirs(tmp_path, monkeypatch):
     for p in d.values():
         p.mkdir()
     monkeypatch.setattr(config, "GEENII_WORKING_DIR", str(d["geenii_wd"]))
-    monkeypatch.setattr(config, "read_user_settings", lambda: {})
+    monkeypatch.setattr(config, "read_user_settings", dict)
     return d
 
 

@@ -1,18 +1,18 @@
 import abc
 import json
 import uuid
-from typing import Any, Optional, List
+from typing import Any
 
 import pydantic
 from pymongo import MongoClient
 from redis import Redis
 
+from geenii.config import MONGODB_DB_NAME
+
 # from bson import ObjectId
 # from pydantic import Field, ConfigDict
 # from pydantic_core import core_schema
-
-from geenii.utils.mongodb import get_mongo_collection, get_mongo_client
-from geenii.config import MONGODB_DB_NAME
+from geenii.utils.mongodb import get_mongo_client, get_mongo_collection
 
 
 class ModelStore(abc.ABC):
@@ -37,7 +37,7 @@ class ModelStore(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def find(self, query: Optional[dict] = None) -> List[pydantic.BaseModel]:
+    def find(self, query: dict | None = None) -> list[pydantic.BaseModel]:
         pass
 
     def _get_model_key(self, model: pydantic.BaseModel) -> str | None:
@@ -91,7 +91,7 @@ class InMemoryModelStore(ModelStore):
             del self.store[key]
         return True
 
-    def find(self, query: Optional[dict] = None) -> List[pydantic.BaseModel]:
+    def find(self, query: dict | None = None) -> list[pydantic.BaseModel]:
         raise NotImplementedError(
             "Find method is not implemented for InMemoryModelStore."
         )
@@ -129,7 +129,7 @@ class SerializedInMemoryModelStore(ModelStore):
             del self.store[key]
         return True
 
-    def find(self, query: Optional[dict] = None) -> List[pydantic.BaseModel]:
+    def find(self, query: dict | None = None) -> list[pydantic.BaseModel]:
         raise NotImplementedError(
             "Find method is not implemented for SerializedInMemoryModelStore."
         )
@@ -181,7 +181,7 @@ class RedisModelStore(ModelStore):
         self.redis.delete(self._build_redis_key(key))
         return True
 
-    def find(self, query: Optional[dict] = None) -> List[pydantic.BaseModel]:
+    def find(self, query: dict | None = None) -> list[pydantic.BaseModel]:
         raise NotImplementedError("Find method is not implemented for RedisModelStore.")
 
 
@@ -229,7 +229,7 @@ class MongoDbModelStore(ModelStore):
         result = self.collection.delete_one({self.key_field: key})
         return result.deleted_count > 0
 
-    def find(self, query: Optional[dict] = None) -> List[pydantic.BaseModel]:
+    def find(self, query: dict | None = None) -> list[pydantic.BaseModel]:
         if query is None:
             query = {}
         records = list(self.collection.find(query))

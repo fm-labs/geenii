@@ -1,30 +1,30 @@
+import datetime
 import json
+import logging
 import os
 import time
 import uuid
-import datetime
-import logging
 
 from openai import OpenAI
 
 from geenii import config
-from geenii.chat_models import TextContent, ToolCallContent, JsonContent, ImageContent
+from geenii.chat_models import ImageContent, JsonContent, TextContent, ToolCallContent
 from geenii.config import GEENII_CACHE_DIR
 from geenii.datamodels import (
-    CompletionResponse,
-    ImageGenerationApiResponse,
-    ChatCompletionRequest,
-    ChatCompletionResponse,
     AIModelInfo,
     AudioTranscriptionApiResponse,
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    CompletionResponse,
+    ImageGenerationApiResponse,
     Usage,
 )
 from geenii.provider.interfaces import (
-    AIProvider,
-    AICompletionProvider,
-    AIChatCompletionProvider,
-    AIImageGeneratorProvider,
     AIAudioTranscriptionProvider,
+    AIChatCompletionProvider,
+    AICompletionProvider,
+    AIImageGeneratorProvider,
+    AIProvider,
 )
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.json_util import write_json
@@ -246,8 +246,7 @@ class OpenAIProvider(
         self, request: ChatCompletionRequest, tool_registry: ToolRegistry = None
     ) -> ChatCompletionResponse:
         model = request.model or self.DEFAULT_MODEL
-        if model.startswith("openai:"):
-            model = model[len("openai:") :]
+        model = model.removeprefix("openai:")
 
         # map tool names to tool definitions in openai format
         tools = request.tools or set()
@@ -506,7 +505,7 @@ class OpenAIProvider(
 
         # check parameters
         if model not in self.IMAGE_MODELS:
-            raise ValueError(f"Model {model} is not supported by {repr(self)}.")
+            raise ValueError(f"Model {model} is not supported by {self!r}.")
         if size not in self.IMAGE_MODELS[model]["sizes"]:
             raise ValueError(
                 f"Size {size} is not supported by model {model}. "

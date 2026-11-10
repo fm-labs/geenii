@@ -1,13 +1,13 @@
 import abc
 import uuid
 
-import pytest
 import pydantic
+import pytest
 
 from geenii.utils.modelstore import (
     InMemoryModelStore,
-    SerializedInMemoryModelStore,
     ModelStore,
+    SerializedInMemoryModelStore,
 )
 
 

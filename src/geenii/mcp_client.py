@@ -7,12 +7,12 @@ from fastmcp import Client
 from fastmcp.client.logging import LogMessage
 from fastmcp.mcp_config import MCPConfig
 from mcp_types import (
-    TextResourceContents,
     BlobResourceContents,
     CallToolResult,
     Prompt,
-    Tool,
     Resource,
+    TextResourceContents,
+    Tool,
 )
 
 from geenii.config import MCP_INIT_TIMEOUT

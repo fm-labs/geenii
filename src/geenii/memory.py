@@ -1,10 +1,9 @@
-import sqlite3
-import threading
-
 import abc
 import json
-from pathlib import Path
 import logging
+import sqlite3
+import threading
+from pathlib import Path
 
 from geenii.datamodels import ModelMessage
 
@@ -34,12 +33,10 @@ class ChatMemory(abc.ABC):
     @abc.abstractmethod
     def _insert(self, message: ModelMessage) -> None:
         """Insert a message into the memory storage."""
-        pass
 
     @abc.abstractmethod
     def _write(self) -> None:
         """Save the current state of the memory to persistent storage."""
-        pass
 
     def __iter__(self):
         return iter(self._messages)
