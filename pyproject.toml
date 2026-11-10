@@ -84,6 +84,13 @@ target-version = "py314"
 line-length = 120
 
 [tool.ruff.lint]
+ignore = [
+    "BLE001",
+    "E402",
+    "E501",
+    "PERF402",
+    "TRY401"
+]
 select = [
     "E",   # pycodestyle errors
     #"W",   # pycodestyle warnings
