@@ -79,11 +79,7 @@ class Agent(BaseAgent):
                 message = parts[1] if len(parts) > 1 else ""
                 logger.info("Agent macro: agent=%s message=%s", agent_name, message)
                 # handoff to the agent
-                self.enqueue_task(
-                    HandoffTask(
-                        agent=self, target_agent_name=agent_name, prompt=message
-                    )
-                )
+                self.enqueue_task(HandoffTask(agent=self, target_agent_name=agent_name, prompt=message))
                 return True  # signal to stop message handling
 
             # slash commands using '/' prefix
@@ -104,9 +100,7 @@ class Agent(BaseAgent):
                     self.enqueue_task(MemoryCompactionTask(agent=self, prompt=prompt))
                     return True
                 elif skill_name in INFO_COMMANDS:
-                    self.enqueue_task(
-                        InfoCommandTask(agent=self, command=skill_name, args=prompt)
-                    )
+                    self.enqueue_task(InfoCommandTask(agent=self, command=skill_name, args=prompt))
                     return True
                 # elif skill_name == "memo":
                 #     self.enqueue_task(StorePersistentMemoryTask(agent=self, message=prompt))
@@ -115,27 +109,19 @@ class Agent(BaseAgent):
                 #     self.enqueue_task(RetrievePersistentMemoryTask(agent=self, message=prompt))
                 #     return True
                 else:
-                    self.enqueue_task(
-                        ActivateSkillTask(
-                            agent=self, skill_name=skill_name, prompt=prompt
-                        )
-                    )
+                    self.enqueue_task(ActivateSkillTask(agent=self, skill_name=skill_name, prompt=prompt))
                     return True
 
             # direct tool call using ':' prefix
             if message.startswith(":"):
                 parts = message.split(" ", maxsplit=1)
                 tool_name = parts[0][1:]
-                args_str = (
-                    parts[1] if len(parts) > 1 else ""
-                )  # key=value key2="value 2"
+                args_str = parts[1] if len(parts) > 1 else ""  # key=value key2="value 2"
                 args = {}
                 try:
                     for part in shlex.split(args_str):
                         if "=" not in part:
-                            raise ValueError(
-                                f"Invalid argument '{part}', expected key=value"
-                            )
+                            raise ValueError(f"Invalid argument '{part}', expected key=value")
                         key, value = part.split("=", maxsplit=1)
                         args[key] = value
                 except ValueError as e:
@@ -148,11 +134,7 @@ class Agent(BaseAgent):
                 # tool = tool_registry.get(tool_name)
                 # result = tool.invoke(args=args, env={})
                 call_id = f"usr-{tool_name}-{time.time()}"
-                self.enqueue_task(
-                    ToolCallTask(
-                        agent=self, tool_name=tool_name, arguments=args, call_id=call_id
-                    )
-                )
+                self.enqueue_task(ToolCallTask(agent=self, tool_name=tool_name, arguments=args, call_id=call_id))
                 return True
 
         return None

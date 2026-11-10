@@ -5,9 +5,7 @@ from geenii.hitl import HumanInTheLoopController
 
 
 class CliHumanInTheLoopController(HumanInTheLoopController):
-    def request_tool_execution(
-        self, tool_name: str, arguments: dict, call_id: str
-    ) -> bool:
+    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
         click.secho(
             f"Tool execution requested: {tool_name} with arguments {arguments} (call_id={call_id})",
             fg="yellow",

@@ -37,9 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 def _is_interaction_message(msg) -> bool:
-    return isinstance(msg, ModelMessage) and any(
-        isinstance(p, UserInteractionContent) for p in msg.content
-    )
+    return isinstance(msg, ModelMessage) and any(isinstance(p, UserInteractionContent) for p in msg.content)
 
 
 def _usage_source(agent: BaseAgent) -> str:
@@ -58,9 +56,7 @@ def _complete(
     A model call of an agent task: tagged with the agent and `task` for the usage log, and counted in the
     agent's usage (`BaseAgent.record_usage`). Every agent task makes its model calls through this.
     """
-    response = generate_chat_completion(
-        request, tool_registry=tool_registry, source=_usage_source(agent), task=task
-    )
+    response = generate_chat_completion(request, tool_registry=tool_registry, source=_usage_source(agent), task=task)
     agent.record_usage(response.usage)
     return response
 
@@ -103,9 +99,7 @@ class ToolCallTask(BaseAgentTask):
         # enforce argument-level tool filters from active skills
         tool_filter_set = self._get_active_tool_filters()
         if tool_filter_set and not tool_filter_set.allows(tool_name, arguments):
-            logger.warning(
-                f"Tool call {tool_name} blocked by tool filters: args={arguments}"
-            )
+            logger.warning(f"Tool call {tool_name} blocked by tool filters: args={arguments}")
             msg = ModelMessage(
                 role="tool",
                 content=[
@@ -141,9 +135,7 @@ class ToolCallTask(BaseAgentTask):
             tool_name=tool_name, arguments=arguments, call_id=call_id
         )
         if not tool_usage_approved:
-            logger.critical(
-                f"Tool execution for {tool_name} was rejected by the request_tool_execution method."
-            )
+            logger.critical(f"Tool execution for {tool_name} was rejected by the request_tool_execution method.")
             tool_result = {"error": "Tool execution rejected."}
             msg = ModelMessage(
                 role="tool",
@@ -186,9 +178,7 @@ class ToolCallTask(BaseAgentTask):
 
         except Exception as e:
             logger.exception(f"Error executing tool {tool_name}", exc_info=e)
-            tool_result = ToolCallResult(
-                text=str(e), structured_content={"error": str(e)}, is_error=True
-            )
+            tool_result = ToolCallResult(text=str(e), structured_content={"error": str(e)}, is_error=True)
 
         msg = ModelMessage(
             role="tool",
@@ -255,9 +245,7 @@ class LLMTask(BaseAgentTask):
             )
         return effective
 
-    def _calculate_max_tokens(
-        self, system_prompt: str, messages: list[ContentPart]
-    ) -> int:
+    def _calculate_max_tokens(self, system_prompt: str, messages: list[ContentPart]) -> int:
         """Calculate the maximum number of tokens needed to complete the response"""
         str_len = len(system_prompt)
         for message in messages:
@@ -269,9 +257,7 @@ class LLMTask(BaseAgentTask):
     def execute(self) -> Iterator[ModelMessage]:
         full_system_prompt = self._build_system_prompt()
         prompt = message_to_prompt(self.message)
-        allowed_tools = (
-            self.allowed_tools
-        )  # if self.allowed_tools else self._compute_effective_tools()
+        allowed_tools = self.allowed_tools  # if self.allowed_tools else self._compute_effective_tools()
         # message history (last MAX_MESSAGE_HISTORY messages)
         input_messages = list(self.agent.message_history[-self.MAX_MESSAGE_HISTORY :])
 
@@ -294,9 +280,7 @@ class LLMTask(BaseAgentTask):
             # input_messages.append(user_message)
 
         response = self._request_completion(request)
-        logger.info(
-            f"Received model response with {len(response.output)} content parts."
-        )
+        logger.info(f"Received model response with {len(response.output)} content parts.")
 
         # yield all message from parse_response
         for msg in self._handle_response_with_tool_calls(prompt, request, response):
@@ -314,35 +298,25 @@ class LLMTask(BaseAgentTask):
         # recursion breaker
         if i >= self.MAX_RECURSION:
             logger.warning("Too many tool call recursion detected.")
-            bot_message = ModelMessage(
-                role="assistant", content=response.output, usage=response.usage
-            )
+            bot_message = ModelMessage(role="assistant", content=response.output, usage=response.usage)
             yield bot_message
             return
 
         # handle tools calls
         tools_called = 0
         while True:
-            tool_call_contents = [
-                content
-                for content in response.output
-                if isinstance(content, ToolCallContent)
-            ]
+            tool_call_contents = [content for content in response.output if isinstance(content, ToolCallContent)]
             if len(tool_call_contents) < 1:
                 if tools_called == 0:
                     logger.debug(
                         "No tool calls detected in the model response. Proceeding to yield the final response."
                     )
 
-                bot_message = ModelMessage(
-                    role="assistant", content=response.output, usage=response.usage
-                )
+                bot_message = ModelMessage(role="assistant", content=response.output, usage=response.usage)
                 yield bot_message
                 break  # no tool calls, we can proceed without re-generating the response.
 
-            logger.debug(
-                f"Detected {len(tool_call_contents)} tool calls in the model response."
-            )
+            logger.debug(f"Detected {len(tool_call_contents)} tool calls in the model response.")
 
             if tools_called >= self.MAX_TOOL_CALLS:
                 logger.error(
@@ -362,9 +336,7 @@ class LLMTask(BaseAgentTask):
             # tool calls in a single response) before re-generating based on their results.
             tool_call_failed = False
             for n, tool_call in enumerate(tool_call_contents):
-                logger.debug(
-                    f"Next tool call to process: {tool_call.name} and call ID {tool_call.call_id}"
-                )
+                logger.debug(f"Next tool call to process: {tool_call.name} and call ID {tool_call.call_id}")
                 # stream the tool call; execute() adds it to the history when the consumer resumes, i.e. before the
                 # tool runs, so the tool result follows its call in the history.
                 # (the response's usage goes on its first message only, so it is counted once)
@@ -382,9 +354,7 @@ class LLMTask(BaseAgentTask):
                 )
                 tool_result = None
                 for msg in tool_task.execute():
-                    if isinstance(msg, ModelMessage) and isinstance(
-                        msg.content[0], ToolCallResultContent
-                    ):
+                    if isinstance(msg, ModelMessage) and isinstance(msg.content[0], ToolCallResultContent):
                         tool_result = msg.content[0].result
                         # add the tool result to the message history so that it can be used as context for the next response generation
                         # self.agent.add_to_history(msg)
@@ -394,10 +364,7 @@ class LLMTask(BaseAgentTask):
                         # todo: add to message history as well?
                         if isinstance(msg, ModelMessage):
                             # approval requests only go out if the human answers through this stream
-                            if (
-                                not isinstance(msg.content[0], UserInteractionContent)
-                                or self.agent.hitl.interactive
-                            ):
+                            if not isinstance(msg.content[0], UserInteractionContent) or self.agent.hitl.interactive:
                                 yield msg
 
                 tools_called += 1
@@ -407,11 +374,7 @@ class LLMTask(BaseAgentTask):
                     )
                     yield ModelMessage(
                         role="assistant",
-                        content=[
-                            TextContent(
-                                text=f"Tool '{tool_call.name}' did not return a valid result."
-                            )
-                        ],
+                        content=[TextContent(text=f"Tool '{tool_call.name}' did not return a valid result.")],
                     )
                     tool_call_failed = True
                     break  # if a tool call did not return a valid result, we stop the process to avoid infinite loops
@@ -426,9 +389,7 @@ class LLMTask(BaseAgentTask):
                 #                  + "Based on the tool call results proceed with the request.")
                 # snapshot of the updated message history
                 # todo dynamically adjust the history window or use compaction
-                request.messages = list(
-                    self.agent.message_history[-self.MAX_MESSAGE_HISTORY :]
-                )
+                request.messages = list(self.agent.message_history[-self.MAX_MESSAGE_HISTORY :])
                 request.prompt = ""  # already in history; re-sending it after the tool result makes the model ask again
                 response2 = self._request_completion(request)
                 logger.info(
@@ -436,9 +397,7 @@ class LLMTask(BaseAgentTask):
                 )
 
                 # recursively handle response with tool calls
-                for msg in self._handle_response_with_tool_calls(
-                    prompt, request, response2, i + 1
-                ):
+                for msg in self._handle_response_with_tool_calls(prompt, request, response2, i + 1):
                     yield msg
             break
 
@@ -447,9 +406,7 @@ class LLMTask(BaseAgentTask):
 
     def _request_completion(self, request):
         # print("_request_completions", request.messages)
-        return _complete(
-            self.agent, request, task="llm", tool_registry=self.agent.tools
-        )
+        return _complete(self.agent, request, task="llm", tool_registry=self.agent.tools)
 
     def _build_system_prompt(self) -> list[str]:
         """
@@ -559,9 +516,7 @@ class ToolFilterTask(BaseAgentTask):
             context_id=self.agent.context_id,  # attributes the usage to the conversation
         )
         response = _complete(self.agent, request, task="tool_filter")
-        logger.info(
-            f"Received model response for tool filtering with {len(response.output)} content parts."
-        )
+        logger.info(f"Received model response for tool filtering with {len(response.output)} content parts.")
         selected_tools = []
         if len(response.output) > 0:
             if isinstance(response.output[0], JsonContent):
@@ -593,29 +548,21 @@ class ToolFilterTask(BaseAgentTask):
 class HandoffTask(BaseAgentTask):
     """Task to hand off the conversation to another agent or agent"""
 
-    def __init__(
-        self, agent: BaseAgent, target_agent_name: str, prompt: str | None = None
-    ):
+    def __init__(self, agent: BaseAgent, target_agent_name: str, prompt: str | None = None):
         super().__init__(agent)
         self.target_agent_name = target_agent_name
         self.prompt = prompt or f"Handing off the conversation to {target_agent_name}."
 
         sub = init_agent_by_name(target_agent_name, cwd=self.agent.cwd)
         if not sub:
-            raise ValueError(
-                f"Target agent '{target_agent_name}' not found for handoff."
-            )
+            raise ValueError(f"Target agent '{target_agent_name}' not found for handoff.")
         self.sub = sub
         self.sub._hitl = self.agent._hitl  # share the same human-in-the-loop handler
 
     def execute(self) -> Iterator[ModelMessage]:
         msg = ModelMessage(
             role="assistant",
-            content=[
-                TextContent(
-                    text=f"Handing off conversation to {self.target_agent_name}."
-                )
-            ],
+            content=[TextContent(text=f"Handing off conversation to {self.target_agent_name}.")],
         )
         self.agent.add_to_history(msg)
 
@@ -687,17 +634,11 @@ class FindBestAgentTask(BaseAgentTask):
         def format_agent(agent) -> str:
             tools = ", ".join(agent.tools) if agent.tools else "none"
             skills = ", ".join(agent.skills) if agent.skills else "none"
-            desc = (
-                (agent.description or "No description available.").strip().rstrip(".")
-            )
+            desc = (agent.description or "No description available.").strip().rstrip(".")
             return f"[{agent.name}]\n  purpose: {desc}\n  tools: {tools}\n  skills: {skills}"
 
-        agents_str = "\n".join(
-            format_agent(a) for a in self.agent_registry.configs.values()
-        )
-        agent_names = [
-            a.name for a in self.agent_registry.configs.values() if a.name != "default"
-        ] + ["NONE"]
+        agents_str = "\n".join(format_agent(a) for a in self.agent_registry.configs.values())
+        agent_names = [a.name for a in self.agent_registry.configs.values() if a.name != "default"] + ["NONE"]
         agents_str += "\n\nValid agent names:\n" + ", ".join(agent_names)
 
         output_schema = copy.deepcopy(self.OUTPUT_SCHEMA)
@@ -716,9 +657,7 @@ class FindBestAgentTask(BaseAgentTask):
             context_id=self.agent.context_id,  # attributes the usage to the conversation
         )
         response = _complete(self.agent, request, task="agent_select")
-        logger.info(
-            f"Received model response for agent selection with {len(response.output)} content parts."
-        )
+        logger.info(f"Received model response for agent selection with {len(response.output)} content parts.")
 
         selected_agent, confidence, reason = None, 0.0, ""
         if response.output:
@@ -739,17 +678,13 @@ class FindBestAgentTask(BaseAgentTask):
                 # None for "NONE" or hallucinated names
                 # names the model is actually allowed to return -> canonical form
                 valid_agents = {
-                    a.name.strip().lower(): a.name
-                    for a in self.agent_registry.configs.values()
-                    if a.name != "default"
+                    a.name.strip().lower(): a.name for a in self.agent_registry.configs.values() if a.name != "default"
                 }
                 canonical = valid_agents.get(raw.lower())
                 if canonical:
                     selected_agent = canonical
                 else:
-                    logger.warning(
-                        f"Agent selector returned unlisted agent '{raw}'; no handoff."
-                    )
+                    logger.warning(f"Agent selector returned unlisted agent '{raw}'; no handoff.")
 
         MIN_CONFIDENCE = 0.4
         if selected_agent and confidence < MIN_CONFIDENCE:
@@ -760,27 +695,19 @@ class FindBestAgentTask(BaseAgentTask):
             yield ModelMessage(
                 role="assistant",
                 content=[
-                    TextContent(
-                        text=f"Selected agent: {selected_agent} (confidence: {confidence}). Reason: {reason}"
-                    )
+                    TextContent(text=f"Selected agent: {selected_agent} (confidence: {confidence}). Reason: {reason}")
                 ],
             )
-            yield HandoffTask(
-                self.agent, target_agent_name=selected_agent, prompt=self.prompt
-            )
+            yield HandoffTask(self.agent, target_agent_name=selected_agent, prompt=self.prompt)
 
         else:
             yield ModelMessage(
                 role="assistant",
                 content=[
-                    TextContent(
-                        text="No suitable agent found. Trying to process the prompt with the current agent."
-                    )
+                    TextContent(text="No suitable agent found. Trying to process the prompt with the current agent.")
                 ],
             )
-            yield LLMTask(
-                self.agent, message=self.prompt
-            )  # fallback to processing the prompt with the current agent
+            yield LLMTask(self.agent, message=self.prompt)  # fallback to processing the prompt with the current agent
 
 
 class ActivateSkillTask(BaseAgentTask):
@@ -794,9 +721,7 @@ class ActivateSkillTask(BaseAgentTask):
         if not skill:
             yield SystemMessage(
                 level="info",
-                content=[
-                    TextContent(text=f"Skill '{self.skill_name}' could not be found.")
-                ],
+                content=[TextContent(text=f"Skill '{self.skill_name}' could not be found.")],
             )
             return
         logger.info("Activating skill %s", skill.name)
@@ -900,9 +825,7 @@ class FindBestSkillTask(BaseAgentTask):
             context_id=self.agent.context_id,  # attributes the usage to the conversation
         )
         response = _complete(self.agent, request, task="skill_select")
-        logger.info(
-            f"Received model response for agent selection with {len(response.output)} content parts."
-        )
+        logger.info(f"Received model response for agent selection with {len(response.output)} content parts.")
 
         selected_skill: str | None = None
         if len(response.output) > 0:
@@ -1155,14 +1078,10 @@ Write in second person ("the user asked …", "you answered …") so the summary
 
         summary_text = ""
         if response.output:
-            summary_text = "\n".join(
-                part.to_text() for part in response.output if hasattr(part, "to_text")
-            )
+            summary_text = "\n".join(part.to_text() for part in response.output if hasattr(part, "to_text"))
 
         if not summary_text.strip():
-            logger.warning(
-                "MemoryCompactionTask: LLM returned empty summary; skipping rotation."
-            )
+            logger.warning("MemoryCompactionTask: LLM returned empty summary; skipping rotation.")
             return
 
         generation = self._next_generation(self.agent.context_id)
@@ -1171,11 +1090,7 @@ Write in second person ("the user asked …", "you answered …") so the summary
 
         summary_message = ModelMessage(
             role="assistant",
-            content=[
-                TextContent(
-                    text=f"[Handover summary from context {self.agent.context_id}]\n\n{summary_text}"
-                )
-            ],
+            content=[TextContent(text=f"[Handover summary from context {self.agent.context_id}]\n\n{summary_text}")],
             usage=response.usage,
         )
         new_memory.append(summary_message)

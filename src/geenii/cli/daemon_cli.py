@@ -12,9 +12,7 @@ def _client(socket) -> DaemonClient:
     return DaemonClient(socket)
 
 
-def live_daemon(
-    component: str, config: str, socket: str | None = None
-) -> tuple[DaemonClient | None, str | None]:
+def live_daemon(component: str, config: str, socket: str | None = None) -> tuple[DaemonClient | None, str | None]:
     """Return (client, None) if a running daemon uses `config` for `component` ("scheduler"/"supervisor").
 
     Otherwise (None, reason): the daemon isn't running, or it uses another config file.
@@ -28,9 +26,7 @@ def live_daemon(
     return client, None
 
 
-def start_daemon(
-    socket: str | None, scheduler_config: str | None, services_config: str | None = None
-) -> None:
+def start_daemon(socket: str | None, scheduler_config: str | None, services_config: str | None = None) -> None:
     """Run the daemon in the foreground (shared by `daemon start` and its aliases)."""
     from geenii.daemon.server import (
         DEFAULT_SERVICES_CONFIG,

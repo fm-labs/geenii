@@ -43,19 +43,14 @@ def _reload_if_live(ctx, config: str) -> None:
     if client is None:
         return
     changes = client.call("supervisor.reload")
-    summary = (
-        ", ".join(f"{k}: {', '.join(v)}" for k, v in changes.items() if v)
-        or "no changes"
-    )
+    summary = ", ".join(f"{k}: {', '.join(v)}" for k, v in changes.items() if v) or "no changes"
     click.echo(f"Reloaded the running daemon ({summary}).")
 
 
 def _client(ctx) -> DaemonClient:
     client = DaemonClient(ctx.obj or None)
     if not client.is_available():
-        click.echo(
-            f"The geenii daemon is not running ({client.socket_path}). Start it with `geenii daemon start`."
-        )
+        click.echo(f"The geenii daemon is not running ({client.socket_path}). Start it with `geenii daemon start`.")
         raise SystemExit(1)
     return client
 
@@ -192,9 +187,7 @@ def restart(ctx, name):
 
 @supervisor.command(name="logs")
 @click.argument("name")
-@click.option(
-    "--tail", "-n", default=100, show_default=True, help="Number of lines to show."
-)
+@click.option("--tail", "-n", default=100, show_default=True, help="Number of lines to show.")
 @click.pass_context
 def logs(ctx, name, tail):
     """Show the recent output of NAME (stdout, stderr and supervisor events)."""
@@ -225,9 +218,7 @@ def list_services(config):
             ]
             if f
         )
-        click.echo(
-            f"  {svc.get('name', '?'):<20} {' '.join(svc.get('cmd', []))} {flags}".rstrip()
-        )
+        click.echo(f"  {svc.get('name', '?'):<20} {' '.join(svc.get('cmd', []))} {flags}".rstrip())
 
 
 @supervisor.command(name="add")

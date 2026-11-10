@@ -87,21 +87,14 @@ def test_usage_is_counted_once_per_model_call(provider):
 
 def test_streamed_messages_carry_the_usage_of_every_call(provider):
     # the tool-calling response's usage reaches the stream too, not only the history
-    provider.enqueue_parts(
-        [ToolCallContent(name="add", arguments={"a": 1, "b": 2}, call_id="c1")]
-    )
+    provider.enqueue_parts([ToolCallContent(name="add", arguments={"a": 1, "b": 2}, call_id="c1")])
     provider.enqueue("3")
     agent = _agent()
 
     streamed = list(agent.process("add"))
 
     assert isinstance(streamed[0].content[0], ToolCallContent)
-    assert (
-        _total(streamed)
-        == _total(agent.message_history)
-        == agent.usage.total_tokens
-        == 2 * 30
-    )
+    assert _total(streamed) == _total(agent.message_history) == agent.usage.total_tokens == 2 * 30
     # the call is stored once, before its result
     roles = [(m.role, type(m.content[0]).__name__) for m in agent.message_history]
     assert roles == [
@@ -124,9 +117,7 @@ def test_usage_survives_file_memory(tmp_path):
     )
 
     [restored] = FileChatMemory(str(path)).messages
-    assert restored.usage == Usage(
-        input_tokens=5, output_tokens=1, cache_read_input_tokens=4
-    )
+    assert restored.usage == Usage(input_tokens=5, output_tokens=1, cache_read_input_tokens=4)
 
 
 def test_messages_without_usage_still_load():
@@ -183,9 +174,7 @@ def test_agent_counts_skill_selection(provider):
     from geenii.skills import SkillSpec
 
     for name in ("alpha", "beta"):
-        agent.skills.register(
-            SkillSpec(name=name, description=f"{name} skill", path=f"/tmp/{name}")
-        )
+        agent.skills.register(SkillSpec(name=name, description=f"{name} skill", path=f"/tmp/{name}"))
     provider.enqueue('{"skill": "NONE", "confidence": 0.1, "rationale": "-"}')
     provider.enqueue("answer")
 
@@ -228,7 +217,4 @@ def test_self_shows_agent_usage(provider):
     provider.enqueue("hi")
     list(agent.process("hello"))
     [after] = list(agent.process("/self"))
-    assert (
-        "30 tokens (10 in, 20 out) in 1 model call since the agent was started"
-        in after.to_text()
-    )
+    assert "30 tokens (10 in, 20 out) in 1 model call since the agent was started" in after.to_text()

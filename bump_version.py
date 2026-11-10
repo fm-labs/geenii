@@ -7,9 +7,7 @@ sys.path.append("./src")
 from geenii.utils.toml_util import read_toml, write_toml
 
 
-def bump_version_json(
-    file_path: str, key: str, new_version: str, extra: dict | None = None
-):
+def bump_version_json(file_path: str, key: str, new_version: str, extra: dict | None = None):
     # import json
     with open(file_path, "r") as f:
         data = json.load(f)
@@ -21,9 +19,7 @@ def bump_version_json(
         json.dump(data, f, indent=2)
 
 
-def bump_version_toml(
-    file_path: str, key: str, new_version: str, extra: dict | None = None
-):
+def bump_version_toml(file_path: str, key: str, new_version: str, extra: dict | None = None):
     # import toml
     data = read_toml(file_path)
 
@@ -39,9 +35,7 @@ def bump_version_toml(
     write_toml(file_path, data)
 
 
-def bump_version_in_file(
-    file_path: str, line_prefix: str, new_version: str, extra: dict | None = None
-):
+def bump_version_in_file(file_path: str, line_prefix: str, new_version: str, extra: dict | None = None):
     # if not line_prefix:
     #    print("No line prefix provided, skipping file:", file_path)
     #    return
@@ -64,9 +58,7 @@ def bump_version_in_file(
                 f.write(line)
 
 
-def write_version_to_file(
-    file_path: str, key: str, version: str, extra: dict | None = None
-):
+def write_version_to_file(file_path: str, key: str, version: str, extra: dict | None = None):
     print(f"Writing version to {file_path}: {key} -> {version}")
     with open(file_path, "w") as f:
         f.write(version.strip() + "\n")
@@ -96,12 +88,6 @@ if __name__ == "__main__":
     for file_path, key, bump_func, extra in files:
         bump_func(file_path, key, new_version, extra)
 
-    print(
-        "You need to run 'pnpm install' in the ui/ directory to update the lockfile after bumping the version."
-    )
-    print(
-        "You need to run 'pnpm tauri build' in the ui/ directory to rebuild the Tauri app after bumping the version."
-    )
-    print(
-        "You need to run 'uv sync' in the root directory to update the lockfile after bumping the version."
-    )
+    print("You need to run 'pnpm install' in the ui/ directory to update the lockfile after bumping the version.")
+    print("You need to run 'pnpm tauri build' in the ui/ directory to rebuild the Tauri app after bumping the version.")
+    print("You need to run 'uv sync' in the root directory to update the lockfile after bumping the version.")

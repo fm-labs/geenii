@@ -39,9 +39,7 @@ class ExecuteScriptProcessor(FlowProcessor):
     config_model = ExecuteScriptConfig
     output_model = ExecuteScriptOutput
 
-    def process(
-        self, input_data: Any, ctx: FlowContext
-    ) -> Generator[Any, None, ExecuteScriptOutput]:
+    def process(self, input_data: Any, ctx: FlowContext) -> Generator[Any, None, ExecuteScriptOutput]:
         c: ExecuteScriptConfig = self.config
         yield StepEvent("log", "Running script")
         out = yield from run_process(

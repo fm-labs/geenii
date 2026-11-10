@@ -22,9 +22,7 @@ class ExecutePmCommandConfig(pydantic.BaseModel):
     )
     cwd: str | None = None
     env: dict[str, str] | None = None
-    pid: str | None = pydantic.Field(
-        None, description="Custom process ID (auto-generated if omitted)"
-    )
+    pid: str | None = pydantic.Field(None, description="Custom process ID (auto-generated if omitted)")
     wait: bool = pydantic.Field(
         True,
         description="Wait for the process to finish, streaming its output; otherwise return right after starting it",
@@ -37,9 +35,7 @@ class ExecutePmCommandConfig(pydantic.BaseModel):
         False,
         description="With wait: fail the step unless the process completed (rc 0)",
     )
-    poll_interval: float = pydantic.Field(
-        0.5, gt=0, description="Seconds between output polls while waiting"
-    )
+    poll_interval: float = pydantic.Field(0.5, gt=0, description="Seconds between output polls while waiting")
     socket: str | None = pydantic.Field(
         None, description="Daemon socket path (default: GEENII_SOCKET or the cache dir)"
     )
@@ -84,9 +80,7 @@ class _OutputFollower:
         return "".join(self.parts)
 
     def _read(self, offset: int) -> str:
-        return self.client.output(
-            self.process_id, stream=self.stream, offset=offset, limit=self.chunk_size
-        )
+        return self.client.output(self.process_id, stream=self.stream, offset=offset, limit=self.chunk_size)
 
     def poll(self, final: bool = False) -> list[str]:
         """Return the lines written since the last poll. final: the process has exited, flush everything."""
@@ -127,9 +121,7 @@ class ExecutePmCommandProcessor(FlowProcessor):
     config_model = ExecutePmCommandConfig
     output_model = ExecutePmCommandOutput
 
-    def process(
-        self, input_data: Any, ctx: FlowContext
-    ) -> Generator[Any, None, ExecutePmCommandOutput]:
+    def process(self, input_data: Any, ctx: FlowContext) -> Generator[Any, None, ExecutePmCommandOutput]:
         c: ExecutePmCommandConfig = self.config
         client = ProcessManagerClient(c.socket)
         info = client.start(c.command, env=c.env, cwd=c.cwd, pid=c.pid)
@@ -145,9 +137,7 @@ class ExecutePmCommandProcessor(FlowProcessor):
                 state=info["state"],
             )
 
-        followers = [
-            _OutputFollower(client, process_id, s) for s in ("stdout", "stderr")
-        ]
+        followers = [_OutputFollower(client, process_id, s) for s in ("stdout", "stderr")]
         deadline = time.monotonic() + c.timeout if c.timeout is not None else None
         try:
             while True:
@@ -162,9 +152,7 @@ class ExecutePmCommandProcessor(FlowProcessor):
                 if ctx.stopping:
                     raise RuntimeError(f"Flow is stopping; killed process {process_id}")
                 if deadline is not None and time.monotonic() >= deadline:
-                    raise TimeoutError(
-                        f"Process {process_id} did not finish within {c.timeout}s; killed it"
-                    )
+                    raise TimeoutError(f"Process {process_id} did not finish within {c.timeout}s; killed it")
                 time.sleep(c.poll_interval)
         except BaseException:
             # The step owns the process while waiting: don't leave it running

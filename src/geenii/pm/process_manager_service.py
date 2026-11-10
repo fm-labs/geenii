@@ -21,9 +21,7 @@ from geenii.pm.process_manager import ProcessManager
 class ProcessManagerService(DaemonServer):
     """A daemon whose ProcessHost uses the given ProcessManager (and an idle scheduler)."""
 
-    def __init__(
-        self, socket_path: str | None = None, pm: ProcessManager | None = None
-    ) -> None:
+    def __init__(self, socket_path: str | None = None, pm: ProcessManager | None = None) -> None:
         super().__init__(ProcessHost(pm=pm), socket_path)
 
 

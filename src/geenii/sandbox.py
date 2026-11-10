@@ -11,9 +11,7 @@ from geenii.config import GEENII_CACHE_DIR
 SANDBOX_PYTHON3_BASEIMAGE = "python:3.13-slim"
 
 
-def run_docker_subprocess(
-    command: list[str], timeout: int = 30, env: dict | None = None
-) -> tuple[int, str, str]:
+def run_docker_subprocess(command: list[str], timeout: int = 30, env: dict | None = None) -> tuple[int, str, str]:
     """
     Run a subprocess command with a timeout and return the exit code, stdout, and stderr.
 
@@ -62,9 +60,7 @@ def build_sandbox_image(
     :return:
     """
     # sandbox_docker_file = os.path.join(app_dir, "sandbox.Dockerfile")
-    sandbox_docker_file = os.path.join(
-        GEENII_CACHE_DIR, "sandboxes", sandbox_id, "Dockerfile"
-    )
+    sandbox_docker_file = os.path.join(GEENII_CACHE_DIR, "sandboxes", sandbox_id, "Dockerfile")
     os.makedirs(dirname(sandbox_docker_file), exist_ok=True)
     overwrite = True
     image_name = "geenii-sandbox-" + sandbox_id
@@ -81,9 +77,7 @@ def build_sandbox_image(
     start_time = time.time()
     rc, stdout, stderr = run_docker_subprocess(command, timeout=3600, env=env)
     end_time = time.time()
-    print(
-        f"Command finished in {end_time - start_time:.8f} seconds with exit code {rc}"
-    )
+    print(f"Command finished in {end_time - start_time:.8f} seconds with exit code {rc}")
     if rc != 0:
         print(stdout)
         print(stderr)
@@ -194,13 +188,9 @@ class Sandbox(abc.ABC):
             command.extend(["--cpus", str(self.cpu_limit)])
         if self.mem_limit is not None:
             command.extend(["--memory", str(self.mem_limit)])
-            command.extend(
-                ["--memory-swap", str(self.mem_limit)]
-            )  # prevent using swap beyond the memory limit
+            command.extend(["--memory-swap", str(self.mem_limit)])  # prevent using swap beyond the memory limit
         if self.pid_limit is not None:
-            command.extend(
-                ["--pids-limit", str(self.pid_limit)]
-            )  # prevent fork bombs and excessive process creation
+            command.extend(["--pids-limit", str(self.pid_limit)])  # prevent fork bombs and excessive process creation
 
         # Capabilities
         # --cap-drop ALL is used to drop all Linux capabilities from the container
@@ -244,9 +234,7 @@ class Sandbox(abc.ABC):
         start_time = time.time()
         result = run_docker_subprocess(command, timeout=self.timeout)
         end_time = time.time()
-        print(
-            f"Command finished in {end_time - start_time:.8f} seconds with exit code {result[0]}"
-        )
+        print(f"Command finished in {end_time - start_time:.8f} seconds with exit code {result[0]}")
         return result
 
 
@@ -265,13 +253,9 @@ class PythonSandbox(Sandbox):
         self.script_args = script_args
 
     def dockerlines(self) -> str:
-        dockerfile_str = (
-            "FROM python:3.13-alpine\nENV PYTHONUNBUFFERED=1\nWORKDIR /app\n"
-        )
+        dockerfile_str = "FROM python:3.13-alpine\nENV PYTHONUNBUFFERED=1\nWORKDIR /app\n"
         if os.path.exists(os.path.join(self.app_dir, "requirements.txt")):
-            dockerfile_str += (
-                "COPY ./requirements.txt ./\nRUN pip3 install -r ./requirements.txt\n"
-            )
+            dockerfile_str += "COPY ./requirements.txt ./\nRUN pip3 install -r ./requirements.txt\n"
         if os.path.exists(os.path.join(self.app_dir, "pyproject.toml")):
             dockerfile_str += (
                 "COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/\n"

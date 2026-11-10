@@ -413,9 +413,7 @@ def short_dir():
 
 def test_service_and_client_roundtrip(short_dir):
     socket_path = os.path.join(short_dir, "pm.sock")
-    service = ProcessManagerService(
-        socket_path, pm=ProcessManager(os.path.join(short_dir, "procs"))
-    )
+    service = ProcessManagerService(socket_path, pm=ProcessManager(os.path.join(short_dir, "procs")))
 
     loop = asyncio.new_event_loop()
     started = threading.Event()
@@ -439,10 +437,7 @@ def test_service_and_client_roundtrip(short_dir):
         assert (shell_proc["shell"], list_proc["shell"]) == (True, False)
 
         deadline = time.time() + 5
-        while (
-            time.time() < deadline
-            and client.status(list_proc["pid"])["state"] == "running"
-        ):
+        while time.time() < deadline and client.status(list_proc["pid"])["state"] == "running":
             time.sleep(0.05)
         assert client.output(shell_proc["pid"]) == "HI\n"
         assert client.output(list_proc["pid"]) == "a b\n"

@@ -3,9 +3,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def estimate_token_count(
-    input_text: str, expected_output_chars: int = 0
-) -> tuple[int, int, int]:
+def estimate_token_count(input_text: str, expected_output_chars: int = 0) -> tuple[int, int, int]:
     """
     Estimate the number of tokens in the input text and expected output based on character count.
 
@@ -31,9 +29,7 @@ def estimate_token_cost(
     return input_cost, output_cost, total_cost
 
 
-def estimated_max_response_length(
-    input_text: str, model_max_tokens: int, reserved_tokens: int = 100
-) -> int:
+def estimated_max_response_length(input_text: str, model_max_tokens: int, reserved_tokens: int = 100) -> int:
     """Estimate the maximum number of tokens available for the model's response based on the input text and model's context window."""
     input_tokens, _, _ = estimate_token_count(input_text)
     # Calculate the remaining tokens available for the response

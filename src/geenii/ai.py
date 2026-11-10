@@ -100,9 +100,7 @@ def split_model_id(model_id: str) -> tuple[str, str]:
         if len(parts) == 2:
             return parts[0].strip(), parts[1].strip()
 
-    raise ValueError(
-        f"Invalid model ID format: {model_id}. Expected 'provider:model_name'."
-    )
+    raise ValueError(f"Invalid model ID format: {model_id}. Expected 'provider:model_name'.")
 
 
 def _import_provider_class(name: str) -> type:
@@ -111,14 +109,10 @@ def _import_provider_class(name: str) -> type:
     try:
         module = importlib.import_module(module_path)
     except ImportError as exc:
-        raise ValueError(
-            f"Unknown provider '{name}': could not import {module_path}"
-        ) from exc
+        raise ValueError(f"Unknown provider '{name}': could not import {module_path}") from exc
     cls = getattr(module, "ai_provider_class", None)
     if cls is None:
-        raise ValueError(
-            f"Provider module {module_path} does not export 'ai_provider_class'"
-        )
+        raise ValueError(f"Provider module {module_path} does not export 'ai_provider_class'")
     return cls
 
 
@@ -140,9 +134,7 @@ def get_ai_provider(provider: str) -> AIProviderType:
     return cls()
 
 
-def get_ai_provider_from_model_id(
-    model_id: str, iface=None
-) -> tuple[AIProviderType, str, str]:
+def get_ai_provider_from_model_id(model_id: str, iface=None) -> tuple[AIProviderType, str, str]:
     """
     Get the AI provider instance based on the model ID.
 
@@ -232,9 +224,7 @@ def generate_completion(
         # publish_event(["ai.completion.completed"], {"response": response.model_dump()})
 
         # _log_request_response(request, response)
-        _ai_usage_log(
-            provider, model_name, None, response.usage, source=source, task=task
-        )
+        _ai_usage_log(provider, model_name, None, response.usage, source=source, task=task)
         return response
     except Exception as e:
         print(f"Error in {model} completion API: {e!s}")
@@ -281,9 +271,7 @@ def generate_chat_completion_deprecated(
         stream=stream,
         # model_parameters=kwargs
     )
-    return generate_chat_completion(
-        request, tool_registry=tool_registry, source=source, task=task
-    )
+    return generate_chat_completion(request, tool_registry=tool_registry, source=source, task=task)
 
 
 def generate_chat_completion(
@@ -310,9 +298,7 @@ def generate_chat_completion(
     try:
         ai, provider_name, model_name = get_ai_completion_provider(request.model)
         if not isinstance(ai, AIChatCompletionProvider):
-            raise TypeError(
-                f"Invalid AI provider: {provider_name} does not support assistant completions."
-            )
+            raise TypeError(f"Invalid AI provider: {provider_name} does not support assistant completions.")
 
         _ai_log("completion.request", request)
 
@@ -395,9 +381,7 @@ def generate_audio_transcription(
     """
     try:
         ai, _provider, model = get_ai_audio_transcription_provider(request.model)
-        response = ai.generate_audio_transcription(
-            model=model, audio=request.input_file
-        )
+        response = ai.generate_audio_transcription(model=model, audio=request.input_file)
         return response
     except Exception as e:
         return CompletionErrorResponse(error=str(e))
@@ -422,9 +406,7 @@ _MAX_ERROR_LENGTH = 500
 def _error_text(e: Exception) -> str:
     """One-line error text for the logs, e.g. "RuntimeError: provider down"."""
     text = " ".join(f"{type(e).__name__}: {e}".split())
-    return (
-        text if len(text) <= _MAX_ERROR_LENGTH else text[: _MAX_ERROR_LENGTH - 1] + "…"
-    )
+    return text if len(text) <= _MAX_ERROR_LENGTH else text[: _MAX_ERROR_LENGTH - 1] + "…"
 
 
 def _log_failed_call(
@@ -444,9 +426,7 @@ def _log_failed_call(
             "completion.error",
             {"model": model_id, "context_id": context_id, "error": error},
         )
-        _ai_usage_log(
-            provider, model, context_id, None, source=source, task=task, error=error
-        )
+        _ai_usage_log(provider, model, context_id, None, source=source, task=task, error=error)
     except Exception as log_error:
         # never hide the original error behind a logging failure
         print(f"Could not log failed completion: {log_error}")

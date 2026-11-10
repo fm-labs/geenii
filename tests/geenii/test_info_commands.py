@@ -21,9 +21,7 @@ def isolated_cache_dir(tmp_path, monkeypatch):
 def _agent(context_id="ctx", allowed_tools=None) -> Agent:
     memory = ShortTermChatMemory()
     memory.append(ModelMessage(role="user", content=[TextContent(text="hello")]))
-    memory.append(
-        ModelMessage(role="assistant", content=[TextContent(text="hi there")])
-    )
+    memory.append(ModelMessage(role="assistant", content=[TextContent(text="hi there")]))
     return Agent(
         name="tester",
         model="fake:test",
@@ -84,9 +82,7 @@ def test_usage_sums_conversation_and_compactions(isolated_cache_dir):
             "usage": {"input_tokens": 999, "output_tokens": 999, "total_tokens": 1998},
         },
     ]
-    (logs / "ai-usage-2026-10.log").write_text(
-        "\n".join(json.dumps(e) for e in entries) + "\nnot json ctx\n"
-    )
+    (logs / "ai-usage-2026-10.log").write_text("\n".join(json.dumps(e) for e in entries) + "\nnot json ctx\n")
 
     text = _run(_agent(context_id="ctx-2"), "/usage")
     assert "| `fake:test` | 2 | 30 | 10 | 40 |" in text
@@ -129,9 +125,7 @@ def test_usage_by_purpose(isolated_cache_dir):
             "usage": usage,
         },  # written before tagging
     ]
-    (logs / "ai-usage-2026-10.log").write_text(
-        "\n".join(json.dumps(e) for e in entries) + "\n"
-    )
+    (logs / "ai-usage-2026-10.log").write_text("\n".join(json.dumps(e) for e in entries) + "\n")
 
     text = _run(_agent(), "/usage")
     assert "| `fake:test` | 4 | 40 | 20 | 60 |" in text
@@ -177,9 +171,7 @@ def test_usage_counts_failed_calls(isolated_cache_dir):
             "error": "RuntimeError: provider down",
         },
     ]
-    (logs / "ai-usage-2026-10.log").write_text(
-        "\n".join(json.dumps(e) for e in entries) + "\n"
-    )
+    (logs / "ai-usage-2026-10.log").write_text("\n".join(json.dumps(e) for e in entries) + "\n")
 
     text = _run(_agent(), "/usage")
     assert "| `fake:test` | 2 | 10 | 5 | 15 |" in text
@@ -241,9 +233,7 @@ def test_usage_tolerates_malformed_usage(isolated_cache_dir):
             "usage": {"input_tokens": 1, "output_tokens": 1},
         },
     ]
-    (logs / "ai-usage-2026-10.log").write_text(
-        "\n".join(json.dumps(e) for e in entries) + "\n"
-    )
+    (logs / "ai-usage-2026-10.log").write_text("\n".join(json.dumps(e) for e in entries) + "\n")
 
     # the malformed call is counted without tokens; a missing total is input + output
     assert "| `fake:test` | 2 | 1 | 1 | 2 |" in _run(_agent(), "/usage")
@@ -281,13 +271,8 @@ def test_usage_reports_cache_share_across_versions(isolated_cache_dir):
             },
         },
     ]
-    (logs / "ai-usage-2026-10.log").write_text(
-        "\n".join(json.dumps(e) for e in entries) + "\n"
-    )
+    (logs / "ai-usage-2026-10.log").write_text("\n".join(json.dumps(e) for e in entries) + "\n")
 
     text = _run(_agent(), "/usage")
     assert "| `anthropic:m` | 2 | 1700 | 20 | 1720 |" in text
-    assert (
-        "1,200 of 1,700 input tokens (70%) were read from the prompt cache; 300 were written to it."
-        in text
-    )
+    assert "1,200 of 1,700 input tokens (70%) were read from the prompt cache; 300 were written to it." in text

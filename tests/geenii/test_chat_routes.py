@@ -133,29 +133,19 @@ def test_create_rejects_unknown_agent(client):
 
 @pytest.mark.parametrize("context_id", ["..", "a.b", "x" * 65, "with space", "%2e%2e"])
 def test_rejects_unsafe_context_id(client, store, tmp_path, context_id):
-    response = client.post(
-        f"/api/v1/chats/{context_id}/messages", json={"prompt": "hi"}
-    )
-    assert (
-        400 <= response.status_code < 500
-    )  # ".." is already normalized away by the client (405)
+    response = client.post(f"/api/v1/chats/{context_id}/messages", json={"prompt": "hi"})
+    assert 400 <= response.status_code < 500  # ".." is already normalized away by the client (405)
     assert not any(p.name == "memory.jsonl" for p in tmp_path.rglob("*"))
 
 
 def test_unknown_chat_is_404(client):
-    assert (
-        client.post("/api/v1/chats/abc/messages", json={"prompt": "hi"}).status_code
-        == 404
-    )
+    assert client.post("/api/v1/chats/abc/messages", json={"prompt": "hi"}).status_code == 404
     assert client.get("/api/v1/chats/abc/messages").status_code == 404
 
 
 def test_message_requires_input(client):
     chat = _create(client)
-    assert (
-        client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "  "}).status_code
-        == 422
-    )
+    assert client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "  "}).status_code == 422
 
 
 def test_files_endpoints_are_501(client):
@@ -171,9 +161,7 @@ def test_post_message_streams_turn_and_stores_history(client, provider):
     chat = _create(client)
     provider.enqueue("Hello there.")
 
-    events = _events(
-        client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "hi"})
-    )
+    events = _events(client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "hi"}))
 
     assert events[0] == {"type": "status", "status": "thinking"}
     assert events[-1] == {"type": "done"}
@@ -198,9 +186,7 @@ def test_each_chat_has_its_own_agent_and_memory(client, provider):
     provider.enqueue("one")
     provider.enqueue("two")
 
-    _events(
-        client.post(f"/api/v1/chats/{first}/messages", json={"prompt": "first chat"})
-    )
+    _events(client.post(f"/api/v1/chats/{first}/messages", json={"prompt": "first chat"}))
     _events(
         client.post(
             f"/api/v1/chats/{second}/messages",
@@ -250,9 +236,7 @@ def test_agent_failure_streams_error_and_releases_turn(client, monkeypatch, prov
         raise RuntimeError("provider down")
 
     monkeypatch.setattr(tasks_mod, "generate_chat_completion", boom)
-    events = _events(
-        client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "hi"})
-    )
+    events = _events(client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "hi"}))
     assert any("provider down" in t for t in _texts(events))
 
     provider.enqueue("recovered")
@@ -261,9 +245,7 @@ def test_agent_failure_streams_error_and_releases_turn(client, monkeypatch, prov
         "generate_chat_completion",
         lambda request, **kwargs: provider.generate_chat_completion(request),
     )
-    assert _texts(
-        _events(client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "again"}))
-    ) == ["recovered"]
+    assert _texts(_events(client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "again"}))) == ["recovered"]
 
 
 # -- tool approval (HITL) ------------------------------------------------------
@@ -287,27 +269,17 @@ def _next_message(events):
     raise AssertionError("stream ended")
 
 
-def test_tool_call_waits_for_approval_and_runs_when_allowed(
-    client, store, provider, add_tool
-):
+def test_tool_call_waits_for_approval_and_runs_when_allowed(client, store, provider, add_tool):
     chat = _create(client)
     runner, events = _start_tool_turn(store, provider, chat)
 
     request = _next_message(events)
     interaction = request.content[0]
-    assert (
-        isinstance(interaction, UserInteractionContent)
-        and interaction.interaction_id == "call-1"
-    )
+    assert isinstance(interaction, UserInteractionContent) and interaction.interaction_id == "call-1"
     assert add_tool == []
 
     # the answer may arrive before or while the agent waits
-    assert (
-        client.post(
-            f"/api/v1/chats/{chat}/interactions/call-1", json={"choice": "Allow"}
-        ).status_code
-        == 204
-    )
+    assert client.post(f"/api/v1/chats/{chat}/interactions/call-1", json={"choice": "Allow"}).status_code == 204
 
     result = _next_message(events).content[0]
     assert isinstance(result, ToolCallResultContent) and result.result == "5"
@@ -318,9 +290,7 @@ def test_tool_call_waits_for_approval_and_runs_when_allowed(
 
     # approval requests are not part of the model conversation
     history = client.get(f"/api/v1/chats/{chat}/messages").json()
-    assert not any(
-        p["type"] == "interaction" for m in history for p in m["message"]["content"]
-    )
+    assert not any(p["type"] == "interaction" for m in history for p in m["message"]["content"])
 
 
 def test_tool_call_denied(client, store, provider, add_tool):
@@ -339,24 +309,12 @@ def test_tool_call_denied(client, store, provider, add_tool):
 
 def test_interaction_endpoint_404s(client, store):
     chat = _create(client)
-    assert (
-        client.post(
-            f"/api/v1/chats/{chat}/interactions/x", json={"choice": "Allow"}
-        ).status_code
-        == 404
-    )
+    assert client.post(f"/api/v1/chats/{chat}/interactions/x", json={"choice": "Allow"}).status_code == 404
     store.runner(chat)
-    assert (
-        client.post(
-            f"/api/v1/chats/{chat}/interactions/x", json={"choice": "Allow"}
-        ).status_code
-        == 404
-    )
+    assert client.post(f"/api/v1/chats/{chat}/interactions/x", json={"choice": "Allow"}).status_code == 404
 
 
-def test_cancel_rejects_pending_approval_and_ends_stream(
-    client, store, provider, add_tool
-):
+def test_cancel_rejects_pending_approval_and_ends_stream(client, store, provider, add_tool):
     chat = _create(client)
     runner, events = _start_tool_turn(store, provider, chat)
     _next_message(events)
@@ -367,9 +325,7 @@ def test_cancel_rejects_pending_approval_and_ends_stream(
     assert add_tool == []
     assert not any(isinstance(e, ChatMessageEvent) for e in rest)
     assert not runner.busy
-    assert (
-        runner.agent._tasks == type(runner.agent._tasks)()
-    )  # nothing left for the next turn
+    assert runner.agent._tasks == type(runner.agent._tasks)()  # nothing left for the next turn
 
 
 def _wait_until_idle(runner, timeout=5):
@@ -392,14 +348,10 @@ def test_abandoned_stream_does_not_leave_chat_busy(client, store, provider, add_
 
     provider._responses.clear()  # the cancelled turn never used its queued answer
     provider.enqueue("still works")
-    assert _texts(
-        _events(client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "hi"}))
-    ) == ["still works"]
+    assert _texts(_events(client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "hi"}))) == ["still works"]
 
 
-def test_abandoned_stream_is_released_after_approval_timeout(
-    client, store, provider, add_tool
-):
+def test_abandoned_stream_is_released_after_approval_timeout(client, store, provider, add_tool):
     store.approval_timeout = 0.2
     chat = _create(client)
     runner, events = _start_tool_turn(store, provider, chat)
@@ -416,16 +368,9 @@ def test_unanswered_approval_times_out_in_stream(client, store, provider, add_to
     provider.enqueue_tool_call("add", {"a": 1, "b": 1}, call_id="call-9")
     provider.enqueue("Ok.")
 
-    events = _events(
-        client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "add"})
-    )
+    events = _events(client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "add"}))
 
-    types = [
-        e["type"]
-        if e["type"] != "message"
-        else e["message"]["message"]["content"][0]["type"]
-        for e in events
-    ]
+    types = [e["type"] if e["type"] != "message" else e["message"]["message"]["content"][0]["type"] for e in events]
     assert types[:4] == ["status", "tool_call", "interaction", "status"]
     assert {"type": "status", "status": "awaiting_input"} in events
     assert "tool_call_result" in types

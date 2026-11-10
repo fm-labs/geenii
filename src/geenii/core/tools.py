@@ -68,9 +68,7 @@ def init_core_tools(tool_registry: ToolRegistry) -> None:
     #     return f"Contents successfully written to {file_path}"
 
     @tool_registry.tool()
-    def display_desktop_notification(
-        message: str, title: str = "Message from Geenii"
-    ) -> str:
+    def display_desktop_notification(message: str, title: str = "Message from Geenii") -> str:
         """
         Show a desktop notification with the given title and message.
 
@@ -93,9 +91,7 @@ def init_core_tools(tool_registry: ToolRegistry) -> None:
             f' with title "{_escape_applescript(title)}"'
             f' buttons {{"OK"}} giving up after 60'
         )
-        result = subprocess.run(
-            ["osascript", "-e", script], capture_output=True, text=True, check=False
-        )
+        result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, check=False)
         if result.returncode != 0:
             return f"Failed to send notification: {result.stderr.strip()}"
         return f"Notification sent: {title} - {message}"

@@ -34,12 +34,7 @@ _GENERATION_SUFFIX = re.compile(r"(-\d+)+$")
 
 def _cell(value) -> str:
     """Make a value safe for a markdown table cell."""
-    return (
-        str(value if value is not None else "")
-        .replace("|", "\\|")
-        .replace("\n", " ")
-        .strip()
-    )
+    return str(value if value is not None else "").replace("|", "\\|").replace("\n", " ").strip()
 
 
 def _table(headers: list[str], rows: list[list]) -> str:
@@ -124,8 +119,7 @@ def report_self(agent: BaseAgent, args: str) -> str:
         ["MCP servers", ", ".join(sorted(agent.mcp_servers)) or "none"],
         [
             "Skills",
-            ", ".join(f"**{s}** (active)" if s in active else s for s in skills)
-            or "none loaded",
+            ", ".join(f"**{s}** (active)" if s in active else s for s in skills) or "none loaded",
         ],
         ["Usage", _usage_summary(agent)],
     ]
@@ -140,9 +134,7 @@ def report_usage(agent: BaseAgent, args: str) -> str:
     pattern = re.compile(rf"^{re.escape(root)}(-\d+)*$")
     per_model: dict[str, Counter] = {}
     per_task: dict[str, Counter] = {}
-    for path in sorted(
-        glob.glob(os.path.join(GEENII_CACHE_DIR, "logs", "ai-usage-*.log"))
-    ):
+    for path in sorted(glob.glob(os.path.join(GEENII_CACHE_DIR, "logs", "ai-usage-*.log"))):
         try:
             with open(path, "r") as f:
                 for line in f:
@@ -156,22 +148,16 @@ def report_usage(agent: BaseAgent, args: str) -> str:
                         continue
                     calls = Counter(calls=1, failed=1 if entry.get("error") else 0)
                     try:
-                        usage = Usage.from_log_entry(
-                            entry
-                        )  # converts older log conventions
+                        usage = Usage.from_log_entry(entry)  # converts older log conventions
                     except pydantic.ValidationError:
-                        usage = (
-                            Usage()
-                        )  # malformed usage: count the call, without tokens
+                        usage = Usage()  # malformed usage: count the call, without tokens
                     for key, value in usage.model_dump(exclude_none=True).items():
                         if key.endswith("tokens"):
                             calls[key] += value
                     model = f"{entry.get('provider')}:{entry.get('model')}"
                     per_model.setdefault(model, Counter()).update(calls)
                     # lines written before source/task were logged have neither
-                    per_task.setdefault(
-                        entry.get("task") or "untagged", Counter()
-                    ).update(calls)
+                    per_task.setdefault(entry.get("task") or "untagged", Counter()).update(calls)
         except OSError as e:
             logger.warning(f"Could not read usage log {path}: {e}")
 
@@ -205,9 +191,7 @@ def report_usage(agent: BaseAgent, args: str) -> str:
     columns = ["Calls", "Input tokens", "Output tokens", "Total"]
     text = "### Usage\n\n" + _table(["Model", *columns], rows(per_model, "`{}`"))
     if len(per_task) > 1:
-        text += "\n\n**By purpose**\n\n" + _table(
-            ["Task", *columns], rows(per_task, "{}")
-        )
+        text += "\n\n**By purpose**\n\n" + _table(["Task", *columns], rows(per_task, "{}"))
     total = sum(per_model.values(), Counter())
     if total["failed"]:
         text += f"\n\n{total['failed']} of {total['calls']} calls failed; they used no tokens."
@@ -216,11 +200,7 @@ def report_usage(agent: BaseAgent, args: str) -> str:
         total["cache_creation_input_tokens"],
     )
     if cache_read or cache_write:
-        share = (
-            f" ({cache_read * 100 // total['input_tokens']}%)"
-            if total["input_tokens"]
-            else ""
-        )
+        share = f" ({cache_read * 100 // total['input_tokens']}%)" if total["input_tokens"] else ""
         text += f"\n\n{cache_read:,} of {total['input_tokens']:,} input tokens{share} were read from the prompt cache"
         text += f"; {cache_write:,} were written to it." if cache_write else "."
     text += "\n\nCounts all of the agent's model calls in this conversation, across compactions. Handoffs to other agents (`@agent`) are not included."
@@ -240,12 +220,7 @@ def report_models(agent: BaseAgent, args: str) -> str:
     text = f"### Models ({len(models)})\n\nCurrent: `{agent.model}`\n"
     for provider, items in by_provider.items():
         localities = sorted({m.locality for m in items})
-        names = [
-            f"**`{m.name}`**"
-            if f"{provider}:{m.name}" == agent.model
-            else f"`{m.name}`"
-            for m in items
-        ]
+        names = [f"**`{m.name}`**" if f"{provider}:{m.name}" == agent.model else f"`{m.name}`" for m in items]
         text += f"\n- **{provider}** ({', '.join(localities)}, {len(items)}): {', '.join(names)}"
     if agent.model not in {f"{m.provider}:{m.name}" for m in models}:
         text += f"\n\nThe agent's model `{agent.model}` is not in this list."
@@ -262,9 +237,7 @@ def report_tools(agent: BaseAgent, args: str) -> str:
         if description is None:
             missing.append(name)
         elif name.startswith("mcp__"):
-            _, server, tool = (
-                name.split("__", 2) if name.count("__") >= 2 else ("", "?", name)
-            )
+            _, server, tool = name.split("__", 2) if name.count("__") >= 2 else ("", "?", name)
             mcp.setdefault(server, []).append([f"`{tool}`", _first_line(description)])
         else:
             builtin.append([f"`{name}`", _first_line(description)])
@@ -275,9 +248,7 @@ def report_tools(agent: BaseAgent, args: str) -> str:
     for server, rows in sorted(mcp.items()):
         text += f"\n\n**MCP: {server}**\n\n" + _table(["Tool", "Description"], rows)
     if missing:
-        text += "\n\n**Not available** (configured but not loaded): " + ", ".join(
-            f"`{n}`" for n in missing
-        )
+        text += "\n\n**Not available** (configured but not loaded): " + ", ".join(f"`{n}`" for n in missing)
     return text
 
 
@@ -291,13 +262,7 @@ def report_context(agent: BaseAgent, args: str) -> str:
         [
             "Messages",
             f"{len(messages)}"
-            + (
-                " ("
-                + ", ".join(f"{count} {role}" for role, count in sorted(roles.items()))
-                + ")"
-                if roles
-                else ""
-            ),
+            + (" (" + ", ".join(f"{count} {role}" for role, count in sorted(roles.items())) + ")" if roles else ""),
         ],
         ["System prompt", f"{len(agent.system_prompt or '')} characters"],
         ["Estimated tokens", f"~{chars // 4}"],
@@ -314,9 +279,7 @@ def report_help(agent: BaseAgent, args: str) -> str:
         if name.lower() in commands:
             continue
         skill = agent.skills.get(name)
-        rows.append(
-            [f"`/{name}`", f"Skill: {_first_line(skill.description if skill else '')}"]
-        )
+        rows.append([f"`/{name}`", f"Skill: {_first_line(skill.description if skill else '')}"])
     text = "### Commands\n\n" + _table(["Command", "Description"], rows)
     text += (
         "\n\n**Other prefixes**\n\n"
@@ -347,6 +310,4 @@ class InfoCommandTask(BaseAgentTask):
 
     def execute(self) -> Iterator[ModelMessage]:
         _, report = INFO_COMMANDS[self.command]
-        yield ModelMessage(
-            role="assistant", content=[TextContent(text=report(self.agent, self.args))]
-        )
+        yield ModelMessage(role="assistant", content=[TextContent(text=report(self.agent, self.args))])

@@ -128,9 +128,7 @@ def test_terminate_on_exited_process_returns_exit_code():
 
 def test_terminate_sync_kills_the_whole_process_group(tmp_path):
     pidfile = tmp_path / "pid"
-    p = subprocess.Popen(
-        _grandchild_cmd(pidfile), start_new_session=proc.USE_PROCESS_GROUPS
-    )
+    p = subprocess.Popen(_grandchild_cmd(pidfile), start_new_session=proc.USE_PROCESS_GROUPS)
     grandchild = asyncio.run(_read_pidfile(pidfile))
     assert proc.terminate_sync(p, grace=1.0) == -signal.SIGTERM
     _assert_dead(grandchild)

@@ -10,9 +10,7 @@ from geenii.tool.computer import AppleScriptTool, ComputerTool
 from geenii.tool.registry import ToolRegistry
 from geenii.tools import init_builtin_tools
 
-pytestmark = pytest.mark.skipif(
-    sys.platform == "win32", reason="runs POSIX shell commands"
-)
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="runs POSIX shell commands")
 
 # for the tests that don't care about the working dir
 CTX = ToolCallContext(cwd=os.getcwd())
@@ -46,10 +44,7 @@ def test_stdout_and_stderr_are_in_text(bash):
 
 
 def test_output_is_stripped(bash):
-    assert (
-        bash.invoke(ctx=CTX, args={"command": "printf '\\n  out  \\n\\n'"}).text
-        == "stdout:\nout\nstderr:\n"
-    )
+    assert bash.invoke(ctx=CTX, args={"command": "printf '\\n  out  \\n\\n'"}).text == "stdout:\nout\nstderr:\n"
 
 
 def test_json_object_output_is_structured_content(bash):
@@ -60,27 +55,17 @@ def test_json_object_output_is_structured_content(bash):
 
 @pytest.mark.parametrize("output", ["5", "[1, 2]", '"text"', "true"])
 def test_json_non_object_output_is_not_structured_content(bash, output):
-    assert (
-        bash.invoke(ctx=CTX, args={"command": f"echo '{output}'"}).structured_content
-        is None
-    )
+    assert bash.invoke(ctx=CTX, args={"command": f"echo '{output}'"}).structured_content is None
 
 
 def test_non_json_output_has_no_structured_content(bash):
-    assert (
-        bash.invoke(ctx=CTX, args={"command": "echo hello"}).structured_content is None
-    )
+    assert bash.invoke(ctx=CTX, args={"command": "echo hello"}).structured_content is None
 
 
 def test_non_zero_exit_is_an_error(bash):
-    result = bash.invoke(
-        ctx=CTX, args={"command": "echo partial; echo boom >&2; exit 3"}
-    )
+    result = bash.invoke(ctx=CTX, args={"command": "echo partial; echo boom >&2; exit 3"})
     assert result.is_error is True
-    assert (
-        result.text
-        == "stdout:\npartial\nstderr:\nboom\nEXITED WITH NON-ZERO EXIT CODE: 3"
-    )
+    assert result.text == "stdout:\npartial\nstderr:\nboom\nEXITED WITH NON-ZERO EXIT CODE: 3"
 
 
 def test_error_result_has_no_structured_content_even_for_json(bash):
@@ -96,9 +81,7 @@ def test_unknown_command_is_an_error(bash):
 
 
 def test_runs_through_the_shell(bash):
-    assert bash.invoke(
-        ctx=CTX, args={"command": "echo a | tr a b && echo c"}
-    ).text.startswith("stdout:\nb\nc\n")
+    assert bash.invoke(ctx=CTX, args={"command": "echo a | tr a b && echo c"}).text.startswith("stdout:\nb\nc\n")
 
 
 def test_unbalanced_quote_reaches_the_shell(bash):
@@ -110,9 +93,7 @@ def test_unbalanced_quote_reaches_the_shell(bash):
 # ---------- arguments ----------
 
 
-@pytest.mark.parametrize(
-    "args", [{}, {"command": ""}, {"command": None}, {"other": "x"}]
-)
+@pytest.mark.parametrize("args", [{}, {"command": ""}, {"command": None}, {"other": "x"}])
 def test_missing_command_raises(bash, args):
     with pytest.raises(ValueError, match="Missing 'command'"):
         bash.invoke(ctx=CTX, args=args)
@@ -146,9 +127,9 @@ def test_applescript_template(recorded_run):
 
 
 def test_runs_in_given_cwd(bash, tmp_path):
-    assert bash.invoke(
-        args={"command": "pwd -P"}, ctx=ToolCallContext(cwd=str(tmp_path))
-    ).text.startswith(f"stdout:\n{os.path.realpath(tmp_path)}\n")
+    assert bash.invoke(args={"command": "pwd -P"}, ctx=ToolCallContext(cwd=str(tmp_path))).text.startswith(
+        f"stdout:\n{os.path.realpath(tmp_path)}\n"
+    )
 
 
 def test_invoke_tool_defaults_to_geenii_working_dir(bash, tmp_path, monkeypatch):
@@ -160,9 +141,7 @@ def test_invoke_tool_defaults_to_geenii_working_dir(bash, tmp_path, monkeypatch)
 
 def test_missing_cwd_raises(bash, tmp_path):
     with pytest.raises(FileNotFoundError):
-        bash.invoke(
-            args={"command": "pwd"}, ctx=ToolCallContext(cwd=str(tmp_path / "missing"))
-        )
+        bash.invoke(args={"command": "pwd"}, ctx=ToolCallContext(cwd=str(tmp_path / "missing")))
 
 
 # ---------- env ----------
@@ -194,9 +173,7 @@ def test_env_does_not_change_os_environ(bash):
 
 
 def test_env_vars_are_expanded_in_the_command(recorded_run, bash):
-    bash.invoke(
-        ctx=CTX, args={"command": "echo ${NAME} $NAME $OTHER"}, env={"NAME": "geenii"}
-    )
+    bash.invoke(ctx=CTX, args={"command": "echo ${NAME} $NAME $OTHER"}, env={"NAME": "geenii"})
     # unknown variables are left to the shell
     assert recorded_run[0]["command"] == "echo geenii geenii $OTHER"
 
@@ -220,11 +197,7 @@ def test_expand_vars_does_not_expand_values_again():
 def test_builtin_bash_tool():
     registry = ToolRegistry()
     init_builtin_tools(registry)
-    assert (
-        registry.get("bash")
-        .invoke(ctx=CTX, args={"command": "echo hi"})
-        .text.startswith("stdout:\nhi\n")
-    )
+    assert registry.get("bash").invoke(ctx=CTX, args={"command": "echo hi"}).text.startswith("stdout:\nhi\n")
 
 
 def test_builtin_python_tool():

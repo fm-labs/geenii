@@ -10,14 +10,10 @@ from geenii.tool.registry import ToolRegistry
 logger = logging.getLogger(__name__)
 
 
-def init_process_tools(
-    tool_registry: ToolRegistry, client: ProcessManagerClient
-) -> None:
+def init_process_tools(tool_registry: ToolRegistry, client: ProcessManagerClient) -> None:
 
     @tool_registry.tool(name="bg_process_start")
-    def start_process(
-        command: str, working_directory: str = "", process_id: str = ""
-    ) -> str:
+    def start_process(command: str, working_directory: str = "", process_id: str = "") -> str:
         """
         Start a long-running command as a background process.
         Returns immediately with a process ID that can be used to check status and retrieve output later.

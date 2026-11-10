@@ -61,17 +61,13 @@ class DaemonServer:
         os.makedirs(os.path.dirname(self._socket_path), exist_ok=True)
         if os.path.exists(self._socket_path):
             if await self._socket_is_live():
-                raise DaemonAlreadyRunning(
-                    f"A geenii daemon is already running on {self._socket_path}"
-                )
+                raise DaemonAlreadyRunning(f"A geenii daemon is already running on {self._socket_path}")
             os.unlink(self._socket_path)  # stale socket from a crashed daemon
 
         # Components first (recovers process records), then accept connections
         await self._host.start()
         try:
-            self._server = await asyncio.start_unix_server(
-                self._handle_client, path=self._socket_path
-            )
+            self._server = await asyncio.start_unix_server(self._handle_client, path=self._socket_path)
         except BaseException:
             await self._host.stop()
             raise
@@ -112,9 +108,7 @@ class DaemonServer:
         await writer.wait_closed()
         return True
 
-    async def _handle_client(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-    ) -> None:
+    async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
             while True:
                 line = await reader.readline()
@@ -123,14 +117,10 @@ class DaemonServer:
                 try:
                     request = json.loads(line)
                 except json.JSONDecodeError as exc:
-                    await self._write(
-                        writer, {"ok": False, "error": f"Bad JSON: {exc}"}
-                    )
+                    await self._write(writer, {"ok": False, "error": f"Bad JSON: {exc}"})
                     continue
                 if not isinstance(request, dict):
-                    await self._write(
-                        writer, {"ok": False, "error": "Request must be a JSON object"}
-                    )
+                    await self._write(writer, {"ok": False, "error": "Request must be a JSON object"})
                     continue
                 await self._write(writer, await self._dispatch(request))
         except ConnectionResetError, BrokenPipeError:
@@ -176,9 +166,7 @@ class DaemonServer:
         return {
             "pid": os.getpid(),
             "socket": self._socket_path,
-            "uptime_s": round(time.time() - self._started_at, 3)
-            if self._started_at
-            else 0.0,
+            "uptime_s": round(time.time() - self._started_at, 3) if self._started_at else 0.0,
             **await self._host.info(),
         }
 
@@ -202,9 +190,7 @@ def build_host(
             scheduler_config,
         )
     if services_config and not os.path.isfile(services_config):
-        logger.info(
-            "No services config at %s; no services are started", services_config
-        )
+        logger.info("No services config at %s; no services are started", services_config)
     return ProcessHost(
         scheduler=scheduler,
         scheduler_config=scheduler_config,
@@ -227,9 +213,7 @@ def main(argv: list[str] | None = None) -> None:
 
     init_logging()
 
-    parser = argparse.ArgumentParser(
-        prog="geenii-daemon", description="Run the geenii daemon."
-    )
+    parser = argparse.ArgumentParser(prog="geenii-daemon", description="Run the geenii daemon.")
     parser.add_argument("--socket", default=None, help="Unix socket path")
     parser.add_argument(
         "--scheduler-config",

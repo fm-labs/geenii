@@ -78,12 +78,8 @@ def main() -> None:
     parser.add_argument("--repo", default="fm-labs/geenii", help="GitHub owner/repo")
     parser.add_argument("--class-name", default="Geenii", help="Formula class name")
     parser.add_argument("--desc", default="geenii", help="Formula description")
-    parser.add_argument(
-        "--homepage", default=None, help="Homepage URL (defaults to repo URL)"
-    )
-    parser.add_argument(
-        "-o", "--output", default=None, help="Output file (default: stdout)"
-    )
+    parser.add_argument("--homepage", default=None, help="Homepage URL (defaults to repo URL)")
+    parser.add_argument("-o", "--output", default=None, help="Output file (default: stdout)")
     args = parser.parse_args()
 
     homepage = args.homepage or f"https://github.com/{args.repo}"

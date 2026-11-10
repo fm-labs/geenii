@@ -57,9 +57,7 @@ class FallbackGroup(click.Group):
 @click.option("--no-cache", is_flag=True, default=False, help="Disable caching.")
 @click.option(
     "--log-level",
-    type=click.Choice(
-        ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"], case_sensitive=False
-    ),
+    type=click.Choice(["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"], case_sensitive=False),
     default=None,
     help="Set the logging level.",
 )
@@ -72,9 +70,7 @@ def geecli(no_cache, log_level):
         logging.getLogger("httpx").setLevel(log_level.upper())
 
 
-@geecli.command(
-    hidden=True, context_settings={"ignore_unknown_options": True}
-)  # hidden so it doesn't clutter --help
+@geecli.command(hidden=True, context_settings={"ignore_unknown_options": True})  # hidden so it doesn't clutter --help
 # @click.option("name", "--name", "-n", default="default",
 #               help="Name of the agent to run.")
 # @click.option("skills", "--skills", "-s", default="",

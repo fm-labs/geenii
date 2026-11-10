@@ -22,9 +22,7 @@ def ai():
     default=DEFAULT_COMPLETION_MODEL,
     help="Model to use for completion.",
 )
-@click.option(
-    "--temperature", "-t", type=float, default=None, help="Sampling temperature."
-)
+@click.option("--temperature", "-t", type=float, default=None, help="Sampling temperature.")
 @click.option("--output-format", "-o", default=None, help="Output format type.")
 @click.argument("prompt")
 def completion(model, temperature, output_format, prompt):
@@ -42,12 +40,8 @@ def completion(model, temperature, output_format, prompt):
 
 
 @ai.command()
-@click.option(
-    "--model", "-m", default=DEFAULT_COMPLETION_MODEL, help="Model to use for chat."
-)
-@click.option(
-    "--temperature", "-t", type=float, default=None, help="Sampling temperature."
-)
+@click.option("--model", "-m", default=DEFAULT_COMPLETION_MODEL, help="Model to use for chat.")
+@click.option("--temperature", "-t", type=float, default=None, help="Sampling temperature.")
 @click.option("--output-format", "-o", default=None, help="Output format type.")
 @click.argument("prompt")
 def chat(model, temperature, output_format, prompt):
@@ -77,9 +71,7 @@ def chat(model, temperature, output_format, prompt):
         ModelMessage(
             role="user",
             content=[
-                TextContent(
-                    text="My car is red and I live in Berlin, but i lived in New York before"
-                ),
+                TextContent(text="My car is red and I live in Berlin, but i lived in New York before"),
             ],
         )
     )
@@ -101,9 +93,7 @@ def chat(model, temperature, output_format, prompt):
             name="get_weather",
             description="Get the weather from the given location.",
             input_schema={"location": {"type": "string"}},
-            handler=lambda x: (
-                f"The weather in {x['location']} is sunny with a high of 25°C."
-            ),
+            handler=lambda x: f"The weather in {x['location']} is sunny with a high of 25°C.",
         )
     )
 

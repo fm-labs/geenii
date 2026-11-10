@@ -36,9 +36,7 @@ class HuggingFaceAIProvider(AISpeechGeneratorProvider):
                 )
             )
             # run_tts_pipeline(text, output_file, 'a')
-            raise NotImplementedError(
-                "HuggingFaceAIProvider.generate_speech is not yet implemented."
-            )
+            raise NotImplementedError("HuggingFaceAIProvider.generate_speech is not yet implemented.")
 
             # read the generated audio file
             # encode as base64

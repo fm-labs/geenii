@@ -69,9 +69,7 @@ def test_stop_kills_running_command(tmp_path):
             )
         )
         await sched.start()
-        await asyncio.sleep(
-            0.05
-        )  # let the main loop compute its initial schedule first
+        await asyncio.sleep(0.05)  # let the main loop compute its initial schedule first
         sched._schedule["long"] = datetime.now(UTC) - timedelta(seconds=1)
         grandchild = int(await asyncio.to_thread(_wait_for_file, pidfile))
         await sched.stop()
@@ -110,9 +108,7 @@ def test_command_runs_as_process_manager_process(tmp_path):
 
 
 def test_failed_command_is_logged_with_run_id(tmp_path, caplog):
-    task = ScheduledTask(
-        name="fails", interval="cron:* * * * *", cmd=["sh", "-c", "exit 4"]
-    )
+    task = ScheduledTask(name="fails", interval="cron:* * * * *", cmd=["sh", "-c", "exit 4"])
     task.load()
     with caplog.at_level(logging.ERROR, logger="geenii.scheduler"):
         asyncio.run(task.run(ProcessManager(str(tmp_path / "procs"))))
@@ -165,9 +161,7 @@ def test_callable_receives_params_and_env():
         params=["x", "y"],
         env={"K": "V"},
     )
-    t2 = ScheduledTask(
-        name="b", interval="cron:* * * * *", run_fn=no_args, params=["ignored"]
-    )
+    t2 = ScheduledTask(name="b", interval="cron:* * * * *", run_fn=no_args, params=["ignored"])
     t1.load()
     t2.load()
     asyncio.run(t1.run())
@@ -201,11 +195,7 @@ def test_duplicate_task_names_are_rejected(tmp_path):
     assert [t.cmd for t in sched.tasks] == [["true"]]
 
     with pytest.raises(ValueError):
-        asyncio.run(
-            sched.add_task(
-                ScheduledTask(name="dup", interval="cron:* * * * *", cmd=["true"])
-            )
-        )
+        asyncio.run(sched.add_task(ScheduledTask(name="dup", interval="cron:* * * * *", cmd=["true"])))
 
 
 def test_config_fields_are_loaded(tmp_path):
@@ -239,13 +229,9 @@ def test_config_fields_are_loaded(tmp_path):
 def test_overlapping_run_is_skipped(caplog):
     async def main():
         sched = Scheduler()
-        await sched.add_task(
-            ScheduledTask(name="busy", interval="cron:* * * * *", cmd=["sleep", "30"])
-        )
+        await sched.add_task(ScheduledTask(name="busy", interval="cron:* * * * *", cmd=["sleep", "30"]))
         await sched.start()
-        await asyncio.sleep(
-            0.05
-        )  # let the main loop compute its initial schedule first
+        await asyncio.sleep(0.05)  # let the main loop compute its initial schedule first
         past = datetime.now(UTC) - timedelta(seconds=1)
         sched._schedule["busy"] = past
         await asyncio.sleep(1.2)

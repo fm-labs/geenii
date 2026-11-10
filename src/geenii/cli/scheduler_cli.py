@@ -28,10 +28,7 @@ def _reload_if_live(config: str) -> None:
     if client is None:
         return
     changes = client.call("scheduler.reload")
-    summary = (
-        ", ".join(f"{k}: {', '.join(v)}" for k, v in changes.items() if v)
-        or "no changes"
-    )
+    summary = ", ".join(f"{k}: {', '.join(v)}" for k, v in changes.items() if v) or "no changes"
     click.echo(f"Reloaded the running daemon ({summary}).")
 
 
@@ -70,9 +67,7 @@ def start_scheduler(config):
     from geenii.cli.daemon_cli import start_daemon
 
     if not os.path.isfile(config):
-        click.echo(
-            f"Warning: config file not found: {config}; the scheduler starts without tasks."
-        )
+        click.echo(f"Warning: config file not found: {config}; the scheduler starts without tasks.")
     start_daemon(None, config)
 
 
@@ -105,9 +100,7 @@ def status_scheduler(config):
         table.add_column("Last Run ID", style="dim")
         table.add_column("State")
         for task in status["tasks"]:
-            cmd = (
-                " ".join(task["cmd"]) if task.get("cmd") else (task.get("module") or "")
-            )
+            cmd = " ".join(task["cmd"]) if task.get("cmd") else (task.get("module") or "")
             table.add_row(
                 task["name"],
                 task["interval"],
@@ -195,9 +188,7 @@ def list_tasks(config):
     required=True,
     help="Schedule: 'cron:EXPRESSION' or 'at:DATETIME'.",
 )
-@click.option(
-    "--env", "-e", multiple=True, help="Environment variable in KEY=VALUE format."
-)
+@click.option("--env", "-e", multiple=True, help="Environment variable in KEY=VALUE format.")
 @click.option("--disabled", is_flag=True, help="Add the task in disabled state.")
 @click.option(
     "--timeout",

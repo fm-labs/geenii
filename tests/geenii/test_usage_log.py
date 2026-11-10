@@ -78,9 +78,7 @@ def test_failed_call_is_logged_and_reraised(cache_dir, monkeypatch):
 
 def test_invalid_model_id_is_logged_without_provider(cache_dir):
     with pytest.raises(ValueError):
-        ai.generate_chat_completion(
-            ChatCompletionRequest(model="no-prefix", prompt="hi"), task="llm"
-        )
+        ai.generate_chat_completion(ChatCompletionRequest(model="no-prefix", prompt="hi"), task="llm")
 
     [line] = _usage_lines(cache_dir)
     assert line["provider"] is None
@@ -101,18 +99,14 @@ def test_logging_failure_does_not_hide_the_error(cache_dir, monkeypatch):
 
     monkeypatch.setattr(ai, "_ai_usage_log", broken_log)
     with pytest.raises(ValueError, match="Invalid model ID"):
-        ai.generate_chat_completion(
-            ChatCompletionRequest(model="no-prefix", prompt="hi")
-        )
+        ai.generate_chat_completion(ChatCompletionRequest(model="no-prefix", prompt="hi"))
 
 
 # -- text completions (generate_completion) -------------------------------------
 
 
 def test_text_completion_is_logged(cache_dir):
-    response = ai.generate_completion(
-        model="fake:test", prompt="hi", source="cli", task="completion"
-    )
+    response = ai.generate_completion(model="fake:test", prompt="hi", source="cli", task="completion")
 
     assert response.usage.total_tokens == 30
     [line] = _usage_lines(cache_dir)
@@ -149,9 +143,7 @@ def test_usage_log_write_failure_does_not_fail_the_call(cache_dir, monkeypatch):
     monkeypatch.setattr(ai, "append_jsonl", broken_append)
     response = ai.generate_completion(model="fake:test", prompt="hi")
     assert response.output_text
-    chat = ai.generate_chat_completion(
-        ChatCompletionRequest(model="fake:test", prompt="hi")
-    )
+    chat = ai.generate_chat_completion(ChatCompletionRequest(model="fake:test", prompt="hi"))
     assert chat.output
 
 
@@ -162,9 +154,7 @@ def test_usage_total_defaults_to_input_plus_output():
     from geenii.datamodels import Usage
 
     assert Usage(input_tokens=3, output_tokens=4).total_tokens == 7
-    assert (
-        Usage(input_tokens=3, output_tokens=4, total_tokens=9).total_tokens == 9
-    )  # provider's own total wins
+    assert Usage(input_tokens=3, output_tokens=4, total_tokens=9).total_tokens == 9  # provider's own total wins
     assert Usage().total_tokens == 0
 
 
@@ -238,9 +228,7 @@ def test_anthropic_without_cache_fields():
 
     from geenii.provider.anthropic.provider import _usage_from_result
 
-    usage = _usage_from_result(
-        SimpleNamespace(usage=SimpleNamespace(input_tokens=10, output_tokens=5))
-    )
+    usage = _usage_from_result(SimpleNamespace(usage=SimpleNamespace(input_tokens=10, output_tokens=5)))
     assert (usage.input_tokens, usage.total_tokens) == (10, 15)
     assert usage.cache_read_input_tokens == 0
 
@@ -265,9 +253,7 @@ def test_openai_records_cached_tokens():
     assert usage.uncached_input_tokens == 400
 
     no_details = _usage_from_result(
-        SimpleNamespace(
-            usage=SimpleNamespace(input_tokens=10, output_tokens=5, total_tokens=15)
-        )
+        SimpleNamespace(usage=SimpleNamespace(input_tokens=10, output_tokens=5, total_tokens=15))
     )
     assert no_details.cache_read_input_tokens is None
     assert _usage_from_result(SimpleNamespace(usage=None)) is None
@@ -313,6 +299,4 @@ def test_from_log_entry_converts_version_1_anthropic_lines():
     }
     assert Usage.from_log_entry(openai_v1).input_tokens == 10
 
-    assert (
-        Usage.from_log_entry({"provider": "anthropic", "usage": {}}).total_tokens == 0
-    )
+    assert Usage.from_log_entry({"provider": "anthropic", "usage": {}}).total_tokens == 0

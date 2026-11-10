@@ -91,9 +91,7 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
             )
         return models
 
-    def generate_chat_completion(
-        self, request: ChatCompletionRequest, tool_registry=None
-    ) -> ChatCompletionResponse:
+    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry=None) -> ChatCompletionResponse:
         model = request.model or self.DEFAULT_MODEL
         model = model.removeprefix("anthropic:")
 
@@ -116,9 +114,7 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
         if request.prompt:
             input_messages.append({"role": "user", "content": request.prompt})
         elif not input_messages:
-            raise ValueError(
-                "At least a prompt or some messages must be provided for chat completion."
-            )
+            raise ValueError("At least a prompt or some messages must be provided for chat completion.")
 
         # OUTPUT
         output_format = request.output_format
@@ -138,14 +134,8 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
             output_config["format"] = {"schema": output_schema, "type": "json_schema"}
 
         model_params = request.model_parameters or {}
-        temperature = (
-            model_params.get("temperature", request.temperature)
-            or self.DEFAULT_TEMPERATURE
-        )
-        max_tokens = (
-            model_params.get("max_tokens", request.max_tokens)
-            or self.DEFAULT_MAX_TOKENS
-        )
+        temperature = model_params.get("temperature", request.temperature) or self.DEFAULT_TEMPERATURE
+        max_tokens = model_params.get("max_tokens", request.max_tokens) or self.DEFAULT_MAX_TOKENS
 
         try:
             logger.info(
@@ -178,15 +168,9 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
                         try:
                             _out_part = JsonContent(data=json.loads(text))
                         except json.JSONDecodeError:
-                            logger.warning(
-                                "Failed to parse content as JSON, adding as plain text."
-                            )
+                            logger.warning("Failed to parse content as JSON, adding as plain text.")
                     elif output_format is None or output_format == "auto":
-                        if (
-                            isinstance(text, str)
-                            and text.strip().startswith("{")
-                            and text.strip().endswith("}")
-                        ):
+                        if isinstance(text, str) and text.strip().startswith("{") and text.strip().endswith("}"):
                             try:
                                 _out_part = JsonContent(data=json.loads(text))
                             except json.JSONDecodeError:
@@ -201,9 +185,7 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
                             call_id=block.id,
                         )
                     )
-                    logger.info(
-                        f"Tool call requested: {block.name} with call_id {block.id}"
-                    )
+                    logger.info(f"Tool call requested: {block.name} with call_id {block.id}")
 
             usage = _usage_from_result(model_result)
             logger.info(
@@ -244,9 +226,7 @@ def _to_anthropic_tool(tool_def: dict) -> dict:
     return {
         "name": tool_def["name"],
         "description": tool_def.get("description", ""),
-        "input_schema": tool_def.get(
-            "parameters", {"type": "object", "properties": {}}
-        ),
+        "input_schema": tool_def.get("parameters", {"type": "object", "properties": {}}),
     }
 
 
@@ -279,8 +259,7 @@ def _model_messages_to_anthropic_format(messages: list[ModelMessage]) -> list[di
                         "content": [
                             {
                                 "type": "tool_use",
-                                "id": content_item.call_id
-                                or ("call_" + uuid.uuid4().hex),
+                                "id": content_item.call_id or ("call_" + uuid.uuid4().hex),
                                 "name": content_item.name,
                                 "input": content_item.arguments or {},
                             }
@@ -295,9 +274,7 @@ def _model_messages_to_anthropic_format(messages: list[ModelMessage]) -> list[di
                             {
                                 "type": "tool_result",
                                 "tool_use_id": content_item.call_id or "",
-                                "content": str(content_item.result)
-                                if content_item.result is not None
-                                else "",
+                                "content": str(content_item.result) if content_item.result is not None else "",
                             }
                         ],
                     }

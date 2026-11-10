@@ -33,16 +33,12 @@ def run_whisper_cli_transcribe(
     if not os.path.exists(model_dir):
         raise FileNotFoundError(f"Model directory does not exist: {model_dir}")
     if not os.path.exists(os.path.join(model_dir, model_file)):
-        raise FileNotFoundError(
-            f"Model file does not exist: {os.path.join(model_dir, model_file)}"
-        )
+        raise FileNotFoundError(f"Model file does not exist: {os.path.join(model_dir, model_file)}")
 
     if not os.path.exists(input_dir):
         raise FileNotFoundError(f"Input directory does not exist: {input_dir}")
     if not os.path.exists(os.path.join(input_dir, input_file)):
-        raise FileNotFoundError(
-            f"Input file does not exist: {os.path.join(input_dir, input_file)}"
-        )
+        raise FileNotFoundError(f"Input file does not exist: {os.path.join(input_dir, input_file)}")
 
     if output_file is None:
         base_name, _ = os.path.splitext(input_file)
@@ -75,9 +71,7 @@ def run_whisper_cli_transcribe(
     print(f"Return code: {p.returncode}")
     if p.returncode != 0:
         print(p.stderr.decode("utf-8"))
-        raise RuntimeError(
-            f"Whisper CLI failed with return code {p.returncode}. Command: {' '.join(command)}"
-        )
+        raise RuntimeError(f"Whisper CLI failed with return code {p.returncode}. Command: {' '.join(command)}")
 
     stdout = p.stdout.decode("utf-8").strip()
     stderr = p.stderr.decode("utf-8").strip()
@@ -106,9 +100,7 @@ def run_whisper_cli_transcribe(
     return transcription
 
 
-def run_whisper_server_in_docker(
-    model_dir: str = "models", model_file="ggml-base.bin"
-) -> None:
+def run_whisper_server_in_docker(model_dir: str = "models", model_file="ggml-base.bin") -> None:
     """
     Run the whisper-server in Docker container to transcribe audio files.
 
@@ -121,9 +113,7 @@ def run_whisper_server_in_docker(
     if not os.path.exists(model_dir):
         raise FileNotFoundError(f"Model directory does not exist: {model_dir}")
     if not os.path.exists(os.path.join(model_dir, model_file)):
-        raise FileNotFoundError(
-            f"Model file does not exist: {os.path.join(model_dir, model_file)}"
-        )
+        raise FileNotFoundError(f"Model file does not exist: {os.path.join(model_dir, model_file)}")
 
     whisper_cmd = f"whisper-server -m /models/{model_file} --host 0.0.0.0 --port 8766 --language en"
 
@@ -145,9 +135,7 @@ def run_whisper_server_in_docker(
     print(f"Return code: {p.returncode}")
     if p.returncode != 0:
         print(p.stderr.decode("utf-8"))
-        raise RuntimeError(
-            f"Whisper Server failed with return code {p.returncode}. Command: {' '.join(command)}"
-        )
+        raise RuntimeError(f"Whisper Server failed with return code {p.returncode}. Command: {' '.join(command)}")
 
     stdout = p.stdout.decode("utf-8").strip()
     stderr = p.stderr.decode("utf-8").strip()

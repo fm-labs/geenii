@@ -73,9 +73,7 @@ def read_mcp_server_tools(server_name) -> list[dict]:
             tools = mcp_client.list_tools()
         except Exception as e:
             # try again after a short delay in case the server is still starting up
-            logger.warning(
-                f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds..."
-            )
+            logger.warning(f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds...")
             try:
                 time.sleep(1)
                 tools = mcp_client.list_tools()
@@ -108,9 +106,7 @@ def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] | None 
             mcp_tools = read_mcp_server_tools(server_name)
             if len(mcp_tools) > 0:
                 # map the MCP tool definitions to the internal tool representation and register them in the registry
-                registry.register_mcp_tools(
-                    mcp_server_id=server_name, tool_definitions=mcp_tools
-                )
+                registry.register_mcp_tools(mcp_server_id=server_name, tool_definitions=mcp_tools)
         except Exception as e:
             logger.error(f"Error connecting to MCP server {server_name}: {e}")
             continue
@@ -159,20 +155,13 @@ _SENSITIVE_NAME_PARTS = ("pass", "passwd", "pat")
 
 def _is_sensitive_env_var(name: str) -> bool:
     name = name.lower()
-    return any(s in name for s in _SENSITIVE_KEYS) or any(
-        p in _SENSITIVE_NAME_PARTS for p in name.split("_")
-    )
+    return any(s in name for s in _SENSITIVE_KEYS) or any(p in _SENSITIVE_NAME_PARTS for p in name.split("_"))
 
 
-def _redact_env_vars(
-    env_vars: dict[str, str], secret_keys: set[str] | None = None
-) -> dict[str, str]:
+def _redact_env_vars(env_vars: dict[str, str], secret_keys: set[str] | None = None) -> dict[str, str]:
     """A copy of env_vars with sensitive values redacted. The input is left untouched, since it is passed on to the tool."""
     secret_keys = secret_keys or set()
-    return {
-        k: "REDACTED" if k in secret_keys or _is_sensitive_env_var(k) else v
-        for k, v in env_vars.items()
-    }
+    return {k: "REDACTED" if k in secret_keys or _is_sensitive_env_var(k) else v for k, v in env_vars.items()}
 
 
 def _log_tool_call(

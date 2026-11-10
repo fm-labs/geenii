@@ -104,12 +104,8 @@ def aggregate_log_file(path: str) -> dict[str, DayAggregate]:
             ts = _local_time(entry.get("timestamp"))
             if ts is None:
                 continue
-            day = days.setdefault(
-                ts.date().isoformat(), {"rows": {}, "hours": [0] * 24}
-            )
-            day["rows"].setdefault(_row_key(entry), Counter()).update(
-                _entry_counters(entry)
-            )
+            day = days.setdefault(ts.date().isoformat(), {"rows": {}, "hours": [0] * 24})
+            day["rows"].setdefault(_row_key(entry), Counter()).update(_entry_counters(entry))
             day["hours"][ts.hour] += 1
     return days
 
@@ -134,18 +130,13 @@ class UsageStatsCache:
     def _cache_file(self, path: str) -> str:
         return os.path.join(self.cache_dir, Path(path).stem + ".json")
 
-    def _read_cache_file(
-        self, path: str, signature: tuple[int, int]
-    ) -> dict[str, DayAggregate] | None:
+    def _read_cache_file(self, path: str, signature: tuple[int, int]) -> dict[str, DayAggregate] | None:
         try:
             with open(self._cache_file(path), "r") as f:
                 data = json.load(f)
         except OSError, ValueError:
             return None
-        if (
-            data.get("version") != CACHE_VERSION
-            or tuple(data.get("signature") or ()) != signature
-        ):
+        if data.get("version") != CACHE_VERSION or tuple(data.get("signature") or ()) != signature:
             return None
         return {
             day: {
@@ -155,9 +146,7 @@ class UsageStatsCache:
             for day, agg in data["days"].items()
         }
 
-    def _write_cache_file(
-        self, path: str, signature: tuple[int, int], days: dict[str, DayAggregate]
-    ) -> None:
+    def _write_cache_file(self, path: str, signature: tuple[int, int], days: dict[str, DayAggregate]) -> None:
         """Atomic write; a failure only costs a recalculation after a restart."""
         target = self._cache_file(path)
         try:
@@ -206,9 +195,7 @@ class UsageStatsCache:
                     target = merged.setdefault(day, {"rows": {}, "hours": [0] * 24})
                     for key, counters in agg["rows"].items():
                         target["rows"].setdefault(key, Counter()).update(counters)
-                    target["hours"] = [
-                        a + b for a, b in zip(target["hours"], agg["hours"])
-                    ]
+                    target["hours"] = [a + b for a, b in zip(target["hours"], agg["hours"])]
         return merged
 
 
@@ -217,11 +204,7 @@ _default_cache = UsageStatsCache()
 
 def _totals(counters: Counter) -> dict:
     result = {field: counters.get(field, 0) for field in COUNTER_FIELDS}
-    result["avg_duration_ms"] = (
-        round(result["duration_ms"] / result["timed_calls"])
-        if result["timed_calls"]
-        else None
-    )
+    result["avg_duration_ms"] = round(result["duration_ms"] / result["timed_calls"]) if result["timed_calls"] else None
     return result
 
 
@@ -246,9 +229,7 @@ def usage_stats(
 
     total = Counter()
     hours = [0] * 24
-    breakdowns: dict[str, dict[str, Counter]] = {
-        d: {} for d in (*DIMENSIONS, "model_id")
-    }
+    breakdowns: dict[str, dict[str, Counter]] = {d: {} for d in (*DIMENSIONS, "model_id")}
     daily = []
     day = start
     while day <= end:
@@ -280,10 +261,7 @@ def usage_stats(
         day += timedelta(days=1)
 
     def breakdown(dimension: str) -> list[dict]:
-        rows = [
-            {"key": key, **_totals(counters)}
-            for key, counters in breakdowns[dimension].items()
-        ]
+        rows = [{"key": key, **_totals(counters)} for key, counters in breakdowns[dimension].items()]
         return sorted(rows, key=lambda r: (-r["total_tokens"], -r["calls"], r["key"]))
 
     return {

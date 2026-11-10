@@ -31,13 +31,9 @@ class StartProcessRequest(pydantic.BaseModel):
     command: str | list[str] = pydantic.Field(
         ..., description="A string runs through the shell; a list is executed directly"
     )
-    env: dict[str, str] | None = pydantic.Field(
-        None, description="Extra environment variables"
-    )
+    env: dict[str, str] | None = pydantic.Field(None, description="Extra environment variables")
     cwd: str | None = pydantic.Field(None, description="Working directory")
-    pid: str | None = pydantic.Field(
-        None, description="Custom process ID (auto-generated if omitted)"
-    )
+    pid: str | None = pydantic.Field(None, description="Custom process ID (auto-generated if omitted)")
 
 
 def dep_pm_client() -> ProcessManagerClient:
@@ -56,9 +52,7 @@ def _call(fn, *args, **kwargs):
             raise HTTPException(status_code=500, detail=message)
         if exc_type == "KeyError":
             detail = detail.strip("'\"")  # str(KeyError) quotes its message
-        raise HTTPException(
-            status_code=_ERROR_STATUS[exc_type], detail=detail or message
-        )
+        raise HTTPException(status_code=_ERROR_STATUS[exc_type], detail=detail or message)
     except OSError as exc:
         raise HTTPException(
             status_code=503,
@@ -76,9 +70,7 @@ def ping(client: ProcessManagerClient = Depends(dep_pm_client)) -> dict:
 
 @router.get("/processes")
 def list_processes(
-    include_finished: bool = Query(
-        False, description="Include finished processes from disk"
-    ),
+    include_finished: bool = Query(False, description="Include finished processes from disk"),
     client: ProcessManagerClient = Depends(dep_pm_client),
 ) -> list[dict]:
     """List background processes."""
@@ -86,13 +78,9 @@ def list_processes(
 
 
 @router.post("/processes", status_code=201)
-def start_process(
-    request: StartProcessRequest, client: ProcessManagerClient = Depends(dep_pm_client)
-) -> dict:
+def start_process(request: StartProcessRequest, client: ProcessManagerClient = Depends(dep_pm_client)) -> dict:
     """Start a background process."""
-    return _call(
-        client.start, request.command, env=request.env, cwd=request.cwd, pid=request.pid
-    )
+    return _call(client.start, request.command, env=request.env, cwd=request.cwd, pid=request.pid)
 
 
 @router.post("/gc")
@@ -114,9 +102,7 @@ def gc_processes(
 
 
 @router.get("/processes/{process_id}")
-def get_process(
-    process_id: str, client: ProcessManagerClient = Depends(dep_pm_client)
-) -> dict:
+def get_process(process_id: str, client: ProcessManagerClient = Depends(dep_pm_client)) -> dict:
     """Get the current state of a background process."""
     return _call(client.status, process_id)
 
@@ -126,9 +112,7 @@ def get_process_output(
     process_id: str,
     stream: Literal["stdout", "stderr"] = "stdout",
     tail: int | None = Query(None, ge=0, description="Return only the last N lines"),
-    offset: int | None = Query(
-        None, ge=0, description="Start reading at this byte position"
-    ),
+    offset: int | None = Query(None, ge=0, description="Start reading at this byte position"),
     limit: int | None = Query(None, ge=1, description="Read at most this many bytes"),
     client: ProcessManagerClient = Depends(dep_pm_client),
 ) -> str:
@@ -137,17 +121,13 @@ def get_process_output(
     Either the last `tail` lines, or `limit` bytes from byte `offset`. To read the whole
     output in chunks, advance offset by limit until the response body is empty.
     """
-    return _call(
-        client.output, process_id, stream=stream, tail=tail, offset=offset, limit=limit
-    )
+    return _call(client.output, process_id, stream=stream, tail=tail, offset=offset, limit=limit)
 
 
 @router.post("/processes/{process_id}/wait")
 def wait_process(
     process_id: str,
-    timeout: float | None = Query(
-        None, gt=0, description="Give up after this many seconds"
-    ),
+    timeout: float | None = Query(None, gt=0, description="Give up after this many seconds"),
     client: ProcessManagerClient = Depends(dep_pm_client),
 ) -> dict:
     """Wait until a background process has finished and return its final state."""
@@ -165,8 +145,6 @@ def kill_process(
 
 
 @router.delete("/processes/{process_id}", status_code=204)
-def cleanup_process(
-    process_id: str, client: ProcessManagerClient = Depends(dep_pm_client)
-) -> None:
+def cleanup_process(process_id: str, client: ProcessManagerClient = Depends(dep_pm_client)) -> None:
     """Remove on-disk logs for a finished process."""
     _call(client.cleanup, process_id)

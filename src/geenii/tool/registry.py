@@ -94,12 +94,8 @@ class ToolRegistry:
         """
 
         def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
-            logger.debug(
-                f"Registering tool {name or fn.__name__!r} via fn decorator {fn.__module__}.{fn.__qualname__}"
-            )
-            self.register_function(
-                fn, name=name, description=description, parameters=parameters
-            )
+            logger.debug(f"Registering tool {name or fn.__name__!r} via fn decorator {fn.__module__}.{fn.__qualname__}")
+            self.register_function(fn, name=name, description=description, parameters=parameters)
             return fn
 
         return decorator

@@ -16,11 +16,7 @@ def fast_backoff(monkeypatch):
 
 
 def _restart_delays(sup: Supervisor, name: str) -> list[float]:
-    return [
-        float(m.group(1))
-        for line in sup.logs(name, 400)
-        if (m := re.search(r"restarting in ([\d.]+)s", line))
-    ]
+    return [float(m.group(1)) for line in sup.logs(name, 400) if (m := re.search(r"restarting in ([\d.]+)s", line))]
 
 
 def test_backoff_escalates_on_repeated_crashes_and_is_capped():
@@ -57,9 +53,7 @@ def test_clean_exit_resets_backoff():
 def test_restart_process_respawns_when_restart_disabled():
     async def main():
         sup = Supervisor()
-        await sup.ensure(
-            "svc", ProcConfig(name="svc", cmd=["sleep", "30"], restart=False)
-        )
+        await sup.ensure("svc", ProcConfig(name="svc", cmd=["sleep", "30"], restart=False))
         await asyncio.sleep(0.2)
         first_pid = sup.status()["running"]["svc"]["pid"]
         await sup.restart_process("svc")
@@ -77,9 +71,7 @@ def test_is_active_reflects_processes_and_watchers():
     async def main():
         sup = Supervisor()
         idle = sup.is_active()
-        await sup.ensure(
-            "once", ProcConfig(name="once", cmd=["sh", "-c", "exit 0"], restart=False)
-        )
+        await sup.ensure("once", ProcConfig(name="once", cmd=["sh", "-c", "exit 0"], restart=False))
         while_running = sup.is_active()
         await asyncio.sleep(0.3)
         after_exit = sup.is_active()
@@ -279,9 +271,7 @@ def test_apply_services(tmp_path):
         sup = Supervisor()
         await sup.ensure("adhoc", ProcConfig(name="adhoc", cmd=["sleep", "30"]))
 
-        changes = await sup.apply_services(
-            read_services(_services_file(tmp_path, [svc("a"), svc("b")]))
-        )
+        changes = await sup.apply_services(read_services(_services_file(tmp_path, [svc("a"), svc("b")])))
         assert changes == {"started": ["a", "b"], "stopped": [], "restarted": []}
         st = sup.status()
         assert {n: d["source"] for n, d in st["desired"].items()} == {
@@ -294,9 +284,7 @@ def test_apply_services(tmp_path):
         pid_b = sup.status()["running"]["b"]["pid"]
 
         # Unchanged file: nothing happens
-        assert await sup.apply_services(
-            read_services(_services_file(tmp_path, [svc("a"), svc("b")]))
-        ) == {
+        assert await sup.apply_services(read_services(_services_file(tmp_path, [svc("a"), svc("b")]))) == {
             "started": [],
             "stopped": [],
             "restarted": [],
@@ -304,9 +292,7 @@ def test_apply_services(tmp_path):
 
         # b stopped by hand is started again by a reload
         await sup.stop_process("b")
-        changes = await sup.apply_services(
-            read_services(_services_file(tmp_path, [svc("a"), svc("b")]))
-        )
+        changes = await sup.apply_services(read_services(_services_file(tmp_path, [svc("a"), svc("b")])))
         assert changes["started"] == ["b"]
 
         # a changed -> restarted with the new command; b removed -> stopped; c added
@@ -329,9 +315,7 @@ def test_apply_services_adopts_an_ad_hoc_service_of_the_same_name(tmp_path):
         sup = Supervisor()
         await sup.ensure("web", ProcConfig(name="web", cmd=["sleep", "30"]))
         changes = await sup.apply_services(
-            read_services(
-                _services_file(tmp_path, [{"name": "web", "cmd": ["sleep", "31"]}])
-            )
+            read_services(_services_file(tmp_path, [{"name": "web", "cmd": ["sleep", "31"]}]))
         )
         st = sup.status()
         await sup.stop()

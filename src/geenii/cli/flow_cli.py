@@ -29,9 +29,7 @@ def _import_processor_modules(modules: tuple[str, ...]):
         try:
             importlib.import_module(module)
         except ImportError as e:
-            raise click.ClickException(
-                f"Cannot import processor module '{module}': {e}"
-            )
+            raise click.ClickException(f"Cannot import processor module '{module}': {e}")
 
 
 def _load_flow(path: str, modules: tuple[str, ...]) -> Flow:
@@ -114,9 +112,7 @@ def flow():
     default=False,
     help="Print the full result as JSON.",
 )
-@click.option(
-    "--quiet", "-q", is_flag=True, default=False, help="Don't print step events."
-)
+@click.option("--quiet", "-q", is_flag=True, default=False, help="Don't print step events.")
 @click.option(
     "--snapshot",
     "-s",
@@ -125,9 +121,7 @@ def flow():
     default=None,
     help="Write the flow, its input and the step results to this JSON file while the flow runs and when it ends.",
 )
-@click.option(
-    "--context-id", default=None, help="Id of the run (default: a generated id)."
-)
+@click.option("--context-id", default=None, help="Id of the run (default: a generated id).")
 @processor_module_option
 def run(
     path,
@@ -149,9 +143,7 @@ def run(
     for item in variables:
         key, sep, value = item.partition("=")
         if not sep or not key:
-            raise click.BadParameter(
-                f"Expected KEY=VALUE, got '{item}'", param_hint="--var"
-            )
+            raise click.BadParameter(f"Expected KEY=VALUE, got '{item}'", param_hint="--var")
         f.variables[key] = _parse_value(value)
 
     input_data = None
@@ -177,9 +169,7 @@ def run(
         click.echo(f"\nFlow '{result.name}' ({result.context_id}): {result.status}")
         for step in result.steps:
             error = f"  {step.error}" if step.error else ""
-            click.echo(
-                f"  {step.step_id:20} {step.status:8} {step.duration:7.3f}s{error}"
-            )
+            click.echo(f"  {step.step_id:20} {step.status:8} {step.duration:7.3f}s{error}")
         click.echo("\nOutput:")
         click.echo(json.dumps(result.output, indent=2, default=str))
 
@@ -212,9 +202,7 @@ def validate(path, strict, processor_modules):
         raise SystemExit(1)
 
     preds = f.predecessors()
-    click.echo(
-        f"Flow '{f.name}' is valid ({len(f.steps)} steps, max_workers={f.max_workers})"
-    )
+    click.echo(f"Flow '{f.name}' is valid ({len(f.steps)} steps, max_workers={f.max_workers})")
     click.echo("\nExecution order:")
     for step in f.execution_order():
         after = f"  (after {', '.join(preds[step.id])})" if preds[step.id] else ""
@@ -264,11 +252,7 @@ def graph(path, fmt, output, direction, processor_modules):
     """
     f = _load_flow(path, processor_modules)
     if fmt is None:
-        fmt = (
-            GRAPH_SUFFIX_FORMATS.get(Path(output).suffix.lower(), "mermaid")
-            if output
-            else "mermaid"
-        )
+        fmt = GRAPH_SUFFIX_FORMATS.get(Path(output).suffix.lower(), "mermaid") if output else "mermaid"
 
     try:
         text = f.to_mermaid(direction) if fmt == "mermaid" else f.to_dot(direction)
@@ -302,9 +286,7 @@ def graph(path, fmt, output, direction, processor_modules):
 
 
 @flow.command(name="list")
-@click.option(
-    "--json", "as_json", is_flag=True, default=False, help="Print the flows as JSON."
-)
+@click.option("--json", "as_json", is_flag=True, default=False, help="Print the flows as JSON.")
 def list_flows(as_json):
     """List the flows in ~/.geenii/flows and the working directory's .geenii/flows."""
     from geenii.config import flow_dirs
@@ -312,11 +294,7 @@ def list_flows(as_json):
 
     flows = init_flow_registry().flows
     if as_json:
-        click.echo(
-            json.dumps(
-                [{"name": f.name, "filepath": f.filepath} for f in flows], indent=2
-            )
-        )
+        click.echo(json.dumps([{"name": f.name, "filepath": f.filepath} for f in flows], indent=2))
         return
     if not flows:
         click.echo("No flows found in:")

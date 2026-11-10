@@ -8,9 +8,7 @@ import tempfile
 import textwrap
 
 
-def open_terminal(
-    command: str | None = None, keep_open: bool = True, cwd: str | None = None
-):
+def open_terminal(command: str | None = None, keep_open: bool = True, cwd: str | None = None):
     """Open a new terminal window, optionally running `command` in it."""
     cwd = cwd or os.getcwd()
 

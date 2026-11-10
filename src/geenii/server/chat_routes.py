@@ -46,9 +46,7 @@ def dep_chat_sessions(request: Request) -> ChatSessionStore:
         with _store_lock:
             store = getattr(request.app.state, "chat_sessions", None)
             if store is None:
-                store = ChatSessionStore(
-                    GEENII_CHAT_SESSIONS_DIR, request.app.state.agent_registry
-                )
+                store = ChatSessionStore(GEENII_CHAT_SESSIONS_DIR, request.app.state.agent_registry)
                 request.app.state.chat_sessions = store
     return store
 
@@ -104,9 +102,7 @@ def list_chats(
 
 
 @router.post("", status_code=201)
-def create_chat(
-    request: ChatCreateRequest, store: ChatSessionStore = Depends(dep_chat_sessions)
-) -> ChatSessionInfo:
+def create_chat(request: ChatCreateRequest, store: ChatSessionStore = Depends(dep_chat_sessions)) -> ChatSessionInfo:
     """Create a chat session with the given agent."""
     try:
         return store.create(request.agent, title=request.title)
@@ -115,9 +111,7 @@ def create_chat(
 
 
 @router.get("/{context_id}")
-def get_chat(
-    context_id: str, store: ChatSessionStore = Depends(dep_chat_sessions)
-) -> ChatSessionInfo:
+def get_chat(context_id: str, store: ChatSessionStore = Depends(dep_chat_sessions)) -> ChatSessionInfo:
     return _get(store, context_id)
 
 
@@ -130,9 +124,7 @@ def delete_chat(context_id: str, store: ChatSessionStore = Depends(dep_chat_sess
 
 
 @router.get("/{context_id}/messages")
-def get_chat_messages(
-    context_id: str, store: ChatSessionStore = Depends(dep_chat_sessions)
-) -> list[ChatMessage]:
+def get_chat_messages(context_id: str, store: ChatSessionStore = Depends(dep_chat_sessions)) -> list[ChatMessage]:
     """The conversation history (the agent's memory)."""
     info = _get(store, context_id)
     return [
@@ -197,16 +189,12 @@ def respond_to_interaction(
     _get(store, context_id)
     runner = store.get_runner(context_id)
     if not runner or not runner.respond(interaction_id, response.choice):
-        raise HTTPException(
-            status_code=404, detail=f"No pending interaction {interaction_id}."
-        )
+        raise HTTPException(status_code=404, detail=f"No pending interaction {interaction_id}.")
     return Response(status_code=204)
 
 
 @router.post("/{context_id}/cancel", status_code=204)
-def cancel_chat_turn(
-    context_id: str, store: ChatSessionStore = Depends(dep_chat_sessions)
-):
+def cancel_chat_turn(context_id: str, store: ChatSessionStore = Depends(dep_chat_sessions)):
     """Cancel the running turn: pending approvals are rejected and the stream ends at the next message."""
     _get(store, context_id)
     runner = store.get_runner(context_id)
@@ -220,9 +208,7 @@ _NOT_IMPLEMENTED = {501: {"model": Problem, "description": "Not implemented"}}
 
 @router.post("/{context_id}/files", responses=_NOT_IMPLEMENTED)
 def upload_files(context_id: str):
-    raise HTTPException(
-        status_code=501, detail="Chat file uploads are not implemented yet."
-    )
+    raise HTTPException(status_code=501, detail="Chat file uploads are not implemented yet.")
 
 
 @router.get("/{context_id}/files", responses=_NOT_IMPLEMENTED)

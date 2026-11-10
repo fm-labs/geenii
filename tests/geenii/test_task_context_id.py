@@ -34,9 +34,7 @@ def requests(monkeypatch):
         captured.append((request, tags))
         raise StopTask()
 
-    monkeypatch.setattr(
-        tasks, "generate_chat_completion", fake_generate_chat_completion
-    )
+    monkeypatch.setattr(tasks, "generate_chat_completion", fake_generate_chat_completion)
     return captured
 
 
@@ -46,9 +44,7 @@ def agent():
     memory.append(ModelMessage(role="user", content=[TextContent(text="hello")]))
     agent = Agent(name="tester", model="fake:test", context_id="ctx-1", memory=memory)
     for name in ("alpha", "beta"):
-        agent.skills.register(
-            SkillSpec(name=name, description=f"The {name} skill", path=f"/tmp/{name}")
-        )
+        agent.skills.register(SkillSpec(name=name, description=f"The {name} skill", path=f"/tmp/{name}"))
     return agent
 
 

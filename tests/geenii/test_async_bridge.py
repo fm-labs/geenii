@@ -70,14 +70,8 @@ def test_python_function_tool_supports_sync_and_async_handlers():
     sync_tool = PythonFunctionTool(name="sync_greet", handler=lambda name: f"hi {name}")
     async_tool = PythonFunctionTool(name="async_greet", handler=async_greet)
 
-    assert (
-        sync_tool.invoke(args={"name": "a"}, ctx=ToolCallContext(cwd=".")).text
-        == "hi a"
-    )
-    assert (
-        async_tool.invoke(args={"name": "b"}, ctx=ToolCallContext(cwd=".")).text
-        == "hello b"
-    )
+    assert sync_tool.invoke(args={"name": "a"}, ctx=ToolCallContext(cwd=".")).text == "hi a"
+    assert async_tool.invoke(args={"name": "b"}, ctx=ToolCallContext(cwd=".")).text == "hello b"
 
 
 MCP_SERVER = textwrap.dedent("""
@@ -98,9 +92,7 @@ MCP_SERVER = textwrap.dedent("""
 def mcp_client(tmp_path):
     script = tmp_path / "server.py"
     script.write_text(MCP_SERVER)
-    client = McpClient(
-        "test", {"type": "stdio", "command": sys.executable, "args": [str(script)]}
-    )
+    client = McpClient("test", {"type": "stdio", "command": sys.executable, "args": [str(script)]})
     yield client
     client.close()
 
@@ -111,7 +103,5 @@ def test_mcp_client_reuses_connection_across_threads(mcp_client):
 
     # the persistent connection opened above is reused from other threads
     with ThreadPoolExecutor(max_workers=3) as pool:
-        results = list(
-            pool.map(lambda i: mcp_client.call_tool("add", {"a": i, "b": 1}), range(3))
-        )
+        results = list(pool.map(lambda i: mcp_client.call_tool("add", {"a": i, "b": 1}), range(3)))
     assert [r.structured_content["result"] for r in results] == [1, 2, 3]

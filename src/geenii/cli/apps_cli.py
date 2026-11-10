@@ -205,9 +205,7 @@ def init_app(name, app_type, title, description, extra_dir):
 
 
 @apps.command(name="init-all")
-@click.option(
-    "--overwrite", is_flag=True, default=False, help="Overwrite existing manifests."
-)
+@click.option("--overwrite", is_flag=True, default=False, help="Overwrite existing manifests.")
 @click.option(
     "--dir",
     "apps_dir",

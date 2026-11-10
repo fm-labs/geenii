@@ -27,9 +27,7 @@ class ScriptTool(Tool):
         self.type = "function"
         self.script_path = script_path
 
-    def invoke(
-        self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any
-    ) -> ToolCallResult:
+    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> ToolCallResult:
         arg_str = args.get("args")
         cmd = [self.script_path]
         if arg_str:

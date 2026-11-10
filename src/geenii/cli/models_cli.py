@@ -31,7 +31,5 @@ def list_models(provider: str, locality: str):
         if locality is not None and locality != m.locality:
             continue
 
-        table.add_row(
-            m.name, m.provider, m.description, m.locality, ",".join(m.capabilities)
-        )
+        table.add_row(m.name, m.provider, m.description, m.locality, ",".join(m.capabilities))
     Console().print(table)

@@ -70,9 +70,7 @@ class SqliteCacheStore(CacheStore):
         self.conn.execute("PRAGMA temp_store=MEMORY;")
         self.conn.execute(f"PRAGMA cache_size={int(cache_size_kib)};")
         self.conn.execute(f"PRAGMA mmap_size={int(mmap_size_bytes)};")
-        self.conn.execute(
-            "PRAGMA foreign_keys=ON;"
-        )  # not required here, but sane default
+        self.conn.execute("PRAGMA foreign_keys=ON;")  # not required here, but sane default
 
         # Optionally helpful in WAL mode; avoids reader blocks on schema changes
         self.conn.execute("PRAGMA recursive_triggers=OFF;")
@@ -85,9 +83,7 @@ class SqliteCacheStore(CacheStore):
                 value BLOB NOT NULL
             )
         """)
-        self.conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_cache_expiry ON cache(expiry)"
-        )
+        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_cache_expiry ON cache(expiry)")
 
     # ---- Internal helper: retry on transient locks ----
 
@@ -257,9 +253,7 @@ def default_cache_store():
         return SqliteCacheStore(f"{config.GEENII_CACHE_DIR}/cache.sqlite")
     except Exception as e:
         logger.debug(f"Error initializing SqliteCacheStore: {e}")
-        logger.debug(
-            "Falling back to InMemoryCacheStore (non-persistent, not shared across processes)"
-        )
+        logger.debug("Falling back to InMemoryCacheStore (non-persistent, not shared across processes)")
         return InMemoryCacheStore()
 
 
@@ -290,9 +284,7 @@ def _cache_write(func_name: str, key: str, result: Any, ttl: float | None) -> No
     cache_store().write_cache(key, result, ttl=ttl)
 
 
-async def acache_fn(
-    func: Callable, key, ttl, cache_if: Callable[[Any], bool] | None = None
-) -> Any:
+async def acache_fn(func: Callable, key, ttl, cache_if: Callable[[Any], bool] | None = None) -> Any:
     hit, v = _cache_read(func.__name__, key)
     # hit, v = asyncio.to_thread(_cache_read(func.__name__, key))
     if hit:
@@ -304,9 +296,7 @@ async def acache_fn(
     return result
 
 
-def cache_fn(
-    func: Callable, key, ttl, cache_if: Callable[[Any], bool] | None = None
-) -> Any:
+def cache_fn(func: Callable, key, ttl, cache_if: Callable[[Any], bool] | None = None) -> Any:
     hit, v = _cache_read(func.__name__, key)
     if hit:
         return v
@@ -345,9 +335,7 @@ def cached(ttl=None, cachekey=None, cache_if: Callable[[Any], bool] | None = Non
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
                 key = make_key(args, kwargs)
-                return await acache_fn(
-                    lambda: func(*args, **kwargs), key, ttl, cache_if
-                )
+                return await acache_fn(lambda: func(*args, **kwargs), key, ttl, cache_if)
 
             async_wrapper.__wrapped__ = func
             return async_wrapper

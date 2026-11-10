@@ -75,6 +75,4 @@ class ProcessManagerClient(DaemonClient):
         dry_run: bool = False,
     ) -> list[str]:
         """Remove artifacts of processes finished more than max_age seconds ago; returns their IDs."""
-        return self.call(
-            "pm.gc", {"max_age": max_age, "states": states, "dry_run": dry_run}
-        )
+        return self.call("pm.gc", {"max_age": max_age, "states": states, "dry_run": dry_run})

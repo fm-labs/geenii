@@ -44,9 +44,7 @@ BACKOFF_MAX = 30.0  # upper bound for the exponential restart delay
 BACKOFF_RESET_AFTER = 60.0  # a process that ran this long counts as healthy again
 RUN_LOG_HISTORY = 50  # number of finished one-shot run() log buffers to keep
 SUBSCRIBER_QUEUE_SIZE = 1000  # per-subscriber queue bound; oldest events are dropped
-TERMINATE_GRACE_S = (
-    proc_util.TERMINATE_GRACE_S
-)  # SIGTERM → SIGKILL grace period when terminating
+TERMINATE_GRACE_S = proc_util.TERMINATE_GRACE_S  # SIGTERM → SIGKILL grace period when terminating
 
 # Children are spawned via geenii.proc: each in its own process group, so
 # signals reach everything the command spawned, not just the direct child.
@@ -61,9 +59,7 @@ class ProcConfig:
     name: str
     cmd: list[str]
     restart: bool = True
-    env: dict[str, str] | None = (
-        None  # extra vars; merged into os.environ at spawn time
-    )
+    env: dict[str, str] | None = None  # extra vars; merged into os.environ at spawn time
     cwd: str | None = None
     capture_output: bool = True
 
@@ -103,17 +99,13 @@ def read_services(config_path: str | Path) -> list[ProcConfig]:
         try:
             conf = ServiceConfig.model_validate(entry)
         except pydantic.ValidationError as e:
-            logger.error(
-                "Invalid service in %s: %s — skipping entry: %s", config_path, e, entry
-            )
+            logger.error("Invalid service in %s: %s — skipping entry: %s", config_path, e, entry)
             continue
         if not conf.enabled:
             logger.info("Service '%s' is disabled — skipping", conf.name)
             continue
         if conf.name in names:
-            logger.error(
-                "Duplicate service name '%s' in %s — skipping", conf.name, config_path
-            )
+            logger.error("Duplicate service name '%s' in %s — skipping", conf.name, config_path)
             continue
         names.add(conf.name)
         services.append(
@@ -122,9 +114,7 @@ def read_services(config_path: str | Path) -> list[ProcConfig]:
                 cmd=[os.path.expandvars(arg) for arg in conf.cmd],
                 restart=conf.restart,
                 env=conf.env,
-                cwd=os.path.expanduser(os.path.expandvars(conf.cwd))
-                if conf.cwd
-                else None,
+                cwd=os.path.expanduser(os.path.expandvars(conf.cwd)) if conf.cwd else None,
                 capture_output=conf.capture_output,
             )
         )
@@ -295,12 +285,8 @@ class Supervisor:
         try:
             await asyncio.wait_for(
                 asyncio.gather(
-                    proc_util.pump_lines(
-                        proc.stdout, partial(collect, "stdout", stdout_lines)
-                    ),
-                    proc_util.pump_lines(
-                        proc.stderr, partial(collect, "stderr", stderr_lines)
-                    ),
+                    proc_util.pump_lines(proc.stdout, partial(collect, "stdout", stdout_lines)),
+                    proc_util.pump_lines(proc.stderr, partial(collect, "stderr", stderr_lines)),
                     proc.wait(),
                 ),
                 timeout=timeout,
@@ -500,9 +486,7 @@ class Supervisor:
     def _ensure_watcher_locked(self, name: str) -> None:
         t = self._watchers.get(name)
         if t is None or t.done():
-            self._watchers[name] = asyncio.create_task(
-                self._watch(name), name=f"watch:{name}"
-            )
+            self._watchers[name] = asyncio.create_task(self._watch(name), name=f"watch:{name}")
 
     async def _cancel_watcher_locked(self, name: str) -> None:
         watcher = self._watchers.pop(name, None)
@@ -591,22 +575,16 @@ class Supervisor:
         self._log(name, f"starting: {' '.join(cfg.cmd)}")
 
         # cfg.env is merged over os.environ (not a replacement)
-        proc = await proc_util.spawn(
-            cfg.cmd, env=cfg.env, cwd=cfg.cwd, capture_output=cfg.capture_output
-        )
+        proc = await proc_util.spawn(cfg.cmd, env=cfg.env, cwd=cfg.cwd, capture_output=cfg.capture_output)
 
         rt = ProcRuntime(proc=proc)
         self._runtime[name] = rt
 
         if cfg.capture_output:
             if proc.stdout is not None:
-                rt.out_task = asyncio.create_task(
-                    self._pipe(name, proc.stdout, "stdout"), name=f"pipe:{name}:out"
-                )
+                rt.out_task = asyncio.create_task(self._pipe(name, proc.stdout, "stdout"), name=f"pipe:{name}:out")
             if proc.stderr is not None:
-                rt.err_task = asyncio.create_task(
-                    self._pipe(name, proc.stderr, "stderr"), name=f"pipe:{name}:err"
-                )
+                rt.err_task = asyncio.create_task(self._pipe(name, proc.stderr, "stderr"), name=f"pipe:{name}:err")
 
         self._log(name, f"started pid={proc.pid}")
 
@@ -641,9 +619,7 @@ class Supervisor:
         for t in (rt.out_task, rt.err_task):
             if t:
                 t.cancel()
-        await asyncio.gather(
-            *(t for t in (rt.out_task, rt.err_task) if t), return_exceptions=True
-        )
+        await asyncio.gather(*(t for t in (rt.out_task, rt.err_task) if t), return_exceptions=True)
 
         proc = rt.proc
         if proc.returncode is not None:

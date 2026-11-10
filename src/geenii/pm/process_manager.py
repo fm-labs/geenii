@@ -52,9 +52,7 @@ logger = logging.getLogger(__name__)
 PROCESSES_DIR = os.path.join(GEENII_CACHE_DIR, "processes")
 
 KILL_WAIT_S = 5.0  # how long kill() waits for the process to exit before returning
-TERMINATE_GRACE_S = (
-    proc_util.TERMINATE_GRACE_S
-)  # SIGTERM → SIGKILL grace period used by shutdown()
+TERMINATE_GRACE_S = proc_util.TERMINATE_GRACE_S  # SIGTERM → SIGKILL grace period used by shutdown()
 
 # Process IDs become directory names: allow only a safe, bounded character set
 # (no path separators, no leading dot, so no "." / ".." / hidden files).
@@ -80,9 +78,7 @@ class ProcessState(str, Enum):
 
 _ACTIVE_STATES = (ProcessState.PENDING, ProcessState.RUNNING)
 # States gc() removes by default. Orphaned processes are left alone: they may still be running.
-_GC_STATES = frozenset(
-    (ProcessState.COMPLETED, ProcessState.FAILED, ProcessState.KILLED)
-)
+_GC_STATES = frozenset((ProcessState.COMPLETED, ProcessState.FAILED, ProcessState.KILLED))
 
 
 def validate_pid(pid: str) -> str:
@@ -211,9 +207,7 @@ class ProcessManager:
                 info.error = "process manager exited while the process was running; final state unknown"
                 self._write_meta(info)
                 orphaned.append(name)
-                logger.warning(
-                    f"Marked process {name} (system pid {info.system_pid}) as orphaned"
-                )
+                logger.warning(f"Marked process {name} (system pid {info.system_pid}) as orphaned")
             except Exception as exc:
                 logger.error(f"Could not reconcile process directory {name}: {exc}")
         return orphaned
@@ -250,9 +244,7 @@ class ProcessManager:
             shell = False
             argv = cmd
         else:
-            raise ValueError(
-                "Command must be a non-empty string or a non-empty list of strings"
-            )
+            raise ValueError("Command must be a non-empty string or a non-empty list of strings")
 
         async with self._start_lock:
             pid = validate_pid(pid) if pid else self._make_pid()
@@ -266,9 +258,7 @@ class ProcessManager:
             try:
                 # The child gets its own descriptors; ours can be closed right after spawning
                 with open(stdout_path, "ab") as out, open(stderr_path, "ab") as err:
-                    p = await proc_util.spawn(
-                        argv, env=env, cwd=cwd, stdout=out, stderr=err
-                    )
+                    p = await proc_util.spawn(argv, env=env, cwd=cwd, stdout=out, stderr=err)
             except BaseException:
                 shutil.rmtree(proc_dir, ignore_errors=True)
                 raise
@@ -341,12 +331,8 @@ class ProcessManager:
             raise ValueError("limit must be >= 1")
         log_file = os.path.join(self._proc_path(pid), f"{stream}.log")
         if tail is not None:
-            return await asyncio.to_thread(
-                self._read_log_tail, pid, stream, log_file, tail
-            )
-        return await asyncio.to_thread(
-            self._read_log_chunk, pid, stream, log_file, offset or 0, limit
-        )
+            return await asyncio.to_thread(self._read_log_tail, pid, stream, log_file, tail)
+        return await asyncio.to_thread(self._read_log_chunk, pid, stream, log_file, offset or 0, limit)
 
     async def wait(self, pid: str, timeout: float | None = None) -> ProcessInfo:
         """
@@ -383,9 +369,7 @@ class ProcessManager:
         sig = proc_util.SIGKILL if force else signal.SIGTERM
         rp.kill_requested = True
         proc_util.signal_group(rp.proc, sig)
-        logger.info(
-            f"Sent {signal.Signals(sig).name} to process {pid} (process group {rp.proc.pid})"
-        )
+        logger.info(f"Sent {signal.Signals(sig).name} to process {pid} (process group {rp.proc.pid})")
 
         if rp.waiter:
             try:
@@ -394,18 +378,14 @@ class ProcessManager:
                 pass
         return rp.info
 
-    async def list(
-        self, *, include_finished: bool = False
-    ) -> builtins.list[ProcessInfo]:
+    async def list(self, *, include_finished: bool = False) -> builtins.list[ProcessInfo]:
         """
         List tracked processes.
 
         :param include_finished: If True, also scan disk for finished processes
                                  that are no longer in memory.
         """
-        by_pid: dict[str, ProcessInfo] = {
-            pid: rp.info for pid, rp in self._procs.items()
-        }
+        by_pid: dict[str, ProcessInfo] = {pid: rp.info for pid, rp in self._procs.items()}
         if include_finished:
             # A process may finish while the scan runs; keep the in-memory entry then
             for info in await asyncio.to_thread(self._scan_finished, set(by_pid)):
@@ -416,9 +396,7 @@ class ProcessManager:
         """Remove all on-disk artifacts for a finished process."""
         proc_dir = self._proc_path(pid)
         if pid in self._procs:
-            raise RuntimeError(
-                f"Process {pid} is still tracked in memory; wait for it to finish or kill it first"
-            )
+            raise RuntimeError(f"Process {pid} is still tracked in memory; wait for it to finish or kill it first")
 
         if os.path.isdir(proc_dir):
             await asyncio.to_thread(shutil.rmtree, proc_dir)
@@ -446,13 +424,9 @@ class ProcessManager:
         gc_states = frozenset(ProcessState(s) for s in states) if states else _GC_STATES
         if gc_states & set(_ACTIVE_STATES):
             raise ValueError("Pending or running processes cannot be garbage collected")
-        removed = await asyncio.to_thread(
-            self._gc, time.time() - max_age, gc_states, set(self._procs), dry_run
-        )
+        removed = await asyncio.to_thread(self._gc, time.time() - max_age, gc_states, set(self._procs), dry_run)
         if removed and not dry_run:
-            logger.info(
-                f"Garbage collected {len(removed)} process(es) finished more than {max_age:g}s ago"
-            )
+            logger.info(f"Garbage collected {len(removed)} process(es) finished more than {max_age:g}s ago")
         return removed
 
     async def shutdown(self) -> None:
@@ -467,9 +441,7 @@ class ProcessManager:
             *(proc_util.terminate(rp.proc, grace=TERMINATE_GRACE_S) for rp in running),
             return_exceptions=True,
         )
-        await asyncio.gather(
-            *(rp.waiter for rp in running if rp.waiter), return_exceptions=True
-        )
+        await asyncio.gather(*(rp.waiter for rp in running if rp.waiter), return_exceptions=True)
         if running:
             logger.info(f"Terminated {len(running)} running process(es) on shutdown")
 
@@ -498,9 +470,7 @@ class ProcessManager:
             logger.error(f"Could not persist final state of process {info.pid}: {exc}")
         finally:
             self._procs.pop(info.pid, None)
-        logger.info(
-            f"Process {info.pid} finished: state={info.state.value} exit_code={info.exit_code}"
-        )
+        logger.info(f"Process {info.pid} finished: state={info.state.value} exit_code={info.exit_code}")
 
     @staticmethod
     def _read_log_tail(pid: str, stream: str, log_file: str, tail: int) -> str:
@@ -510,9 +480,7 @@ class ProcessManager:
             return "".join(deque(f, maxlen=max(tail, 0))).rstrip("\n")
 
     @staticmethod
-    def _read_log_chunk(
-        pid: str, stream: str, log_file: str, offset: int, limit: int | None
-    ) -> str:
+    def _read_log_chunk(pid: str, stream: str, log_file: str, offset: int, limit: int | None) -> str:
         if not os.path.isfile(log_file):
             raise KeyError(f"No {stream} log for process {pid}")
         with open(log_file, "rb") as f:
@@ -525,9 +493,7 @@ class ProcessManager:
             # a character cut off at the end of this one.
             start = 0
             if offset > 0:
-                while start < min(_UTF8_MAX_CONT, len(data)) and _is_utf8_cont(
-                    data[start]
-                ):
+                while start < min(_UTF8_MAX_CONT, len(data)) and _is_utf8_cont(data[start]):
                     start += 1
             if limit is not None:
                 extra = f.read(_UTF8_MAX_CONT)
@@ -537,9 +503,7 @@ class ProcessManager:
                 data += extra[:end]
         return data[start:].decode("utf-8", errors="replace")
 
-    def _gc(
-        self, cutoff: float, states: frozenset, known_pids: set[str], dry_run: bool
-    ) -> builtins.list[str]:
+    def _gc(self, cutoff: float, states: frozenset, known_pids: set[str], dry_run: bool) -> builtins.list[str]:
         candidates = []
         # A directory without meta.json may belong to a process being started: skip it
         for info in self._scan_finished(known_pids):

@@ -44,9 +44,7 @@ class Usage(pydantic.BaseModel):
     `model_dump(exclude_none=True)` is the form written to the usage log.
     """
 
-    model_config = pydantic.ConfigDict(
-        extra="ignore"
-    )  # tolerate unknown keys, e.g. when reading old log lines
+    model_config = pydantic.ConfigDict(extra="ignore")  # tolerate unknown keys, e.g. when reading old log lines
 
     input_tokens: int = 0
     output_tokens: int = 0
@@ -80,11 +78,7 @@ class Usage(pydantic.BaseModel):
     @property
     def uncached_input_tokens(self) -> int:
         """Input tokens neither read from nor written to the prompt cache."""
-        return (
-            self.input_tokens
-            - (self.cache_read_input_tokens or 0)
-            - (self.cache_creation_input_tokens or 0)
-        )
+        return self.input_tokens - (self.cache_read_input_tokens or 0) - (self.cache_creation_input_tokens or 0)
 
     @classmethod
     def from_log_entry(cls, entry: dict) -> "Usage":
@@ -95,9 +89,7 @@ class Usage(pydantic.BaseModel):
         usage = cls.model_validate(entry.get("usage") or {})
         if entry.get("usage_version") is None and entry.get("provider") == "anthropic":
             # version 1: anthropic's input_tokens (and so total_tokens) left out the cached input
-            cached = (usage.cache_read_input_tokens or 0) + (
-                usage.cache_creation_input_tokens or 0
-            )
+            cached = (usage.cache_read_input_tokens or 0) + (usage.cache_creation_input_tokens or 0)
             usage.input_tokens += cached
             usage.total_tokens += cached
         return usage
@@ -358,13 +350,9 @@ class MCPServerInfo(pydantic.BaseModel):
 
 # Standard error model (Problem Details, RFC 7807)
 class Problem(pydantic.BaseModel):
-    error: str = pydantic.Field(
-        ..., description="Short, human-readable summary of the problem type"
-    )
+    error: str = pydantic.Field(..., description="Short, human-readable summary of the problem type")
     status: int = pydantic.Field(..., description="HTTP status code")
-    detail: str | None = pydantic.Field(
-        None, description="Human-readable explanation specific to this occurrence"
-    )
+    detail: str | None = pydantic.Field(None, description="Human-readable explanation specific to this occurrence")
     # problem_type: str = pydantic.Field(default="about:blank", description="URI identifying the problem type")
     # instance: Optional[str] = Field(None, description="URI reference that identifies the specific occurrence")
     # errors: Optional[dict[str, Any]] = Field(

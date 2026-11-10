@@ -48,9 +48,7 @@ class McpClient:
             mode = "legacy"
             del server_config["legacy"]
 
-        logger.info(
-            f"MCP {self.server_name}: Connecting to MCP server '{self.server_name}' mode: {mode}"
-        )
+        logger.info(f"MCP {self.server_name}: Connecting to MCP server '{self.server_name}' mode: {mode}")
         return Client(
             transport=MCPConfig(mcpServers={self.server_name: server_config}),
             mode=mode,
@@ -73,9 +71,7 @@ class McpClient:
         # placeholder for later impl
         pass
 
-    async def _progress_handler(
-        self, progress: float, total: float | None, message: str | None
-    ) -> None:
+    async def _progress_handler(self, progress: float, total: float | None, message: str | None) -> None:
         if total:
             print(f"{progress / total:6.1%}  {message or ''}")
         else:
@@ -87,9 +83,7 @@ class McpClient:
             if not self._connected:
                 await self._client.__aenter__()
                 self._connected = True
-                logger.info(
-                    f"MCP {self.server_name}: Opened persistent MCP connection for '{self.server_name}'"
-                )
+                logger.info(f"MCP {self.server_name}: Opened persistent MCP connection for '{self.server_name}'")
 
     async def _close(self):
         if self._connected:
@@ -99,9 +93,7 @@ class McpClient:
                 pass
             self._connected = False
             self._info = None
-            logger.info(
-                f"MCP {self.server_name}: Closed MCP connection for '{self.server_name}'"
-            )
+            logger.info(f"MCP {self.server_name}: Closed MCP connection for '{self.server_name}'")
 
     async def _list(self, kind: str, fetch):
         await self._ensure_connected()
@@ -123,13 +115,9 @@ class McpClient:
 
     async def _call_tool(self, tool_name: str, args: dict) -> any:
         await self._ensure_connected()
-        logger.info(
-            f"MCP {self.server_name}: Calling tool '{tool_name}' with args {args}"
-        )
+        logger.info(f"MCP {self.server_name}: Calling tool '{tool_name}' with args {args}")
         result = await self._client.call_tool_mcp(tool_name, arguments=args)
-        logger.info(
-            f"MCP {self.server_name}: Tool call result for '{tool_name}': {result}"
-        )
+        logger.info(f"MCP {self.server_name}: Tool call result for '{tool_name}': {result}")
         return result
 
     @property
@@ -191,16 +179,12 @@ class McpClient:
             return base64.b64decode(r.blob)
         return None
 
-    def download_resource(
-        self, resource_name: str, target_path: str, overwrite: bool = False
-    ) -> None:
+    def download_resource(self, resource_name: str, target_path: str, overwrite: bool = False) -> None:
         response: list = run_sync(self._resource(resource_name))
         if len(response) == 0:
             raise Exception(f"Resource '{resource_name}' not found.")
         if len(response) >= 2:
-            raise Exception(
-                f"Multi-part resource not supported. ({len(response)} parts detected)"
-            )
+            raise Exception(f"Multi-part resource not supported. ({len(response)} parts detected)")
 
         if not target_path:
             raise Exception("Target path is required.")

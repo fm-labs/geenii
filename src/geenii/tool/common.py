@@ -25,9 +25,7 @@ class ToolCallContext:
 class Tool(ABC):
     """Abstract base for all tool types."""
 
-    def __init__(
-        self, name: str, description: str = "", input_schema: dict | None = None
-    ):
+    def __init__(self, name: str, description: str = "", input_schema: dict | None = None):
         self.type = "tool"
         self.name = name
         self.description = description
@@ -50,11 +48,7 @@ class Tool(ABC):
 
     @property
     def short_description(self) -> str:
-        return (
-            self.description.strip().split("\n")[0]
-            if self.description
-            else "no description"
-        )
+        return self.description.strip().split("\n")[0] if self.description else "no description"
 
     def to_definition(self) -> dict:
         """Return an OpenAI-compatible tool definition."""
@@ -113,9 +107,7 @@ def to_tool_call_result(result: Any) -> ToolCallResult:
     if isinstance(result, bytes):
         return ToolCallResult(text=result.decode("utf-8", errors="replace"))
     if isinstance(result, dict):
-        return ToolCallResult(
-            text=json.dumps(result, default=str), structured_content=result
-        )
+        return ToolCallResult(text=json.dumps(result, default=str), structured_content=result)
     if isinstance(result, (list, tuple)):
         return ToolCallResult(text=json.dumps(result, default=str))
     return ToolCallResult(text=str(result))

@@ -14,9 +14,7 @@ def read_toml(path: str) -> dict:
         try:
             import toml  # type: ignore
         except ModuleNotFoundError:
-            raise RuntimeError(
-                "Error: Need 'tomllib' (Python 3.11+) or 'toml' package to read TOML."
-            )
+            raise RuntimeError("Error: Need 'tomllib' (Python 3.11+) or 'toml' package to read TOML.")
         data = toml.loads(content.decode("utf-8"))
     if not isinstance(data, dict):
         data = {}

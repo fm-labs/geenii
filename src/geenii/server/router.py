@@ -29,33 +29,15 @@ API_ROUTE_PREFIX = "/api/v1"
 
 app_router = APIRouter()
 app_router.include_router(api_router, prefix=API_ROUTE_PREFIX)
-app_router.include_router(
-    pm_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)]
-)
-app_router.include_router(
-    agents_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)]
-)
-app_router.include_router(
-    tools_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)]
-)
-app_router.include_router(
-    ai_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)]
-)
-app_router.include_router(
-    chat_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)]
-)
-app_router.include_router(
-    mcp_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)]
-)
-app_router.include_router(
-    skills_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)]
-)
-app_router.include_router(
-    stats_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)]
-)
-app_router.include_router(
-    projects_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)]
-)
+app_router.include_router(pm_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
+app_router.include_router(agents_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
+app_router.include_router(tools_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
+app_router.include_router(ai_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
+app_router.include_router(chat_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
+app_router.include_router(mcp_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
+app_router.include_router(skills_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
+app_router.include_router(stats_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
+app_router.include_router(projects_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 # app_router.include_router(chat_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 # app_router.include_router(supervisor_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 # app_router.include_router(scheduler_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])

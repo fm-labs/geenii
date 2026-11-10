@@ -153,17 +153,11 @@ def chat_completion(request: ChatCompletionRequest) -> ChatCompletionResponse:
     context_memory_dir = _chat_session_dir(context_id)
     context_memory_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(
-        f"Chat completion request with context_id={context_id}, model={request.model}, prompt={request.prompt}"
-    )
-    memory = FileChatMemory(
-        f"{context_memory_dir}/memory.jsonl", create=True, restore=True
-    )
+    logger.info(f"Chat completion request with context_id={context_id}, model={request.model}, prompt={request.prompt}")
+    memory = FileChatMemory(f"{context_memory_dir}/memory.jsonl", create=True, restore=True)
 
     messages = list(memory.messages)
-    logger.info(
-        f"Loaded {len(messages)} messages from memory for context_id={context_id}"
-    )
+    logger.info(f"Loaded {len(messages)} messages from memory for context_id={context_id}")
     if len(messages) > 10:
         logger.warning(
             f"Memory for context_id={context_id} has {len(messages)} messages, which may exceed token limits for some models. Consider implementing memory management strategies."
@@ -181,22 +175,14 @@ def chat_completion(request: ChatCompletionRequest) -> ChatCompletionResponse:
         _request.system = [DEFAULT_CHAT_SYSTEM_PROMPT]
 
     try:
-        response = ai.generate_chat_completion(
-            request=_request, source="api", task="chat_completion"
-        )
+        response = ai.generate_chat_completion(request=_request, source="api", task="chat_completion")
     except Exception as e:
         logger.error(f"Error during chat completion for context_id={context_id}: {e}")
         raise HTTPException(status_code=502, detail=str(e))
 
     # Append the user message and assistant response to memory
-    memory.append(
-        ModelMessage(
-            role="user", content=[TextContent(type="text", text=request.prompt)]
-        )
-    )
-    memory.append(
-        ModelMessage(role="assistant", content=response.output, usage=response.usage)
-    )
+    memory.append(ModelMessage(role="user", content=[TextContent(type="text", text=request.prompt)]))
+    memory.append(ModelMessage(role="assistant", content=response.output, usage=response.usage))
 
     return response
 
@@ -266,9 +252,7 @@ def generate_audio_transcription(
     """
     file = input_blob
     if not file.content_type or not file.content_type.startswith("audio/"):
-        raise HTTPException(
-            status_code=400, detail=f"Expected audio/*, got {file.content_type}"
-        )
+        raise HTTPException(status_code=400, detail=f"Expected audio/*, got {file.content_type}")
 
     save_path = _save_upload(file, MAX_AUDIO_UPLOAD_BYTES)
     try:
@@ -296,6 +280,4 @@ def generate_audio_translation(
     Translate audio into text in the target language. Not implemented yet.
     """
     # return ai_service.generate_audio_translation(request)
-    raise HTTPException(
-        status_code=501, detail="Audio translation is not implemented yet."
-    )
+    raise HTTPException(status_code=501, detail="Audio translation is not implemented yet.")

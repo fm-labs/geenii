@@ -284,9 +284,7 @@ Services created with `ensure()` that aren't in the file are never touched.
 ```python
 sup = Supervisor()
 await sup.ensure("worker", ProcConfig(name="worker", cmd=["python", "worker.py"]))
-await sup.ensure(
-    "once", ProcConfig(name="once", cmd=["sh", "-c", "echo hi"], restart=False)
-)
+await sup.ensure("once", ProcConfig(name="once", cmd=["sh", "-c", "echo hi"], restart=False))
 
 print(sup.status())
 async for line in sup.stream_logs("worker"):

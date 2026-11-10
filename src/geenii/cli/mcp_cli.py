@@ -129,9 +129,7 @@ def server_tool_info(server_id, tool_name):
     multiple=True,
     help="Tool arguments in key=value format. (Multiple allowed)",
 )
-@click.option(
-    "--json-args", "-j", default=None, help="Tool arguments as a JSON string."
-)
+@click.option("--json-args", "-j", default=None, help="Tool arguments as a JSON string.")
 def server_tool_exec(server_id, tool_name, arg, json_args):
     """Execute a tool on a server."""
     if json_args:
@@ -143,9 +141,7 @@ def server_tool_exec(server_id, tool_name, arg, json_args):
         args = {}
         for a in arg:
             if "=" not in a:
-                raise click.ClickException(
-                    f"Invalid argument format: '{a}'. Expected key=value."
-                )
+                raise click.ClickException(f"Invalid argument format: '{a}'. Expected key=value.")
             key, value = a.split("=", 1)
             args[key] = value
 
@@ -158,9 +154,7 @@ def server_tool_exec(server_id, tool_name, arg, json_args):
             if hasattr(content, "text"):
                 click.echo(content.text)
             if hasattr(content, "structured_content"):
-                click.echo(
-                    json.dumps(content.structured_content, indent=2, default=str)
-                )
+                click.echo(json.dumps(content.structured_content, indent=2, default=str))
         else:
             click.echo(json.dumps(result, indent=2, default=str))
     finally:
@@ -172,9 +166,7 @@ def server_tool_exec(server_id, tool_name, arg, json_args):
 @click.argument("resource_name")
 @click.option("--download", is_flag=True, help="Download the resource to a file.")
 @click.option("--overwrite", is_flag=True, help="Overwrite existing resource.")
-def server_resource(
-    server_id: str, resource_name: str, download: bool, overwrite: bool
-):
+def server_resource(server_id: str, resource_name: str, download: bool, overwrite: bool):
     """List tools provided by a server."""
     client = get_mcp_client_for_server(server_id)
     try:

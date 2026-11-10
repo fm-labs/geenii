@@ -40,12 +40,7 @@ class DaemonClient:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             sock.connect(self._socket_path)
-            payload = (
-                json.dumps(
-                    {"method": method, "params": params or {}}, separators=(",", ":")
-                )
-                + "\n"
-            )
+            payload = json.dumps({"method": method, "params": params or {}}, separators=(",", ":")) + "\n"
             sock.sendall(payload.encode())
 
             # read until newline

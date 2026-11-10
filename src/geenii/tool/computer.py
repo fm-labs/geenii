@@ -46,16 +46,12 @@ class ComputerTool(Tool):
 
         command = args.get("command")
         if not command:
-            raise ValueError(
-                f"Missing 'command' argument for ComputerTool {self.name!r}"
-            )
+            raise ValueError(f"Missing 'command' argument for ComputerTool {self.name!r}")
         if self.command_template is not None:
             # `command` is in args too, so it must not be passed twice
             command = self.command_template.format(**{**args, "command": command})
 
-        logger.info(
-            f"Executing ComputerTool command: {command} in working directory={working_dir}"
-        )
+        logger.info(f"Executing ComputerTool command: {command} in working directory={working_dir}")
         subprocess_id = uuid.uuid4().hex[:8]
         # logged before expansion and with env names only, since env may hold secrets
         logger.info(
@@ -94,9 +90,7 @@ class ComputerTool(Tool):
         if p.returncode != 0:
             _output += f"\nEXITED WITH NON-ZERO EXIT CODE: {p.returncode}"
             return ToolCallResult(text=_output, is_error=True)
-        return ToolCallResult(
-            text=_output, is_error=False, structured_content=json_data
-        )
+        return ToolCallResult(text=_output, is_error=False, structured_content=json_data)
 
 
 class AppleScriptTool(ComputerTool):
@@ -108,9 +102,7 @@ class AppleScriptTool(ComputerTool):
         description: str = "",
         input_schema: dict | None = None,
     ):
-        super().__init__(
-            name, description, input_schema, command_template="osascript -e '{command}'"
-        )
+        super().__init__(name, description, input_schema, command_template="osascript -e '{command}'")
 
 
 class ReadTool(Tool):
@@ -139,16 +131,12 @@ class ReadTool(Tool):
         file_path = args.get("file_path")
         try:
             if not file_path or not isinstance(file_path, str):
-                raise ValueError(
-                    f"Invalid file_path argument for ReadTool {self.name!r}"
-                )
+                raise ValueError(f"Invalid file_path argument for ReadTool {self.name!r}")
 
             wd = ctx.cwd
             file_path = _normalize_path(file_path, wd)
             if not is_file_in_allowed_dirs(file_path, wd):
-                logger.critical(
-                    f"SECURITY ALERT! Attempting to read file from {file_path}. wd={wd}"
-                )
+                logger.critical(f"SECURITY ALERT! Attempting to read file from {file_path}. wd={wd}")
                 raise ValueError(f"You are not allowed to read this file: {file_path}")
 
             logger.warning(f"file_read: {file_path}")
@@ -187,17 +175,13 @@ class WriteTool(Tool):
         contents = args.get("contents", "")
         try:
             if not file_path or not isinstance(file_path, str):
-                raise ValueError(
-                    f"Invalid file_path argument for WriteTool {self.name!r}"
-                )
+                raise ValueError(f"Invalid file_path argument for WriteTool {self.name!r}")
 
             wd = ctx.cwd
             file_path = _normalize_path(file_path, wd)
 
             if not is_file_in_allowed_dirs(file_path, wd):
-                logger.critical(
-                    f"SECURITY ALERT! Attempting to write to {file_path}. wd={wd}"
-                )
+                logger.critical(f"SECURITY ALERT! Attempting to write to {file_path}. wd={wd}")
                 raise ValueError(f"You are not allowed to write this file: {file_path}")
 
             logger.warning(f"file_write: {file_path}")
@@ -220,9 +204,7 @@ def _normalize_path(path: str, base_dir: str) -> str:
 def is_file_in_allowed_dirs(file_path: str | Path, wd: str | None = None) -> bool:
     dirs = [wd, config.GEENII_WORKING_DIR]
     user_settings = config.read_user_settings()
-    if "allowed_dirs" in user_settings and isinstance(
-        user_settings["allowed_dirs"], list
-    ):
+    if "allowed_dirs" in user_settings and isinstance(user_settings["allowed_dirs"], list):
         allowed_dirs = user_settings["allowed_dirs"]
         dirs.extend(allowed_dirs)
 

@@ -17,9 +17,7 @@ def _line(timestamp, provider="ollama", model="qwen3:8b", usage=None, **extra):
             "provider": provider,
             "context_id": "ctx",
             "model": model,
-            "usage": usage
-            if usage is not None
-            else {"input_tokens": 10, "output_tokens": 5},
+            "usage": usage if usage is not None else {"input_tokens": 10, "output_tokens": 5},
             "usage_version": 2,
             **extra,
         }
@@ -101,23 +99,15 @@ def test_totals_and_breakdowns(cache):
 
     by_model = {r["key"]: r for r in stats["by_model"]}
     assert by_model["anthropic:claude"]["calls"] == 2
-    assert (
-        by_model["ollama:qwen3:8b"]["calls"] == 3
-    )  # the malformed usage still counts as a call
+    assert by_model["ollama:qwen3:8b"]["calls"] == 3  # the malformed usage still counts as a call
     assert stats["by_model"][0]["key"] == "anthropic:claude"  # sorted by tokens
     assert {r["key"] for r in stats["by_source"]} == {"agent:a", "untagged"}
     assert {r["key"] for r in stats["by_task"]} == {"llm", "untagged"}
-    assert (
-        stats["hourly"][9] == 2
-        and stats["hourly"][23] == 1
-        and sum(stats["hourly"]) == 5
-    )
+    assert stats["hourly"][9] == 2 and stats["hourly"][23] == 1 and sum(stats["hourly"]) == 5
 
 
 def test_daily_series_fills_days_without_calls(cache):
-    daily = usage_stats.usage_stats(date(2026, 10, 1), date(2026, 10, 4), cache=cache)[
-        "daily"
-    ]
+    daily = usage_stats.usage_stats(date(2026, 10, 1), date(2026, 10, 4), cache=cache)["daily"]
 
     assert [d["date"] for d in daily] == [
         "2026-10-01",
@@ -196,9 +186,7 @@ def client(cache, monkeypatch):
 
 
 def test_route_with_explicit_range(client):
-    response = client.get(
-        "/api/v1/stats/usage", params={"start": "2026-10-01", "end": "2026-10-03"}
-    )
+    response = client.get("/api/v1/stats/usage", params={"start": "2026-10-01", "end": "2026-10-03"})
 
     assert response.status_code == 200
     body = response.json()
@@ -207,22 +195,16 @@ def test_route_with_explicit_range(client):
 
 
 def test_route_last_n_days(client):
-    body = client.get(
-        "/api/v1/stats/usage", params={"days": 2, "end": "2026-10-03"}
-    ).json()
+    body = client.get("/api/v1/stats/usage", params={"days": 2, "end": "2026-10-03"}).json()
     assert body["start"] == "2026-10-02"
     assert len(body["daily"]) == 2
 
 
 def test_route_all_days(client):
-    body = client.get(
-        "/api/v1/stats/usage", params={"days": 0, "end": "2026-10-03"}
-    ).json()
+    body = client.get("/api/v1/stats/usage", params={"days": 0, "end": "2026-10-03"}).json()
     assert body["start"] == "2026-09-30"
 
 
 def test_route_invalid_range_is_400(client):
-    response = client.get(
-        "/api/v1/stats/usage", params={"start": "2026-10-03", "end": "2026-10-01"}
-    )
+    response = client.get("/api/v1/stats/usage", params={"start": "2026-10-03", "end": "2026-10-01"})
     assert response.status_code == 400

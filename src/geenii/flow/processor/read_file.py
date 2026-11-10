@@ -32,9 +32,7 @@ class ReadFileProcessor(FlowProcessor):
     config_model = ReadFileConfig
     output_model = ReadFileOutput
 
-    def process(
-        self, input_data: Any, ctx: FlowContext
-    ) -> Generator[Any, None, ReadFileOutput]:
+    def process(self, input_data: Any, ctx: FlowContext) -> Generator[Any, None, ReadFileOutput]:
         c: ReadFileConfig = self.config
         path = Path(c.path).expanduser().resolve()
         size = path.stat().st_size
@@ -43,11 +41,7 @@ class ReadFileProcessor(FlowProcessor):
         yield StepEvent("log", f"Reading {path} ({size} bytes)")
 
         text = path.read_text(encoding=c.encoding)
-        fmt = (
-            FORMAT_BY_SUFFIX.get(path.suffix.lower(), "text")
-            if c.format == "auto"
-            else c.format
-        )
+        fmt = FORMAT_BY_SUFFIX.get(path.suffix.lower(), "text") if c.format == "auto" else c.format
         if fmt == "json":
             data = json.loads(text)
         elif fmt == "toml":

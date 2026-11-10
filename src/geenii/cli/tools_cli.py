@@ -43,9 +43,7 @@ def inspect_tool(tool_name):
 
 @tools.command("call")
 @click.argument("tool_name")
-@click.option(
-    "--args", "-a", multiple=True, help="Arguments for the tool in key=value format."
-)
+@click.option("--args", "-a", multiple=True, help="Arguments for the tool in key=value format.")
 def call_tool(tool_name, **kwargs):
     """Call a tool by name with the provided arguments."""
     click.echo(f"Calling tool {tool_name} with arguments: {kwargs}")

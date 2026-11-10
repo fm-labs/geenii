@@ -45,9 +45,7 @@ flow = Flow(
     name="demo",
     variables={"greeting": "hello"},
     steps=[
-        FlowStepSpec(
-            id="greet", processor="echo", config={"message": "${vars.greeting}"}
-        ),
+        FlowStepSpec(id="greet", processor="echo", config={"message": "${vars.greeting}"}),
         FlowStepSpec(
             id="upper",
             processor="execute_command",

@@ -95,9 +95,7 @@ class GeeApp(pydantic.BaseModel):
             self._assigned_port = self.manifest.port
 
         cmd, env = self._build_launch_command()
-        logger.info(
-            f"Starting app '{self.name}': {' '.join(cmd)} in path '{self.path}'"
-        )
+        logger.info(f"Starting app '{self.name}': {' '.join(cmd)} in path '{self.path}'")
 
         self._process = subprocess.Popen(
             cmd,
@@ -165,9 +163,7 @@ class GeeApp(pydantic.BaseModel):
 
         if app_type == AppType.BINARY:
             if main is None:
-                raise ValueError(
-                    f"App '{self.name}' is type 'binary' but has no 'main' set in manifest"
-                )
+                raise ValueError(f"App '{self.name}' is type 'binary' but has no 'main' set in manifest")
             bin_path = os.path.join(self.path, main)
             if not os.path.isfile(bin_path):
                 raise FileNotFoundError(f"Binary not found: {bin_path}")
@@ -272,13 +268,9 @@ class AppRegistry:
             manifest = read_manifest(entry_path)
             if manifest is None:
                 manifest = infer_manifest(entry_path, entry)
-                logger.debug(
-                    f"Inferred manifest for '{entry}': type={manifest.type.value}"
-                )
+                logger.debug(f"Inferred manifest for '{entry}': type={manifest.type.value}")
 
-            app = GeeApp(
-                name=entry, path=entry_path, manifest=manifest, trusted=trusted
-            )
+            app = GeeApp(name=entry, path=entry_path, manifest=manifest, trusted=trusted)
             self.register(app)
             logger.debug(f"Registered app '{entry}' ({manifest.type.value})")
 

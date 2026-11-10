@@ -53,9 +53,7 @@ def test_values_that_are_not_json_are_stringified():
 
 
 def test_tool_call_result_is_returned_as_is():
-    expected = ToolCallResult(
-        text="failed", structured_content={"error": "x"}, is_error=True
-    )
+    expected = ToolCallResult(text="failed", structured_content={"error": "x"}, is_error=True)
     assert invoke(expected) is expected
 
 

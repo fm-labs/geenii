@@ -20,9 +20,7 @@ def get_tools(registry: ToolRegistry = Depends(dep_tool_registry)):
 
 
 @router.post("/{tool_name}/execute")
-def execute_tool(
-    tool_name: str, args: dict, registry: ToolRegistry = Depends(dep_tool_registry)
-) -> ToolCallResult:
+def execute_tool(tool_name: str, args: dict, registry: ToolRegistry = Depends(dep_tool_registry)) -> ToolCallResult:
     # sync endpoint: FastAPI runs it in its threadpool, so the blocking tool call doesn't stall the event loop
     try:
         tool = registry.get(tool_name)

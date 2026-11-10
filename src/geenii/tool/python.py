@@ -51,9 +51,7 @@ class PythonFunctionTool(Tool):
             if inspect.isawaitable(result):
                 result = run_sync(result)
         except Exception as e:
-            logger.error(
-                f"Error during python fn tool {self.name!r}: {e}", exc_info=True
-            )
+            logger.error(f"Error during python fn tool {self.name!r}: {e}", exc_info=True)
             result = e
 
         # print(f"Tool {self.name!r} returned:", result)
@@ -93,9 +91,7 @@ class PythonCliTool(Tool):
 
         working_dir = ctx.cwd
         # the unexpanded command, since env may hold secrets
-        logger.info(
-            f"Spawn python subprocess with command={args.get('command')!r} in directory: {working_dir!r}"
-        )
+        logger.info(f"Spawn python subprocess with command={args.get('command')!r} in directory: {working_dir!r}")
         p = subprocess.run(
             _command,
             shell=False,
@@ -123,6 +119,4 @@ class PythonCliTool(Tool):
         if p.returncode != 0:
             _output += f"\nEXITED WITH NON-ZERO EXIT CODE: {p.returncode}"
             return ToolCallResult(text=_output, is_error=True)
-        return ToolCallResult(
-            text=_output, is_error=False, structured_content=json_data
-        )
+        return ToolCallResult(text=_output, is_error=False, structured_content=json_data)

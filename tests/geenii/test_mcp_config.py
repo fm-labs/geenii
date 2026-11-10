@@ -108,9 +108,7 @@ def test_project_file_overrides_root(mcp_dirs):
             "mcpServers": {"x": {"command": "root"}, "y": {"command": "y"}},
         },
     )
-    write_json(
-        project, {"env": {"A": "project"}, "mcpServers": {"x": {"command": "project"}}}
-    )
+    write_json(project, {"env": {"A": "project"}, "mcpServers": {"x": {"command": "project"}}})
 
     cfg = mc.get_mcp_config()
 
@@ -145,9 +143,7 @@ def test_compiled_server_config_is_a_copy(mcp_dirs):
 
     assert compiled["headers"] == {"Authorization": "Bearer abc"}
     # the cached config keeps the placeholder
-    assert mc.get_mcp_config_for_server("x")["headers"] == {
-        "Authorization": "Bearer ${TOKEN}"
-    }
+    assert mc.get_mcp_config_for_server("x")["headers"] == {"Authorization": "Bearer ${TOKEN}"}
 
 
 def test_unknown_server_is_none(mcp_dirs):
@@ -174,9 +170,7 @@ def test_save_creates_root_file(mcp_dirs):
 
     mc.save_mcp_server_config("x", {"url": "http://h/${TOKEN}"})
 
-    assert json.loads(root.read_text()) == {
-        "mcpServers": {"x": {"url": "http://h/${TOKEN}"}}
-    }
+    assert json.loads(root.read_text()) == {"mcpServers": {"x": {"url": "http://h/${TOKEN}"}}}
     assert not project.exists()
     assert not root.with_name("mcp.json.tmp").exists()
 

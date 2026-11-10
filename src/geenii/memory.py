@@ -82,20 +82,14 @@ class FileChatMemory(ChatMemory):
                     message_dict = json.loads(line)
                     message = ModelMessage.model_validate(message_dict)
                     self._messages.append(message)
-            logger.info(
-                f"Loaded {len(self._messages)} messages from chat memory file '{file_path}'"
-            )
+            logger.info(f"Loaded {len(self._messages)} messages from chat memory file '{file_path}'")
         else:
-            logger.info(
-                f"No existing chat memory file found at '{file_path}', starting with empty memory"
-            )
+            logger.info(f"No existing chat memory file found at '{file_path}', starting with empty memory")
 
     def _insert(self, message: ModelMessage) -> None:
         with self.file_path.open("a") as f:
             f.write(message.to_json() + "\n")
-            logger.info(
-                f"Appended message to chat memory file '{self.file_path}': {message}"
-            )
+            logger.info(f"Appended message to chat memory file '{self.file_path}': {message}")
 
     def _write(self) -> None:
         with self.file_path.open("w") as f:
@@ -122,9 +116,7 @@ class SqliteChatMemory(ChatMemory):
                 "CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, content TEXT, message TEXT)"
             )
             # migrate tables created before the 'message' column existed
-            columns = {
-                row[1] for row in self._conn.execute("PRAGMA table_info(messages)")
-            }
+            columns = {row[1] for row in self._conn.execute("PRAGMA table_info(messages)")}
             if "message" not in columns:
                 self._conn.execute("ALTER TABLE messages ADD COLUMN message TEXT")
         if restore:
@@ -132,16 +124,12 @@ class SqliteChatMemory(ChatMemory):
 
     def _read(self) -> None:
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT role, content, message FROM messages ORDER BY id"
-            ).fetchall()
+            rows = self._conn.execute("SELECT role, content, message FROM messages ORDER BY id").fetchall()
         for role, content, message_json in rows:
             if message_json:
                 message = ModelMessage.model_validate_json(message_json)
             else:
-                message = ModelMessage.model_validate(
-                    {"role": role, "content": json.loads(content)}
-                )
+                message = ModelMessage.model_validate({"role": role, "content": json.loads(content)})
             self._messages.append(message)
 
     @staticmethod

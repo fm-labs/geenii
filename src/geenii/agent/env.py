@@ -32,11 +32,7 @@ def validate_env_key(key: str) -> None:
 
 class AgentEnvStore:
     def __init__(self, base_dir: str | Path | None = None):
-        self.base_dir = (
-            Path(base_dir)
-            if base_dir
-            else Path(get_user_home_dir()) / ".geenii" / "agents"
-        )
+        self.base_dir = Path(base_dir) if base_dir else Path(get_user_home_dir()) / ".geenii" / "agents"
 
     def vars_path(self, agent: str) -> Path:
         return self.base_dir / f"{agent}.vars.env"
@@ -113,9 +109,7 @@ class AgentEnvStore:
             path.unlink(missing_ok=True)
             return
         path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(
-            dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
-        )
+        fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
         try:
             os.chmod(tmp, mode)
             with os.fdopen(fd, "w") as f:

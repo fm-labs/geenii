@@ -109,31 +109,23 @@ def test_create(client, root_file):
         "url": "http://x/${TOKEN}",
         "headers": {"X-Key": "k"},
     }
-    assert "new-server_1" in [
-        s["name"] for s in client.get("/api/v1/mcp/servers").json()
-    ]
+    assert "new-server_1" in [s["name"] for s in client.get("/api/v1/mcp/servers").json()]
 
 
 def test_create_existing_name_is_409(client, root_file):
-    response = client.post(
-        "/api/v1/mcp/servers", json={"name": "local", "config": {"command": "x"}}
-    )
+    response = client.post("/api/v1/mcp/servers", json={"name": "local", "config": {"command": "x"}})
     assert response.status_code == 409
     assert stored(root_file)["local"]["command"] == "echo"
 
 
 def test_create_name_taken_in_project_file_is_409(client, project_file):
-    response = client.post(
-        "/api/v1/mcp/servers", json={"name": "project_only", "config": {"command": "x"}}
-    )
+    response = client.post("/api/v1/mcp/servers", json={"name": "project_only", "config": {"command": "x"}})
     assert response.status_code == 409
 
 
 @pytest.mark.parametrize("name", ["", "with space", "slash/name", "dot.name", "ümlaut"])
 def test_create_invalid_name_is_400(client, name):
-    response = client.post(
-        "/api/v1/mcp/servers", json={"name": name, "config": {"command": "x"}}
-    )
+    response = client.post("/api/v1/mcp/servers", json={"name": name, "config": {"command": "x"}})
     assert response.status_code == 400
 
 
@@ -150,9 +142,7 @@ def test_create_invalid_name_is_400(client, name):
     ],
 )
 def test_create_invalid_config_is_400(client, root_file, config):
-    response = client.post(
-        "/api/v1/mcp/servers", json={"name": "bad", "config": config}
-    )
+    response = client.post("/api/v1/mcp/servers", json={"name": "bad", "config": config})
     assert response.status_code == 400
     assert "bad" not in stored(root_file)
 
@@ -209,9 +199,7 @@ def test_update_replaces_value_and_removes_left_out_key(client, root_file):
 
 
 def test_update_with_unknown_masked_key_is_400(client, root_file):
-    response = client.put(
-        "/api/v1/mcp/servers/local", json={"command": "echo", "env": {"OTHER": MASKED}}
-    )
+    response = client.put("/api/v1/mcp/servers/local", json={"command": "echo", "env": {"OTHER": MASKED}})
     assert response.status_code == 400
     assert stored(root_file)["local"]["command"] == "echo"
 
@@ -222,22 +210,13 @@ def test_update_invalid_config_is_400(client, root_file):
 
 
 def test_update_unknown_server_is_404(client, root_file):
-    assert (
-        client.put("/api/v1/mcp/servers/nope", json={"command": "x"}).status_code == 404
-    )
+    assert client.put("/api/v1/mcp/servers/nope", json={"command": "x"}).status_code == 404
     assert "nope" not in stored(root_file)
 
 
 def test_update_project_only_server_is_409(client, project_file):
-    assert (
-        client.put(
-            "/api/v1/mcp/servers/project_only", json={"command": "x"}
-        ).status_code
-        == 409
-    )
-    assert json.loads(project_file.read_text())["mcpServers"]["project_only"] == {
-        "command": "p"
-    }
+    assert client.put("/api/v1/mcp/servers/project_only", json={"command": "x"}).status_code == 409
+    assert json.loads(project_file.read_text())["mcpServers"]["project_only"] == {"command": "p"}
 
 
 def test_update_drops_cached_client(client):

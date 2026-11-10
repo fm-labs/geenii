@@ -16,9 +16,7 @@ class AgentSpec(pydantic.BaseModel):
     Represents the configuration for an agent, including its name, model, system prompt, description, tools, and skills.
     """
 
-    file_path: str | None = (
-        None  # path to the spec file, used for loading additional instructions
-    )
+    file_path: str | None = None  # path to the spec file, used for loading additional instructions
     name: str
     model: str
     system: str | None = None
@@ -122,9 +120,7 @@ class AgentRegistry:
             del self._agents[name]
             logger.info(f"Agent '{name}' unloaded.")
         else:
-            logger.warning(
-                f"Attempted to unload agent '{name}' which is not currently loaded."
-            )
+            logger.warning(f"Attempted to unload agent '{name}' which is not currently loaded.")
 
     def _register_agent(self, agent: BaseAgent) -> None:
         """Internal method"""
@@ -140,25 +136,19 @@ class AgentRegistry:
             try:
                 agent_conf = AgentSpec.from_md_file(config_path)
                 self._agent_configs[agent_conf.name] = agent_conf
-                logger.debug(
-                    f"Agent config '{agent_conf.name}' loaded from file '{config_path}'."
-                )
+                logger.debug(f"Agent config '{agent_conf.name}' loaded from file '{config_path}'.")
             except Exception as e:
                 logger.error(
                     f"Error loading agent from config file '{config_path}': {e!s}",
                     exc_info=e,
                 )
         else:
-            logger.warning(
-                f"Agent configuration file not found at {config_path}. No agents loaded."
-            )
+            logger.warning(f"Agent configuration file not found at {config_path}. No agents loaded.")
 
     def load_from_directory(self, directory: str, scope: str = "global") -> None:
         base_path = Path(directory)
         if not base_path.is_dir():
-            logger.warning(
-                f"Agent directory '{directory}' does not exist or is not a directory."
-            )
+            logger.warning(f"Agent directory '{directory}' does not exist or is not a directory.")
             return
         for item in base_path.iterdir():
             if item.is_file() and item.name.endswith(".md"):
@@ -168,12 +158,8 @@ class AgentRegistry:
                     agent_conf = AgentSpec.from_md_file(str(file_path))
                     agent_conf.scope = scope
                     if scope == "project":
-                        agent_conf.working_dir = str(
-                            base_path.parent.parent.resolve().absolute()
-                        )
+                        agent_conf.working_dir = str(base_path.parent.parent.resolve().absolute())
                     self._agent_configs[agent_conf.name] = agent_conf
-                    logger.info(
-                        f"Agent config '{agent_conf.name}' loaded from file '{file_path}'."
-                    )
+                    logger.info(f"Agent config '{agent_conf.name}' loaded from file '{file_path}'.")
                 except Exception as e:
                     logger.error(f"Error loading agent from config: {e!s}", exc_info=e)

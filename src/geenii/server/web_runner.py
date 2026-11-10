@@ -88,11 +88,7 @@ class WebAgentRunner:
             for message in messages:
                 if self._cancelled.is_set():
                     break
-                interaction_ids = [
-                    p.interaction_id
-                    for p in message.content
-                    if isinstance(p, UserInteractionContent)
-                ]
+                interaction_ids = [p.interaction_id for p in message.content if isinstance(p, UserInteractionContent)]
                 for interaction_id in interaction_ids:
                     # answerable from now on, even before the agent starts waiting
                     self.hitl.expect(interaction_id)
@@ -104,9 +100,7 @@ class WebAgentRunner:
                 elif any(isinstance(p, ToolCallResultContent) for p in message.content):
                     events.put(ChatStatusEvent(status="thinking"))
         except Exception as e:
-            logger.exception(
-                f"Agent run failed for context {self.agent.context_id}", exc_info=e
-            )
+            logger.exception(f"Agent run failed for context {self.agent.context_id}", exc_info=e)
             final = ChatErrorEvent(error=str(e))
         finally:
             messages.close()

@@ -153,9 +153,7 @@ async def unhandled_exception_middleware(request: Request, call_next):
     except Exception as exc:
         logging.error(f"Unhandled exception: {exc}", exc_info=True)
         problem = Problem(error="Internal Server Error", status=500, detail=str(exc))
-        return JSONResponse(
-            status_code=500, content=problem.model_dump(), media_type="application/json"
-        )
+        return JSONResponse(status_code=500, content=problem.model_dump(), media_type="application/json")
 
 
 # Note: Middlewares are executed in reverse order of addition (LIFO)

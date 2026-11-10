@@ -12,9 +12,7 @@ from geenii.skills import SkillSpec
 
 class FakeSkillRegistry:
     SKILLS: ClassVar[dict] = {
-        "weather": SkillSpec(
-            name="weather", description="Get the weather forecast", path="/tmp/weather"
-        ),
+        "weather": SkillSpec(name="weather", description="Get the weather forecast", path="/tmp/weather"),
         "notes": SkillSpec(name="notes", description="Take notes", path="/tmp/notes"),
         "clear": SkillSpec(
             name="clear",
@@ -51,9 +49,7 @@ def test_commands_are_builtins_then_skills(client):
     response = client.get("/api/v1/agents/default/commands")
 
     assert response.status_code == 200
-    builtins = [
-        {"command": c, "description": d} for c, d in Agent.BUILTIN_COMMANDS.items()
-    ]
+    builtins = [{"command": c, "description": d} for c, d in Agent.BUILTIN_COMMANDS.items()]
     assert response.json() == builtins + [
         # sorted; broken and missing skills are skipped, "clear" stays the built-in command
         {"command": "notes", "description": "Take notes"},
@@ -78,18 +74,14 @@ def test_unknown_agent_is_404(client):
 @pytest.fixture
 def agent_dirs(tmp_path, monkeypatch):
     dirs = {scope: tmp_path / scope for scope in ("project", "user", "global")}
-    monkeypatch.setattr(
-        agents_routes, "agent_paths", lambda: [(str(d), s) for s, d in dirs.items()]
-    )
+    monkeypatch.setattr(agents_routes, "agent_paths", lambda: [(str(d), s) for s, d in dirs.items()])
     return dirs
 
 
 @pytest.fixture
 def write_client(agent_dirs):
     agents = AgentRegistry()
-    agents.configs.update(
-        {"builtin": AgentSpec(name="builtin", model="fake:test", scope="global")}
-    )
+    agents.configs.update({"builtin": AgentSpec(name="builtin", model="fake:test", scope="global")})
     app.dependency_overrides[agents_routes.dep_agent_registry] = lambda: agents
     yield TestClient(app), agents
     app.dependency_overrides.pop(agents_routes.dep_agent_registry, None)
@@ -130,9 +122,7 @@ def test_create_writes_file_and_registers(write_client, agent_dirs):
 
 def test_create_existing_agent_is_409(write_client):
     client, _ = write_client
-    response = client.post(
-        "/api/v1/agents/", json={"spec": {**SPEC, "name": "builtin"}}
-    )
+    response = client.post("/api/v1/agents/", json={"spec": {**SPEC, "name": "builtin"}})
     assert response.status_code == 409
 
 
@@ -146,19 +136,12 @@ def test_create_over_existing_file_is_409(write_client, agent_dirs):
 @pytest.mark.parametrize("name", ["", "has space", "../escape", "a/b"])
 def test_create_invalid_name_is_400(write_client, name):
     client, _ = write_client
-    assert (
-        client.post(
-            "/api/v1/agents/", json={"spec": {**SPEC, "name": name}}
-        ).status_code
-        == 400
-    )
+    assert client.post("/api/v1/agents/", json={"spec": {**SPEC, "name": name}}).status_code == 400
 
 
 def test_create_rejects_load_time_fields(write_client):
     client, _ = write_client
-    response = client.post(
-        "/api/v1/agents/", json={"spec": {**SPEC, "file_path": "/etc/passwd"}}
-    )
+    response = client.post("/api/v1/agents/", json={"spec": {**SPEC, "file_path": "/etc/passwd"}})
     assert response.status_code == 422
 
 
@@ -198,20 +181,10 @@ def test_update_builtin_agent_creates_user_file(write_client, agent_dirs):
 
 def test_update_unknown_agent_is_404(write_client):
     client, _ = write_client
-    assert (
-        client.put(
-            "/api/v1/agents/nope", json={"spec": {**SPEC, "name": "nope"}}
-        ).status_code
-        == 404
-    )
+    assert client.put("/api/v1/agents/nope", json={"spec": {**SPEC, "name": "nope"}}).status_code == 404
 
 
 def test_update_rename_is_400(write_client):
     client, _ = write_client
     client.post("/api/v1/agents/", json={"spec": SPEC})
-    assert (
-        client.put(
-            "/api/v1/agents/news", json={"spec": {**SPEC, "name": "other"}}
-        ).status_code
-        == 400
-    )
+    assert client.put("/api/v1/agents/news", json={"spec": {**SPEC, "name": "other"}}).status_code == 400

@@ -32,9 +32,7 @@ class MarkdownFile:
         # find the second occurrence of '---' to determine the end of the header
         second_header_index = contents.find("---", 3)
         if second_header_index == -1:
-            raise ValueError(
-                "Malformed skill markdown file: missing second header delimiter."
-            )
+            raise ValueError("Malformed skill markdown file: missing second header delimiter.")
 
         # extract the header and body sections
         header_str = contents[3:second_header_index].strip()
@@ -44,9 +42,7 @@ class MarkdownFile:
         try:
             header_dict = yaml.safe_load(header_str)
         except yaml.YAMLError as e:
-            raise ValueError(
-                f"Malformed skill markdown file: error parsing header YAML. {e!s}"
-            )
+            raise ValueError(f"Malformed skill markdown file: error parsing header YAML. {e!s}")
         self.header = header_dict
 
 
@@ -65,16 +61,12 @@ def read_frontmatter_file(file_path: str) -> tuple[dict, str]:
         contents = f.read()
 
     if not contents.startswith("---"):
-        raise ValueError(
-            "Malformed frontmatter markdown file: missing header delimiter."
-        )
+        raise ValueError("Malformed frontmatter markdown file: missing header delimiter.")
 
     # find the second occurrence of '---' to determine the end of the header
     second_header_index = contents.find("---", 3)
     if second_header_index == -1:
-        raise ValueError(
-            "Malformed frontmatter markdown file: missing second header delimiter."
-        )
+        raise ValueError("Malformed frontmatter markdown file: missing second header delimiter.")
 
     # extract the header and body sections
     header = contents[3:second_header_index].strip()
@@ -84,8 +76,6 @@ def read_frontmatter_file(file_path: str) -> tuple[dict, str]:
     try:
         header_dict = yaml.safe_load(header)
     except yaml.YAMLError as e:
-        raise ValueError(
-            f"Malformed frontmatter markdown file: error parsing header YAML. {e!s}"
-        )
+        raise ValueError(f"Malformed frontmatter markdown file: error parsing header YAML. {e!s}")
 
     return header_dict, body

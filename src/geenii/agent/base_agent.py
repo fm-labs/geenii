@@ -34,9 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 class BaseAgent(BotInterface, abc.ABC):
-    MAX_TASKS = (
-        15  # maximum number of tasks to process in the queue to prevent infinite loops
-    )
+    MAX_TASKS = 15  # maximum number of tasks to process in the queue to prevent infinite loops
 
     def __init__(
         self,
@@ -72,9 +70,7 @@ class BaseAgent(BotInterface, abc.ABC):
 
         if not cwd:
             # create a temp agent dir
-            self._temp_dir = tempfile.TemporaryDirectory(
-                prefix=f"geenii_agent_{self.name}_"
-            )
+            self._temp_dir = tempfile.TemporaryDirectory(prefix=f"geenii_agent_{self.name}_")
             cwd = self._temp_dir.name
         self.cwd = cwd
 
@@ -101,15 +97,11 @@ class BaseAgent(BotInterface, abc.ABC):
 
     def _create_memory(self, context_id: str) -> ChatMemory:
         if GEENII_MEMORY_ENGINE == "file":
-            path = os.path.join(
-                GEENII_CACHE_DIR, "agents", self.name, f"memory.{context_id}.jsonl"
-            )
+            path = os.path.join(GEENII_CACHE_DIR, "agents", self.name, f"memory.{context_id}.jsonl")
             os.makedirs(os.path.dirname(path), exist_ok=True)
             return FileChatMemory(path)
         elif GEENII_MEMORY_ENGINE == "sqlite":
-            path = os.path.join(
-                GEENII_CACHE_DIR, "agents", self.name, f"memory.{context_id}.db"
-            )
+            path = os.path.join(GEENII_CACHE_DIR, "agents", self.name, f"memory.{context_id}.db")
             os.makedirs(os.path.dirname(path), exist_ok=True)
             return SqliteChatMemory(path)
         else:
@@ -217,9 +209,7 @@ class BaseAgent(BotInterface, abc.ABC):
                 # drop remaining tasks, otherwise the loop would never terminate
                 dropped = len(self._tasks)
                 self._tasks.clear()
-                logger.error(
-                    f"Maximum number of tasks reached: {self.MAX_TASKS}. Dropped {dropped} pending task(s)."
-                )
+                logger.error(f"Maximum number of tasks reached: {self.MAX_TASKS}. Dropped {dropped} pending task(s).")
                 _agent_log(
                     self.name,
                     self.context_id,
@@ -228,19 +218,13 @@ class BaseAgent(BotInterface, abc.ABC):
                 )
                 yield ModelMessage(
                     role="assistant",
-                    content=[
-                        TextContent(
-                            text=f"Maximum number of tasks reached: {self.MAX_TASKS}"
-                        )
-                    ],
+                    content=[TextContent(text=f"Maximum number of tasks reached: {self.MAX_TASKS}")],
                 )
                 return
 
             task = self._tasks.popleft()
             try:
-                logger.info(
-                    f"Task #{i}/{len(self._tasks)} {task.__class__.__name__} started."
-                )
+                logger.info(f"Task #{i}/{len(self._tasks)} {task.__class__.__name__} started.")
                 _agent_log(
                     self.name,
                     self.context_id,
@@ -254,21 +238,15 @@ class BaseAgent(BotInterface, abc.ABC):
                             continue
                         if isinstance(result, (ModelMessage, SystemMessage)):
                             # _agent_log(self.name, "agent.task_result", {"i": i, "task": result.__class__.__name__, "result": result})
-                            _agent_log(
-                                self.name, self.context_id, "agent.task_result", result
-                            )
+                            _agent_log(self.name, self.context_id, "agent.task_result", result)
                             yield result
                         elif isinstance(result, BaseTask):
                             # if the task yields another task, we enqueue it
                             self.enqueue_task(result)
                             continue
                         else:
-                            logger.critical(
-                                f"Task {task} yielded an invalid message of type {type(result)}: {result}"
-                            )
-                            raise TypeError(
-                                f"Unsupported task response type: {type(result)}"
-                            )
+                            logger.critical(f"Task {task} yielded an invalid message of type {type(result)}: {result}")
+                            raise TypeError(f"Unsupported task response type: {type(result)}")
                 else:
                     logger.critical(f"Unsupported task type: {type(task)}")
                     raise TypeError(f"Unsupported task type: {type(task)}")
@@ -280,16 +258,10 @@ class BaseAgent(BotInterface, abc.ABC):
                 # todo handle exceptions properly, e.g. by yielding an error message
                 yield ModelMessage(
                     role="assistant",
-                    content=[
-                        TextContent(
-                            text=f"An error occurred while processing the task: {e!s}"
-                        )
-                    ],
+                    content=[TextContent(text=f"An error occurred while processing the task: {e!s}")],
                 )
 
-    def request_tool_execution(
-        self, tool_name: str, arguments: dict, call_id: str
-    ) -> bool:
+    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
         """
         This method can be overridden to implement custom logic for approving or rejecting tool execution requests.
         By default, it approves all tool execution requests.
@@ -308,12 +280,8 @@ class BaseAgent(BotInterface, abc.ABC):
         """
         Load a skill by name and add its tools to the agent's available tools.
         """
-        logger.warning(
-            f"Using deprecated method Agent.load_skill(). Use 'Agent.skills.load({skill_name})' instead."
-        )
-        _agent_log(
-            self.name, self.context_id, "agent.load_skill", {"skill_name": skill_name}
-        )
+        logger.warning(f"Using deprecated method Agent.load_skill(). Use 'Agent.skills.load({skill_name})' instead.")
+        _agent_log(self.name, self.context_id, "agent.load_skill", {"skill_name": skill_name})
         self.skills.load(skill_name)
 
     def unload_skill(self, skill_name: str):
@@ -323,9 +291,7 @@ class BaseAgent(BotInterface, abc.ABC):
         logger.warning(
             f"Using deprecated method Agent.unload_skill(). Use 'Agent.skills.unload({skill_name})' instead."
         )
-        _agent_log(
-            self.name, self.context_id, "agent.unload_skill", {"skill_name": skill_name}
-        )
+        _agent_log(self.name, self.context_id, "agent.unload_skill", {"skill_name": skill_name})
         self.skills.unload(skill_name)
 
     @property
@@ -336,9 +302,7 @@ class BaseAgent(BotInterface, abc.ABC):
         self.memory.append(msg)
 
 
-def _agent_log(
-    agent_name: str, context_id: str, event_name: str, data: dict | pydantic.BaseModel
-):
+def _agent_log(agent_name: str, context_id: str, event_name: str, data: dict | pydantic.BaseModel):
     date_formatted = datetime.now().strftime("%Y-%m-%d")
     # log_file = f"{CACHE_DIR}/logs/{agent_name}/logs/{agent_name}-{date_formatted}.log"
     log_file = f"{GEENII_CACHE_DIR}/logs/{agent_name}-{date_formatted}.log"

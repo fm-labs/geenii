@@ -82,9 +82,7 @@ def test_references_and_interpolation():
 
 
 def test_unknown_reference_fails_step():
-    result = Flow(
-        "t", [{"id": "a", "processor": "echo", "config": {"message": "${nope.x}"}}]
-    ).run()
+    result = Flow("t", [{"id": "a", "processor": "echo", "config": {"message": "${nope.x}"}}]).run()
     assert result.status == "failed"
     assert "nope.x" in result.get("a").error
 
@@ -135,20 +133,14 @@ def test_abort():
 
 
 def test_unknown_type_and_module_path():
-    assert (
-        Flow("t", [{"id": "a", "processor": "does_not_exist"}]).run().status == "failed"
-    )
-    result = Flow("t", [{"id": "a", "processor": f"{__name__}:PlainProcessor"}]).run(
-        input_data=1
-    )
+    assert Flow("t", [{"id": "a", "processor": "does_not_exist"}]).run().status == "failed"
+    result = Flow("t", [{"id": "a", "processor": f"{__name__}:PlainProcessor"}]).run(input_data=1)
     assert result.output == {"got": 1}
 
 
 def test_events():
     events: list[StepEvent] = []
-    Flow("t", [{"id": "a", "processor": "echo", "config": {"message": "m"}}]).run(
-        on_event=events.append
-    )
+    Flow("t", [{"id": "a", "processor": "echo", "config": {"message": "m"}}]).run(on_event=events.append)
     assert [(e.type, e.step_id) for e in events] == [
         ("step.start", "a"),
         ("log", "a"),
@@ -283,9 +275,7 @@ def test_from_file(tmp_path):
     assert Flow.from_file(path).run().output == {"message": "x"}
 
     toml = tmp_path / "flow.toml"
-    toml.write_text(
-        'name = "f"\n[[steps]]\nid = "a"\nprocessor = "echo"\nconfig = { message = "y" }\n'
-    )
+    toml.write_text('name = "f"\n[[steps]]\nid = "a"\nprocessor = "echo"\nconfig = { message = "y" }\n')
     assert Flow.from_file(toml).run().output == {"message": "y"}
 
     yml = tmp_path / "flow.yml"
@@ -353,9 +343,7 @@ def test_snapshots_during_and_after_run(tmp_path):
     assert final.to_flow().to_dict() == flow.to_dict()
 
     path = tmp_path / "snap.json"
-    flow.run(
-        input_data=object(), snapshot=path
-    )  # input that isn't JSON serializable is stored as str
+    flow.run(input_data=object(), snapshot=path)  # input that isn't JSON serializable is stored as str
     loaded = FlowSnapshot.load(path)
     assert loaded.status == "success"
     assert loaded.get("b").output == {"message": {"message": "m"}}
@@ -379,9 +367,7 @@ def test_context_id():
 
 
 def test_snapshot_error_does_not_stop_flow(tmp_path):
-    result = Flow("f", [{"id": "a", "processor": "echo"}]).run(
-        snapshot=tmp_path / "missing" / "snap.json"
-    )
+    result = Flow("f", [{"id": "a", "processor": "echo"}]).run(snapshot=tmp_path / "missing" / "snap.json")
     assert result.status == "success"
 
 
@@ -460,9 +446,7 @@ def test_no_edges_are_independent_roots():
     assert flow.edges == []
     result = flow.run(input_data="in")
     assert _order(result) == ["a", "b", "c"]  # sequential: insertion order
-    assert [r.output for r in result.steps] == [
-        {"message": "in"}
-    ] * 3  # each root gets the flow input
+    assert [r.output for r in result.steps] == [{"message": "in"}] * 3  # each root gets the flow input
 
 
 def test_edges_define_order():
@@ -503,9 +487,7 @@ def test_roots_get_flow_input_and_join_gets_dict():
     )
     result = flow.run(input_data="IN")
     assert result.get("left").output == {"message": "IN"}
-    assert result.get("join").output == {
-        "message": {"left": {"message": "IN"}, "right": {"message": "R"}}
-    }
+    assert result.get("join").output == {"message": {"left": {"message": "IN"}, "right": {"message": "R"}}}
 
 
 def test_add_edge_variants_and_dedupe():
@@ -585,12 +567,8 @@ class SleepProcessor(FlowProcessor):
 
 def _branches(n: int, processor: str = "test_barrier") -> list[dict]:
     steps = [{"id": "root", "processor": "echo", "config": {"message": "r"}}]
-    steps += [
-        {"id": f"b{i}", "processor": processor, "depends_on": "root"} for i in range(n)
-    ]
-    steps += [
-        {"id": "join", "processor": "echo", "depends_on": [f"b{i}" for i in range(n)]}
-    ]
+    steps += [{"id": f"b{i}", "processor": processor, "depends_on": "root"} for i in range(n)]
+    steps += [{"id": "join", "processor": "echo", "depends_on": [f"b{i}" for i in range(n)]}]
     return steps
 
 
@@ -611,18 +589,14 @@ def test_parallel_branches_run_concurrently():
 
 def test_sequential_by_default():
     # with one worker the barrier can never be reached by 2 processor at once
-    flow = Flow(
-        "t", _branches(2), variables={"barrier": threading.Barrier(2, timeout=0.2)}
-    )
+    flow = Flow("t", _branches(2), variables={"barrier": threading.Barrier(2, timeout=0.2)})
     result = flow.run()
     assert result.get("b0").status == "failed"
     assert result.get("b1").status == "skipped"
 
 
 def test_max_workers_override_and_limit():
-    flow = Flow(
-        "t", _branches(2), variables={"barrier": threading.Barrier(2, timeout=2)}
-    )
+    flow = Flow("t", _branches(2), variables={"barrier": threading.Barrier(2, timeout=2)})
     assert flow.run(max_workers=2).status == "success"
     # 3 branches, 2 workers: the third waits, so a barrier of 3 can't be reached
     flow = Flow(
@@ -672,11 +646,7 @@ def test_parallel_events_are_serialized():
 
 def test_max_workers_from_file(tmp_path):
     path = tmp_path / "flow.json"
-    path.write_text(
-        json.dumps(
-            {"name": "f", "max_workers": 4, "steps": [{"id": "a", "processor": "echo"}]}
-        )
-    )
+    path.write_text(json.dumps({"name": "f", "max_workers": 4, "steps": [{"id": "a", "processor": "echo"}]}))
     assert Flow.from_file(path).max_workers == 4
 
 

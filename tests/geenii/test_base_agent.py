@@ -84,9 +84,7 @@ def test_runs_exactly_max_tasks_then_stops():
 
     msgs = _run(agent)
 
-    assert msgs == ["tick"] * BaseAgent.MAX_TASKS + [
-        f"Maximum number of tasks reached: {BaseAgent.MAX_TASKS}"
-    ]
+    assert msgs == ["tick"] * BaseAgent.MAX_TASKS + [f"Maximum number of tasks reached: {BaseAgent.MAX_TASKS}"]
     _assert_queue_settled(agent)
 
 

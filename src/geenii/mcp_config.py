@@ -37,9 +37,7 @@ def get_mcp_config_for_server(server_name: str, compile: bool = False) -> dict |
 
     server_conf = _config["mcpServers"][server_name]
     if compile:
-        server_conf = _expand_env_vars_in_server_config(
-            copy.deepcopy(server_conf), dict(**_config.get("env", {}))
-        )
+        server_conf = _expand_env_vars_in_server_config(copy.deepcopy(server_conf), dict(**_config.get("env", {})))
     return server_conf
 
 
@@ -71,14 +69,10 @@ def expand_env_vars(q: str | None, env_vars: dict) -> str | None:
         return None
 
     # unknown variables are left untouched
-    return re.sub(
-        r"\$\{(\w+)\}", lambda m: str(env_vars.get(m.group(1), m.group(0))), q
-    )
+    return re.sub(r"\$\{(\w+)\}", lambda m: str(env_vars.get(m.group(1), m.group(0))), q)
 
 
-def _expand_env_vars_in_server_config(
-    server_config: dict, env_vars: dict[str, str]
-) -> dict:
+def _expand_env_vars_in_server_config(server_config: dict, env_vars: dict[str, str]) -> dict:
 
     # replace in strings
     for loc in ["command", "url"]:
@@ -88,17 +82,13 @@ def _expand_env_vars_in_server_config(
     # replace in lists of strings
     for loc in ["args"]:
         if isinstance(server_config.get(loc), list):
-            server_config[loc] = [
-                expand_env_vars(v, env_vars) if isinstance(v, str) else v
-                for v in server_config[loc]
-            ]
+            server_config[loc] = [expand_env_vars(v, env_vars) if isinstance(v, str) else v for v in server_config[loc]]
 
     # replace in dict[str,str]
     for loc in ["env", "headers"]:
         if isinstance(server_config.get(loc), dict):
             server_config[loc] = {
-                k: expand_env_vars(v, env_vars) if isinstance(v, str) else v
-                for k, v in server_config[loc].items()
+                k: expand_env_vars(v, env_vars) if isinstance(v, str) else v for k, v in server_config[loc].items()
             }
 
     return server_config

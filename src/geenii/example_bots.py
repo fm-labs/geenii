@@ -30,9 +30,7 @@ class EchoBot(BotInterface):
             response_text = "You sent structured content"
         yield ModelMessage(
             role="assistant",
-            content=[
-                TextContent(type="text", text=f">{self.botname}< {response_text}")
-            ],
+            content=[TextContent(type="text", text=f">{self.botname}< {response_text}")],
         )
 
 

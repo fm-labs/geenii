@@ -38,18 +38,14 @@ def get_bot(botname: str) -> BotInterface:
     # return DemoAgent(botname=botname)
 
     if not botname.startswith("geenii:bot:"):
-        raise ValueError(
-            f"Invalid bot name: {botname}. Bot names must start with 'geenii:bot:'"
-        )
+        raise ValueError(f"Invalid bot name: {botname}. Bot names must start with 'geenii:bot:'")
 
     name = botname[len("geenii:bot:") :]
     # cwd = BOT_WORKING_DIR
     return init_agent_by_name(name, cwd=None)
 
 
-def init_global_agent_registry(
-    registry: AgentRegistry | None = None, projects: bool = False
-) -> AgentRegistry:
+def init_global_agent_registry(registry: AgentRegistry | None = None, projects: bool = False) -> AgentRegistry:
     registry = registry or AgentRegistry()
     # default
     registry._agent_configs.update(
@@ -73,20 +69,10 @@ def init_global_agent_registry(
         }
     )
     # chatgpt
-    registry._agent_configs.update(
-        {
-            "chatgpt": AgentSpec(
-                name="chatgpt", model="openai:gpt-3.5-turbo", scope="global"
-            )
-        }
-    )
+    registry._agent_configs.update({"chatgpt": AgentSpec(name="chatgpt", model="openai:gpt-3.5-turbo", scope="global")})
     # anthropic
     registry._agent_configs.update(
-        {
-            "claude": AgentSpec(
-                name="claude", model="anthropic:claude-opus-4-6", scope="global"
-            )
-        }
+        {"claude": AgentSpec(name="claude", model="anthropic:claude-opus-4-6", scope="global")}
     )
 
     for agent_dir, scope in set(agent_paths()):
@@ -96,9 +82,7 @@ def init_global_agent_registry(
     if projects:
         for project_dir in project_paths():
             logger.info(f"Loading project '{project_dir}'")
-            registry.load_from_directory(
-                os.path.join(project_dir, ".geenii", "agents"), scope="project"
-            )
+            registry.load_from_directory(os.path.join(project_dir, ".geenii", "agents"), scope="project")
 
     return registry
 
@@ -111,9 +95,7 @@ def locate_agent_md_file(agent_name: str) -> tuple[str, str] | tuple[None, None]
     return None, None
 
 
-def init_agent_by_name(
-    name: str, context_id: str | None = None, cwd: str | None = None
-) -> BaseAgent:
+def init_agent_by_name(name: str, context_id: str | None = None, cwd: str | None = None) -> BaseAgent:
     """Load an agent configuration from a markdown file and create an Agent instance."""
     try:
         md_file_path, scope = locate_agent_md_file(name)
@@ -146,9 +128,7 @@ def init_agent(
     """Create a new agent instance from its spec. `memory` and `hitl` override the agent's defaults."""
     # todo check model provider configuration
     # todo check model availability
-    logger.info(
-        f"Loading agent '{agent_conf.name}' with class '{agent_conf.class_name}'."
-    )
+    logger.info(f"Loading agent '{agent_conf.name}' with class '{agent_conf.class_name}'.")
 
     tool_registry = ToolRegistry()
     if agent_conf.tools is not None:
@@ -204,9 +184,7 @@ def init_agent(
         )
         return agent
     except Exception as e:
-        logger.error(
-            f"Error loading agent class '{agent_class_name}': {e!s}", exc_info=e
-        )
+        logger.error(f"Error loading agent class '{agent_class_name}': {e!s}", exc_info=e)
         raise ValueError(f"Error loading agent class '{agent_class_name}': {e!s}")
 
 
@@ -269,9 +247,7 @@ def get_app_info() -> dict:
     if "env" in report:
         report["env"] = _redact_env_vars(report["env"])
         if os.environ.get("DEV_MODE", "0") != "1":
-            report["env"] = {
-                k: v for k, v in report["env"].items() if k in allowed_env_vars
-            }
+            report["env"] = {k: v for k, v in report["env"].items() if k in allowed_env_vars}
     data.update({"system": report})
 
     return data

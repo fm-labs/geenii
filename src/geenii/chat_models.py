@@ -52,12 +52,8 @@ class ToolCallContent(BaseContent):
     name: str
     arguments: dict | None = None
     call_id: str | None = None  # Unique call ID
-    require_approval: bool = (
-        False  # True, if HITL approval is required before executing the tool
-    )
-    approval_id: str | None = (
-        None  # Unique approval ID for HITL, if require_approval is True
-    )
+    require_approval: bool = False  # True, if HITL approval is required before executing the tool
+    approval_id: str | None = None  # Unique approval ID for HITL, if require_approval is True
 
     def to_text(self) -> str:
         args_str = ", ".join(f"{k}={v!r}" for k, v in (self.arguments or {}).items())
@@ -121,35 +117,21 @@ class JsonContent(BaseContent):
 
 class UserConfirmationContent(BaseContent):
     type: Literal["confirmation"] = "confirmation"
-    confirmation_id: str = Field(
-        default_factory=lambda: uuid.uuid4().hex
-    )  # Unique confirmation ID
+    confirmation_id: str = Field(default_factory=lambda: uuid.uuid4().hex)  # Unique confirmation ID
     text: str = ""  # Prompt or question for the user
-    confirmed: bool | None = (
-        None  # True if user confirmed, False if rejected, None if not responded yet
-    )
+    confirmed: bool | None = None  # True if user confirmed, False if rejected, None if not responded yet
 
     def to_text(self) -> str:
-        status = (
-            "Confirmed"
-            if self.confirmed
-            else "Rejected"
-            if self.confirmed is False
-            else "Pending"
-        )
+        status = "Confirmed" if self.confirmed else "Rejected" if self.confirmed is False else "Pending"
         return f"UserConfirmation (id={self.confirmation_id}): {self.text} [Status: {status}]"
 
 
 class UserInteractionContent(BaseContent):
     type: Literal["interaction"] = "interaction"
-    interaction_id: str = Field(
-        default_factory=lambda: uuid.uuid4().hex
-    )  # Unique interaction ID
+    interaction_id: str = Field(default_factory=lambda: uuid.uuid4().hex)  # Unique interaction ID
     interaction_type: str
     text: str = ""  # Prompt or question for the user
-    choices: list[str] = Field(
-        default_factory=list
-    )  # List of valid choices for the user
+    choices: list[str] = Field(default_factory=list)  # List of valid choices for the user
     choice: str | None = None  # The user's choice (if applicable)
 
     def to_text(self) -> str:
@@ -161,9 +143,7 @@ class WidgetContent(BaseContent):
     type: Literal["widget"] = "widget"
     name: str  # Widget name in dot-notation, e.g. "geenii.table" or "geenii.clock"
     data: dict | list | Any | None = None  # Passed to the widget as-is
-    heading: str | None = (
-        None  # Shown in a small header above the widget (unlike titles inside `data`)
-    )
+    heading: str | None = None  # Shown in a small header above the widget (unlike titles inside `data`)
     text: str | None = None  # Shown if the UI does not know the widget
 
     def to_text(self) -> str:

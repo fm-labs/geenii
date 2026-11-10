@@ -46,17 +46,13 @@ def list_agents():
 
 
 @agents.command(name="inspect")
-@click.option(
-    "--instructions", default=False, is_flag=True, help="Show agent instructions."
-)
+@click.option("--instructions", default=False, is_flag=True, help="Show agent instructions.")
 @click.argument("name")
 def inspect_agent(name: str, instructions: bool):
     _agents = init_global_agent_registry()
     agent_config = _agents.get_config(name)
     if not agent_config:
-        click_error(
-            f"Agent '{name}' not found. Please check the available agents with 'agents list'."
-        )
+        click_error(f"Agent '{name}' not found. Please check the available agents with 'agents list'.")
         return
 
     if not instructions:
@@ -141,10 +137,6 @@ def unset_agent_env(name: str, key: str, secret: bool):
     store = AgentEnvStore()
     removed = store.delete_secret(name, key) if secret else store.delete_var(name, key)
     if not removed:
-        click_error(
-            f"{'Secret' if secret else 'Variable'} {key} not found for agent '{name}'."
-        )
+        click_error(f"{'Secret' if secret else 'Variable'} {key} not found for agent '{name}'.")
         return
-    click_info(
-        f"{'Secret' if secret else 'Variable'} {key} removed from agent '{name}'."
-    )
+    click_info(f"{'Secret' if secret else 'Variable'} {key} removed from agent '{name}'.")

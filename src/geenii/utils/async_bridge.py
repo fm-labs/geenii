@@ -33,16 +33,9 @@ def get_loop() -> asyncio.AbstractEventLoop:
     """Return the background event loop, starting it on first use."""
     global _loop, _thread
     with _lock:
-        if (
-            _loop is None
-            or _loop.is_closed()
-            or _thread is None
-            or not _thread.is_alive()
-        ):
+        if _loop is None or _loop.is_closed() or _thread is None or not _thread.is_alive():
             loop = asyncio.new_event_loop()
-            thread = threading.Thread(
-                target=_run_loop, args=(loop,), name="geenii-async-bridge", daemon=True
-            )
+            thread = threading.Thread(target=_run_loop, args=(loop,), name="geenii-async-bridge", daemon=True)
             thread.start()
             _loop, _thread = loop, thread
             logger.debug("Started async bridge event loop")
@@ -58,9 +51,7 @@ def run_sync[T](coro: Coroutine[Any, Any, T], timeout: float | None = None) -> T
     loop = get_loop()
     if threading.current_thread() is _thread:
         coro.close()
-        raise RuntimeError(
-            "run_sync() called from the async bridge loop; await the coroutine instead"
-        )
+        raise RuntimeError("run_sync() called from the async bridge loop; await the coroutine instead")
 
     future = asyncio.run_coroutine_threadsafe(coro, loop)
     try:

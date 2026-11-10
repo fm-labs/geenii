@@ -107,9 +107,7 @@ def test_env_routes_never_return_secret_values(client, store):
     response = client.put("/api/v1/agents/bot/env/vars", json={"REGION": "eu"})
     assert response.json() == {"vars": {"REGION": "eu"}, "secrets": []}
 
-    response = client.put(
-        "/api/v1/agents/bot/env/secrets/TOKEN", json={"value": "t0k3n"}
-    )
+    response = client.put("/api/v1/agents/bot/env/secrets/TOKEN", json={"value": "t0k3n"})
     assert response.json() == {"vars": {"REGION": "eu"}, "secrets": ["TOKEN"]}
     assert "t0k3n" not in client.get("/api/v1/agents/bot/env").text
     assert store.get_secrets("bot") == {"TOKEN": "t0k3n"}
@@ -120,16 +118,8 @@ def test_env_routes_never_return_secret_values(client, store):
 
 def test_env_routes_validate(client):
     assert client.get("/api/v1/agents/nobody/env").status_code == 404
-    assert (
-        client.put("/api/v1/agents/bot/env/vars", json={"BAD-KEY": "x"}).status_code
-        == 400
-    )
-    assert (
-        client.put(
-            "/api/v1/agents/bot/env/secrets/1BAD", json={"value": "x"}
-        ).status_code
-        == 400
-    )
+    assert client.put("/api/v1/agents/bot/env/vars", json={"BAD-KEY": "x"}).status_code == 400
+    assert client.put("/api/v1/agents/bot/env/secrets/1BAD", json={"value": "x"}).status_code == 400
 
 
 def test_init_agent_loads_env(monkeypatch, store):

@@ -92,13 +92,9 @@ class OpenAIProvider(
             # api_key = os.environ.get("OPENAI_API_KEY", None)
             api_key = config.OPENAI_API_KEY
             if not api_key:
-                raise ValueError(
-                    "OpenAI API key not found. Please set the OPENAI_API_KEY environment variable."
-                )
+                raise ValueError("OpenAI API key not found. Please set the OPENAI_API_KEY environment variable.")
 
-            print(
-                f"Connecting using OpenAI API Key starting with '{config.OPENAI_API_KEY[:13]}..'"
-            )
+            print(f"Connecting using OpenAI API Key starting with '{config.OPENAI_API_KEY[:13]}..'")
             return OpenAI(api_key=config.OPENAI_API_KEY)
         return self._client
 
@@ -118,11 +114,7 @@ class OpenAIProvider(
         try:
             openai_models = self.client.models.list()
 
-            cache_data = {
-                "models": [
-                    model.model_dump(mode="json") for model in openai_models.data
-                ]
-            }
+            cache_data = {"models": [model.model_dump(mode="json") for model in openai_models.data]}
             write_json(f"{GEENII_CACHE_DIR}/openai.models.json", cache_data)
         except Exception as e:
             print(f"Error fetching models from OpenAI: {e}")
@@ -168,9 +160,7 @@ class OpenAIProvider(
             )
         return models
 
-    def generate_completion(
-        self, prompt: str, model: str = DEFAULT_MODEL, **kwargs
-    ) -> CompletionResponse:
+    def generate_completion(self, prompt: str, model: str = DEFAULT_MODEL, **kwargs) -> CompletionResponse:
         """
         Get openai completion for the given prompt via OpenAI Responses API.
 
@@ -195,10 +185,7 @@ class OpenAIProvider(
         # top_k = kwargs.get('top_k', None) # top_k is not supported in OpenAI Responses API
         output_format = kwargs.get("output_format", None)
         if isinstance(output_format, str):
-            if (
-                output_format.lower() == "json"
-                or output_format.lower() == "json_object"
-            ):
+            if output_format.lower() == "json" or output_format.lower() == "json_object":
                 output_format = {"type": "json_object"}
             else:
                 raise ValueError(
@@ -252,14 +239,10 @@ class OpenAIProvider(
         # map tool names to tool definitions in openai format
         tools = request.tools or set()
         tool_defs_openai = []
-        logger.info(
-            f"Tool registry provided {tool_registry is not None}, tools requested: {tools}"
-        )
+        logger.info(f"Tool registry provided {tool_registry is not None}, tools requested: {tools}")
         if tool_registry is not None and len(tools) > 0:
             _tools = tool_registry.list_tools()
-            tool_defs_openai = [
-                _tool.to_openai() for _tool in _tools if _tool.name in tools
-            ]
+            tool_defs_openai = [_tool.to_openai() for _tool in _tools if _tool.name in tools]
             logger.info(f"OpenAI tools mapped: {len(tool_defs_openai)}")
 
         # mapping history/seed model messages to OpenAI Responses API input format
@@ -269,9 +252,7 @@ class OpenAIProvider(
             if message.content and len(message.content) > 0:
                 for content_item in message.content:
                     if content_item.type == "text":
-                        input_messages.append(
-                            {"role": message.role, "content": content_item.text}
-                        )
+                        input_messages.append({"role": message.role, "content": content_item.text})
                     elif content_item.type == "json":
                         input_messages.append(
                             {
@@ -295,8 +276,7 @@ class OpenAIProvider(
                         if not any(
                             m
                             for m in input_messages
-                            if m.get("type") == "function_call"
-                            and m.get("call_id") == content_item.call_id
+                            if m.get("type") == "function_call" and m.get("call_id") == content_item.call_id
                         ):
                             logger.warning(
                                 f"Tool call result with call_id {content_item.call_id} does not have a corresponding tool call in the input messages, adding a placeholder for it."
@@ -324,9 +304,7 @@ class OpenAIProvider(
                             f"Unsupported model message content type for openai chat completion input: {content_item.type}"
                         )
 
-        print(
-            f"Mapped {len(messages)} input messages to {len(input_messages)} OpenAI input messages."
-        )
+        print(f"Mapped {len(messages)} input messages to {len(input_messages)} OpenAI input messages.")
         print(input_messages)
 
         # finally add the user prompt
@@ -336,11 +314,7 @@ class OpenAIProvider(
 
         #  build system instructions
         system_prompt = request.system or [self.DEFAULT_SYSTEM_PROMPT]
-        instructions = (
-            "\n".join(system_prompt)
-            if isinstance(system_prompt, list)
-            else system_prompt
-        )
+        instructions = "\n".join(system_prompt) if isinstance(system_prompt, list) else system_prompt
 
         output_format = {"type": "text"}
         if request.output_schema:
@@ -354,14 +328,8 @@ class OpenAIProvider(
             output_format = {"type": "json_object"}
 
         model_params = request.model_parameters or {}
-        temperature = (
-            model_params.get("temperature", request.temperature)
-            or self.DEFAULT_TEMPERATURE
-        )
-        max_tokens = (
-            model_params.get("max_tokens", request.max_tokens)
-            or self.DEFAULT_MAX_TOKENS
-        )
+        temperature = model_params.get("temperature", request.temperature) or self.DEFAULT_TEMPERATURE
+        max_tokens = model_params.get("max_tokens", request.max_tokens) or self.DEFAULT_MAX_TOKENS
         top_p = model_params.get("top_p", request.top_p) or None
         max_tool_calls = model_params.get("max_tool_calls", self.DEFAULT_MAX_TOOL_CALLS)
 
@@ -399,47 +367,29 @@ class OpenAIProvider(
                         # logger.info(f"Model output text: {content_item.text}")
                         _text = content_item.text
                         _text_part = TextContent(text=_text)
-                        if _text.strip().startswith("{") and _text.strip().endswith(
-                            "}"
-                        ):
-                            logger.info(
-                                "Looks like the content is JSON, trying to parse it."
-                            )
+                        if _text.strip().startswith("{") and _text.strip().endswith("}"):
+                            logger.info("Looks like the content is JSON, trying to parse it.")
                             try:
                                 json_data = json.loads(_text)
                                 _text_part = JsonContent(data=json_data)
                             except json.JSONDecodeError:
-                                logger.warning(
-                                    "Content looks like JSON but failed to parse, adding as plain text."
-                                )
+                                logger.warning("Content looks like JSON but failed to parse, adding as plain text.")
                         output_parts.append(_text_part)
                     elif content_item.type == "refusal":
                         logger.critical(f"Model refusal: {content_item.refusal}")
-                        output_parts.append(
-                            TextContent(text=f"Model refusal: {content_item.refusal}")
-                        )
+                        output_parts.append(TextContent(text=f"Model refusal: {content_item.refusal}"))
 
             elif output_item.type == "function_call":
                 # https://platform.openai.com/docs/guides/function-calling?api-mode=responses#handling-function-calls
                 fn_call_id = output_item.call_id
                 fn_name = output_item.name
                 fn_args = json.loads(output_item.arguments)
-                logger.info(
-                    f"Tool call detected: Function {fn_name} with args: {fn_args} ({fn_call_id})"
-                )
+                logger.info(f"Tool call detected: Function {fn_name} with args: {fn_args} ({fn_call_id})")
 
-                output_parts.append(
-                    ToolCallContent(name=fn_name, arguments=fn_args, call_id=fn_call_id)
-                )
+                output_parts.append(ToolCallContent(name=fn_name, arguments=fn_args, call_id=fn_call_id))
             else:
-                logger.warning(
-                    f"Unsupported OpenAI response output item type: {output_item.type}"
-                )
-                output_parts.append(
-                    TextContent(
-                        text=f"Unsupported OpenAI response item type: {output_item.type}"
-                    )
-                )
+                logger.warning(f"Unsupported OpenAI response output item type: {output_item.type}")
+                output_parts.append(TextContent(text=f"Unsupported OpenAI response item type: {output_item.type}"))
 
         # Usage
         usage = _usage_from_result(model_result)
@@ -458,9 +408,7 @@ class OpenAIProvider(
             usage=usage,
         )
 
-    def generate_audio_transcription(
-        self, model: str, audio: bytes | str, **kwargs
-    ) -> AudioTranscriptionApiResponse:
+    def generate_audio_transcription(self, model: str, audio: bytes | str, **kwargs) -> AudioTranscriptionApiResponse:
         if isinstance(audio, bytes):
             # OpenAI API expects a file-like object, so we can use BytesIO
             from io import BytesIO

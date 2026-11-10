@@ -34,9 +34,7 @@ class ReadHttpProcessor(FlowProcessor):
     # override in tests, e.g. with httpx.MockTransport
     transport: ClassVar[httpx.BaseTransport | None] = None
 
-    def process(
-        self, input_data: Any, ctx: FlowContext
-    ) -> Generator[Any, None, ReadHttpOutput]:
+    def process(self, input_data: Any, ctx: FlowContext) -> Generator[Any, None, ReadHttpOutput]:
         c: ReadHttpConfig = self.config
         yield StepEvent("log", f"{c.method} {c.url}")
         with httpx.Client(timeout=c.timeout, transport=self.transport) as client:

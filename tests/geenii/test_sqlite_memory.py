@@ -62,9 +62,7 @@ def test_concurrent_appends_are_all_persisted(db_path):
         list(pool.map(lambda i: memory.append(_msg(f"m{i}")), range(50)))
 
     restored = SqliteChatMemory(db_path)
-    assert sorted(m.to_text() for m in restored.messages) == sorted(
-        f"m{i}" for i in range(50)
-    )
+    assert sorted(m.to_text() for m in restored.messages) == sorted(f"m{i}" for i in range(50))
 
 
 def test_clear_persists(db_path):
@@ -77,9 +75,7 @@ def test_clear_persists(db_path):
 
 def test_migrates_legacy_table(db_path):
     conn = sqlite3.connect(db_path)
-    conn.execute(
-        "CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, content TEXT)"
-    )
+    conn.execute("CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, content TEXT)")
     conn.execute(
         "INSERT INTO messages (role, content) VALUES (?, ?)",
         ("user", '[{"type": "text", "text": "legacy"}]'),

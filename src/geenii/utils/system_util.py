@@ -10,9 +10,7 @@ from geenii.utils.os_util import locate_binary
 
 def get_memory_usage():
     try:
-        tot_m, used_m, free_m = map(
-            int, os.popen("/usr/bin/free -t -m").readlines()[-1].split()[1:]
-        )
+        tot_m, used_m, free_m = map(int, os.popen("/usr/bin/free -t -m").readlines()[-1].split()[1:])
     except Exception:
         return -1, -1, -1
 
@@ -30,9 +28,7 @@ def get_system_summary():
         "mem_virt": dict(psutil.virtual_memory()._asdict()),
         "mem_swap": dict(psutil.swap_memory()._asdict()),
         "mem_virt_percent": psutil.virtual_memory().percent,
-        "mem_avail_percent": psutil.virtual_memory().available
-        * 100
-        / psutil.virtual_memory().total,
+        "mem_avail_percent": psutil.virtual_memory().available * 100 / psutil.virtual_memory().total,
     }
 
 

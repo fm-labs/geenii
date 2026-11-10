@@ -123,9 +123,7 @@ class FlowSnapshot(pydantic.BaseModel):
     status: Literal["running", "success", "failed", "aborted"]
     started_at: datetime
     updated_at: datetime
-    steps: list[
-        StepResult
-    ] = []  # finished (and, at the end, skipped) steps, in execution order
+    steps: list[StepResult] = []  # finished (and, at the end, skipped) steps, in execution order
     running: list[str] = []
     pending: list[str] = []
 
@@ -249,9 +247,7 @@ _REF_FULL = re.compile(r"\$\{([^}]+)\}")
 def _config_references(value: Any) -> set[str]:
     """The ${...} references (without the braces) in strings inside value; $${...} escapes are skipped"""
     if isinstance(value, str):
-        return {
-            m.group(1) for m in _REF.finditer(value) if not m.group(0).startswith("$$")
-        }
+        return {m.group(1) for m in _REF.finditer(value) if not m.group(0).startswith("$$")}
     if isinstance(value, dict):
         return set().union(*(_config_references(v) for v in value.values()))
     if isinstance(value, (list, tuple)):
@@ -285,9 +281,7 @@ class FlowProcessor:
 
     def __init__(self, config: dict | None = None):
         config = config or {}
-        self.config = (
-            self.config_model.model_validate(config) if self.config_model else config
-        )
+        self.config = self.config_model.model_validate(config) if self.config_model else config
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({self.config})"
@@ -323,9 +317,7 @@ def get_step_processor_class(processor: str) -> type[FlowProcessor]:
         module_name, class_name = processor.split(":", 1)
         cls = getattr(importlib.import_module(module_name), class_name, None)
         if cls is None:
-            raise FlowError(
-                f"Processor class '{class_name}' not found in '{module_name}'"
-            )
+            raise FlowError(f"Processor class '{class_name}' not found in '{module_name}'")
     else:
         import geenii.flow.processor  # noqa: F401 - registers the built-in processors
 
@@ -371,9 +363,7 @@ class Flow:
         self.steps.append(step)
         return step
 
-    def add_edge(
-        self, edge: FlowEdge | dict | tuple[str, str] | str, to_step: str | None = None
-    ) -> FlowEdge:
+    def add_edge(self, edge: FlowEdge | dict | tuple[str, str] | str, to_step: str | None = None) -> FlowEdge:
         """Add an edge: add_edge("a", "b"), add_edge(("a", "b")) or add_edge(FlowEdge(...))"""
         if isinstance(edge, str):
             edge = FlowEdge(from_step=edge, to_step=to_step)
@@ -408,9 +398,7 @@ class Flow:
         for e in self.edges:
             for step_id in (e.from_step, e.to_step):
                 if step_id not in ids:
-                    raise FlowError(
-                        f"Edge {e.from_step} -> {e.to_step}: unknown step '{step_id}'"
-                    )
+                    raise FlowError(f"Edge {e.from_step} -> {e.to_step}: unknown step '{step_id}'")
             preds[e.to_step].append(e.from_step)
         return preds
 
@@ -458,13 +446,9 @@ class Flow:
         order: list[FlowStepSpec] = []
         remaining = list(self.steps)
         while remaining:
-            ready = next(
-                (s for s in remaining if all(p in done for p in preds[s.id])), None
-            )
+            ready = next((s for s in remaining if all(p in done for p in preds[s.id])), None)
             if ready is None:
-                raise FlowError(
-                    f"Cycle between steps: {', '.join(s.id for s in remaining)}"
-                )
+                raise FlowError(f"Cycle between steps: {', '.join(s.id for s in remaining)}")
             remaining.remove(ready)
             done.add(ready.id)
             order.append(ready)
@@ -483,9 +467,7 @@ class Flow:
 
         lines = [f"flowchart {direction}"]
         for s in self.steps:
-            lines.append(
-                f'    {node[s.id]}["{label(s.id)}<br/>({label(s.processor)})"]'
-            )
+            lines.append(f'    {node[s.id]}["{label(s.id)}<br/>({label(s.processor)})"]')
         for e in self.edges:
             lines.append(f"    {node[e.from_step]} --> {node[e.to_step]}")
         return "\n".join(lines) + "\n"
@@ -509,9 +491,7 @@ class Flow:
             '    node [shape=box, style=rounded, fontname="Helvetica"];',
         ]
         for s in self.steps:
-            lines.append(
-                f'    {quote(s.id)} [label="{esc(s.id)}\\n{esc(s.processor)}"];'
-            )
+            lines.append(f'    {quote(s.id)} [label="{esc(s.id)}\\n{esc(s.processor)}"];')
         for e in self.edges:
             lines.append(f"    {quote(e.from_step)} -> {quote(e.to_step)};")
         lines.append("}")
@@ -633,9 +613,7 @@ class Flow:
 
         save_snapshot("running")
         executor = (
-            ThreadPoolExecutor(
-                max_workers=workers, thread_name_prefix=f"flow-{self.name}"
-            )
+            ThreadPoolExecutor(max_workers=workers, thread_name_prefix=f"flow-{self.name}")
             if workers > 1
             else _InlineExecutor()
         )
@@ -648,14 +626,8 @@ class Flow:
                             break
                         if all(p in results for p in preds[spec.id]):
                             pending.remove(spec)
-                            step_input = _step_input(
-                                preds[spec.id], outputs, input_data
-                            )
-                            running[
-                                executor.submit(
-                                    self._execute_step, spec, step_input, ctx
-                                )
-                            ] = spec
+                            step_input = _step_input(preds[spec.id], outputs, input_data)
+                            running[executor.submit(self._execute_step, spec, step_input, ctx)] = spec
                 if not running:
                     break
 
@@ -691,29 +663,19 @@ class Flow:
             steps=[results[s.id] for s in order],
         )
 
-    def _execute_step(
-        self, spec: FlowStepSpec, input_data: Any, ctx: FlowContext
-    ) -> StepResult:
+    def _execute_step(self, spec: FlowStepSpec, input_data: Any, ctx: FlowContext) -> StepResult:
         ctx.emit("step.start", {"processor": spec.processor}, step_id=spec.id)
         started = time.monotonic()
         try:
-            step = get_step_processor_class(spec.processor)(
-                config=ctx.resolve(spec.config)
-            )
+            step = get_step_processor_class(spec.processor)(config=ctx.resolve(spec.config))
             output = self._drive(step, spec, input_data, ctx)
-            output = _dump(
-                step.output_model.model_validate(output)
-                if step.output_model
-                else output
-            )
+            output = _dump(step.output_model.model_validate(output) if step.output_model else output)
             result = StepResult(step_id=spec.id, status="success", output=output)
         except FlowAborted as e:
             result = StepResult(step_id=spec.id, status="aborted", error=str(e))
         except Exception as e:
             logger.warning("Step '%s' failed: %s", spec.id, e)
-            result = StepResult(
-                step_id=spec.id, status="failed", error=f"{type(e).__name__}: {e}"
-            )
+            result = StepResult(step_id=spec.id, status="failed", error=f"{type(e).__name__}: {e}")
         result.duration = time.monotonic() - started
         ctx.emit(
             "step.end",
@@ -723,9 +685,7 @@ class Flow:
         return result
 
     @staticmethod
-    def _drive(
-        step: FlowProcessor, spec: FlowStepSpec, input_data: Any, ctx: FlowContext
-    ) -> Any:
+    def _drive(step: FlowProcessor, spec: FlowStepSpec, input_data: Any, ctx: FlowContext) -> Any:
         gen = step.process(input_data, ctx)
         if not inspect.isgenerator(gen):
             return gen

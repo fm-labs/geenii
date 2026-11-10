@@ -92,12 +92,8 @@ def list_agents(
     return agents_list
 
 
-@router.get(
-    "/{name}", responses={404: {"model": Problem, "description": "Agent not found"}}
-)
-def get_agent(
-    name: str, agent_registry: AgentRegistry = Depends(dep_agent_registry)
-) -> dict:
+@router.get("/{name}", responses={404: {"model": Problem, "description": "Agent not found"}})
+def get_agent(name: str, agent_registry: AgentRegistry = Depends(dep_agent_registry)) -> dict:
     """
     The agent's spec plus its `instructions` (the markdown body of the spec file).
     """
@@ -123,9 +119,7 @@ def _agent_dir(scope: str) -> Path:
 def _render_spec_file(spec: AgentSpecInput, instructions: str) -> str:
     # empty values are left out, so the file only holds what was set
     front = {k: v for k, v in spec.model_dump().items() if v not in (None, "", [], {})}
-    header = yaml.safe_dump(
-        front, sort_keys=False, allow_unicode=True, default_flow_style=False, width=1000
-    )
+    header = yaml.safe_dump(front, sort_keys=False, allow_unicode=True, default_flow_style=False, width=1000)
     body = instructions.strip()
     return f"---\n{header}---\n" + (f"\n{body}\n" if body else "")
 
@@ -141,17 +135,13 @@ def _write_spec_file(
     content = _render_spec_file(spec, instructions)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(
-            dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
-        )
+        fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
         with os.fdopen(fd, "w") as f:
             f.write(content)
         os.replace(tmp, path)
     except OSError as e:
         logger.error(f"Could not write agent spec '{path}': {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Could not write '{path}': {e.strerror or e}"
-        )
+        raise HTTPException(status_code=500, detail=f"Could not write '{path}': {e.strerror or e}")
     loaded = AgentSpec.from_md_file(str(path))
     loaded.scope = scope
     agent_registry.configs[loaded.name] = loaded
@@ -184,14 +174,8 @@ def create_agent(
         raise HTTPException(status_code=409, detail=f"Agent '{name}' already exists.")
     path = _agent_dir(request.scope) / f"{name}.md"
     if path.exists():
-        raise HTTPException(
-            status_code=409, detail=f"The file '{path}' already exists."
-        )
-    return _agent_detail(
-        _write_spec_file(
-            path, request.spec, request.instructions, request.scope, agent_registry
-        )
-    )
+        raise HTTPException(status_code=409, detail=f"The file '{path}' already exists.")
+    return _agent_detail(_write_spec_file(path, request.spec, request.instructions, request.scope, agent_registry))
 
 
 @router.put(
@@ -224,23 +208,15 @@ def update_agent(
     else:
         path, scope = _agent_dir("user") / f"{name}.md", "user"
         if path.exists():
-            raise HTTPException(
-                status_code=409, detail=f"The file '{path}' already exists."
-            )
-    return _agent_detail(
-        _write_spec_file(
-            path, request.spec, request.instructions, scope, agent_registry
-        )
-    )
+            raise HTTPException(status_code=409, detail=f"The file '{path}' already exists.")
+    return _agent_detail(_write_spec_file(path, request.spec, request.instructions, scope, agent_registry))
 
 
 @router.get(
     "/{name}/commands",
     responses={404: {"model": Problem, "description": "Agent not found"}},
 )
-def list_agent_commands(
-    name: str, agent_registry: AgentRegistry = Depends(dep_agent_registry)
-) -> list[AgentCommand]:
+def list_agent_commands(name: str, agent_registry: AgentRegistry = Depends(dep_agent_registry)) -> list[AgentCommand]:
     """
     Slash commands the agent understands: the built-in commands, then one per configured skill
     ("/<skill>" activates the skill). Commands are listed without the leading slash.
@@ -249,10 +225,7 @@ def list_agent_commands(
     if spec is None:
         raise HTTPException(status_code=404, detail=f"Agent '{name}' not found.")
 
-    commands = [
-        AgentCommand(command=c, description=d)
-        for c, d in Agent.BUILTIN_COMMANDS.items()
-    ]
+    commands = [AgentCommand(command=c, description=d) for c, d in Agent.BUILTIN_COMMANDS.items()]
     skills = SkillRegistry()
     for skill_name in sorted(spec.skills or []):
         # the macro handler matches lowercased names, and built-in commands win over skills
@@ -276,14 +249,10 @@ def _require_agent(name: str, agent_registry: AgentRegistry) -> None:
 
 
 def _agent_env(name: str, env_store: AgentEnvStore) -> AgentEnv:
-    return AgentEnv(
-        vars=env_store.get_vars(name), secrets=sorted(env_store.secret_keys(name))
-    )
+    return AgentEnv(vars=env_store.get_vars(name), secrets=sorted(env_store.secret_keys(name)))
 
 
-@router.get(
-    "/{name}/env", responses={404: {"model": Problem, "description": "Agent not found"}}
-)
+@router.get("/{name}/env", responses={404: {"model": Problem, "description": "Agent not found"}})
 def get_agent_env(
     name: str,
     agent_registry: AgentRegistry = Depends(dep_agent_registry),

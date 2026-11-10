@@ -15,9 +15,7 @@ class KokoroProvider(AISpeechGeneratorProvider):
             return OpenAI(api_key="no-key", base_url="http://localhost:33300/api/v1")
         return self._client
 
-    def generate_speech(
-        self, model: str, text: str, **kwargs
-    ) -> AudioSpeechGenerationApiResponse:
+    def generate_speech(self, model: str, text: str, **kwargs) -> AudioSpeechGenerationApiResponse:
         _response = self.client.audio.speech.create(
             model="model_q8f16",
             voice="af_heart",

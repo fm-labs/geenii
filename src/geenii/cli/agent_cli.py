@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__)
 
 @click.command(name="agent")
 @click.argument("prompt", required=False)
-@click.option(
-    "name", "--name", "-n", default="default", help="Name of the agent to run."
-)
+@click.option("name", "--name", "-n", default="default", help="Name of the agent to run.")
 @click.option(
     "skills",
     "--skills",
@@ -118,9 +116,7 @@ def agent_cli(
     if prompt is None or len(prompt) < 1:
         prompt = ""
         if interactive:
-            prompt = click.prompt(
-                text="Please enter a prompt", type=str, default="No prompt"
-            )
+            prompt = click.prompt(text="Please enter a prompt", type=str, default="No prompt")
 
     if context_id is None or len(context_id) < 1:
         context_id = f"{uuid.uuid4().hex}-cli"
@@ -188,9 +184,7 @@ def agent_run(
     # agent: BaseAgent | None = _agents.get_instance(name, context_id=context_id)
     agent: BaseAgent = init_agent_by_name(name, context_id=context_id)
     if not agent:
-        click.echo(
-            f"Agent '{name}' not found. Please check the available agents with 'geenii agents list'."
-        )
+        click.echo(f"Agent '{name}' not found. Please check the available agents with 'geenii agents list'.")
         return
 
     # Apply overrides from CLI options
@@ -216,9 +210,7 @@ def agent_run(
             agent.skills.load(skill_name)
     if output_format:
         if output_format not in ["text", "json"]:
-            click.echo(
-                f"Invalid output format '{output_format}'. Supported formats are 'text' and 'json'."
-            )
+            click.echo(f"Invalid output format '{output_format}'. Supported formats are 'text' and 'json'.")
             return
         agent.output_format = output_format
 
