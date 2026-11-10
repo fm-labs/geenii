@@ -27,9 +27,15 @@ class ExecuteCommandOutput(pydantic.BaseModel):
     rc: int
 
 
-def run_process(args: str | list[str], shell: bool = False, cwd: str | None = None,
-                env: dict[str, str] | None = None, stdin: str | None = None,
-                timeout: float | None = None, check: bool = False) -> Generator[StepEvent, None, ExecuteCommandOutput]:
+def run_process(
+    args: str | list[str],
+    shell: bool = False,
+    cwd: str | None = None,
+    env: dict[str, str] | None = None,
+    stdin: str | None = None,
+    timeout: float | None = None,
+    check: bool = False,
+) -> Generator[StepEvent, None, ExecuteCommandOutput]:
     """
     Run a process to completion. env is merged over the current environment.
 
@@ -61,10 +67,14 @@ def run_process(args: str | list[str], shell: bool = False, cwd: str | None = No
             except BrokenPipeError:
                 pass
 
-    threads = [threading.Thread(target=read, args=("stdout", proc.stdout), daemon=True),
-               threading.Thread(target=read, args=("stderr", proc.stderr), daemon=True)]
+    threads = [
+        threading.Thread(target=read, args=("stdout", proc.stdout), daemon=True),
+        threading.Thread(target=read, args=("stderr", proc.stderr), daemon=True),
+    ]
     if stdin is not None:
-        threads.append(threading.Thread(target=write, args=(proc.stdin, stdin), daemon=True))
+        threads.append(
+            threading.Thread(target=write, args=(proc.stdin, stdin), daemon=True)
+        )
     for t in threads:
         t.start()
 
@@ -75,7 +85,9 @@ def run_process(args: str | list[str], shell: bool = False, cwd: str | None = No
         while open_streams:
             remaining = deadline - time.monotonic() if deadline is not None else None
             try:
-                name, line = lines.get(timeout=max(remaining, 0) if remaining is not None else None)
+                name, line = lines.get(
+                    timeout=max(remaining, 0) if remaining is not None else None
+                )
             except queue.Empty:
                 raise subprocess.TimeoutExpired(args, timeout) from None
             if line is None:
@@ -103,12 +115,23 @@ class ExecuteCommandProcessor(FlowProcessor):
     config_model = ExecuteCommandConfig
     output_model = ExecuteCommandOutput
 
-    def process(self, input_data: Any, ctx: FlowContext) -> Generator[Any, None, ExecuteCommandOutput]:
+    def process(
+        self, input_data: Any, ctx: FlowContext
+    ) -> Generator[Any, None, ExecuteCommandOutput]:
         c: ExecuteCommandConfig = self.config
         if c.shell:
             args = c.command if isinstance(c.command, str) else shlex.join(c.command)
         else:
             args = shlex.split(c.command) if isinstance(c.command, str) else c.command
         yield StepEvent("log", f"Running {args!r}")
-        return (yield from run_process(args, shell=c.shell, cwd=c.cwd, env=c.env, stdin=c.stdin,
-                                       timeout=c.timeout, check=c.check))
+        return (
+            yield from run_process(
+                args,
+                shell=c.shell,
+                cwd=c.cwd,
+                env=c.env,
+                stdin=c.stdin,
+                timeout=c.timeout,
+                check=c.check,
+            )
+        )

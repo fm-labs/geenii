@@ -7,11 +7,27 @@ import logging
 import ollama
 
 from geenii import config
-from geenii.chat_models import TextContent, ToolCallContent, ContentPart, ToolCallResultContent, JsonContent
+from geenii.chat_models import (
+    TextContent,
+    ToolCallContent,
+    ContentPart,
+    ToolCallResultContent,
+    JsonContent,
+)
 from geenii.config import GEENII_CACHE_DIR
-from geenii.datamodels import CompletionResponse, ChatCompletionResponse, ChatCompletionRequest, AIModelInfo, \
-    ModelMessage, Usage
-from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider
+from geenii.datamodels import (
+    CompletionResponse,
+    ChatCompletionResponse,
+    ChatCompletionRequest,
+    AIModelInfo,
+    ModelMessage,
+    Usage,
+)
+from geenii.provider.interfaces import (
+    AIProvider,
+    AICompletionProvider,
+    AIChatCompletionProvider,
+)
 from geenii.utils.json_util import write_json
 
 logger = logging.getLogger(__name__)
@@ -19,26 +35,31 @@ logger = logging.getLogger(__name__)
 
 def _usage_from_result(model_result) -> Usage:
     """Usage and performance metrics of an Ollama chat or generate result. Durations are in milliseconds."""
+
     def count(key: str) -> int:
-        return int(model_result.get(key) or 0)  # may be missing or None, e.g. for a cached prompt
+        return int(
+            model_result.get(key) or 0
+        )  # may be missing or None, e.g. for a cached prompt
 
     def millis(key: str) -> int:
-        return int((model_result.get(key) or 0) / 1_000_000)  # nanoseconds -> milliseconds
+        return int(
+            (model_result.get(key) or 0) / 1_000_000
+        )  # nanoseconds -> milliseconds
 
     return Usage(
-        input_tokens=count('prompt_eval_count'),
-        output_tokens=count('eval_count'),
-        load_duration=millis('load_duration'),
-        input_duration=millis('prompt_eval_duration'),
-        output_duration=millis('eval_duration'),
-        total_duration=millis('total_duration'),
+        input_tokens=count("prompt_eval_count"),
+        output_tokens=count("eval_count"),
+        load_duration=millis("load_duration"),
+        input_duration=millis("prompt_eval_duration"),
+        output_duration=millis("eval_duration"),
+        total_duration=millis("total_duration"),
     )
 
 
 class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
     DEFAULT_MODEL = "qwen:3b"
     DEFAULT_TEMPERATURE = 0.1
-    DEFAULT_MAX_TOKENS = 8192 # 4096
+    DEFAULT_MAX_TOKENS = 8192  # 4096
     DEFAULT_TOP_K = None  # 20
     DEFAULT_TOP_P = None  # 0.9
 
@@ -59,7 +80,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         if self._client is None:
             headers = {}
             if config.OLLAMA_API_KEY:
-                headers['Authorization'] = f"Bearer {config.OLLAMA_API_KEY}"
+                headers["Authorization"] = f"Bearer {config.OLLAMA_API_KEY}"
             self._client = ollama.Client(host=config.OLLAMA_HOST, headers=headers)
         return self._client
 
@@ -67,7 +88,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         return True if config.OLLAMA_HOST is not None else False
 
     def get_capabilities(self) -> list[str]:
-        return ['completion', 'chat_completion', 'tool_calling']
+        return ["completion", "chat_completion", "tool_calling"]
 
     def get_models(self) -> list[AIModelInfo]:
         models = []
@@ -75,7 +96,11 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         try:
             ollama_models = self.ollama.list()
 
-            cache_data = {"models": [model.model_dump(mode="json") for model in ollama_models.models]}
+            cache_data = {
+                "models": [
+                    model.model_dump(mode="json") for model in ollama_models.models
+                ]
+            }
             write_json(f"{GEENII_CACHE_DIR}/ollama.models.json", cache_data)
         except Exception as e:
             logger.error(f"Error fetching models from Ollama: {e}")
@@ -86,7 +111,9 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 metadata = dict()
                 metadata["size"] = model.size if model.size else None
                 metadata["digest"] = model.digest if model.digest else None
-                metadata["modified_at"] = model.modified_at.isoformat() if model.modified_at else None
+                metadata["modified_at"] = (
+                    model.modified_at.isoformat() if model.modified_at else None
+                )
                 metadata.update(model.details.model_dump())
                 model_info = AIModelInfo(
                     provider=self.name,
@@ -99,7 +126,9 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 models.append(model_info)
         return models
 
-    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry=None) -> ChatCompletionResponse:
+    def generate_chat_completion(
+        self, request: ChatCompletionRequest, tool_registry=None
+    ) -> ChatCompletionResponse:
         """
         Get ollama completion for the given prompt via Ollama Chat API.
 
@@ -168,22 +197,29 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         """
         model = request.model or self.DEFAULT_MODEL
         if model.startswith("ollama:"):
-            model = model[len("ollama:"):]
+            model = model[len("ollama:") :]
 
         # TOOLS
         tools = request.tools or set()
         ollama_tools = []
-        logger.info(f"Tool registry provided {tool_registry is not None}, tools requested: {tools}")
+        logger.info(
+            f"Tool registry provided {tool_registry is not None}, tools requested: {tools}"
+        )
         if tool_registry is not None and len(tools) > 0:
             # tool_registry = get_tool_registry()
             # filter the registry to get the tool definitions for the requested tools
             tool_defs = tool_registry.list_definitions()
-            openai_tools = [tool_def for tool_def in tool_defs if tool_def['name'] in tools]
-            #print("Mapped OpenAI tools:", openai_tools)
-            ollama_tools = [map_openai_tool_to_ollama(tool_def) for tool_def in openai_tools]
+            openai_tools = [
+                tool_def for tool_def in tool_defs if tool_def["name"] in tools
+            ]
+            # print("Mapped OpenAI tools:", openai_tools)
+            ollama_tools = [
+                map_openai_tool_to_ollama(tool_def) for tool_def in openai_tools
+            ]
             logger.info(
-                f"Mapped {len(openai_tools)} tools to Ollama format, {[tool['function']['name'] for tool in ollama_tools]}")
-            #print("Mapped tools:", ollama_tools)
+                f"Mapped {len(openai_tools)} tools to Ollama format, {[tool['function']['name'] for tool in ollama_tools]}"
+            )
+            # print("Mapped tools:", ollama_tools)
 
         # messages that will be sent to the Ollama API in the format expected by the API
         input_messages = []
@@ -191,10 +227,12 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         # system prompt goes first in the messages list
         system_prompt = request.system or []
         for system_prompt_part in system_prompt:
-            input_messages.append({
-                'role': 'system',
-                'content': system_prompt_part,
-            })
+            input_messages.append(
+                {
+                    "role": "system",
+                    "content": system_prompt_part,
+                }
+            )
 
         # todo developer prompt goes after system prompt and before user prompt
         # developer_prompt = request.developer_prompt
@@ -205,19 +243,25 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         #     })
 
         # message history
-        logger.debug(f"Input messages provided {len(request.messages) if request.messages else 0}")
-        #print(request.messages)
+        logger.debug(
+            f"Input messages provided {len(request.messages) if request.messages else 0}"
+        )
+        # print(request.messages)
         if request.messages:
             input_messages.extend(model_messages_to_ollama_format(request.messages))
 
         # user prompt
         if request.prompt:
-            input_messages.append({
-                'role': 'user',
-                'content': request.prompt,
-            })
+            input_messages.append(
+                {
+                    "role": "user",
+                    "content": request.prompt,
+                }
+            )
         elif not request.prompt and (not request.messages or len(request.messages) < 1):
-            raise ValueError("At least a prompt or some messages must be provided for chat completion.")
+            raise ValueError(
+                "At least a prompt or some messages must be provided for chat completion."
+            )
 
         try:
             logger.debug(input_messages)
@@ -225,10 +269,16 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             output_schema = request.output_schema or None
 
             model_params = request.model_parameters or {}
-            temperature = model_params.get('temperature', request.temperature) or self.DEFAULT_TEMPERATURE
-            max_tokens = model_params.get('max_tokens', request.max_tokens) or self.DEFAULT_MAX_TOKENS
-            top_p = model_params.get('top_p', request.top_p) or None
-            top_k = model_params.get('top_k', None)
+            temperature = (
+                model_params.get("temperature", request.temperature)
+                or self.DEFAULT_TEMPERATURE
+            )
+            max_tokens = (
+                model_params.get("max_tokens", request.max_tokens)
+                or self.DEFAULT_MAX_TOKENS
+            )
+            top_p = model_params.get("top_p", request.top_p) or None
+            top_k = model_params.get("top_k", None)
 
             chat_options = {
                 "temperature": temperature,
@@ -241,7 +291,8 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             }
 
             logger.info(
-                f"OLLAMA: Generating chat completion model={model} ctx={max_tokens} temperature={temperature} output={output_format} and {len(input_messages)} input messages")
+                f"OLLAMA: Generating chat completion model={model} ctx={max_tokens} temperature={temperature} output={output_format} and {len(input_messages)} input messages"
+            )
             model_result = self.ollama.chat(
                 model=model,
                 messages=input_messages,
@@ -254,82 +305,104 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                 # logprobs=None,
                 # top_logprobs=None,
             )
-            #print("Model Response:", model_result)
+            # print("Model Response:", model_result)
 
             # Check if the response contains a message with content and tool calls
-            message = model_result.get('message', default={})
+            message = model_result.get("message", default={})
             if not message:
                 raise Exception("No message found in the model response.")
 
             # Check the done reason to see if the model finished generating a complete response
-            done_reason = model_result.get('done_reason', 'unknown')
-            if done_reason != 'stop':
+            done_reason = model_result.get("done_reason", "unknown")
+            if done_reason != "stop":
                 logger.warning(
-                    f"Model response done reason is not 'stop', it is '{done_reason}'. This may indicate that the model did not finish generating a complete response.")
+                    f"Model response done reason is not 'stop', it is '{done_reason}'. This may indicate that the model did not finish generating a complete response."
+                )
 
             # Container for the parsed output parts from the model response
             output_parts: List[ContentPart] = []
 
             # Thinking process
-            thinking_content = message.get('thinking', None)
+            thinking_content = message.get("thinking", None)
             if thinking_content:
                 logger.debug("Thinking content found in the model response.")
                 # output_parts.append(TextContent(text=f"[Thinking]: {thinking_content}"))
 
             # TEXT contents
-            content = message.get('content')
+            content = message.get("content")
             if content:
                 logger.debug("Text Content found in the message len=%d", len(content))
                 _out_part = TextContent(text=content)
-                if output_format == 'json':
+                if output_format == "json":
                     try:
                         json_data = json.loads(content)
                         _out_part = JsonContent(data=json_data)
                     except json.JSONDecodeError:
-                        logger.warning("Failed to parse content as JSON, adding as plain text.")
+                        logger.warning(
+                            "Failed to parse content as JSON, adding as plain text."
+                        )
                 elif output_format == "auto" or output_format is None:
                     # Optimistic JSON parsing
                     # If the content looks like JSON, try to parse it
-                    if isinstance(content, str) and content.strip().startswith("{") and content.strip().endswith("}"):
-                        logger.debug("Looks like the content is JSON, trying to parse it.")
+                    if (
+                        isinstance(content, str)
+                        and content.strip().startswith("{")
+                        and content.strip().endswith("}")
+                    ):
+                        logger.debug(
+                            "Looks like the content is JSON, trying to parse it."
+                        )
                         try:
                             json_data = json.loads(content)
                             _out_part = JsonContent(data=json_data)
                         except json.JSONDecodeError:
                             logger.warning(
-                                "Content looks like JSON but failed to parse, adding as plain text.")
+                                "Content looks like JSON but failed to parse, adding as plain text."
+                            )
                 output_parts.append(_out_part)
 
             # IMAGE content
-            images = message.get('images', [])
+            images = message.get("images", [])
             if images:
                 logger.debug(f"{len(images)} image(s) found in the message.")
                 for image in images:
-                    output_parts.append(TextContent(text="[Image content not supported yet]"))
+                    output_parts.append(
+                        TextContent(text="[Image content not supported yet]")
+                    )
                     # todo output_parts.append(ImageContent(image=image))
 
             # TOOL CALLS
-            tool_calls = message.get('tool_calls', default=[])
+            tool_calls = message.get("tool_calls", default=[])
             if tool_calls:
                 logger.info(f"Tool calls found in the response: {len(tool_calls)}")
                 for tool_call in tool_calls:
-                    function = tool_call.get('function', {})
+                    function = tool_call.get("function", {})
                     if not function:
                         logger.warning("No function found in the tool call.")
                         continue
 
-                    name = function.get('name', '')
-                    arguments = function.get('arguments', {})
-                    call_id = 'xcall_' + uuid.uuid4().hex  # Reference ID for this function call
-                    output_parts.append(ToolCallContent(name=name, arguments=arguments, call_id=call_id))
-                    logger.debug(f"Tool call requested: {name} with arguments {arguments} and call_id {call_id}")
+                    name = function.get("name", "")
+                    arguments = function.get("arguments", {})
+                    call_id = (
+                        "xcall_" + uuid.uuid4().hex
+                    )  # Reference ID for this function call
+                    output_parts.append(
+                        ToolCallContent(name=name, arguments=arguments, call_id=call_id)
+                    )
+                    logger.debug(
+                        f"Tool call requested: {name} with arguments {arguments} and call_id {call_id}"
+                    )
 
             # Usage and performance metrics
             usage = _usage_from_result(model_result)
             logger.info(
-                f"Tokens used in this chat completion: {usage.total_tokens}, processing time: {usage.total_duration} ms")
+                f"Tokens used in this chat completion: {usage.total_tokens}, processing time: {usage.total_duration} ms"
+            )
 
-            logger.debug("OLLAMA: Chat completion generated with %d output parts", len(output_parts))
+            logger.debug(
+                "OLLAMA: Chat completion generated with %d output parts",
+                len(output_parts),
+            )
             # todo remove prompt from response
             response = ChatCompletionResponse(
                 id=uuid.uuid4().hex,
@@ -408,16 +481,18 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
         :return:
         """
         # print("OLLAMA COMPLETION", prompt, kwargs)
-        model = kwargs.get('model', self.DEFAULT_MODEL)
-        system = kwargs.get('system', None)
-        output_format = kwargs.get('output_format', None)
-        stream = kwargs.get('stream', False)
-        temperature = kwargs.get('temperature', self.DEFAULT_TEMPERATURE)
-        max_tokens = kwargs.get('max_tokens', self.DEFAULT_MAX_TOKENS)
-        top_k = kwargs.get('top_k', self.DEFAULT_TOP_K)
-        top_p = kwargs.get('top_p', self.DEFAULT_TOP_P)
+        model = kwargs.get("model", self.DEFAULT_MODEL)
+        system = kwargs.get("system", None)
+        output_format = kwargs.get("output_format", None)
+        stream = kwargs.get("stream", False)
+        temperature = kwargs.get("temperature", self.DEFAULT_TEMPERATURE)
+        max_tokens = kwargs.get("max_tokens", self.DEFAULT_MAX_TOKENS)
+        top_k = kwargs.get("top_k", self.DEFAULT_TOP_K)
+        top_p = kwargs.get("top_p", self.DEFAULT_TOP_P)
 
-        print(f"OLLAMA: Generating completion with model: {model}, system: {system}, prompt: {prompt}")
+        print(
+            f"OLLAMA: Generating completion with model: {model}, system: {system}, prompt: {prompt}"
+        )
         try:
             model_result = self.ollama.generate(
                 model=model,
@@ -434,10 +509,10 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
                     # todo "repeat_penalty": repeat_penalty # OpenAI = frequency_penalty + presence_penalty
                     # todo "stop": stop, # Stop sequences to end the generation. Same as OpenAI API
                     # todo "seed": seed, # Random seed for reproducibility. OpenAI added seed in 2024 (Beta)
-                }
+                },
             )
 
-            response_text = model_result.get('response', 'No response generated.')
+            response_text = model_result.get("response", "No response generated.")
             response = CompletionResponse(
                 id=uuid.uuid4().hex,
                 timestamp=int(time.time()),
@@ -474,7 +549,7 @@ def model_messages_to_ollama_format(messages: List[ModelMessage]) -> List[dict]:
             content = message.content
             if not role or content is None:
                 logger.warning("Invalid message format, missing 'role' or 'content'")
-                #print(message)
+                # print(message)
                 continue
 
             for content_item in content:
@@ -482,39 +557,41 @@ def model_messages_to_ollama_format(messages: List[ModelMessage]) -> List[dict]:
                 if isinstance(content_item, TextContent):
                     # print(f"Adding message with role {role} and text content: {content_item.text}")
                     _message = {
-                        'role': role,
-                        'content': content_item.text,
+                        "role": role,
+                        "content": content_item.text,
                     }
                 elif isinstance(content_item, JsonContent):
-                   # print(f"Adding message with role {role} and JSON content: {content_item.data}")
-                   _message = {
-                       'role': role,
-                       'content': json.dumps(content_item.data),
-                   }
+                    # print(f"Adding message with role {role} and JSON content: {content_item.data}")
+                    _message = {
+                        "role": role,
+                        "content": json.dumps(content_item.data),
+                    }
                 elif isinstance(content_item, ToolCallContent):
                     # print(f"Adding message with role {role} and tool call content: {content_item.name} with arguments {content_item.arguments}")
                     _message = {
-                        'role': 'tool',
-                        'tool_calls': [{
-                            'function': {
-                                'name': content_item.name,
-                                'arguments': content_item.arguments,
-                            },
-                        }],
-                        'content': f"Tool call: {content_item.name} with arguments {content_item.arguments}",
+                        "role": "tool",
+                        "tool_calls": [
+                            {
+                                "function": {
+                                    "name": content_item.name,
+                                    "arguments": content_item.arguments,
+                                },
+                            }
+                        ],
+                        "content": f"Tool call: {content_item.name} with arguments {content_item.arguments}",
                     }
                 elif isinstance(content_item, ToolCallResultContent):
                     # print(f"Adding message with role {role} and tool call result content: {content_item.result}")
                     _message = {
-                        'role': 'tool',
-                        'tool_name': content_item.name,
-                        'content': f"Tool call result: {str(content_item.result)}",
+                        "role": "tool",
+                        "tool_name": content_item.name,
+                        "content": f"Tool call result: {str(content_item.result)}",
                     }
                 else:
                     logger.warning(f"Unknown content type: {content_item.type}")
                     _message = {
-                        'role': role,
-                        'content': f"[{content_item.type}] {content_item.to_text()}",
+                        "role": role,
+                        "content": f"[{content_item.type}] {content_item.to_text()}",
                     }
 
                 if _message is not None:
@@ -543,21 +620,21 @@ def map_openai_tool_to_ollama(tool: dict) -> dict:
         }
     }
     """
-    #if 'type' not in tool:
+    # if 'type' not in tool:
     #    raise ValueError("Tool definition must include a 'type' field.")
-    #if tool['type'] != 'function':
+    # if tool['type'] != 'function':
     #    raise ValueError("Ollama only supports function type tools.")
 
-    if 'name' not in tool:
+    if "name" not in tool:
         raise ValueError("Tool definition must include a 'name' field.")
 
     return {
-        'type': 'function',
-        'function': {
-            'name': tool['name'],
-            'description': tool.get('description', ''),
-            'parameters': tool.get('parameters', {}),
-        }
+        "type": "function",
+        "function": {
+            "name": tool["name"],
+            "description": tool.get("description", ""),
+            "parameters": tool.get("parameters", {}),
+        },
     }
 
 

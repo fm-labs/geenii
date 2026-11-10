@@ -8,7 +8,9 @@ import textwrap
 import stat
 
 
-def open_terminal(command: str | None = None, keep_open: bool = True, cwd: str | None = None):
+def open_terminal(
+    command: str | None = None, keep_open: bool = True, cwd: str | None = None
+):
     """Open a new terminal window, optionally running `command` in it."""
     cwd = cwd or os.getcwd()
 
@@ -21,11 +23,15 @@ def open_terminal(command: str | None = None, keep_open: bool = True, cwd: str |
             script += "\nexit"
         # Escape for an AppleScript string literal
         as_str = script.replace("\\", "\\\\").replace('"', '\\"')
-        subprocess.Popen([
-            "osascript",
-            "-e", f'tell application "Terminal" to do script "{as_str}"',
-            "-e", 'tell application "Terminal" to activate',
-        ])
+        subprocess.Popen(
+            [
+                "osascript",
+                "-e",
+                f'tell application "Terminal" to do script "{as_str}"',
+                "-e",
+                'tell application "Terminal" to activate',
+            ]
+        )
         return
 
     # ---------------- Windows ----------------
@@ -46,7 +52,7 @@ def open_terminal(command: str | None = None, keep_open: bool = True, cwd: str |
     # (name, how to pass the command)
     candidates = [
         (os.environ.get("TERMINAL"), ["-e"]),
-        ("x-terminal-emulator", ["-e"]),   # Debian/Ubuntu "default terminal"
+        ("x-terminal-emulator", ["-e"]),  # Debian/Ubuntu "default terminal"
         ("gnome-terminal", ["--"]),
         ("konsole", ["-e"]),
         ("xfce4-terminal", ["-x"]),
@@ -63,6 +69,7 @@ def open_terminal(command: str | None = None, keep_open: bool = True, cwd: str |
             print(f"Started {term} with PID {pid}")
             return
     raise RuntimeError("No terminal emulator found")
+
 
 def open_terminal_script(script: str, keep_open=True, cwd=None):
     script = textwrap.dedent(script).strip() + "\n"

@@ -6,8 +6,20 @@ import uuid
 from typing import List
 
 from geenii import config
-from geenii.chat_models import TextContent, ToolCallContent, ContentPart, ToolCallResultContent, JsonContent
-from geenii.datamodels import ChatCompletionResponse, ChatCompletionRequest, AIModelInfo, ModelMessage, Usage
+from geenii.chat_models import (
+    TextContent,
+    ToolCallContent,
+    ContentPart,
+    ToolCallResultContent,
+    JsonContent,
+)
+from geenii.datamodels import (
+    ChatCompletionResponse,
+    ChatCompletionRequest,
+    AIModelInfo,
+    ModelMessage,
+    Usage,
+)
 from geenii.provider.interfaces import AIProvider, AIChatCompletionProvider
 
 logger = logging.getLogger(__name__)
@@ -28,6 +40,7 @@ def _usage_from_result(model_result) -> Usage:
         cache_creation_input_tokens=cache_creation,
         cache_read_input_tokens=cache_read,
     )
+
 
 KNOWN_MODELS = [
     "claude-fable-5",
@@ -51,7 +64,9 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
     @property
     def client(self) -> anthropic.Anthropic:
         if self._client is None:
-            logger.info(f"Initializing AnthropicAIProvider with api key {config.ANTHROPIC_API_KEY[0:16]}..{config.ANTHROPIC_API_KEY[-4:]}")
+            logger.info(
+                f"Initializing AnthropicAIProvider with api key {config.ANTHROPIC_API_KEY[0:16]}..{config.ANTHROPIC_API_KEY[-4:]}"
+            )
             self._client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
         return self._client
 
@@ -64,20 +79,24 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
     def get_models(self) -> list[AIModelInfo]:
         models = []
         for model_name in KNOWN_MODELS:
-            models.append(AIModelInfo(
-                provider=self.name,
-                name=model_name,
-                locality="cloud",
-                description=f"Anthropic model {model_name}",
-                capabilities=["chat_completion", "tool_calling"],
-                installed=True,
-            ))
+            models.append(
+                AIModelInfo(
+                    provider=self.name,
+                    name=model_name,
+                    locality="cloud",
+                    description=f"Anthropic model {model_name}",
+                    capabilities=["chat_completion", "tool_calling"],
+                    installed=True,
+                )
+            )
         return models
 
-    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry=None) -> ChatCompletionResponse:
+    def generate_chat_completion(
+        self, request: ChatCompletionRequest, tool_registry=None
+    ) -> ChatCompletionResponse:
         model = request.model or self.DEFAULT_MODEL
         if model.startswith("anthropic:"):
-            model = model[len("anthropic:"):]
+            model = model[len("anthropic:") :]
 
         # TOOLS
         tools = request.tools or set()
@@ -98,7 +117,9 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
         if request.prompt:
             input_messages.append({"role": "user", "content": request.prompt})
         elif not input_messages:
-            raise ValueError("At least a prompt or some messages must be provided for chat completion.")
+            raise ValueError(
+                "At least a prompt or some messages must be provided for chat completion."
+            )
 
         # OUTPUT
         output_format = request.output_format
@@ -117,13 +138,20 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
             }
             output_config["format"] = {"schema": output_schema, "type": "json_schema"}
 
-
         model_params = request.model_parameters or {}
-        temperature = model_params.get("temperature", request.temperature) or self.DEFAULT_TEMPERATURE
-        max_tokens = model_params.get("max_tokens", request.max_tokens) or self.DEFAULT_MAX_TOKENS
+        temperature = (
+            model_params.get("temperature", request.temperature)
+            or self.DEFAULT_TEMPERATURE
+        )
+        max_tokens = (
+            model_params.get("max_tokens", request.max_tokens)
+            or self.DEFAULT_MAX_TOKENS
+        )
 
         try:
-            logger.info(f"ANTHROPIC: Generating chat completion model={model} with {len(input_messages)} input messages")
+            logger.info(
+                f"ANTHROPIC: Generating chat completion model={model} with {len(input_messages)} input messages"
+            )
 
             create_kwargs = dict(
                 model=model,
@@ -151,9 +179,15 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
                         try:
                             _out_part = JsonContent(data=json.loads(text))
                         except json.JSONDecodeError:
-                            logger.warning("Failed to parse content as JSON, adding as plain text.")
+                            logger.warning(
+                                "Failed to parse content as JSON, adding as plain text."
+                            )
                     elif output_format is None or output_format == "auto":
-                        if isinstance(text, str) and text.strip().startswith("{") and text.strip().endswith("}"):
+                        if (
+                            isinstance(text, str)
+                            and text.strip().startswith("{")
+                            and text.strip().endswith("}")
+                        ):
                             try:
                                 _out_part = JsonContent(data=json.loads(text))
                             except json.JSONDecodeError:
@@ -161,16 +195,22 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
                     output_parts.append(_out_part)
 
                 elif block.type == "tool_use":
-                    output_parts.append(ToolCallContent(
-                        name=block.name,
-                        arguments=block.input or {},
-                        call_id=block.id,
-                    ))
-                    logger.info(f"Tool call requested: {block.name} with call_id {block.id}")
+                    output_parts.append(
+                        ToolCallContent(
+                            name=block.name,
+                            arguments=block.input or {},
+                            call_id=block.id,
+                        )
+                    )
+                    logger.info(
+                        f"Tool call requested: {block.name} with call_id {block.id}"
+                    )
 
             usage = _usage_from_result(model_result)
-            logger.info(f"Tokens used: {usage.total_tokens} (cache write: {usage.cache_creation_input_tokens}, "
-                        f"cache read: {usage.cache_read_input_tokens})")
+            logger.info(
+                f"Tokens used: {usage.total_tokens} (cache write: {usage.cache_creation_input_tokens}, "
+                f"cache read: {usage.cache_read_input_tokens})"
+            )
 
             response = ChatCompletionResponse(
                 id=model_result.id,
@@ -205,7 +245,9 @@ def _to_anthropic_tool(tool_def: dict) -> dict:
     return {
         "name": tool_def["name"],
         "description": tool_def.get("description", ""),
-        "input_schema": tool_def.get("parameters", {"type": "object", "properties": {}}),
+        "input_schema": tool_def.get(
+            "parameters", {"type": "object", "properties": {}}
+        ),
     }
 
 
@@ -218,39 +260,56 @@ def _model_messages_to_anthropic_format(messages: List[ModelMessage]) -> List[di
 
         for content_item in message.content:
             if isinstance(content_item, TextContent):
-                anthropic_messages.append({
-                    "role": role,
-                    "content": content_item.text,
-                })
+                anthropic_messages.append(
+                    {
+                        "role": role,
+                        "content": content_item.text,
+                    }
+                )
             elif isinstance(content_item, JsonContent):
-                anthropic_messages.append({
-                    "role": role,
-                    "content": json.dumps(content_item.data),
-                })
+                anthropic_messages.append(
+                    {
+                        "role": role,
+                        "content": json.dumps(content_item.data),
+                    }
+                )
             elif isinstance(content_item, ToolCallContent):
-                anthropic_messages.append({
-                    "role": "assistant",
-                    "content": [{
-                        "type": "tool_use",
-                        "id": content_item.call_id or ("call_" + uuid.uuid4().hex),
-                        "name": content_item.name,
-                        "input": content_item.arguments or {},
-                    }],
-                })
+                anthropic_messages.append(
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "id": content_item.call_id
+                                or ("call_" + uuid.uuid4().hex),
+                                "name": content_item.name,
+                                "input": content_item.arguments or {},
+                            }
+                        ],
+                    }
+                )
             elif isinstance(content_item, ToolCallResultContent):
-                anthropic_messages.append({
-                    "role": "user",
-                    "content": [{
-                        "type": "tool_result",
-                        "tool_use_id": content_item.call_id or "",
-                        "content": str(content_item.result) if content_item.result is not None else "",
-                    }],
-                })
+                anthropic_messages.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": content_item.call_id or "",
+                                "content": str(content_item.result)
+                                if content_item.result is not None
+                                else "",
+                            }
+                        ],
+                    }
+                )
             else:
-                anthropic_messages.append({
-                    "role": role,
-                    "content": content_item.to_text(),
-                })
+                anthropic_messages.append(
+                    {
+                        "role": role,
+                        "content": content_item.to_text(),
+                    }
+                )
     return anthropic_messages
 
 

@@ -13,7 +13,11 @@ from geenii.datamodels import (
     CompletionResponse,
     Usage,
 )
-from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider
+from geenii.provider.interfaces import (
+    AIProvider,
+    AICompletionProvider,
+    AIChatCompletionProvider,
+)
 
 
 class FakeProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
@@ -49,15 +53,19 @@ class FakeProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
         """Queue a response with arbitrary content parts."""
         self._responses.append(parts)
 
-    def enqueue_tool_call(self, name: str, arguments: dict | None = None, call_id: str | None = None) -> None:
+    def enqueue_tool_call(
+        self, name: str, arguments: dict | None = None, call_id: str | None = None
+    ) -> None:
         """Queue a response that requests a tool call."""
-        self._responses.append([
-            ToolCallContent(
-                name=name,
-                arguments=arguments or {},
-                call_id=call_id or ("fake_call_" + uuid.uuid4().hex[:8]),
-            )
-        ])
+        self._responses.append(
+            [
+                ToolCallContent(
+                    name=name,
+                    arguments=arguments or {},
+                    call_id=call_id or ("fake_call_" + uuid.uuid4().hex[:8]),
+                )
+            ]
+        )
 
     def reset(self) -> None:
         """Clear queued responses and recorded requests."""
@@ -83,7 +91,11 @@ class FakeProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
         ]
 
     def generate_completion(self, prompt: str, **kwargs) -> CompletionResponse:
-        text = self._responses.popleft()[0].text if self._responses else self.default_response
+        text = (
+            self._responses.popleft()[0].text
+            if self._responses
+            else self.default_response
+        )
         return CompletionResponse(
             id=uuid.uuid4().hex,
             timestamp=int(time.time()),
@@ -94,7 +106,9 @@ class FakeProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
             usage=Usage(input_tokens=10, output_tokens=20),
         )
 
-    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry=None) -> ChatCompletionResponse:
+    def generate_chat_completion(
+        self, request: ChatCompletionRequest, tool_registry=None
+    ) -> ChatCompletionResponse:
         self.requests.append(request)
 
         if self._responses:

@@ -11,6 +11,7 @@ Method names:
 The pm.* methods are also registered without the prefix (start, status, ...)
 for clients of the former standalone process manager service.
 """
+
 from __future__ import annotations
 
 import logging
@@ -46,9 +47,13 @@ class ProcessHost:
         self.scheduler.pm = self.pm
         self.supervisor = supervisor or Supervisor()
         # The file scheduler.reload re-reads (the one the scheduler was loaded from)
-        self.scheduler_config = os.path.abspath(scheduler_config) if scheduler_config else None
+        self.scheduler_config = (
+            os.path.abspath(scheduler_config) if scheduler_config else None
+        )
         # The services file applied at start() and by supervisor.reload
-        self.services_config = os.path.abspath(services_config) if services_config else None
+        self.services_config = (
+            os.path.abspath(services_config) if services_config else None
+        )
         self._methods: Dict[str, RpcMethod] = {
             "pm.start": self._pm_start,
             "pm.status": self._pm_status,
@@ -79,13 +84,20 @@ class ProcessHost:
         self.pm.recover()
         if self.services_config and os.path.isfile(self.services_config):
             try:
-                await self.supervisor.apply_services(read_services(self.services_config))
+                await self.supervisor.apply_services(
+                    read_services(self.services_config)
+                )
             except Exception:
                 # A broken services file must not keep the daemon from starting
-                logger.exception("Could not apply services config %s", self.services_config)
+                logger.exception(
+                    "Could not apply services config %s", self.services_config
+                )
         await self.scheduler.start()
-        logger.info("Process host started (%d scheduled task(s), %d service(s))",
-                    len(self.scheduler.tasks), len(self.supervisor.status()["desired"]))
+        logger.info(
+            "Process host started (%d scheduled task(s), %d service(s))",
+            len(self.scheduler.tasks),
+            len(self.supervisor.status()["desired"]),
+        )
 
     async def stop(self) -> None:
         """Stop scheduling first, then supervised processes, then on-demand processes."""
@@ -137,13 +149,19 @@ class ProcessHost:
         )
 
     async def _pm_wait(self, params: dict) -> dict:
-        return (await self.pm.wait(params["process_id"], timeout=params.get("timeout"))).to_dict()
+        return (
+            await self.pm.wait(params["process_id"], timeout=params.get("timeout"))
+        ).to_dict()
 
     async def _pm_kill(self, params: dict) -> dict:
-        return (await self.pm.kill(params["process_id"], force=params.get("force", False))).to_dict()
+        return (
+            await self.pm.kill(params["process_id"], force=params.get("force", False))
+        ).to_dict()
 
     async def _pm_list(self, params: dict) -> list[dict]:
-        procs = await self.pm.list(include_finished=params.get("include_finished", False))
+        procs = await self.pm.list(
+            include_finished=params.get("include_finished", False)
+        )
         return [p.to_dict() for p in procs]
 
     async def _pm_cleanup(self, params: dict) -> str:
@@ -178,21 +196,30 @@ class ProcessHost:
 
     async def _supervisor_ensure(self, params: dict) -> str:
         cmd = params.get("cmd")
-        if not isinstance(cmd, list) or not cmd or not all(isinstance(a, str) for a in cmd):
+        if (
+            not isinstance(cmd, list)
+            or not cmd
+            or not all(isinstance(a, str) for a in cmd)
+        ):
             raise ValueError("'cmd' must be a non-empty list of strings")
         name = params["name"]
-        await self.supervisor.ensure(name, ProcConfig(
-            name=name,
-            cmd=cmd,
-            restart=params.get("restart", True),
-            env=params.get("env"),
-            cwd=params.get("cwd"),
-            capture_output=params.get("capture_output", True),
-        ))
+        await self.supervisor.ensure(
+            name,
+            ProcConfig(
+                name=name,
+                cmd=cmd,
+                restart=params.get("restart", True),
+                env=params.get("env"),
+                cwd=params.get("cwd"),
+                capture_output=params.get("capture_output", True),
+            ),
+        )
         return "ok"
 
     async def _supervisor_stop(self, params: dict) -> str:
-        await self.supervisor.stop_process(params["name"], disable_restart=params.get("disable_restart", True))
+        await self.supervisor.stop_process(
+            params["name"], disable_restart=params.get("disable_restart", True)
+        )
         return "ok"
 
     async def _supervisor_restart(self, params: dict) -> str:
@@ -203,7 +230,9 @@ class ProcessHost:
         if not self.services_config:
             raise RuntimeError("The daemon was started without a services config file")
         if not os.path.isfile(self.services_config):
-            raise FileNotFoundError(f"Services config {self.services_config} does not exist")
+            raise FileNotFoundError(
+                f"Services config {self.services_config} does not exist"
+            )
         return await self.supervisor.apply_services(read_services(self.services_config))
 
     async def _supervisor_logs(self, params: dict) -> list[str]:

@@ -17,8 +17,8 @@ from geenii import config
 
 logger = logging.getLogger(__name__)
 
-class CacheStore(abc.ABC):
 
+class CacheStore(abc.ABC):
     @abc.abstractmethod
     def write_cache(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
         pass
@@ -42,14 +42,16 @@ class SqliteCacheStore(CacheStore):
         self,
         db_path: str,
         *,
-        timeout: float = 5.0,          # sqlite3 connect timeout (seconds)
-        busy_timeout_ms: int = 5000,    # PRAGMA busy_timeout (milliseconds)
+        timeout: float = 5.0,  # sqlite3 connect timeout (seconds)
+        busy_timeout_ms: int = 5000,  # PRAGMA busy_timeout (milliseconds)
         wal: bool = True,
-        synchronous: str = "NORMAL",    # FULL | NORMAL | OFF
+        synchronous: str = "NORMAL",  # FULL | NORMAL | OFF
         cache_size_kib: int = -64_000,  # negative => KiB. e.g. -64000 ~= 64MiB
         mmap_size_bytes: int = 128 * 1024 * 1024,  # 128MiB
     ):
-        logger.debug(f"Initializing SqliteCacheStore with db_path={db_path}, timeout={timeout}, busy_timeout_ms={busy_timeout_ms}, wal={wal}, synchronous={synchronous}, cache_size_kib={cache_size_kib}, mmap_size_bytes={mmap_size_bytes}")
+        logger.debug(
+            f"Initializing SqliteCacheStore with db_path={db_path}, timeout={timeout}, busy_timeout_ms={busy_timeout_ms}, wal={wal}, synchronous={synchronous}, cache_size_kib={cache_size_kib}, mmap_size_bytes={mmap_size_bytes}"
+        )
         self.conn = sqlite3.connect(
             db_path,
             timeout=timeout,
@@ -69,7 +71,9 @@ class SqliteCacheStore(CacheStore):
         self.conn.execute("PRAGMA temp_store=MEMORY;")
         self.conn.execute(f"PRAGMA cache_size={int(cache_size_kib)};")
         self.conn.execute(f"PRAGMA mmap_size={int(mmap_size_bytes)};")
-        self.conn.execute("PRAGMA foreign_keys=ON;")  # not required here, but sane default
+        self.conn.execute(
+            "PRAGMA foreign_keys=ON;"
+        )  # not required here, but sane default
 
         # Optionally helpful in WAL mode; avoids reader blocks on schema changes
         self.conn.execute("PRAGMA recursive_triggers=OFF;")
@@ -82,7 +86,9 @@ class SqliteCacheStore(CacheStore):
                 value BLOB NOT NULL
             )
         """)
-        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_cache_expiry ON cache(expiry)")
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cache_expiry ON cache(expiry)"
+        )
 
     # ---- Internal helper: retry on transient locks ----
 
@@ -95,7 +101,7 @@ class SqliteCacheStore(CacheStore):
                 if "locked" in msg or "busy" in msg:
                     if i == retries:
                         raise
-                    time.sleep(base_sleep * (2 ** i))
+                    time.sleep(base_sleep * (2**i))
                     continue
                 raise
 
@@ -169,7 +175,6 @@ class SqliteCacheStore(CacheStore):
         self.conn.close()
 
 
-
 class FileCacheStore(CacheStore):
     def __init__(self, directory: str):
         self.dir = Path(directory)
@@ -237,10 +242,15 @@ class InMemoryCacheStore(CacheStore):
 
 
 def default_cache_key(func, args, kwargs):
-    raw = {"func": f"{func.__module__}.{func.__qualname__}", "args": args, "kwargs": kwargs}
+    raw = {
+        "func": f"{func.__module__}.{func.__qualname__}",
+        "args": args,
+        "kwargs": kwargs,
+    }
     logger.debug(">>> Generating cache key for: %s", raw)
     s = json.dumps(raw, sort_keys=True, default=str)
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
 
 def default_cache_store():
     try:
@@ -248,16 +258,21 @@ def default_cache_store():
         return SqliteCacheStore(f"{config.GEENII_CACHE_DIR}/cache.sqlite")
     except Exception as e:
         logger.debug(f"Error initializing SqliteCacheStore: {e}")
-        logger.debug("Falling back to InMemoryCacheStore (non-persistent, not shared across processes)")
+        logger.debug(
+            "Falling back to InMemoryCacheStore (non-persistent, not shared across processes)"
+        )
         return InMemoryCacheStore()
 
+
 CACHE_STORE: CacheStore | None = None
+
 
 def cache_store():
     global CACHE_STORE
     if CACHE_STORE is None:
         CACHE_STORE = default_cache_store()
     return CACHE_STORE
+
 
 def _cache_read(func_name: str, key: str) -> tuple[bool, Any]:
     if config.GEENII_CACHE_DISABLED:
@@ -276,19 +291,23 @@ def _cache_write(func_name: str, key: str, result: Any, ttl: float | None) -> No
     cache_store().write_cache(key, result, ttl=ttl)
 
 
-async def acache_fn(func: Callable, key, ttl, cache_if: Callable[[Any], bool] | None = None) -> Any:
+async def acache_fn(
+    func: Callable, key, ttl, cache_if: Callable[[Any], bool] | None = None
+) -> Any:
     hit, v = _cache_read(func.__name__, key)
-    #hit, v = asyncio.to_thread(_cache_read(func.__name__, key))
+    # hit, v = asyncio.to_thread(_cache_read(func.__name__, key))
     if hit:
         return v
     result = await func()
     if cache_if is None or cache_if(result):
         _cache_write(func.__name__, key, result, ttl)
-    #hit, v = asyncio.to_thread(_cache_write(func.__name__, key, result, ttl))
+    # hit, v = asyncio.to_thread(_cache_write(func.__name__, key, result, ttl))
     return result
 
 
-def cache_fn(func: Callable, key, ttl, cache_if: Callable[[Any], bool] | None = None) -> Any:
+def cache_fn(
+    func: Callable, key, ttl, cache_if: Callable[[Any], bool] | None = None
+) -> Any:
     hit, v = _cache_read(func.__name__, key)
     if hit:
         return v
@@ -301,14 +320,17 @@ def cache_fn(func: Callable, key, ttl, cache_if: Callable[[Any], bool] | None = 
 def cache_write(key, data, ttl: Optional[int] = None):
     cache_store().write_cache(key, data, ttl=ttl)
 
+
 def cache_read(key) -> Any:
     return cache_store().read_cache(key)
+
 
 def cached(ttl=None, cachekey=None, cache_if: Callable[[Any], bool] | None = None):
     """Memoize a sync or async function in the cache store.
 
     :param cache_if: optional predicate on the result; the result is only stored if it returns True.
     """
+
     def decorator(func):
         is_async = inspect.iscoroutinefunction(func)
 
@@ -320,10 +342,14 @@ def cached(ttl=None, cachekey=None, cache_if: Callable[[Any], bool] | None = Non
             return default_cache_key(func, args, kwargs)
 
         if is_async:
+
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
                 key = make_key(args, kwargs)
-                return await acache_fn(lambda: func(*args, **kwargs), key, ttl, cache_if)
+                return await acache_fn(
+                    lambda: func(*args, **kwargs), key, ttl, cache_if
+                )
+
             async_wrapper.__wrapped__ = func
             return async_wrapper
 
@@ -331,6 +357,7 @@ def cached(ttl=None, cachekey=None, cache_if: Callable[[Any], bool] | None = Non
         def sync_wrapper(*args, **kwargs):
             key = make_key(args, kwargs)
             return cache_fn(lambda: func(*args, **kwargs), key, ttl, cache_if)
+
         sync_wrapper.__wrapped__ = func
         return sync_wrapper
 

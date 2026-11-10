@@ -1,4 +1,3 @@
-
 from openai import OpenAI
 
 from geenii.datamodels import AudioSpeechGenerationApiResponse
@@ -6,7 +5,6 @@ from geenii.provider.interfaces import AISpeechGeneratorProvider
 
 
 class KokoroProvider(AISpeechGeneratorProvider):
-
     def __init__(self, **kwargs):
         super().__init__(name="openai")
         self._client = None
@@ -17,7 +15,9 @@ class KokoroProvider(AISpeechGeneratorProvider):
             return OpenAI(api_key="no-key", base_url="http://localhost:33300/api/v1")
         return self._client
 
-    def generate_speech(self, model: str, text: str, **kwargs) -> AudioSpeechGenerationApiResponse:
+    def generate_speech(
+        self, model: str, text: str, **kwargs
+    ) -> AudioSpeechGenerationApiResponse:
         _response = self.client.audio.speech.create(
             model="model_q8f16",
             voice="af_heart",

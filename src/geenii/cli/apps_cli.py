@@ -6,7 +6,12 @@ import time
 import click
 
 from geenii.apps import AppRegistry, read_manifest, write_manifest, infer_manifest
-from geenii.cli.click_helper import click_success, click_error, click_info, click_warning
+from geenii.cli.click_helper import (
+    click_success,
+    click_error,
+    click_info,
+    click_warning,
+)
 from geenii.config import apps_dirs
 
 
@@ -37,7 +42,13 @@ def apps():
 
 @apps.command(name="list")
 @click.option("--status", "-s", is_flag=True, help="Show runtime status for each app.")
-@click.option("--dir", "extra_dir", default=None, type=click.Path(exists=True), help="Additional apps directory.")
+@click.option(
+    "--dir",
+    "extra_dir",
+    default=None,
+    type=click.Path(exists=True),
+    help="Additional apps directory.",
+)
 def list_apps(status, extra_dir):
     """List all registered apps."""
     registry = _init_app_registry(extra_dir)
@@ -59,7 +70,13 @@ def list_apps(status, extra_dir):
 
 @apps.command(name="info")
 @click.argument("name")
-@click.option("--dir", "extra_dir", default=None, type=click.Path(exists=True), help="Additional apps directory.")
+@click.option(
+    "--dir",
+    "extra_dir",
+    default=None,
+    type=click.Path(exists=True),
+    help="Additional apps directory.",
+)
 def info_app(name, extra_dir):
     """Show details for a specific app."""
     registry = _init_app_registry(extra_dir)
@@ -77,7 +94,13 @@ def info_app(name, extra_dir):
 @apps.command(name="start")
 @click.argument("name")
 @click.option("--port", "-p", type=int, default=None, help="Port to serve on.")
-@click.option("--dir", "extra_dir", default=None, type=click.Path(exists=True), help="Additional apps directory.")
+@click.option(
+    "--dir",
+    "extra_dir",
+    default=None,
+    type=click.Path(exists=True),
+    help="Additional apps directory.",
+)
 def start_app(name, port, extra_dir):
     """Start an app."""
     registry = _init_app_registry(extra_dir)
@@ -108,7 +131,13 @@ def start_app(name, port, extra_dir):
 
 @apps.command(name="stop")
 @click.argument("name")
-@click.option("--dir", "extra_dir", default=None, type=click.Path(exists=True), help="Additional apps directory.")
+@click.option(
+    "--dir",
+    "extra_dir",
+    default=None,
+    type=click.Path(exists=True),
+    help="Additional apps directory.",
+)
 def stop_app(name, extra_dir):
     """Stop a running app."""
     registry = _init_app_registry(extra_dir)
@@ -126,11 +155,23 @@ def stop_app(name, extra_dir):
 
 @apps.command(name="init")
 @click.argument("name")
-@click.option("--type", "-t", "app_type", type=click.Choice(["webapp", "node", "binary"]), default=None,
-              help="App type. Auto-detected if omitted.")
+@click.option(
+    "--type",
+    "-t",
+    "app_type",
+    type=click.Choice(["webapp", "node", "binary"]),
+    default=None,
+    help="App type. Auto-detected if omitted.",
+)
 @click.option("--title", default=None, help="Human-readable title.")
 @click.option("--description", default=None, help="Short description.")
-@click.option("--dir", "extra_dir", default=None, type=click.Path(exists=True), help="Additional apps directory.")
+@click.option(
+    "--dir",
+    "extra_dir",
+    default=None,
+    type=click.Path(exists=True),
+    help="Additional apps directory.",
+)
 def init_app(name, app_type, title, description, extra_dir):
     """Generate a manifest.json for an app directory."""
     apps_dir = _resolve_apps_dir(name)
@@ -152,6 +193,7 @@ def init_app(name, app_type, title, description, extra_dir):
     manifest = infer_manifest(app_dir, name)
     if app_type:
         from geenii.apps import AppType
+
         manifest.type = AppType(app_type)
     if title:
         manifest.title = title
@@ -164,9 +206,16 @@ def init_app(name, app_type, title, description, extra_dir):
 
 
 @apps.command(name="init-all")
-@click.option("--overwrite", is_flag=True, default=False, help="Overwrite existing manifests.")
-@click.option("--dir", "apps_dir", default=None, type=click.Path(exists=True),
-              help="Apps directory to scan. Defaults to all known apps paths.")
+@click.option(
+    "--overwrite", is_flag=True, default=False, help="Overwrite existing manifests."
+)
+@click.option(
+    "--dir",
+    "apps_dir",
+    default=None,
+    type=click.Path(exists=True),
+    help="Apps directory to scan. Defaults to all known apps paths.",
+)
 def init_all_apps(overwrite, apps_dir):
     """Generate manifest.json for all apps that lack one."""
     dirs = [apps_dir] if apps_dir else [d for d in apps_dirs() if os.path.isdir(d)]

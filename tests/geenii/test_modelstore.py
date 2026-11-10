@@ -4,7 +4,11 @@ import uuid
 import pytest
 import pydantic
 
-from geenii.utils.modelstore import InMemoryModelStore, SerializedInMemoryModelStore, ModelStore
+from geenii.utils.modelstore import (
+    InMemoryModelStore,
+    SerializedInMemoryModelStore,
+    ModelStore,
+)
 
 
 class MyModel(pydantic.BaseModel):
@@ -13,7 +17,6 @@ class MyModel(pydantic.BaseModel):
 
 
 class TestModelStore(abc.ABC):
-
     @abc.abstractmethod
     def get_store(self) -> ModelStore:
         pass
@@ -36,7 +39,7 @@ class TestModelStore(abc.ABC):
 
         created = store.create(m)
 
-        #assert created is m
+        # assert created is m
         assert created.id is not None
         # keys are uuid strings (hex)
         assert isinstance(created.id, str)
@@ -116,16 +119,11 @@ class TestModelStore(abc.ABC):
         int(k, 16)  # should be valid hex
 
 
-
 class TestInMemoryModelStore(TestModelStore):
-
     def get_store(self) -> ModelStore:
         return InMemoryModelStore(model_class=MyModel, key_field="id")
 
 
 class TestSerializedInMemoryModelStore(TestModelStore):
-
     def get_store(self) -> ModelStore:
         return SerializedInMemoryModelStore(model_class=MyModel, key_field="id")
-
-

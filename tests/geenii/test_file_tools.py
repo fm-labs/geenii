@@ -28,7 +28,9 @@ def read(ctx, file_path):
 
 
 def write(ctx, file_path, contents="data"):
-    return WriteTool().invoke(args={"file_path": file_path, "contents": contents}, ctx=ctx)
+    return WriteTool().invoke(
+        args={"file_path": file_path, "contents": contents}, ctx=ctx
+    )
 
 
 def test_names():
@@ -37,6 +39,7 @@ def test_names():
 
 
 # ---------- read ----------
+
 
 def test_read_relative_path(dirs, ctx):
     (dirs["wd"] / "a.txt").write_text("hello")
@@ -69,7 +72,9 @@ def test_read_outside_allowed_dirs_is_rejected(dirs, ctx):
     assert result.text != "secret"
 
 
-@pytest.mark.parametrize("path", ["../outside/secret.txt", "sub/../../outside/secret.txt"])
+@pytest.mark.parametrize(
+    "path", ["../outside/secret.txt", "sub/../../outside/secret.txt"]
+)
 def test_read_dotdot_escape_is_rejected(dirs, ctx, path):
     (dirs["wd"] / "sub").mkdir()
     (dirs["outside"] / "secret.txt").write_text("secret")
@@ -102,13 +107,17 @@ def test_read_in_allowed_dirs_from_user_settings(dirs, ctx, monkeypatch):
     (dirs["extra"] / "a.txt").write_text("extra")
     assert read(ctx, str(dirs["extra"] / "a.txt")).is_error is True
 
-    monkeypatch.setattr(config, "read_user_settings", lambda: {"allowed_dirs": [str(dirs["extra"])]})
+    monkeypatch.setattr(
+        config, "read_user_settings", lambda: {"allowed_dirs": [str(dirs["extra"])]}
+    )
     assert read(ctx, str(dirs["extra"] / "a.txt")).text == "extra"
 
 
 def test_allowed_dirs_that_is_not_a_list_is_ignored(dirs, ctx, monkeypatch):
     (dirs["extra"] / "a.txt").write_text("extra")
-    monkeypatch.setattr(config, "read_user_settings", lambda: {"allowed_dirs": str(dirs["extra"])})
+    monkeypatch.setattr(
+        config, "read_user_settings", lambda: {"allowed_dirs": str(dirs["extra"])}
+    )
     assert read(ctx, str(dirs["extra"] / "a.txt")).is_error is True
 
 
@@ -117,7 +126,9 @@ def test_read_missing_file_is_an_error(ctx):
     assert result.is_error is True
 
 
-@pytest.mark.parametrize("args", [{}, {"file_path": ""}, {"file_path": None}, {"file_path": 5}])
+@pytest.mark.parametrize(
+    "args", [{}, {"file_path": ""}, {"file_path": None}, {"file_path": 5}]
+)
 def test_read_invalid_file_path_is_an_error(ctx, args):
     result = ReadTool().invoke(args=args, ctx=ctx)
     assert result.is_error is True
@@ -125,6 +136,7 @@ def test_read_invalid_file_path_is_an_error(ctx, args):
 
 
 # ---------- write ----------
+
 
 def test_write_relative_path(dirs, ctx):
     result = write(ctx, "a.txt", "hello")
@@ -174,7 +186,9 @@ def test_write_through_symlinked_dir_is_rejected(dirs, ctx):
 
 
 def test_write_in_allowed_dirs_from_user_settings(dirs, ctx, monkeypatch):
-    monkeypatch.setattr(config, "read_user_settings", lambda: {"allowed_dirs": [str(dirs["extra"])]})
+    monkeypatch.setattr(
+        config, "read_user_settings", lambda: {"allowed_dirs": [str(dirs["extra"])]}
+    )
     assert write(ctx, str(dirs["extra"] / "a.txt"), "extra").is_error is False
     assert (dirs["extra"] / "a.txt").read_text() == "extra"
 
@@ -185,8 +199,15 @@ def test_write_into_missing_dir_is_an_error(dirs, ctx):
     assert not (dirs["wd"] / "missing").exists()
 
 
-@pytest.mark.parametrize("args", [{"contents": "x"}, {"file_path": "", "contents": "x"},
-                                  {"file_path": None, "contents": "x"}, {"file_path": 5, "contents": "x"}])
+@pytest.mark.parametrize(
+    "args",
+    [
+        {"contents": "x"},
+        {"file_path": "", "contents": "x"},
+        {"file_path": None, "contents": "x"},
+        {"file_path": 5, "contents": "x"},
+    ],
+)
 def test_write_invalid_file_path_is_an_error(ctx, args):
     result = WriteTool().invoke(args=args, ctx=ctx)
     assert result.is_error is True

@@ -36,11 +36,11 @@ your own are described in [Widgets](widgets.md).
 ```python
 class ModelMessage:
     type: str = "message"
-    role: str          # "user", "assistant", "system"
+    role: str  # "user", "assistant", "system"
     content: list[ContentPart]
-    id: str            # auto-generated UUID
+    id: str  # auto-generated UUID
     timestamp: datetime
-    usage: Usage | None = None   # usage of the model call that produced it
+    usage: Usage | None = None  # usage of the model call that produced it
 ```
 
 This is the canonical message format used throughout the agent runtime: in

@@ -1,13 +1,14 @@
 import json
 import os
 import sys
+
 sys.path.append("./src")
 
 from geenii.utils.toml_util import read_toml, write_toml
 
 
 def bump_version_json(file_path: str, key: str, new_version: str, extra: dict = None):
-    #import json
+    # import json
     with open(file_path, "r") as f:
         data = json.load(f)
 
@@ -19,7 +20,7 @@ def bump_version_json(file_path: str, key: str, new_version: str, extra: dict = 
 
 
 def bump_version_toml(file_path: str, key: str, new_version: str, extra: dict = None):
-    #import toml
+    # import toml
     data = read_toml(file_path)
 
     # support nested keys like "project.version"
@@ -34,8 +35,10 @@ def bump_version_toml(file_path: str, key: str, new_version: str, extra: dict = 
     write_toml(file_path, data)
 
 
-def bump_version_in_file(file_path: str, line_prefix: str, new_version: str, extra: dict = None):
-    #if not line_prefix:
+def bump_version_in_file(
+    file_path: str, line_prefix: str, new_version: str, extra: dict = None
+):
+    # if not line_prefix:
     #    print("No line prefix provided, skipping file:", file_path)
     #    return
 
@@ -45,7 +48,7 @@ def bump_version_in_file(file_path: str, line_prefix: str, new_version: str, ext
 
     if extra is not None:
         if extra.get("escape") == "true":
-            new_version = f"\"{new_version}\""
+            new_version = f'"{new_version}"'
 
     with open(file_path, "r") as f:
         lines = f.readlines()
@@ -67,6 +70,7 @@ def write_version_to_file(file_path: str, key: str, version: str, extra: dict = 
 if __name__ == "__main__":
     # first arg from command line is the new version
     import sys
+
     if len(sys.argv) != 2:
         print("Usage: python bump_version.py <new_version>")
         sys.exit(1)
@@ -76,12 +80,23 @@ if __name__ == "__main__":
 
     files = [
         ("pyproject.toml", "project.version", bump_version_toml, None),
-        ("src/geenii/config.py", "APP_VERSION =", bump_version_in_file, {"escape": "true"}),
+        (
+            "src/geenii/config.py",
+            "APP_VERSION =",
+            bump_version_in_file,
+            {"escape": "true"},
+        ),
         ("VERSION", "", write_version_to_file, None),
     ]
     for file_path, key, bump_func, extra in files:
         bump_func(file_path, key, new_version, extra)
 
-    print("You need to run 'pnpm install' in the ui/ directory to update the lockfile after bumping the version.")
-    print("You need to run 'pnpm tauri build' in the ui/ directory to rebuild the Tauri app after bumping the version.")
-    print("You need to run 'uv sync' in the root directory to update the lockfile after bumping the version.")
+    print(
+        "You need to run 'pnpm install' in the ui/ directory to update the lockfile after bumping the version."
+    )
+    print(
+        "You need to run 'pnpm tauri build' in the ui/ directory to rebuild the Tauri app after bumping the version."
+    )
+    print(
+        "You need to run 'uv sync' in the root directory to update the lockfile after bumping the version."
+    )

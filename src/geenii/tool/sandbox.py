@@ -44,10 +44,14 @@ class SandboxTool(Tool):
         self.pid_limit = pid_limit
         self.timeout = timeout
 
-    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any) -> ToolCallResult:
+    def invoke(
+        self, args: dict[str, Any], env: dict[str, str] | None = None, **kwargs: Any
+    ) -> ToolCallResult:
         command = args.get("command", "")
         if not command:
-            raise ValueError(f"Missing 'command' argument for SandboxTool {self.name!r}")
+            raise ValueError(
+                f"Missing 'command' argument for SandboxTool {self.name!r}"
+            )
 
         if not _docker_available():
             raise RuntimeError("Docker is not installed or not on PATH")
@@ -63,10 +67,14 @@ class SandboxTool(Tool):
 
         sandbox_id = (env or {}).get("SKILL_NAME", "sandbox")
 
-        result = self._run(app_dir=app_dir, command=command, sandbox_id=sandbox_id, env=env)
+        result = self._run(
+            app_dir=app_dir, command=command, sandbox_id=sandbox_id, env=env
+        )
         return ToolCallResult(text=result)
 
-    def _run(self, app_dir: str, command: str, sandbox_id: str, env: dict[str, str] | None) -> str:
+    def _run(
+        self, app_dir: str, command: str, sandbox_id: str, env: dict[str, str] | None
+    ) -> str:
         from geenii.sandbox import PythonSandbox, BashSandbox, NodeJsSandbox
 
         shared_kwargs = dict(

@@ -1,4 +1,5 @@
 """Tools for managing background processes via the ProcessManager service."""
+
 import json
 import logging
 
@@ -9,10 +10,14 @@ from geenii.tool.registry import ToolRegistry
 logger = logging.getLogger(__name__)
 
 
-def init_process_tools(tool_registry: ToolRegistry, client: ProcessManagerClient) -> None:
+def init_process_tools(
+    tool_registry: ToolRegistry, client: ProcessManagerClient
+) -> None:
 
     @tool_registry.tool(name="bg_process_start")
-    def start_process(command: str, working_directory: str = "", process_id: str = "") -> str:
+    def start_process(
+        command: str, working_directory: str = "", process_id: str = ""
+    ) -> str:
         """
         Start a long-running command as a background process.
         Returns immediately with a process ID that can be used to check status and retrieve output later.
@@ -47,8 +52,13 @@ def init_process_tools(tool_registry: ToolRegistry, client: ProcessManagerClient
             return json.dumps({"error": str(exc)})
 
     @tool_registry.tool(name="bg_process_output")
-    def process_output(process_id: str, stream: str = "stdout", tail: int = 0,
-                       offset: int = 0, limit: int = 0) -> str:
+    def process_output(
+        process_id: str,
+        stream: str = "stdout",
+        tail: int = 0,
+        offset: int = 0,
+        limit: int = 0,
+    ) -> str:
         """
         Retrieve captured output from a background process. Can be called while the process is still running to see partial output.
 

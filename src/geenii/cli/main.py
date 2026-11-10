@@ -24,6 +24,7 @@ from geenii.logs import init_logging
 init_logging()
 logger = logging.getLogger(__name__)
 
+
 class FallbackGroup(click.Group):
     """Group that routes unknown commands to a default command."""
 
@@ -44,14 +45,24 @@ class FallbackGroup(click.Group):
             return cmd.name, cmd, args
 
 
-@click.group(context_settings={
-            "max_content_width": 130,
-            "ignore_unknown_options": True,
-            "allow_extra_args": True
-            }, cls=FallbackGroup)
+@click.group(
+    context_settings={
+        "max_content_width": 130,
+        "ignore_unknown_options": True,
+        "allow_extra_args": True,
+    },
+    cls=FallbackGroup,
+)
 @click.version_option(version=APP_VERSION)
 @click.option("--no-cache", is_flag=True, default=False, help="Disable caching.")
-@click.option("--log-level", type=click.Choice(["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"], case_sensitive=False), default=None, help="Set the logging level.")
+@click.option(
+    "--log-level",
+    type=click.Choice(
+        ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"], case_sensitive=False
+    ),
+    default=None,
+    help="Set the logging level.",
+)
 def geecli(no_cache, log_level):
     """Geenii CLI - A versatile command-line interface for AI agents, tools, and skills."""
     if no_cache:
@@ -61,7 +72,9 @@ def geecli(no_cache, log_level):
         logging.getLogger("httpx").setLevel(log_level.upper())
 
 
-@geecli.command(hidden=True, context_settings={"ignore_unknown_options": True})  # hidden so it doesn't clutter --help
+@geecli.command(
+    hidden=True, context_settings={"ignore_unknown_options": True}
+)  # hidden so it doesn't clutter --help
 # @click.option("name", "--name", "-n", default="default",
 #               help="Name of the agent to run.")
 # @click.option("skills", "--skills", "-s", default="",
@@ -84,7 +97,7 @@ def geecli(no_cache, log_level):
 #               help="Continue a previous conversation. Creates a new conversation if omitted.")
 @click.argument("prompt", nargs=-1, required=True, type=click.UNPROCESSED)
 @click.pass_context
-#def handle(ctx, prompt: str, name: str, interactive: bool, skills: str, tools: str, model: str, model_parameters: str,
+# def handle(ctx, prompt: str, name: str, interactive: bool, skills: str, tools: str, model: str, model_parameters: str,
 #              system_instructions: str, developer_instructions: str, output_format: str, conv_id: str):
 def handle(ctx, prompt, **kwargs):
     if isinstance(prompt, tuple):
@@ -97,7 +110,6 @@ def handle(ctx, prompt, **kwargs):
     kwargs["prompt"] = prompt
     print(kwargs)
     agent_run(**kwargs)
-
 
 
 geecli.add_command(info_cli)
@@ -117,7 +129,7 @@ geecli.add_command(flow_cli)
 
 
 def main():
-    #init_app_directories()
+    # init_app_directories()
     os.makedirs(GEENII_CACHE_DIR, exist_ok=True)
     geecli()
 

@@ -147,8 +147,12 @@ def test_output_rejects_bad_ranges(procs_dir):
         pm = ProcessManager(procs_dir)
         info = await pm.start(["true"])
         await _wait_done(pm, info.pid)
-        for kwargs in ({"tail": 2, "offset": 0}, {"tail": 2, "limit": 5},
-                       {"offset": -1}, {"limit": 0}):
+        for kwargs in (
+            {"tail": 2, "offset": 0},
+            {"tail": 2, "limit": 5},
+            {"offset": -1},
+            {"limit": 0},
+        ):
             with pytest.raises(ValueError):
                 await pm.output(info.pid, **kwargs)
 
@@ -242,8 +246,10 @@ def test_duplicate_process_id_is_rejected(procs_dir):
 def test_concurrent_starts_with_same_id(procs_dir):
     async def main():
         pm = ProcessManager(procs_dir)
-        results = await asyncio.gather(*(pm.start(["sleep", "1"], pid="same") for _ in range(5)),
-                                       return_exceptions=True)
+        results = await asyncio.gather(
+            *(pm.start(["sleep", "1"], pid="same") for _ in range(5)),
+            return_exceptions=True,
+        )
         started = [r for r in results if not isinstance(r, Exception)]
         assert len(started) == 1
         assert all(isinstance(r, ValueError) for r in results if r not in started)
@@ -298,7 +304,10 @@ def test_list_includes_running_and_finished(procs_dir):
         running = await pm.start(["sleep", "30"], pid="running")
         assert [i.pid for i in await pm.list()] == ["running"]
         all_procs = {i.pid: i.state for i in await pm.list(include_finished=True)}
-        assert all_procs == {"running": ProcessState.RUNNING, "done": ProcessState.COMPLETED}
+        assert all_procs == {
+            "running": ProcessState.RUNNING,
+            "done": ProcessState.COMPLETED,
+        }
         await pm.kill(running.pid)
 
     asyncio.run(main())
@@ -308,10 +317,18 @@ def test_restart_marks_leftover_running_processes_as_orphaned(tmp_path):
     procs_dir = tmp_path / "processes"
     stale = procs_dir / "stale"
     stale.mkdir(parents=True)
-    (stale / "meta.json").write_text(json.dumps({
-        "pid": "stale", "system_pid": 999999, "cmd": "sleep 100", "state": "running",
-        "cwd": None, "started_at": time.time(),
-    }))
+    (stale / "meta.json").write_text(
+        json.dumps(
+            {
+                "pid": "stale",
+                "system_pid": 999999,
+                "cmd": "sleep 100",
+                "state": "running",
+                "cwd": None,
+                "started_at": time.time(),
+            }
+        )
+    )
 
     async def main():
         pm = ProcessManager(str(procs_dir))
@@ -396,7 +413,9 @@ def short_dir():
 
 def test_service_and_client_roundtrip(short_dir):
     socket_path = os.path.join(short_dir, "pm.sock")
-    service = ProcessManagerService(socket_path, pm=ProcessManager(os.path.join(short_dir, "procs")))
+    service = ProcessManagerService(
+        socket_path, pm=ProcessManager(os.path.join(short_dir, "procs"))
+    )
 
     loop = asyncio.new_event_loop()
     started = threading.Event()
@@ -420,12 +439,18 @@ def test_service_and_client_roundtrip(short_dir):
         assert (shell_proc["shell"], list_proc["shell"]) == (True, False)
 
         deadline = time.time() + 5
-        while time.time() < deadline and client.status(list_proc["pid"])["state"] == "running":
+        while (
+            time.time() < deadline
+            and client.status(list_proc["pid"])["state"] == "running"
+        ):
             time.sleep(0.05)
         assert client.output(shell_proc["pid"]) == "HI\n"
         assert client.output(list_proc["pid"]) == "a b\n"
         assert {p["pid"] for p in client.list(include_finished=True)} >= {
-            shell_proc["pid"], list_proc["pid"], long_proc["pid"]}
+            shell_proc["pid"],
+            list_proc["pid"],
+            long_proc["pid"],
+        }
 
         with pytest.raises(RuntimeError, match="Invalid process ID"):
             client.start(["true"], pid="../x")

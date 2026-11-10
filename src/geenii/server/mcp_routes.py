@@ -5,8 +5,14 @@ import pydantic
 from fastapi import APIRouter, HTTPException, Response
 
 from geenii.datamodels import MCPToolCallRequest
-from geenii.mcp_config import get_mcp_config, get_mcp_config_for_server, get_mcp_client_for_server, \
-    read_root_mcp_config, save_mcp_server_config, delete_mcp_server_config
+from geenii.mcp_config import (
+    get_mcp_config,
+    get_mcp_config_for_server,
+    get_mcp_client_for_server,
+    read_root_mcp_config,
+    save_mcp_server_config,
+    delete_mcp_server_config,
+)
 from geenii.config import get_root_mcp_config_path
 
 logger = logging.getLogger(__name__)
@@ -16,7 +22,9 @@ router = APIRouter(prefix="/mcp", tags=["mcp"])
 
 def _server_summary(name: str, cfg: dict) -> dict:
     """Public view of a server config. Env values are masked, as they commonly hold secrets."""
-    _type = cfg.get("type") or ("stdio" if cfg.get("command") else "http" if cfg.get("url") else None)
+    _type = cfg.get("type") or (
+        "stdio" if cfg.get("command") else "http" if cfg.get("url") else None
+    )
     return {
         "name": name,
         "type": _type,
@@ -58,7 +66,10 @@ def _unmask_config(cfg: dict, stored: dict | None) -> dict:
         for key, value in values.items():
             if value == MASKED_VALUE:
                 if key not in stored_values:
-                    raise HTTPException(status_code=400, detail=f"No stored value for masked {loc} entry '{key}'.")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"No stored value for masked {loc} entry '{key}'.",
+                    )
                 value = stored_values[key]
             unmasked[key] = value
         cfg[loc] = unmasked
@@ -67,12 +78,22 @@ def _unmask_config(cfg: dict, stored: dict | None) -> dict:
 
 def _validate_server_config(cfg: dict) -> None:
     if not cfg.get("command") and not cfg.get("url"):
-        raise HTTPException(status_code=400, detail="A server config needs either a 'command' or a 'url'.")
-    if "args" in cfg and not (isinstance(cfg["args"], list) and all(isinstance(a, str) for a in cfg["args"])):
+        raise HTTPException(
+            status_code=400,
+            detail="A server config needs either a 'command' or a 'url'.",
+        )
+    if "args" in cfg and not (
+        isinstance(cfg["args"], list) and all(isinstance(a, str) for a in cfg["args"])
+    ):
         raise HTTPException(status_code=400, detail="'args' must be a list of strings.")
     for loc in SECRET_KEYS:
-        if loc in cfg and not (isinstance(cfg[loc], dict) and all(isinstance(v, str) for v in cfg[loc].values())):
-            raise HTTPException(status_code=400, detail=f"'{loc}' must be an object of strings.")
+        if loc in cfg and not (
+            isinstance(cfg[loc], dict)
+            and all(isinstance(v, str) for v in cfg[loc].values())
+        ):
+            raise HTTPException(
+                status_code=400, detail=f"'{loc}' must be an object of strings."
+            )
 
 
 def _get_root_server_config(server_name: str) -> dict:
@@ -80,16 +101,23 @@ def _get_root_server_config(server_name: str) -> dict:
     cfg = read_root_mcp_config()["mcpServers"].get(server_name)
     if cfg is None:
         if get_mcp_config_for_server(server_name) is not None:
-            raise HTTPException(status_code=409, detail=f"MCP server '{server_name}' is not defined in "
-                                                        f"{get_root_mcp_config_path()}, so it can't be changed here.")
-        raise HTTPException(status_code=404, detail=f"MCP server '{server_name}' not found.")
+            raise HTTPException(
+                status_code=409,
+                detail=f"MCP server '{server_name}' is not defined in "
+                f"{get_root_mcp_config_path()}, so it can't be changed here.",
+            )
+        raise HTTPException(
+            status_code=404, detail=f"MCP server '{server_name}' not found."
+        )
     return cfg
 
 
 def _get_server_config(server_name: str) -> dict:
     cfg = get_mcp_config_for_server(server_name)
     if cfg is None:
-        raise HTTPException(status_code=404, detail=f"MCP server '{server_name}' not found.")
+        raise HTTPException(
+            status_code=404, detail=f"MCP server '{server_name}' not found."
+        )
     return cfg
 
 
@@ -102,9 +130,14 @@ def list_servers(reload: bool = False) -> list[dict]:
 @router.post("/servers", status_code=201)
 def create_server(request: McpServerCreateRequest) -> dict:
     if not SERVER_NAME_PATTERN.match(request.name):
-        raise HTTPException(status_code=400, detail="Server names may only contain letters, digits, - and _.")
+        raise HTTPException(
+            status_code=400,
+            detail="Server names may only contain letters, digits, - and _.",
+        )
     if get_mcp_config_for_server(request.name) is not None:
-        raise HTTPException(status_code=409, detail=f"MCP server '{request.name}' already exists.")
+        raise HTTPException(
+            status_code=409, detail=f"MCP server '{request.name}' already exists."
+        )
     cfg = _unmask_config(request.config, None)
     _validate_server_config(cfg)
     save_mcp_server_config(request.name, cfg)
@@ -142,7 +175,10 @@ def get_server(server_name: str) -> dict:
         info = client.info()
     except Exception as e:
         logger.error(f"Error fetching info from MCP server '{server_name}': {e}")
-        raise HTTPException(status_code=502, detail=f"Failed to connect to MCP server '{server_name}': {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to connect to MCP server '{server_name}': {e}",
+        )
     return {**_server_summary(server_name, cfg), **info}
 
 
@@ -153,6 +189,8 @@ def call_server_tool(server_name: str, request: MCPToolCallRequest):
     try:
         result = client.call_tool(request.tool_name, request.arguments or {})
     except Exception as e:
-        logger.error(f"Error calling tool '{request.tool_name}' on MCP server '{server_name}': {e}")
+        logger.error(
+            f"Error calling tool '{request.tool_name}' on MCP server '{server_name}': {e}"
+        )
         raise HTTPException(status_code=502, detail=f"Tool call failed: {e}")
     return result.model_dump() if hasattr(result, "model_dump") else result

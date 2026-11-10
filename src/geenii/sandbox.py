@@ -62,7 +62,9 @@ def build_sandbox_image(
     :return:
     """
     # sandbox_docker_file = os.path.join(app_dir, "sandbox.Dockerfile")
-    sandbox_docker_file = os.path.join(GEENII_CACHE_DIR, "sandboxes", sandbox_id, "Dockerfile")
+    sandbox_docker_file = os.path.join(
+        GEENII_CACHE_DIR, "sandboxes", sandbox_id, "Dockerfile"
+    )
     os.makedirs(dirname(sandbox_docker_file), exist_ok=True)
     overwrite = True
     image_name = "geenii-sandbox-" + sandbox_id
@@ -146,9 +148,11 @@ class Sandbox(abc.ABC):
     def build(self) -> None:
         dockerlines = self.dockerlines()
         self.image_name = build_sandbox_image(
-            self.sandbox_id, self.app_dir, env=self.env, dockerlines=dockerlines,
+            self.sandbox_id,
+            self.app_dir,
+            env=self.env,
+            dockerlines=dockerlines,
         )
-
 
     def run(self) -> tuple[int, str, str]:
         container_name = "geenii-sandbox-" + self.sandbox_id
@@ -231,6 +235,7 @@ class Sandbox(abc.ABC):
         cmd = self.command()
         if isinstance(cmd, str):
             import shlex
+
             command.extend(shlex.split(cmd))
         else:
             command.extend(cmd)
@@ -261,14 +266,11 @@ class PythonSandbox(Sandbox):
 
     def dockerlines(self) -> str:
         dockerfile_str = (
-            "FROM python:3.13-alpine\n"
-            "ENV PYTHONUNBUFFERED=1\n"
-            "WORKDIR /app\n"
+            "FROM python:3.13-alpine\nENV PYTHONUNBUFFERED=1\nWORKDIR /app\n"
         )
         if os.path.exists(os.path.join(self.app_dir, "requirements.txt")):
             dockerfile_str += (
-                "COPY ./requirements.txt ./\n"
-                "RUN pip3 install -r ./requirements.txt\n"
+                "COPY ./requirements.txt ./\nRUN pip3 install -r ./requirements.txt\n"
             )
         if os.path.exists(os.path.join(self.app_dir, "pyproject.toml")):
             dockerfile_str += (
@@ -304,10 +306,7 @@ class BashSandbox(Sandbox):
         self._script_args = script_args
 
     def dockerlines(self) -> str:
-        return (
-            "FROM bash:latest\n"
-            "WORKDIR /app\n"
-        )
+        return "FROM bash:latest\nWORKDIR /app\n"
 
     def command(self) -> list[str]:
         if self._shell_command:
@@ -331,10 +330,7 @@ class NodeJsSandbox(Sandbox):
         self.script_args = script_args
 
     def dockerlines(self) -> str:
-        dockerfile_str = (
-            "FROM node:22-alpine\n"
-            "WORKDIR /app\n"
-        )
+        dockerfile_str = "FROM node:22-alpine\nWORKDIR /app\n"
         if os.path.exists(os.path.join(self.app_dir, "package.json")):
             dockerfile_str += (
                 "COPY ./package.json ./package-lock.json* ./\n"

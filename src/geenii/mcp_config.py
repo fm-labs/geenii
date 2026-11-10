@@ -76,6 +76,7 @@ def expand_env_vars(q: str | None, env_vars: dict) -> str | None:
         r"\$\{(\w+)\}", lambda m: str(env_vars.get(m.group(1), m.group(0))), q
     )
 
+
 def _expand_env_vars_in_server_config(
     server_config: dict, env_vars: dict[str, str]
 ) -> dict:

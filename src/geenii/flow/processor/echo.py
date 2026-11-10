@@ -20,7 +20,9 @@ class EchoProcessor(FlowProcessor):
     config_model = EchoConfig
     output_model = EchoOutput
 
-    def process(self, input_data: Any, ctx: FlowContext) -> Generator[Any, None, EchoOutput]:
+    def process(
+        self, input_data: Any, ctx: FlowContext
+    ) -> Generator[Any, None, EchoOutput]:
         message = input_data if self.config.message is None else self.config.message
         yield StepEvent("log", message)
         return EchoOutput(message=message)

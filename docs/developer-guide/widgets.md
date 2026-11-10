@@ -39,15 +39,21 @@ From Python, for example from an agent task:
 from geenii.chat_models import TextContent, WidgetContent
 from geenii.datamodels import SystemMessage
 
-yield SystemMessage(level="info", content=[
-    TextContent(text="Connected MCP servers:"),
-    WidgetContent(
-        name="geenii.table",
-        heading="MCP servers",
-        data={"columns": ["server", "tools"], "rows": [["filesystem", 7], ["weather", 2]]},
-        text="MCP servers: filesystem (7 tools), weather (2 tools)",
-    ),
-])
+yield SystemMessage(
+    level="info",
+    content=[
+        TextContent(text="Connected MCP servers:"),
+        WidgetContent(
+            name="geenii.table",
+            heading="MCP servers",
+            data={
+                "columns": ["server", "tools"],
+                "rows": [["filesystem", 7], ["weather", 2]],
+            },
+            text="MCP servers: filesystem (7 tools), weather (2 tools)",
+        ),
+    ],
+)
 ```
 
 On the wire (the chat NDJSON stream and the history) the part is plain JSON:

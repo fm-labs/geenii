@@ -193,15 +193,17 @@ Custom instances with relaxed limits can be registered directly:
 ```python
 from geenii.tool.sandbox import SandboxTool
 
-registry.register(SandboxTool(
-    name="sandbox_python_network",
-    description="Python sandbox with network access.",
-    input_schema={...},
-    runtime="python",
-    network_mode="bridge",
-    timeout=120,
-    mem_limit="512m",
-))
+registry.register(
+    SandboxTool(
+        name="sandbox_python_network",
+        description="Python sandbox with network access.",
+        input_schema={...},
+        runtime="python",
+        network_mode="bridge",
+        timeout=120,
+        mem_limit="512m",
+    )
+)
 ```
 
 ## Standalone use

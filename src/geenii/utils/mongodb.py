@@ -6,6 +6,7 @@ from geenii import config
 
 mongo: MongoClient | None = None
 
+
 def get_global_mongo_client() -> MongoClient:
     global mongo
     if mongo is None:
@@ -23,10 +24,10 @@ def get_mongo_client(uri=None, ping: bool = False) -> MongoClient:
     if ping:
         try:
             # The ismaster command is cheap and does not require auth.
-            client.admin.command('ismaster')
+            client.admin.command("ismaster")
 
             # The ping command is cheap and does not require auth.
-            #client.admin.command('ping')
+            # client.admin.command('ping')
         except Exception as e:
             raise ConnectionError(f"Could not connect to MongoDB: {e}")
     return client

@@ -4,6 +4,7 @@ Synchronous client for the geenii daemon socket.
 Connects, sends a JSON-RPC request, reads the response, disconnects.
 Stateless — each call opens a fresh connection.
 """
+
 from __future__ import annotations
 
 import json
@@ -27,7 +28,6 @@ def default_socket_path() -> str:
 
 
 class DaemonClient:
-
     def __init__(self, socket_path: str | None = None) -> None:
         self._socket_path = socket_path or default_socket_path()
 
@@ -40,7 +40,12 @@ class DaemonClient:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             sock.connect(self._socket_path)
-            payload = json.dumps({"method": method, "params": params or {}}, separators=(",", ":")) + "\n"
+            payload = (
+                json.dumps(
+                    {"method": method, "params": params or {}}, separators=(",", ":")
+                )
+                + "\n"
+            )
             sock.sendall(payload.encode())
 
             # read until newline

@@ -19,49 +19,61 @@ GEENII_CHAT_SESSIONS_DIR = Path(GEENII_USER_HOME) / ".geenii" / "chats"
 
 # Load environment variables from the project and user .env files, if they exist.
 # Without override the first source to set a variable wins: shell > project .env > user .env
-dotenv.load_dotenv(os.path.join(GEENII_WORKING_DIR, ".geenii", ".env"), override=False, verbose=True)
-dotenv.load_dotenv(os.path.join(GEENII_USER_HOME, ".geenii", ".env"), override=False, verbose=True)
+dotenv.load_dotenv(
+    os.path.join(GEENII_WORKING_DIR, ".geenii", ".env"), override=False, verbose=True
+)
+dotenv.load_dotenv(
+    os.path.join(GEENII_USER_HOME, ".geenii", ".env"), override=False, verbose=True
+)
 
-GEENII_CACHE_DIR = os.environ.get("GEENII_CACHE_DIR", os.path.join(GEENII_USER_HOME, ".cache", "geenii"))
-GEENII_CACHE_DISABLED = os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
+GEENII_CACHE_DIR = os.environ.get(
+    "GEENII_CACHE_DIR", os.path.join(GEENII_USER_HOME, ".cache", "geenii")
+)
+GEENII_CACHE_DISABLED = (
+    os.environ.get("GEENII_CACHE_DISABLED", "false").lower() == "true"
+)
 
 # Default minimum age (seconds since a process finished) before the process manager's gc removes it
 PM_GC_MAX_AGE = float(os.environ.get("GEENII_PM_GC_MAX_AGE", 7 * 24 * 3600))
 
-#GEENII_BIN = os.getenv("GEENII_BIN", "geenii")
+# GEENII_BIN = os.getenv("GEENII_BIN", "geenii")
 
 # Static web GUI served by the API server (defaults to the repo's www/ folder)
-WWW_DIR = os.environ.get("GEENII_WWW_DIR",
-                         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, "www"))
+WWW_DIR = os.environ.get(
+    "GEENII_WWW_DIR",
+    os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, "www"),
+)
 
 GEENII_MEMORY_ENGINE = "file"
 
 FERNET_SECRET_KEY = os.environ.get("FERNET_SECRET_KEY", "")
 
-MCP_CONFIG_FILE="mcp.json"
+MCP_CONFIG_FILE = "mcp.json"
 MCP_INIT_TIMEOUT = float(os.environ.get("GEENII_MCP_INIT_TIMEOUT", "30"))
 
 # Completion models
-#DEFAULT_COMPLETION_MODEL= "openai:gpt-4o-mini"
-DEFAULT_COMPLETION_MODEL="ollama:qwen3:8b"
+# DEFAULT_COMPLETION_MODEL= "openai:gpt-4o-mini"
+DEFAULT_COMPLETION_MODEL = "ollama:qwen3:8b"
 
 # Image generation
-#DEFAULT_IMAGE_GENERATION_MODEL="stable-diffusion:stable-diffusion:latest" # need GPU
-DEFAULT_IMAGE_GENERATION_MODEL="openai:dall-e-2"
+# DEFAULT_IMAGE_GENERATION_MODEL="stable-diffusion:stable-diffusion:latest" # need GPU
+DEFAULT_IMAGE_GENERATION_MODEL = "openai:dall-e-2"
 
 # Audio generation / Text-to-Speech
-DEFAULT_AUDIO_GENERATION_MODEL="hf:llama-2:latest"
+DEFAULT_AUDIO_GENERATION_MODEL = "hf:llama-2:latest"
 # Audio transcription / Speech-to-Text
-#DEFAULT_AUDIO_TRANSCRIPTION_MODEL="whisper:whisper-1:latest"
-DEFAULT_AUDIO_TRANSCRIPTION_MODEL="openai:whisper-1"
-DEFAULT_AUDIO_TRANSLATION_MODEL="whisper:whisper-1:latest"
+# DEFAULT_AUDIO_TRANSCRIPTION_MODEL="whisper:whisper-1:latest"
+DEFAULT_AUDIO_TRANSCRIPTION_MODEL = "openai:whisper-1"
+DEFAULT_AUDIO_TRANSLATION_MODEL = "whisper:whisper-1:latest"
 
-WHISPERCPP_IMAGE="whispercpp:latest"
+WHISPERCPP_IMAGE = "whispercpp:latest"
 
-OPENAI_API_KEY=os.environ.get("OPENAI_API_KEY", "")
-ANTHROPIC_API_KEY=os.environ.get("ANTHROPIC_API_KEY", "")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")  # default Ollama API endpoint
+OLLAMA_HOST = os.environ.get(
+    "OLLAMA_HOST", "http://localhost:11434"
+)  # default Ollama API endpoint
 OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", "")
 
 # Database settings
@@ -140,7 +152,9 @@ def get_projects() -> dict[str, dict]:
     result = {}
     for d, conf in projects.items():
         if not os.path.isabs(d):
-            print(f"Warning: Project directory '{d}' is not an absolute path, ignoring it.")
+            print(
+                f"Warning: Project directory '{d}' is not an absolute path, ignoring it."
+            )
             continue
         result[realpath(d)] = conf or {}
     return result
@@ -213,8 +227,9 @@ def skill_paths() -> list[str]:
         if os.path.isdir(skill_dir):
             _skill_paths.append(skill_dir)
         else:
-            print(f"Warning: Skill directory '{skill_dir}' does not exist or is not a directory.")
-
+            print(
+                f"Warning: Skill directory '{skill_dir}' does not exist or is not a directory."
+            )
 
     # remove duplicates
     _skill_paths = list(dict.fromkeys(_skill_paths))

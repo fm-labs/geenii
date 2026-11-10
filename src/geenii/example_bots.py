@@ -28,8 +28,12 @@ class EchoBot(BotInterface):
             response_text = f"You said: {message}"
         else:
             response_text = "You sent structured content"
-        yield ModelMessage(role="assistant",
-                           content=[TextContent(type="text", text=f">{self.botname}< {response_text}")])
+        yield ModelMessage(
+            role="assistant",
+            content=[
+                TextContent(type="text", text=f">{self.botname}< {response_text}")
+            ],
+        )
 
 
 class SimpleBot(BotInterface):
@@ -80,26 +84,30 @@ class DemoAgent(Agent):
 
     def __init__(self, botname: str):
         tool_registry = ToolRegistry()
-        tool_registry.register(PythonFunctionTool(name="get_weather",
-                                                  description="Get the weather from the given location.",
-                                                  input_schema={
-                                                      "type": "object",
-                                                      "properties": {
-                                                          "location": {
-                                                              "type": "string",
-                                                              "description": "City and country e.g. Bogotá, Colombia"
-                                                          }
-                                                      },
-                                                      "required": [
-                                                          "location"
-                                                      ],
-                                                      "additionalProperties": False
-                                                  },
-                                                  handler=self.get_weather_demo))
-        super().__init__(name=botname,
-                         model="ollama:qwen3:8b",
-                         system_prompt="You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer.",
-                         tool_registry=tool_registry)
+        tool_registry.register(
+            PythonFunctionTool(
+                name="get_weather",
+                description="Get the weather from the given location.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "City and country e.g. Bogotá, Colombia",
+                        }
+                    },
+                    "required": ["location"],
+                    "additionalProperties": False,
+                },
+                handler=self.get_weather_demo,
+            )
+        )
+        super().__init__(
+            name=botname,
+            model="ollama:qwen3:8b",
+            system_prompt="You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer.",
+            tool_registry=tool_registry,
+        )
 
     @staticmethod
     def get_weather_demo(location: str) -> str:

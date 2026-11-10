@@ -27,7 +27,9 @@ class FlowRegistry:
             return
         for filename in sorted(os.listdir(dirpath)):
             filepath = os.path.join(dirpath, filename)
-            if os.path.isfile(filepath) and filename.lower().endswith(FLOW_FILE_SUFFIXES):
+            if os.path.isfile(filepath) and filename.lower().endswith(
+                FLOW_FILE_SUFFIXES
+            ):
                 flow = FlowSpec(name=os.path.splitext(filename)[0], filepath=filepath)
                 logger.debug(f"Adding flow: {flow}")
                 self.flows.append(flow)

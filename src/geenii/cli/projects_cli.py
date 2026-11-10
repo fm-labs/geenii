@@ -24,15 +24,19 @@ def list_projects():
 
     # same as config.get_project_dir(), without reading the settings (and warning) twice
     cwd = Path(config.GEENII_WORKING_DIR)
-    current = max((p for p in _projects if cwd.is_relative_to(p)), key=len, default=None)
+    current = max(
+        (p for p in _projects if cwd.is_relative_to(p)), key=len, default=None
+    )
     table = Table(show_header=True)
     table.add_column("Path")
     table.add_column("Trusted")
     table.add_column("Exists")
     table.add_column("Current")
     for path, conf in _projects.items():
-        table.add_row(path,
-                      "yes" if conf.get("trusted") is True else "no",
-                      "yes" if os.path.isdir(path) else "no",
-                      "*" if path == current else "")
+        table.add_row(
+            path,
+            "yes" if conf.get("trusted") is True else "no",
+            "yes" if os.path.isdir(path) else "no",
+            "*" if path == current else "",
+        )
     Console().print(table)

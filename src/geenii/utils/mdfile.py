@@ -1,8 +1,8 @@
 import yaml
 import os
 
-class MarkdownFile:
 
+class MarkdownFile:
     def __init__(self, file_path: str, parse: bool = True):
         """
         Read and parse the skill markdown file from the specified directory.
@@ -31,19 +31,22 @@ class MarkdownFile:
         # find the second occurrence of '---' to determine the end of the header
         second_header_index = contents.find("---", 3)
         if second_header_index == -1:
-            raise ValueError("Malformed skill markdown file: missing second header delimiter.")
+            raise ValueError(
+                "Malformed skill markdown file: missing second header delimiter."
+            )
 
         # extract the header and body sections
         header_str = contents[3:second_header_index].strip()
-        self.body = contents[second_header_index + 3:].strip()
+        self.body = contents[second_header_index + 3 :].strip()
 
         # the header str is expected to be in YAML format, we can parse it into a dict
         try:
             header_dict = yaml.safe_load(header_str)
         except yaml.YAMLError as e:
-            raise ValueError(f"Malformed skill markdown file: error parsing header YAML. {str(e)}")
+            raise ValueError(
+                f"Malformed skill markdown file: error parsing header YAML. {str(e)}"
+            )
         self.header = header_dict
-
 
 
 def read_frontmatter_file(file_path: str) -> tuple[dict, str]:
@@ -61,21 +64,27 @@ def read_frontmatter_file(file_path: str) -> tuple[dict, str]:
         contents = f.read()
 
     if not contents.startswith("---"):
-        raise ValueError("Malformed frontmatter markdown file: missing header delimiter.")
+        raise ValueError(
+            "Malformed frontmatter markdown file: missing header delimiter."
+        )
 
     # find the second occurrence of '---' to determine the end of the header
     second_header_index = contents.find("---", 3)
     if second_header_index == -1:
-        raise ValueError("Malformed frontmatter markdown file: missing second header delimiter.")
+        raise ValueError(
+            "Malformed frontmatter markdown file: missing second header delimiter."
+        )
 
     # extract the header and body sections
     header = contents[3:second_header_index].strip()
-    body = contents[second_header_index + 3:].strip()
+    body = contents[second_header_index + 3 :].strip()
 
     # the header str is expected to be in YAML format, we can parse it into a dict
     try:
         header_dict = yaml.safe_load(header)
     except yaml.YAMLError as e:
-        raise ValueError(f"Malformed frontmatter markdown file: error parsing header YAML. {str(e)}")
+        raise ValueError(
+            f"Malformed frontmatter markdown file: error parsing header YAML. {str(e)}"
+        )
 
     return header_dict, body

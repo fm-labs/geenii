@@ -42,15 +42,26 @@ import sys
 from geenii.flow import Flow, FlowStepSpec
 
 flow = Flow(
-  name="demo",
-  variables={"greeting": "hello"},
-  steps=[
-    FlowStepSpec(id="greet", processor="echo", config={"message": "${vars.greeting}"}),
-    FlowStepSpec(id="upper", processor="execute_command", depends_on="greet",
-                 config={"command": [sys.executable, "-c",
-                                     "import sys; print(sys.argv[1].upper())",
-                                     "${greet.message}"]}),
-  ],
+    name="demo",
+    variables={"greeting": "hello"},
+    steps=[
+        FlowStepSpec(
+            id="greet", processor="echo", config={"message": "${vars.greeting}"}
+        ),
+        FlowStepSpec(
+            id="upper",
+            processor="execute_command",
+            depends_on="greet",
+            config={
+                "command": [
+                    sys.executable,
+                    "-c",
+                    "import sys; print(sys.argv[1].upper())",
+                    "${greet.message}",
+                ]
+            },
+        ),
+    ],
 )
 
 result = flow.run()
@@ -155,9 +166,9 @@ id is safe to use. To render an image from the command line, use
 Set `max_workers` to let independent steps run at the same time:
 
 ```python
-flow = Flow("t", steps=[...], max_workers=4)   # default for this flow
+flow = Flow("t", steps=[...], max_workers=4)  # default for this flow
 result = flow.run()
-result = flow.run(max_workers=1)               # override for one run
+result = flow.run(max_workers=1)  # override for one run
 ```
 
 In a flow file, set `max_workers = 4` at the top level. Values below 1 make
@@ -432,9 +443,9 @@ itself:
 result = flow.run(input_data={"n": 1}, snapshot="run.json")
 
 snap = FlowSnapshot.load("run.json")
-snap.status            # "success"
-snap.get("a").output   # output of step "a"
-snap.to_flow()         # the Flow again
+snap.status  # "success"
+snap.get("a").output  # output of step "a"
+snap.to_flow()  # the Flow again
 ```
 
 A snapshot is taken when the run starts, after steps finish, and once more
@@ -562,25 +573,25 @@ from geenii.flow import FlowProcessor, StepEvent, register_processor
 
 
 class GreetConfig(pydantic.BaseModel):
-  name: str
-  shout: bool = False
+    name: str
+    shout: bool = False
 
 
 class GreetOutput(pydantic.BaseModel):
-  text: str
+    text: str
 
 
 @register_processor("greet")
 class GreetProcessor(FlowProcessor):
-  config_model = GreetConfig  # optional: validates config into self.config
-  output_model = GreetOutput  # optional: validates the returned output
+    config_model = GreetConfig  # optional: validates config into self.config
+    output_model = GreetOutput  # optional: validates the returned output
 
-  def process(self, input_data, ctx):
-    text = f"hello {self.config.name}"
-    yield StepEvent("log", text)  # progress events (optional)
-    if not text:
-      ctx.abort("nothing to say")  # stop the whole flow
-    return GreetOutput(text=text.upper() if self.config.shout else text)
+    def process(self, input_data, ctx):
+        text = f"hello {self.config.name}"
+        yield StepEvent("log", text)  # progress events (optional)
+        if not text:
+            ctx.abort("nothing to say")  # stop the whole flow
+        return GreetOutput(text=text.upper() if self.config.shout else text)
 ```
 
 Rules for processors:

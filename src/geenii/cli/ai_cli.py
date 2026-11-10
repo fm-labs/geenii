@@ -19,20 +19,38 @@ def ai():
 
 
 @ai.command()
-@click.option("--model", "-m", default=DEFAULT_COMPLETION_MODEL, help="Model to use for completion.")
-@click.option("--temperature", "-t", type=float, default=None, help="Sampling temperature.")
+@click.option(
+    "--model",
+    "-m",
+    default=DEFAULT_COMPLETION_MODEL,
+    help="Model to use for completion.",
+)
+@click.option(
+    "--temperature", "-t", type=float, default=None, help="Sampling temperature."
+)
 @click.option("--output-format", "-o", default=None, help="Output format type.")
 @click.argument("prompt")
 def completion(model, temperature, output_format, prompt):
     """Generate a response from a single prompt."""
     click.echo(f"Generating with prompt: {prompt}")
-    response = generate_completion(prompt=prompt, model=model, temperature=temperature,
-                                   output_format=output_format, source="cli", task="completion")
+    response = generate_completion(
+        prompt=prompt,
+        model=model,
+        temperature=temperature,
+        output_format=output_format,
+        source="cli",
+        task="completion",
+    )
     print(response)
 
+
 @ai.command()
-@click.option("--model", "-m", default=DEFAULT_COMPLETION_MODEL, help="Model to use for chat.")
-@click.option("--temperature", "-t", type=float, default=None, help="Sampling temperature.")
+@click.option(
+    "--model", "-m", default=DEFAULT_COMPLETION_MODEL, help="Model to use for chat."
+)
+@click.option(
+    "--temperature", "-t", type=float, default=None, help="Sampling temperature."
+)
 @click.option("--output-format", "-o", default=None, help="Output format type.")
 @click.argument("prompt")
 def chat(model, temperature, output_format, prompt):
@@ -42,21 +60,55 @@ def chat(model, temperature, output_format, prompt):
     memory: List[ModelMessage] = []
 
     # Initialize chat history
-    memory.append(ModelMessage(role="user", content=[TextContent(text="My name is Danny"), ]))
     memory.append(
-        ModelMessage(role="assistant", content=[TextContent(text="Nice to meet you Danny, I am Ozzy"), ]))
-    memory.append(ModelMessage(role="user", content=[
-        TextContent(text="My car is red and I live in Berlin, but i lived in New York before"), ]))
-    memory.append(ModelMessage(role="user", content=[TextContent(text="I love to eat sushi"), ]))
+        ModelMessage(
+            role="user",
+            content=[
+                TextContent(text="My name is Danny"),
+            ],
+        )
+    )
+    memory.append(
+        ModelMessage(
+            role="assistant",
+            content=[
+                TextContent(text="Nice to meet you Danny, I am Ozzy"),
+            ],
+        )
+    )
+    memory.append(
+        ModelMessage(
+            role="user",
+            content=[
+                TextContent(
+                    text="My car is red and I live in Berlin, but i lived in New York before"
+                ),
+            ],
+        )
+    )
+    memory.append(
+        ModelMessage(
+            role="user",
+            content=[
+                TextContent(text="I love to eat sushi"),
+            ],
+        )
+    )
 
     tool_registry = ToolRegistry()
     init_builtin_tools(tool_registry)
     init_mcp_server_tools(tool_registry)
 
     tool_registry.register(
-        PythonFunctionTool(name="get_weather", description="Get the weather from the given location.",
-                           input_schema={"location": {"type": "string"}},
-                           handler=lambda x: f"The weather in {x['location']} is sunny with a high of 25°C."))
+        PythonFunctionTool(
+            name="get_weather",
+            description="Get the weather from the given location.",
+            input_schema={"location": {"type": "string"}},
+            handler=lambda x: (
+                f"The weather in {x['location']} is sunny with a high of 25°C."
+            ),
+        )
+    )
 
     continue_chat = True
     while continue_chat:
@@ -65,20 +117,30 @@ def chat(model, temperature, output_format, prompt):
             break
 
         # generate a response based on the chat history
-        response = generate_chat_completion_deprecated(prompt=prompt,
-                                                       model=model,
-                                                       system=DEFAULT_AGENT_SYSTEM_PROMPT,
-                                                       messages=memory,
-                                                       tool_registry=tool_registry,
-                                                       tools={"get_weather", "bash"},
-                                                       temperature=temperature,
-                                                       output_format=output_format,
-                                                       source="cli", task="chat")
+        response = generate_chat_completion_deprecated(
+            prompt=prompt,
+            model=model,
+            system=DEFAULT_AGENT_SYSTEM_PROMPT,
+            messages=memory,
+            tool_registry=tool_registry,
+            tools={"get_weather", "bash"},
+            temperature=temperature,
+            output_format=output_format,
+            source="cli",
+            task="chat",
+        )
         # print the assistant response
         # print(response)
 
         # add the assistant response to the chat history
-        memory.append(ModelMessage(role="user", content=[TextContent(text=prompt), ]))
+        memory.append(
+            ModelMessage(
+                role="user",
+                content=[
+                    TextContent(text=prompt),
+                ],
+            )
+        )
         memory.append(ModelMessage(role="assistant", content=response.output))
 
         echo_model_messages(memory[-1:])  # print the last assistant message

@@ -2,6 +2,7 @@
 Every model call an agent task makes carries the agent's context id, so its usage is attributed to the conversation,
 and is tagged with the agent as `source` and the purpose as `task` for the usage log.
 """
+
 import pytest
 
 from geenii.agent import base_agent as base_agent_mod
@@ -33,7 +34,9 @@ def requests(monkeypatch):
         captured.append((request, tags))
         raise StopTask()
 
-    monkeypatch.setattr(tasks, "generate_chat_completion", fake_generate_chat_completion)
+    monkeypatch.setattr(
+        tasks, "generate_chat_completion", fake_generate_chat_completion
+    )
     return captured
 
 
@@ -43,7 +46,9 @@ def agent():
     memory.append(ModelMessage(role="user", content=[TextContent(text="hello")]))
     agent = Agent(name="tester", model="fake:test", context_id="ctx-1", memory=memory)
     for name in ("alpha", "beta"):
-        agent.skills.register(SkillSpec(name=name, description=f"The {name} skill", path=f"/tmp/{name}"))
+        agent.skills.register(
+            SkillSpec(name=name, description=f"The {name} skill", path=f"/tmp/{name}")
+        )
     return agent
 
 
@@ -60,18 +65,30 @@ def test_llm_task(agent, requests):
 
 
 def test_find_best_skill_task(agent, requests):
-    _run(tasks.FindBestSkillTask(agent, prompt="no trigger matches this"), requests, "skill_select")
+    _run(
+        tasks.FindBestSkillTask(agent, prompt="no trigger matches this"),
+        requests,
+        "skill_select",
+    )
 
 
 def test_find_best_agent_task(agent, requests, monkeypatch):
     registry = AgentRegistry()
     registry.configs["other"] = AgentSpec(name="other", model="fake:test")
     monkeypatch.setattr(tasks, "init_global_agent_registry", lambda: registry)
-    _run(tasks.FindBestAgentTask(agent, prompt="who should answer?"), requests, "agent_select")
+    _run(
+        tasks.FindBestAgentTask(agent, prompt="who should answer?"),
+        requests,
+        "agent_select",
+    )
 
 
 def test_tool_filter_task(agent, requests):
-    _run(tasks.ToolFilterTask(agent, prompt="pick tools", tool_registry=ToolRegistry()), requests, "tool_filter")
+    _run(
+        tasks.ToolFilterTask(agent, prompt="pick tools", tool_registry=ToolRegistry()),
+        requests,
+        "tool_filter",
+    )
 
 
 def test_memory_compaction_task_uses_the_compacted_context(agent, requests):

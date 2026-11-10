@@ -13,6 +13,7 @@ Protocol: newline-delimited JSON over a Unix domain socket.
 Methods: ping, daemon.info, daemon.shutdown, plus everything ProcessHost
 registers (pm.*, scheduler.*, supervisor.*, and the unprefixed pm aliases).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -40,7 +41,6 @@ class DaemonAlreadyRunning(RuntimeError):
 
 
 class DaemonServer:
-
     def __init__(self, host: ProcessHost, socket_path: Optional[str] = None) -> None:
         self._host = host
         self._socket_path = socket_path or default_socket_path()
@@ -61,13 +61,17 @@ class DaemonServer:
         os.makedirs(os.path.dirname(self._socket_path), exist_ok=True)
         if os.path.exists(self._socket_path):
             if await self._socket_is_live():
-                raise DaemonAlreadyRunning(f"A geenii daemon is already running on {self._socket_path}")
+                raise DaemonAlreadyRunning(
+                    f"A geenii daemon is already running on {self._socket_path}"
+                )
             os.unlink(self._socket_path)  # stale socket from a crashed daemon
 
         # Components first (recovers process records), then accept connections
         await self._host.start()
         try:
-            self._server = await asyncio.start_unix_server(self._handle_client, path=self._socket_path)
+            self._server = await asyncio.start_unix_server(
+                self._handle_client, path=self._socket_path
+            )
         except BaseException:
             await self._host.stop()
             raise
@@ -108,7 +112,9 @@ class DaemonServer:
         await writer.wait_closed()
         return True
 
-    async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def _handle_client(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         try:
             while True:
                 line = await reader.readline()
@@ -117,10 +123,14 @@ class DaemonServer:
                 try:
                     request = json.loads(line)
                 except json.JSONDecodeError as exc:
-                    await self._write(writer, {"ok": False, "error": f"Bad JSON: {exc}"})
+                    await self._write(
+                        writer, {"ok": False, "error": f"Bad JSON: {exc}"}
+                    )
                     continue
                 if not isinstance(request, dict):
-                    await self._write(writer, {"ok": False, "error": "Request must be a JSON object"})
+                    await self._write(
+                        writer, {"ok": False, "error": "Request must be a JSON object"}
+                    )
                     continue
                 await self._write(writer, await self._dispatch(request))
         except (ConnectionResetError, BrokenPipeError):
@@ -166,7 +176,9 @@ class DaemonServer:
         return {
             "pid": os.getpid(),
             "socket": self._socket_path,
-            "uptime_s": round(time.time() - self._started_at, 3) if self._started_at else 0.0,
+            "uptime_s": round(time.time() - self._started_at, 3)
+            if self._started_at
+            else 0.0,
             **await self._host.info(),
         }
 
@@ -185,10 +197,19 @@ def build_host(
     if scheduler_config and os.path.isfile(scheduler_config):
         scheduler.load_config(scheduler_config)
     elif scheduler_config:
-        logger.info("No scheduler config at %s; the scheduler starts without tasks", scheduler_config)
+        logger.info(
+            "No scheduler config at %s; the scheduler starts without tasks",
+            scheduler_config,
+        )
     if services_config and not os.path.isfile(services_config):
-        logger.info("No services config at %s; no services are started", services_config)
-    return ProcessHost(scheduler=scheduler, scheduler_config=scheduler_config, services_config=services_config)
+        logger.info(
+            "No services config at %s; no services are started", services_config
+        )
+    return ProcessHost(
+        scheduler=scheduler,
+        scheduler_config=scheduler_config,
+        services_config=services_config,
+    )
 
 
 def run_daemon(
@@ -203,12 +224,23 @@ def run_daemon(
 
 def main(argv: Optional[list[str]] = None) -> None:
     from geenii.logs import init_logging
+
     init_logging()
 
-    parser = argparse.ArgumentParser(prog="geenii-daemon", description="Run the geenii daemon.")
+    parser = argparse.ArgumentParser(
+        prog="geenii-daemon", description="Run the geenii daemon."
+    )
     parser.add_argument("--socket", default=None, help="Unix socket path")
-    parser.add_argument("--scheduler-config", default=DEFAULT_SCHEDULER_CONFIG, help="Scheduler config JSON")
-    parser.add_argument("--services-config", default=DEFAULT_SERVICES_CONFIG, help="Services config JSON")
+    parser.add_argument(
+        "--scheduler-config",
+        default=DEFAULT_SCHEDULER_CONFIG,
+        help="Scheduler config JSON",
+    )
+    parser.add_argument(
+        "--services-config",
+        default=DEFAULT_SERVICES_CONFIG,
+        help="Services config JSON",
+    )
     args = parser.parse_args(argv)
     try:
         run_daemon(args.socket, args.scheduler_config, args.services_config)

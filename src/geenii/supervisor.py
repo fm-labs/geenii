@@ -17,6 +17,7 @@ daemon applies at startup and on reload:
         ]
     }
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -37,12 +38,14 @@ from geenii import proc as proc_util
 
 logger = logging.getLogger(__name__)
 
-BACKOFF_INITIAL = 0.5       # restart delay after a clean exit / first crash
-BACKOFF_MAX = 30.0          # upper bound for the exponential restart delay
+BACKOFF_INITIAL = 0.5  # restart delay after a clean exit / first crash
+BACKOFF_MAX = 30.0  # upper bound for the exponential restart delay
 BACKOFF_RESET_AFTER = 60.0  # a process that ran this long counts as healthy again
-RUN_LOG_HISTORY = 50        # number of finished one-shot run() log buffers to keep
+RUN_LOG_HISTORY = 50  # number of finished one-shot run() log buffers to keep
 SUBSCRIBER_QUEUE_SIZE = 1000  # per-subscriber queue bound; oldest events are dropped
-TERMINATE_GRACE_S = proc_util.TERMINATE_GRACE_S  # SIGTERM → SIGKILL grace period when terminating
+TERMINATE_GRACE_S = (
+    proc_util.TERMINATE_GRACE_S
+)  # SIGTERM → SIGKILL grace period when terminating
 
 # Children are spawned via geenii.proc: each in its own process group, so
 # signals reach everything the command spawned, not just the direct child.
@@ -51,18 +54,22 @@ TERMINATE_GRACE_S = proc_util.TERMINATE_GRACE_S  # SIGTERM → SIGKILL grace per
 # Internal state
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ProcConfig:
     name: str
     cmd: List[str]
     restart: bool = True
-    env: Optional[Dict[str, str]] = None   # extra vars; merged into os.environ at spawn time
+    env: Optional[Dict[str, str]] = (
+        None  # extra vars; merged into os.environ at spawn time
+    )
     cwd: Optional[str] = None
     capture_output: bool = True
 
 
 class ServiceConfig(pydantic.BaseModel):
     """One entry of a services config file."""
+
     model_config = {"extra": "allow"}
 
     name: str = pydantic.Field(min_length=1)
@@ -85,7 +92,9 @@ def read_services(config_path: str | Path) -> List[ProcConfig]:
     config_path = Path(config_path)
     data = json.loads(config_path.read_text())
     if not isinstance(data, dict):
-        raise ValueError(f"{config_path}: expected a JSON object with a 'services' list")
+        raise ValueError(
+            f"{config_path}: expected a JSON object with a 'services' list"
+        )
 
     services: List[ProcConfig] = []
     names: set[str] = set()
@@ -93,23 +102,31 @@ def read_services(config_path: str | Path) -> List[ProcConfig]:
         try:
             conf = ServiceConfig.model_validate(entry)
         except pydantic.ValidationError as e:
-            logger.error("Invalid service in %s: %s — skipping entry: %s", config_path, e, entry)
+            logger.error(
+                "Invalid service in %s: %s — skipping entry: %s", config_path, e, entry
+            )
             continue
         if not conf.enabled:
             logger.info("Service '%s' is disabled — skipping", conf.name)
             continue
         if conf.name in names:
-            logger.error("Duplicate service name '%s' in %s — skipping", conf.name, config_path)
+            logger.error(
+                "Duplicate service name '%s' in %s — skipping", conf.name, config_path
+            )
             continue
         names.add(conf.name)
-        services.append(ProcConfig(
-            name=conf.name,
-            cmd=[os.path.expandvars(arg) for arg in conf.cmd],
-            restart=conf.restart,
-            env=conf.env,
-            cwd=os.path.expanduser(os.path.expandvars(conf.cwd)) if conf.cwd else None,
-            capture_output=conf.capture_output,
-        ))
+        services.append(
+            ProcConfig(
+                name=conf.name,
+                cmd=[os.path.expandvars(arg) for arg in conf.cmd],
+                restart=conf.restart,
+                env=conf.env,
+                cwd=os.path.expanduser(os.path.expandvars(conf.cwd))
+                if conf.cwd
+                else None,
+                capture_output=conf.capture_output,
+            )
+        )
     return services
 
 
@@ -127,12 +144,14 @@ class ProcRuntime:
     out_task: Optional[asyncio.Task] = None
     err_task: Optional[asyncio.Task] = None
 
+
 @dataclass
 class RunResult:
     returncode: int
-    stdout: List[str]   # lines, no trailing newline
+    stdout: List[str]  # lines, no trailing newline
     stderr: List[str]
     duration_s: float
+
 
 # ---------------------------------------------------------------------------
 # Log bus: per-process ring buffer + async subscriber queues for streaming
@@ -143,10 +162,10 @@ Tag = Literal["stdout", "stderr", "supervisor"]
 
 @dataclass
 class LogEvent:
-    t: float          # unix timestamp
-    name: str         # process name
-    tag: Tag          # origin
-    msg: str          # log line (no trailing newline)
+    t: float  # unix timestamp
+    name: str  # process name
+    tag: Tag  # origin
+    msg: str  # log line (no trailing newline)
 
     def as_text(self) -> str:
         """Plain-text representation used by the existing string stream."""
@@ -154,7 +173,10 @@ class LogEvent:
 
     def as_json(self) -> str:
         """Compact JSON line (no trailing newline)."""
-        return json.dumps({"t": self.t, "name": self.name, "tag": self.tag, "msg": self.msg}, separators=(",", ":"))
+        return json.dumps(
+            {"t": self.t, "name": self.name, "tag": self.tag, "msg": self.msg},
+            separators=(",", ":"),
+        )
 
 
 class LogBus:
@@ -189,14 +211,16 @@ class LogBus:
             pass
 
     def tail_text(self, n: int) -> List[str]:
-        return [e.as_text() for e in self._buf[-max(1, n):]]
+        return [e.as_text() for e in self._buf[-max(1, n) :]]
 
     def tail_events(self, n: int) -> List[LogEvent]:
-        return list(self._buf[-max(1, n):])
+        return list(self._buf[-max(1, n) :])
+
 
 # ---------------------------------------------------------------------------
 # Supervisor
 # ---------------------------------------------------------------------------
+
 
 class Supervisor:
     """
@@ -228,19 +252,18 @@ class Supervisor:
         # True if a process is running or any watcher tasks are active; used for graceful shutdowns
         return bool(self._runtime) or any(not t.done() for t in self._watchers.values())
 
-
     # ------------------------------------------------------------------
     # One-shot command runner (useful for ad-hoc tasks, not part of the desired-state model)
     # ------------------------------------------------------------------
 
     async def run(
-            self,
-            cmd: List[str],
-            *,
-            env: Optional[Dict[str, str]] = None,
-            cwd: Optional[str] = None,
-            timeout: Optional[float] = None,
-            name: Optional[str] = None,  # visible in status/logs; auto-generated if omitted
+        self,
+        cmd: List[str],
+        *,
+        env: Optional[Dict[str, str]] = None,
+        cwd: Optional[str] = None,
+        timeout: Optional[float] = None,
+        name: Optional[str] = None,  # visible in status/logs; auto-generated if omitted
     ) -> RunResult:
         """
         Spawn a one-shot command, wait for it to finish, return its output.
@@ -271,8 +294,12 @@ class Supervisor:
         try:
             await asyncio.wait_for(
                 asyncio.gather(
-                    proc_util.pump_lines(proc.stdout, partial(collect, "stdout", stdout_lines)),
-                    proc_util.pump_lines(proc.stderr, partial(collect, "stderr", stderr_lines)),
+                    proc_util.pump_lines(
+                        proc.stdout, partial(collect, "stdout", stdout_lines)
+                    ),
+                    proc_util.pump_lines(
+                        proc.stderr, partial(collect, "stderr", stderr_lines)
+                    ),
                     proc.wait(),
                 ),
                 timeout=timeout,
@@ -298,8 +325,6 @@ class Supervisor:
             stderr=stderr_lines,
             duration_s=round(time.time() - t0, 3),
         )
-
-
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -377,7 +402,11 @@ class Supervisor:
 
         # Snapshot copies: ensure() stores its own object, which update_config() mutates
         self._configured = {name: replace(cfg) for name, cfg in new.items()}
-        changes = {"started": sorted(started), "stopped": stopped, "restarted": sorted(restarted)}
+        changes = {
+            "started": sorted(started),
+            "stopped": stopped,
+            "restarted": sorted(restarted),
+        }
         logger.info("Applied services config: %s", changes)
         return changes
 
@@ -551,14 +580,19 @@ class Supervisor:
                 except Exception as exc:
                     # Escalate the same backoff as crashes to avoid tight loops
                     delay = self._next_delay(name, None, 0.0)
-                    self._log(name, f"spawn error: {type(exc).__name__}: {exc}. retrying in {delay:.1f}s")
+                    self._log(
+                        name,
+                        f"spawn error: {type(exc).__name__}: {exc}. retrying in {delay:.1f}s",
+                    )
                     await asyncio.sleep(delay)
 
     async def _spawn(self, name: str, cfg: ProcConfig) -> None:
         self._log(name, f"starting: {' '.join(cfg.cmd)}")
 
         # cfg.env is merged over os.environ (not a replacement)
-        proc = await proc_util.spawn(cfg.cmd, env=cfg.env, cwd=cfg.cwd, capture_output=cfg.capture_output)
+        proc = await proc_util.spawn(
+            cfg.cmd, env=cfg.env, cwd=cfg.cwd, capture_output=cfg.capture_output
+        )
 
         rt = ProcRuntime(proc=proc)
         self._runtime[name] = rt

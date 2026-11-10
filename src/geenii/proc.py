@@ -12,6 +12,7 @@ Conventions shared by all helpers:
   fall back to signalling the child alone.
 - Termination: SIGTERM to the group, wait up to a grace period, then SIGKILL.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -83,7 +84,9 @@ async def spawn(
     )
 
 
-async def terminate(proc: asyncio.subprocess.Process, grace: float = TERMINATE_GRACE_S) -> Optional[int]:
+async def terminate(
+    proc: asyncio.subprocess.Process, grace: float = TERMINATE_GRACE_S
+) -> Optional[int]:
     """Terminate proc's process group: SIGTERM, wait up to grace seconds, then SIGKILL.
 
     Returns the exit code.  A process that has already exited is left alone.
@@ -105,7 +108,9 @@ def shell_argv(command: str) -> list[str]:
     return ["/bin/sh", "-c", command]
 
 
-def terminate_sync(proc: subprocess.Popen, grace: float = TERMINATE_GRACE_S) -> Optional[int]:
+def terminate_sync(
+    proc: subprocess.Popen, grace: float = TERMINATE_GRACE_S
+) -> Optional[int]:
     """Blocking variant of terminate() for subprocess.Popen (start it with start_new_session=True)."""
     if proc.poll() is not None:
         return proc.returncode
@@ -117,7 +122,9 @@ def terminate_sync(proc: subprocess.Popen, grace: float = TERMINATE_GRACE_S) -> 
         return proc.wait()
 
 
-async def pump_lines(stream: asyncio.StreamReader, on_line: Callable[[str], None]) -> None:
+async def pump_lines(
+    stream: asyncio.StreamReader, on_line: Callable[[str], None]
+) -> None:
     """Read stream until EOF, calling on_line with each decoded line (trailing whitespace stripped)."""
     while True:
         line = await stream.readline()

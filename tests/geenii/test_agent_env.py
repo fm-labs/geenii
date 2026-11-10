@@ -18,7 +18,14 @@ def store(tmp_path):
 
 
 def test_vars_and_secrets_round_trip(store):
-    values = {"PLAIN": "abc", "SPACES": "a b c", "QUOTE": "it's \"quoted\"", "HASH": "x # y", "MULTI": "line1\nline2", "EMPTY": ""}
+    values = {
+        "PLAIN": "abc",
+        "SPACES": "a b c",
+        "QUOTE": 'it\'s "quoted"',
+        "HASH": "x # y",
+        "MULTI": "line1\nline2",
+        "EMPTY": "",
+    }
     store.set_vars("bot", values)
     assert store.get_vars("bot") == values
 
@@ -76,7 +83,11 @@ def test_invoke_tool_passes_secrets_and_redacts_logs(monkeypatch):
 
     assert tool.seen_env == {"MY_PASSWORD": "pw", "SERVICE": "sv", "PLAIN": "p"}
     assert env == {"MY_PASSWORD": "pw", "SERVICE": "sv", "PLAIN": "p"}
-    assert logged["env"] == {"MY_PASSWORD": "REDACTED", "SERVICE": "REDACTED", "PLAIN": "p"}
+    assert logged["env"] == {
+        "MY_PASSWORD": "REDACTED",
+        "SERVICE": "REDACTED",
+        "PLAIN": "p",
+    }
 
 
 @pytest.fixture
@@ -96,7 +107,9 @@ def test_env_routes_never_return_secret_values(client, store):
     response = client.put("/api/v1/agents/bot/env/vars", json={"REGION": "eu"})
     assert response.json() == {"vars": {"REGION": "eu"}, "secrets": []}
 
-    response = client.put("/api/v1/agents/bot/env/secrets/TOKEN", json={"value": "t0k3n"})
+    response = client.put(
+        "/api/v1/agents/bot/env/secrets/TOKEN", json={"value": "t0k3n"}
+    )
     assert response.json() == {"vars": {"REGION": "eu"}, "secrets": ["TOKEN"]}
     assert "t0k3n" not in client.get("/api/v1/agents/bot/env").text
     assert store.get_secrets("bot") == {"TOKEN": "t0k3n"}
@@ -107,12 +120,21 @@ def test_env_routes_never_return_secret_values(client, store):
 
 def test_env_routes_validate(client):
     assert client.get("/api/v1/agents/nobody/env").status_code == 404
-    assert client.put("/api/v1/agents/bot/env/vars", json={"BAD-KEY": "x"}).status_code == 400
-    assert client.put("/api/v1/agents/bot/env/secrets/1BAD", json={"value": "x"}).status_code == 400
+    assert (
+        client.put("/api/v1/agents/bot/env/vars", json={"BAD-KEY": "x"}).status_code
+        == 400
+    )
+    assert (
+        client.put(
+            "/api/v1/agents/bot/env/secrets/1BAD", json={"value": "x"}
+        ).status_code
+        == 400
+    )
 
 
 def test_init_agent_loads_env(monkeypatch, store):
     from geenii import g
+
     store.set_var("bot", "REGION", "eu")
     store.set_secret("bot", "TOKEN", "t0k3n")
     monkeypatch.setattr(g, "AgentEnvStore", lambda: store)
@@ -126,6 +148,22 @@ def test_init_agent_loads_env(monkeypatch, store):
 
 def test_redact_env_vars_matches_short_names_only_as_whole_parts():
     from geenii.tools import _redact_env_vars
-    env = {"PATH": "/bin", "PATTERN": "x", "GH_PAT": "p", "DB_PASS": "p", "PASSENGER": "x", "MY_API_KEY": "k", "HOME": "/h"}
-    assert _redact_env_vars(env) == {"PATH": "/bin", "PATTERN": "x", "GH_PAT": "REDACTED", "DB_PASS": "REDACTED",
-                                     "PASSENGER": "x", "MY_API_KEY": "REDACTED", "HOME": "/h"}
+
+    env = {
+        "PATH": "/bin",
+        "PATTERN": "x",
+        "GH_PAT": "p",
+        "DB_PASS": "p",
+        "PASSENGER": "x",
+        "MY_API_KEY": "k",
+        "HOME": "/h",
+    }
+    assert _redact_env_vars(env) == {
+        "PATH": "/bin",
+        "PATTERN": "x",
+        "GH_PAT": "REDACTED",
+        "DB_PASS": "REDACTED",
+        "PASSENGER": "x",
+        "MY_API_KEY": "REDACTED",
+        "HOME": "/h",
+    }

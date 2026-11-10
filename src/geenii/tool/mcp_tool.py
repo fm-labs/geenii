@@ -25,7 +25,13 @@ class McpTool(Tool):
         self.mcp_server_id = mcp_server_id
         self.type = "mcp_tool"
 
-    def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, *, ctx: ToolCallContext) -> ToolCallResult:
+    def invoke(
+        self,
+        args: dict[str, Any],
+        env: dict[str, str] | None = None,
+        *,
+        ctx: ToolCallContext,
+    ) -> ToolCallResult:
         try:
             client: McpClient = get_mcp_client_for_server(self.mcp_server_id)
             result = client.call_tool(self._mcp_fn_name, args=args)
@@ -33,7 +39,11 @@ class McpTool(Tool):
             result = e
 
         if isinstance(result, Exception):
-            return ToolCallResult(text=str(result), structured_content={"error": str(result)}, is_error=True)
+            return ToolCallResult(
+                text=str(result),
+                structured_content={"error": str(result)},
+                is_error=True,
+            )
 
         text, data, is_error = "", None, False
         if isinstance(result, CallToolResult):
@@ -42,7 +52,7 @@ class McpTool(Tool):
                     text = result.content[0].text
             if result.structured_content:
                 data = result.structured_content
-            elif len(text) > 0: # and result.is_error == False
+            elif len(text) > 0:  # and result.is_error == False
                 # attempt to parse text as json
                 try:
                     data = json.loads(text)
@@ -53,5 +63,5 @@ class McpTool(Tool):
             text = "Unknown result type"
             is_error = True
 
-        #print(text, data, is_error)
+        # print(text, data, is_error)
         return ToolCallResult(text, structured_content=data, is_error=is_error)

@@ -12,15 +12,18 @@ def invoke(value):
     return PythonFunctionTool(name="t", handler=lambda: value).invoke(args={}, ctx=CTX)
 
 
-@pytest.mark.parametrize("value, text", [
-    ("hi", "hi"),
-    ("", ""),
-    (None, ""),
-    (3, "3"),
-    (1.5, "1.5"),
-    (True, "True"),
-    (b"bytes \xff", "bytes �"),
-])
+@pytest.mark.parametrize(
+    "value, text",
+    [
+        ("hi", "hi"),
+        ("", ""),
+        (None, ""),
+        (3, "3"),
+        (1.5, "1.5"),
+        (True, "True"),
+        (b"bytes \xff", "bytes �"),
+    ],
+)
 def test_scalar_results_become_text(value, text):
     assert invoke(value) == ToolCallResult(text=text)
 
@@ -50,7 +53,9 @@ def test_values_that_are_not_json_are_stringified():
 
 
 def test_tool_call_result_is_returned_as_is():
-    expected = ToolCallResult(text="failed", structured_content={"error": "x"}, is_error=True)
+    expected = ToolCallResult(
+        text="failed", structured_content={"error": "x"}, is_error=True
+    )
     assert invoke(expected) is expected
 
 

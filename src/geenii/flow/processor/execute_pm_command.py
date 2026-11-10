@@ -17,18 +17,32 @@ _FINISHED_STATES = ("completed", "failed", "killed", "orphaned")
 
 class ExecutePmCommandConfig(pydantic.BaseModel):
     command: str | list[str] = pydantic.Field(
-        ..., description="A string runs through the shell; a list is executed directly")
+        ..., description="A string runs through the shell; a list is executed directly"
+    )
     cwd: str | None = None
     env: dict[str, str] | None = None
-    pid: str | None = pydantic.Field(None, description="Custom process ID (auto-generated if omitted)")
+    pid: str | None = pydantic.Field(
+        None, description="Custom process ID (auto-generated if omitted)"
+    )
     wait: bool = pydantic.Field(
-        True, description="Wait for the process to finish, streaming its output; "
-                          "otherwise return right after starting it")
+        True,
+        description="Wait for the process to finish, streaming its output; "
+        "otherwise return right after starting it",
+    )
     timeout: float | None = pydantic.Field(
-        None, description="With wait: kill the process and fail the step after this many seconds")
-    check: bool = pydantic.Field(False, description="With wait: fail the step unless the process completed (rc 0)")
-    poll_interval: float = pydantic.Field(0.5, gt=0, description="Seconds between output polls while waiting")
-    socket: str | None = pydantic.Field(None, description="Daemon socket path (default: GEENII_SOCKET or the cache dir)")
+        None,
+        description="With wait: kill the process and fail the step after this many seconds",
+    )
+    check: bool = pydantic.Field(
+        False,
+        description="With wait: fail the step unless the process completed (rc 0)",
+    )
+    poll_interval: float = pydantic.Field(
+        0.5, gt=0, description="Seconds between output polls while waiting"
+    )
+    socket: str | None = pydantic.Field(
+        None, description="Daemon socket path (default: GEENII_SOCKET or the cache dir)"
+    )
 
 
 class ExecutePmCommandOutput(pydantic.BaseModel):
@@ -49,14 +63,20 @@ class _OutputFollower:
     its last newline, so a line still being written is never split.
     """
 
-    def __init__(self, client: ProcessManagerClient, process_id: str, stream: str, chunk_size: int | None = None):
+    def __init__(
+        self,
+        client: ProcessManagerClient,
+        process_id: str,
+        stream: str,
+        chunk_size: int | None = None,
+    ):
         self.client = client
         self.process_id = process_id
         self.stream = stream
         self.chunk_size = chunk_size or CHUNK_SIZE
-        self.offset = 0      # byte offset of the current chunk
-        self.seen = 0        # characters of the current chunk already consumed
-        self.partial = ""    # an incomplete line carried over from a completed chunk
+        self.offset = 0  # byte offset of the current chunk
+        self.seen = 0  # characters of the current chunk already consumed
+        self.partial = ""  # an incomplete line carried over from a completed chunk
         self.parts: list[str] = []
 
     @property
@@ -64,7 +84,9 @@ class _OutputFollower:
         return "".join(self.parts)
 
     def _read(self, offset: int) -> str:
-        return self.client.output(self.process_id, stream=self.stream, offset=offset, limit=self.chunk_size)
+        return self.client.output(
+            self.process_id, stream=self.stream, offset=offset, limit=self.chunk_size
+        )
 
     def poll(self, final: bool = False) -> list[str]:
         """Return the lines written since the last poll. final: the process has exited, flush everything."""
@@ -75,14 +97,14 @@ class _OutputFollower:
             following = self._read(self.offset + self.chunk_size)
             if not following:
                 break
-            self._consume(text[self.seen:], lines)
+            self._consume(text[self.seen :], lines)
             self.offset += self.chunk_size
             self.seen = 0
             text = following
 
-        new = text[self.seen:]
+        new = text[self.seen :]
         if not final:
-            new = new[:new.rfind("\n") + 1]
+            new = new[: new.rfind("\n") + 1]
         self.seen += len(new)
         self._consume(new, lines)
         if final and self.partial:
@@ -105,16 +127,27 @@ class ExecutePmCommandProcessor(FlowProcessor):
     config_model = ExecutePmCommandConfig
     output_model = ExecutePmCommandOutput
 
-    def process(self, input_data: Any, ctx: FlowContext) -> Generator[Any, None, ExecutePmCommandOutput]:
+    def process(
+        self, input_data: Any, ctx: FlowContext
+    ) -> Generator[Any, None, ExecutePmCommandOutput]:
         c: ExecutePmCommandConfig = self.config
         client = ProcessManagerClient(c.socket)
         info = client.start(c.command, env=c.env, cwd=c.cwd, pid=c.pid)
         process_id = info["pid"]
-        yield StepEvent("log", f"Started process {process_id} (system pid {info['system_pid']}): {c.command!r}")
+        yield StepEvent(
+            "log",
+            f"Started process {process_id} (system pid {info['system_pid']}): {c.command!r}",
+        )
         if not c.wait:
-            return ExecutePmCommandOutput(process_id=process_id, system_pid=info["system_pid"], state=info["state"])
+            return ExecutePmCommandOutput(
+                process_id=process_id,
+                system_pid=info["system_pid"],
+                state=info["state"],
+            )
 
-        followers = [_OutputFollower(client, process_id, s) for s in ("stdout", "stderr")]
+        followers = [
+            _OutputFollower(client, process_id, s) for s in ("stdout", "stderr")
+        ]
         deadline = time.monotonic() + c.timeout if c.timeout is not None else None
         try:
             while True:
@@ -129,7 +162,9 @@ class ExecutePmCommandProcessor(FlowProcessor):
                 if ctx.stopping:
                     raise RuntimeError(f"Flow is stopping; killed process {process_id}")
                 if deadline is not None and time.monotonic() >= deadline:
-                    raise TimeoutError(f"Process {process_id} did not finish within {c.timeout}s; killed it")
+                    raise TimeoutError(
+                        f"Process {process_id} did not finish within {c.timeout}s; killed it"
+                    )
                 time.sleep(c.poll_interval)
         except BaseException:
             # The step owns the process while waiting: don't leave it running
@@ -139,10 +174,17 @@ class ExecutePmCommandProcessor(FlowProcessor):
                 pass
             raise
 
-        output = ExecutePmCommandOutput(process_id=process_id, system_pid=info["system_pid"],
-                                        state=info["state"], rc=info.get("exit_code"),
-                                        stdout=followers[0].text, stderr=followers[1].text)
+        output = ExecutePmCommandOutput(
+            process_id=process_id,
+            system_pid=info["system_pid"],
+            state=info["state"],
+            rc=info.get("exit_code"),
+            stdout=followers[0].text,
+            stderr=followers[1].text,
+        )
         if c.check and output.state != "completed":
-            raise RuntimeError(f"Process {process_id} {output.state} with exit code {output.rc}: "
-                               f"{output.stderr.strip()[-500:]}")
+            raise RuntimeError(
+                f"Process {process_id} {output.state} with exit code {output.rc}: "
+                f"{output.stderr.strip()[-500:]}"
+            )
         return output

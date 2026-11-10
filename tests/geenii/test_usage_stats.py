@@ -11,29 +11,73 @@ from geenii.usage_stats import UsageStatsCache
 
 
 def _line(timestamp, provider="ollama", model="qwen3:8b", usage=None, **extra):
-    return json.dumps({"timestamp": timestamp, "provider": provider, "context_id": "ctx", "model": model,
-                       "usage": usage if usage is not None else {"input_tokens": 10, "output_tokens": 5},
-                       "usage_version": 2, **extra})
+    return json.dumps(
+        {
+            "timestamp": timestamp,
+            "provider": provider,
+            "context_id": "ctx",
+            "model": model,
+            "usage": usage
+            if usage is not None
+            else {"input_tokens": 10, "output_tokens": 5},
+            "usage_version": 2,
+            **extra,
+        }
+    )
 
 
 @pytest.fixture
 def logs(tmp_path):
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
-    (log_dir / "ai-usage-2026-09.log").write_text("\n".join([
-        # naive timestamps are local time already
-        _line("2026-09-30T23:30:00"),
-        "not json",
-        _line("not a timestamp"),
-    ]) + "\n")
-    (log_dir / "ai-usage-2026-10.log").write_text("\n".join([
-        _line("2026-10-01T09:15:00", provider="anthropic", model="claude", source="agent:a", task="llm",
-              usage={"input_tokens": 100, "output_tokens": 20, "cache_read_input_tokens": 40}),
-        _line("2026-10-01T09:45:00", provider="anthropic", model="claude", source="agent:a", task="llm",
-              usage={}, error="RuntimeError: down"),
-        _line("2026-10-03T14:00:00", usage={"input_tokens": 1, "output_tokens": 1, "total_duration": 300}),
-        _line("2026-10-03T15:00:00", usage={"input_tokens": "bad"}),
-    ]) + "\n")
+    (log_dir / "ai-usage-2026-09.log").write_text(
+        "\n".join(
+            [
+                # naive timestamps are local time already
+                _line("2026-09-30T23:30:00"),
+                "not json",
+                _line("not a timestamp"),
+            ]
+        )
+        + "\n"
+    )
+    (log_dir / "ai-usage-2026-10.log").write_text(
+        "\n".join(
+            [
+                _line(
+                    "2026-10-01T09:15:00",
+                    provider="anthropic",
+                    model="claude",
+                    source="agent:a",
+                    task="llm",
+                    usage={
+                        "input_tokens": 100,
+                        "output_tokens": 20,
+                        "cache_read_input_tokens": 40,
+                    },
+                ),
+                _line(
+                    "2026-10-01T09:45:00",
+                    provider="anthropic",
+                    model="claude",
+                    source="agent:a",
+                    task="llm",
+                    usage={},
+                    error="RuntimeError: down",
+                ),
+                _line(
+                    "2026-10-03T14:00:00",
+                    usage={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_duration": 300,
+                    },
+                ),
+                _line("2026-10-03T15:00:00", usage={"input_tokens": "bad"}),
+            ]
+        )
+        + "\n"
+    )
     return log_dir
 
 
@@ -57,17 +101,30 @@ def test_totals_and_breakdowns(cache):
 
     by_model = {r["key"]: r for r in stats["by_model"]}
     assert by_model["anthropic:claude"]["calls"] == 2
-    assert by_model["ollama:qwen3:8b"]["calls"] == 3  # the malformed usage still counts as a call
+    assert (
+        by_model["ollama:qwen3:8b"]["calls"] == 3
+    )  # the malformed usage still counts as a call
     assert stats["by_model"][0]["key"] == "anthropic:claude"  # sorted by tokens
     assert {r["key"] for r in stats["by_source"]} == {"agent:a", "untagged"}
     assert {r["key"] for r in stats["by_task"]} == {"llm", "untagged"}
-    assert stats["hourly"][9] == 2 and stats["hourly"][23] == 1 and sum(stats["hourly"]) == 5
+    assert (
+        stats["hourly"][9] == 2
+        and stats["hourly"][23] == 1
+        and sum(stats["hourly"]) == 5
+    )
 
 
 def test_daily_series_fills_days_without_calls(cache):
-    daily = usage_stats.usage_stats(date(2026, 10, 1), date(2026, 10, 4), cache=cache)["daily"]
+    daily = usage_stats.usage_stats(date(2026, 10, 1), date(2026, 10, 4), cache=cache)[
+        "daily"
+    ]
 
-    assert [d["date"] for d in daily] == ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04"]
+    assert [d["date"] for d in daily] == [
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-03",
+        "2026-10-04",
+    ]
     assert [d["calls"] for d in daily] == [2, 0, 2, 0]
     assert daily[0]["tokens_by_provider"] == {"anthropic": 120}
 
@@ -85,6 +142,7 @@ def test_start_after_end_is_an_error(cache):
 def test_offset_timestamps_are_converted_to_local_days(tmp_path, monkeypatch):
     monkeypatch.setenv("TZ", "America/New_York")
     import time
+
     time.tzset()
     try:
         log = tmp_path / "ai-usage-2026-10.log"
@@ -98,7 +156,11 @@ def test_offset_timestamps_are_converted_to_local_days(tmp_path, monkeypatch):
 def test_aggregates_are_cached_until_the_file_changes(cache, logs, monkeypatch):
     calls = []
     original = usage_stats.aggregate_log_file
-    monkeypatch.setattr(usage_stats, "aggregate_log_file", lambda path: calls.append(path) or original(path))
+    monkeypatch.setattr(
+        usage_stats,
+        "aggregate_log_file",
+        lambda path: calls.append(path) or original(path),
+    )
 
     cache.days()
     assert len(calls) == 2
@@ -134,7 +196,9 @@ def client(cache, monkeypatch):
 
 
 def test_route_with_explicit_range(client):
-    response = client.get("/api/v1/stats/usage", params={"start": "2026-10-01", "end": "2026-10-03"})
+    response = client.get(
+        "/api/v1/stats/usage", params={"start": "2026-10-01", "end": "2026-10-03"}
+    )
 
     assert response.status_code == 200
     body = response.json()
@@ -143,16 +207,22 @@ def test_route_with_explicit_range(client):
 
 
 def test_route_last_n_days(client):
-    body = client.get("/api/v1/stats/usage", params={"days": 2, "end": "2026-10-03"}).json()
+    body = client.get(
+        "/api/v1/stats/usage", params={"days": 2, "end": "2026-10-03"}
+    ).json()
     assert body["start"] == "2026-10-02"
     assert len(body["daily"]) == 2
 
 
 def test_route_all_days(client):
-    body = client.get("/api/v1/stats/usage", params={"days": 0, "end": "2026-10-03"}).json()
+    body = client.get(
+        "/api/v1/stats/usage", params={"days": 0, "end": "2026-10-03"}
+    ).json()
     assert body["start"] == "2026-09-30"
 
 
 def test_route_invalid_range_is_400(client):
-    response = client.get("/api/v1/stats/usage", params={"start": "2026-10-03", "end": "2026-10-01"})
+    response = client.get(
+        "/api/v1/stats/usage", params={"start": "2026-10-03", "end": "2026-10-01"}
+    )
     assert response.status_code == 400

@@ -1,4 +1,7 @@
-from geenii.provider.interfaces import AIAudioTranscriptionProvider, AIAudioTranslationProvider
+from geenii.provider.interfaces import (
+    AIAudioTranscriptionProvider,
+    AIAudioTranslationProvider,
+)
 
 
 class WhisperProvider(AIAudioTranscriptionProvider, AIAudioTranslationProvider):
@@ -6,7 +9,6 @@ class WhisperProvider(AIAudioTranscriptionProvider, AIAudioTranslationProvider):
     Whisper provider for audio transcription.
     Uses whispercpp for transcription and translation.
     """
-
 
     def __init__(self, model_id: str):
         super().__init__(model_id=model_id)

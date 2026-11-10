@@ -1,7 +1,9 @@
 import subprocess
 
 
-def tts_say_cli(message: str, max_length: int = 500, speaking_rate: float = 1.0, voice: str = None):
+def tts_say_cli(
+    message: str, max_length: int = 500, speaking_rate: float = 1.0, voice: str = None
+):
     """
     Execute the "say" command on MacOSX to speak the message.
 
@@ -15,14 +17,16 @@ def tts_say_cli(message: str, max_length: int = 500, speaking_rate: float = 1.0,
         message = message[:max_length] + " (message to long, truncated)"
 
     print(f"SAY: {message}")
-    cmd = ["say", '-r', str(int(175 * speaking_rate))]
+    cmd = ["say", "-r", str(int(175 * speaking_rate))]
     if voice:
-        cmd.extend(['-v', voice])
+        cmd.extend(["-v", voice])
     cmd.append(message)
     subprocess.run(cmd)
 
 
-def tts_espeak_cli(message: str, max_length: int = 500, speaking_rate: float = 1.0, voice: str = None):
+def tts_espeak_cli(
+    message: str, max_length: int = 500, speaking_rate: float = 1.0, voice: str = None
+):
     """
     Execute the "espeak" command on Linux to speak the message.
 
@@ -36,9 +40,13 @@ def tts_espeak_cli(message: str, max_length: int = 500, speaking_rate: float = 1
         message = message[:max_length] + " (message to long, truncated)"
 
     print(f"SAY: {message}")
-    cmd = ["espeak", '-s', str(int(175 * speaking_rate))]  # espeak uses words per minute, default is 175 wpm
+    cmd = [
+        "espeak",
+        "-s",
+        str(int(175 * speaking_rate)),
+    ]  # espeak uses words per minute, default is 175 wpm
     if voice:
-        cmd.extend(['-v', voice])
+        cmd.extend(["-v", voice])
     cmd.append(message)
     subprocess.run(cmd)
 

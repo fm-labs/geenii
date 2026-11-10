@@ -10,10 +10,22 @@ from openai import OpenAI
 from geenii import config
 from geenii.chat_models import TextContent, ToolCallContent, JsonContent, ImageContent
 from geenii.config import GEENII_CACHE_DIR
-from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, ChatCompletionRequest, \
-    ChatCompletionResponse, AIModelInfo, AudioTranscriptionApiResponse, Usage
-from geenii.provider.interfaces import AIProvider, AICompletionProvider, AIChatCompletionProvider, \
-    AIImageGeneratorProvider, AIAudioTranscriptionProvider
+from geenii.datamodels import (
+    CompletionResponse,
+    ImageGenerationApiResponse,
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    AIModelInfo,
+    AudioTranscriptionApiResponse,
+    Usage,
+)
+from geenii.provider.interfaces import (
+    AIProvider,
+    AICompletionProvider,
+    AIChatCompletionProvider,
+    AIImageGeneratorProvider,
+    AIAudioTranscriptionProvider,
+)
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.json_util import write_json
 
@@ -38,8 +50,13 @@ def _usage_from_result(model_result) -> Usage | None:
     )
 
 
-class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider, AIImageGeneratorProvider,
-                     AIAudioTranscriptionProvider):
+class OpenAIProvider(
+    AIProvider,
+    AICompletionProvider,
+    AIChatCompletionProvider,
+    AIImageGeneratorProvider,
+    AIAudioTranscriptionProvider,
+):
     """
     A class to represent the OpenAI provider for XAI.
     """
@@ -54,7 +71,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
     IMAGE_MODELS = {
         "gpt-image-1": {"sizes": ["1024x1024", "auto"]},
         "dall-e-2": {"sizes": ["256x256", "512x512", "1024x1024"]},
-        "dall-e-3": {"sizes": ["1024x1024", "1792x1024", "1024x1792"]}
+        "dall-e-3": {"sizes": ["1024x1024", "1792x1024", "1024x1792"]},
     }
 
     TRANSCRIPTION_MODELS = {
@@ -71,12 +88,16 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
     @property
     def client(self):
         if self._client is None:
-            #api_key = os.environ.get("OPENAI_API_KEY", None)
+            # api_key = os.environ.get("OPENAI_API_KEY", None)
             api_key = config.OPENAI_API_KEY
             if not api_key:
-                raise ValueError("OpenAI API key not found. Please set the OPENAI_API_KEY environment variable.")
+                raise ValueError(
+                    "OpenAI API key not found. Please set the OPENAI_API_KEY environment variable."
+                )
 
-            print(f"Connecting using OpenAI API Key starting with '{config.OPENAI_API_KEY[:13]}..'")
+            print(
+                f"Connecting using OpenAI API Key starting with '{config.OPENAI_API_KEY[:13]}..'"
+            )
             return OpenAI(api_key=config.OPENAI_API_KEY)
         return self._client
 
@@ -84,7 +105,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         return config.OPENAI_API_KEY is not None and len(config.OPENAI_API_KEY) > 0
 
     def get_capabilities(self) -> list[str]:
-        return ['completion', 'chat_completion', 'tool_calling', 'image_generation']
+        return ["completion", "chat_completion", "tool_calling", "image_generation"]
 
     def get_models(self) -> list[AIModelInfo]:
         models = []
@@ -96,7 +117,11 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         try:
             openai_models = self.client.models.list()
 
-            cache_data = {"models": [model.model_dump(mode="json") for model in openai_models.data]}
+            cache_data = {
+                "models": [
+                    model.model_dump(mode="json") for model in openai_models.data
+                ]
+            }
             write_json(f"{GEENII_CACHE_DIR}/openai.models.json", cache_data)
         except Exception as e:
             print(f"Error fetching models from OpenAI: {e}")
@@ -106,29 +131,45 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         # Example Entry: Model(id='gpt-4-0613', created=1686588896, object='model', owned_by='openai')
         for model in openai_models.data:
             # filter out models that are not relevant for completion or chat (e.g. audio, image, fine-tuning models)
-            #if not any(keyword in model.id for keyword in ["gpt", "davinci", "curie", "babbage", "ada"]):
+            # if not any(keyword in model.id for keyword in ["gpt", "davinci", "curie", "babbage", "ada"]):
             if not any(keyword in model.id for keyword in ["gpt"]):
                 continue
 
             # filter out preview models and models with date-suffixes (e.g. gpt-4-2024-08-06)
-            if any(keyword in model.id for keyword in ["preview", "2024-", "2025-", "2026-", "image", "audio", "tts", "codex"]):
+            if any(
+                keyword in model.id
+                for keyword in [
+                    "preview",
+                    "2024-",
+                    "2025-",
+                    "2026-",
+                    "image",
+                    "audio",
+                    "tts",
+                    "codex",
+                ]
+            ):
                 continue
 
-            models.append(AIModelInfo(
-                provider=self.name,
-                name=model.id,
-                locality="cloud",
-                description=f"OpenAI model {model.id}",
-                capabilities=[],  # self.get_capabilities(),
-                metadata={
-                    "created_at": datetime_from_timestamp(model.created),
-                    "owned_by": model.owned_by,
-                    "object": model.object
-                }
-            ))
+            models.append(
+                AIModelInfo(
+                    provider=self.name,
+                    name=model.id,
+                    locality="cloud",
+                    description=f"OpenAI model {model.id}",
+                    capabilities=[],  # self.get_capabilities(),
+                    metadata={
+                        "created_at": datetime_from_timestamp(model.created),
+                        "owned_by": model.owned_by,
+                        "object": model.object,
+                    },
+                )
+            )
         return models
 
-    def generate_completion(self, prompt: str, model: str = DEFAULT_MODEL, **kwargs) -> CompletionResponse:
+    def generate_completion(
+        self, prompt: str, model: str = DEFAULT_MODEL, **kwargs
+    ) -> CompletionResponse:
         """
         Get openai completion for the given prompt via OpenAI Responses API.
 
@@ -145,26 +186,30 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         :return:
         """
 
-        system = kwargs.get('system', None)
-        stream = kwargs.get('stream', False)
-        temperature = kwargs.get('temperature', 0.5)
-        max_tokens = kwargs.get('max_tokens', 4096)
-        top_p = kwargs.get('top_p', None)
+        system = kwargs.get("system", None)
+        stream = kwargs.get("stream", False)
+        temperature = kwargs.get("temperature", 0.5)
+        max_tokens = kwargs.get("max_tokens", 4096)
+        top_p = kwargs.get("top_p", None)
         # top_k = kwargs.get('top_k', None) # top_k is not supported in OpenAI Responses API
-        output_format = kwargs.get('output_format', None)
+        output_format = kwargs.get("output_format", None)
         if isinstance(output_format, str):
-            if output_format.lower() == "json" or output_format.lower() == "json_object":
+            if (
+                output_format.lower() == "json"
+                or output_format.lower() == "json_object"
+            ):
                 output_format = {"type": "json_object"}
             else:
                 raise ValueError(
-                    f"Unsupported format: {output_format}. Supported formats are: 'json' or pass a JSON schema object.")
+                    f"Unsupported format: {output_format}. Supported formats are: 'json' or pass a JSON schema object."
+                )
         # if not isinstance(format, dict):
         #    raise ValueError(f"Format must be a string or a JSON schema object, got {type(format)}.")
 
         # if model not in self.get_models():
         #    raise ValueError(f"Model {model} is not supported by {repr(self)}.")
 
-        input_messages = kwargs.get('input', [])
+        input_messages = kwargs.get("input", [])
         # if system is not None:
         #    input_messages.append({"role": "system", "content": system})
         input_messages.append({"role": "user", "content": prompt})
@@ -197,18 +242,24 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         )
         return response
 
-    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry: ToolRegistry=None) -> ChatCompletionResponse:
+    def generate_chat_completion(
+        self, request: ChatCompletionRequest, tool_registry: ToolRegistry = None
+    ) -> ChatCompletionResponse:
         model = request.model or self.DEFAULT_MODEL
         if model.startswith("openai:"):
-            model = model[len("openai:"):]
+            model = model[len("openai:") :]
 
         # map tool names to tool definitions in openai format
         tools = request.tools or set()
         tool_defs_openai = []
-        logger.info(f"Tool registry provided {tool_registry is not None}, tools requested: {tools}")
+        logger.info(
+            f"Tool registry provided {tool_registry is not None}, tools requested: {tools}"
+        )
         if tool_registry is not None and len(tools) > 0:
             _tools = tool_registry.list_tools()
-            tool_defs_openai = [_tool.to_openai() for _tool in _tools if _tool.name in tools]
+            tool_defs_openai = [
+                _tool.to_openai() for _tool in _tools if _tool.name in tools
+            ]
             logger.info(f"OpenAI tools mapped: {len(tool_defs_openai)}")
 
         # mapping history/seed model messages to OpenAI Responses API input format
@@ -218,37 +269,64 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             if message.content and len(message.content) > 0:
                 for content_item in message.content:
                     if content_item.type == "text":
-                        input_messages.append({"role": message.role, "content": content_item.text})
+                        input_messages.append(
+                            {"role": message.role, "content": content_item.text}
+                        )
                     elif content_item.type == "json":
-                        input_messages.append({"role": message.role, "content": json.dumps(content_item.data)})
+                        input_messages.append(
+                            {
+                                "role": message.role,
+                                "content": json.dumps(content_item.data),
+                            }
+                        )
                     elif content_item.type == "tool_call":
-                        input_messages.append({
-                            "type": "function_call",
-                            "call_id": content_item.call_id,
-                            "name": content_item.name,
-                            "arguments": json.dumps(content_item.arguments)  # OpenAI expects arguments as a JSON string
-                        })
-                    elif content_item.type == "tool_call_result":
-                        # check if the corresponding tool call is in the input messages, if not we need to add a placeholder for it, otherwise OpenAI Responses API will return an error "Tool call result provided for unknown tool call ID: {call_id}"
-                        if not any(m for m in input_messages if m.get("type") == "function_call" and m.get("call_id") == content_item.call_id):
-                            logger.warning(f"Tool call result with call_id {content_item.call_id} does not have a corresponding tool call in the input messages, adding a placeholder for it.")
-                            input_messages.append({
+                        input_messages.append(
+                            {
                                 "type": "function_call",
                                 "call_id": content_item.call_id,
                                 "name": content_item.name,
-                                "arguments": json.dumps(content_item.arguments)  # OpenAI expects arguments as a JSON string
-                            })
+                                "arguments": json.dumps(
+                                    content_item.arguments
+                                ),  # OpenAI expects arguments as a JSON string
+                            }
+                        )
+                    elif content_item.type == "tool_call_result":
+                        # check if the corresponding tool call is in the input messages, if not we need to add a placeholder for it, otherwise OpenAI Responses API will return an error "Tool call result provided for unknown tool call ID: {call_id}"
+                        if not any(
+                            m
+                            for m in input_messages
+                            if m.get("type") == "function_call"
+                            and m.get("call_id") == content_item.call_id
+                        ):
+                            logger.warning(
+                                f"Tool call result with call_id {content_item.call_id} does not have a corresponding tool call in the input messages, adding a placeholder for it."
+                            )
+                            input_messages.append(
+                                {
+                                    "type": "function_call",
+                                    "call_id": content_item.call_id,
+                                    "name": content_item.name,
+                                    "arguments": json.dumps(
+                                        content_item.arguments
+                                    ),  # OpenAI expects arguments as a JSON string
+                                }
+                            )
 
-                        input_messages.append({
-                            "type": "function_call_output",
-                            "call_id": content_item.call_id,
-                            "output": content_item.result
-                        })
+                        input_messages.append(
+                            {
+                                "type": "function_call_output",
+                                "call_id": content_item.call_id,
+                                "output": content_item.result,
+                            }
+                        )
                     else:
                         print(
-                            f"Unsupported model message content type for openai chat completion input: {content_item.type}")
+                            f"Unsupported model message content type for openai chat completion input: {content_item.type}"
+                        )
 
-        print(f"Mapped {len(messages)} input messages to {len(input_messages)} OpenAI input messages.")
+        print(
+            f"Mapped {len(messages)} input messages to {len(input_messages)} OpenAI input messages."
+        )
         print(input_messages)
 
         # finally add the user prompt
@@ -258,24 +336,42 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
 
         #  build system instructions
         system_prompt = request.system or [self.DEFAULT_SYSTEM_PROMPT]
-        instructions = "\n".join(system_prompt) if isinstance(system_prompt, list) else system_prompt
+        instructions = (
+            "\n".join(system_prompt)
+            if isinstance(system_prompt, list)
+            else system_prompt
+        )
 
         output_format = {"type": "text"}
         if request.output_schema:
             schema_name = "OutputSchema"
-            output_format = {"type": "json_schema", "schema": request.output_schema, "name": schema_name}
+            output_format = {
+                "type": "json_schema",
+                "schema": request.output_schema,
+                "name": schema_name,
+            }
         elif request.output_format == "json":
             output_format = {"type": "json_object"}
 
         model_params = request.model_parameters or {}
-        temperature = model_params.get('temperature', request.temperature) or self.DEFAULT_TEMPERATURE
-        max_tokens = model_params.get('max_tokens', request.max_tokens) or self.DEFAULT_MAX_TOKENS
-        top_p = model_params.get('top_p', request.top_p) or None
-        max_tool_calls = model_params.get('max_tool_calls', self.DEFAULT_MAX_TOOL_CALLS)
+        temperature = (
+            model_params.get("temperature", request.temperature)
+            or self.DEFAULT_TEMPERATURE
+        )
+        max_tokens = (
+            model_params.get("max_tokens", request.max_tokens)
+            or self.DEFAULT_MAX_TOKENS
+        )
+        top_p = model_params.get("top_p", request.top_p) or None
+        max_tool_calls = model_params.get("max_tool_calls", self.DEFAULT_MAX_TOOL_CALLS)
 
         # call OpenAI Responses API
-        logger.info("OPENAI: Generate completion temperature=%d context=%d with %d input messages:",
-                    float(temperature), int(max_tokens), len(input_messages))
+        logger.info(
+            "OPENAI: Generate completion temperature=%d context=%d with %d input messages:",
+            float(temperature),
+            int(max_tokens),
+            len(input_messages),
+        )
         time_start = time.time()
         model_result = self.client.responses.create(
             model=model,
@@ -300,38 +396,56 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             if output_item.type == "message":
                 for content_item in output_item.content:
                     if content_item.type == "output_text":
-                        #logger.info(f"Model output text: {content_item.text}")
+                        # logger.info(f"Model output text: {content_item.text}")
                         _text = content_item.text
                         _text_part = TextContent(text=_text)
-                        if _text.strip().startswith("{") and _text.strip().endswith("}"):
-                            logger.info("Looks like the content is JSON, trying to parse it.")
+                        if _text.strip().startswith("{") and _text.strip().endswith(
+                            "}"
+                        ):
+                            logger.info(
+                                "Looks like the content is JSON, trying to parse it."
+                            )
                             try:
                                 json_data = json.loads(_text)
                                 _text_part = JsonContent(data=json_data)
                             except json.JSONDecodeError:
                                 logger.warning(
-                                    "Content looks like JSON but failed to parse, adding as plain text.")
+                                    "Content looks like JSON but failed to parse, adding as plain text."
+                                )
                         output_parts.append(_text_part)
                     elif content_item.type == "refusal":
                         logger.critical(f"Model refusal: {content_item.refusal}")
-                        output_parts.append(TextContent(text=f"Model refusal: {content_item.refusal}"))
+                        output_parts.append(
+                            TextContent(text=f"Model refusal: {content_item.refusal}")
+                        )
 
             elif output_item.type == "function_call":
                 # https://platform.openai.com/docs/guides/function-calling?api-mode=responses#handling-function-calls
                 fn_call_id = output_item.call_id
                 fn_name = output_item.name
                 fn_args = json.loads(output_item.arguments)
-                logger.info(f"Tool call detected: Function {fn_name} with args: {fn_args} ({fn_call_id})")
+                logger.info(
+                    f"Tool call detected: Function {fn_name} with args: {fn_args} ({fn_call_id})"
+                )
 
-                output_parts.append(ToolCallContent(name=fn_name, arguments=fn_args, call_id=fn_call_id))
+                output_parts.append(
+                    ToolCallContent(name=fn_name, arguments=fn_args, call_id=fn_call_id)
+                )
             else:
-                logger.warning(f"Unsupported OpenAI response output item type: {output_item.type}")
-                output_parts.append(TextContent(text=f"Unsupported OpenAI response item type: {output_item.type}"))
+                logger.warning(
+                    f"Unsupported OpenAI response output item type: {output_item.type}"
+                )
+                output_parts.append(
+                    TextContent(
+                        text=f"Unsupported OpenAI response item type: {output_item.type}"
+                    )
+                )
 
         # Usage
         usage = _usage_from_result(model_result)
         logger.info(
-            f"Tokens used in this chat completion: {usage.total_tokens if usage else 'unknown'}, processing time approx: {time_end - time_start:.8f} seconds")
+            f"Tokens used in this chat completion: {usage.total_tokens if usage else 'unknown'}, processing time approx: {time_end - time_start:.8f} seconds"
+        )
 
         return ChatCompletionResponse(
             id=uuid.uuid4().hex,
@@ -341,13 +455,16 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             output=output_parts,
             output_text=model_result.output_text,
             model_result=model_result.model_dump(),
-            usage=usage
+            usage=usage,
         )
 
-    def generate_audio_transcription(self, model: str, audio: bytes | str, **kwargs) -> AudioTranscriptionApiResponse:
+    def generate_audio_transcription(
+        self, model: str, audio: bytes | str, **kwargs
+    ) -> AudioTranscriptionApiResponse:
         if isinstance(audio, bytes):
             # OpenAI API expects a file-like object, so we can use BytesIO
             from io import BytesIO
+
             audio = BytesIO(audio)
         elif isinstance(audio, str):
             if not os.path.exists(audio):
@@ -361,11 +478,12 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             id=uuid.uuid4().hex,
             timestamp=int(time.time()),
             model=f"{self.name}:{model}",
-            output_text=transcript.text
+            output_text=transcript.text,
         )
 
-    def generate_image(self,  model: str, prompt: str, n: int = 1, size: str = "256x256",
-                       **kwargs) -> ImageGenerationApiResponse:
+    def generate_image(
+        self, model: str, prompt: str, n: int = 1, size: str = "256x256", **kwargs
+    ) -> ImageGenerationApiResponse:
         """
         Generate an image using OpenAI's DALL-E model.
 
@@ -379,19 +497,21 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
         """
 
         # set response format based on the model
-        if kwargs.get('response_format') is None and model != "gpt-image-1":
+        if kwargs.get("response_format") is None and model != "gpt-image-1":
             # Not supported for gpt-image-1, but required for other models. OpenAI default is 'url'.
-            kwargs['response_format'] = "b64_json"
-        if kwargs.get('output_format') is None and model == "gpt-image-1":
+            kwargs["response_format"] = "b64_json"
+        if kwargs.get("output_format") is None and model == "gpt-image-1":
             # gpt-image-1 supports output_format, but not response_format
-            kwargs['output_format'] = "png"
+            kwargs["output_format"] = "png"
 
         # check parameters
         if model not in self.IMAGE_MODELS:
             raise ValueError(f"Model {model} is not supported by {repr(self)}.")
-        if size not in self.IMAGE_MODELS[model]['sizes']:
-            raise ValueError(f"Size {size} is not supported by model {model}. "
-                             f"Supported sizes are: {self.IMAGE_MODELS[model]['sizes']}.")
+        if size not in self.IMAGE_MODELS[model]["sizes"]:
+            raise ValueError(
+                f"Size {size} is not supported by model {model}. "
+                f"Supported sizes are: {self.IMAGE_MODELS[model]['sizes']}."
+            )
 
         # # Fake response for 'response_format=url' for testing purposes
         # if kwargs.get('response_format') == "url":
@@ -414,7 +534,7 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             # quality="standard",
             # response_format="b64_json", # omit for gpt-image-1
             # output_format="png", # only gpt-image-1 supports this
-            **kwargs  # allow additional parameters
+            **kwargs,  # allow additional parameters
         )
 
         # image_url = img.data[0].url
@@ -436,9 +556,9 @@ class OpenAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider,
             timestamp=int(time.time()),
             prompt=prompt,
             model=f"{self.name}:{model}",
-            #provider=self.name,
+            # provider=self.name,
             # model_result=img.model_dump(), # skip model_dump() as it contains large data
-            output=[ImageContent.model_validate(_map_item(item)) for item in img.data]
+            output=[ImageContent.model_validate(_map_item(item)) for item in img.data],
         )
 
 

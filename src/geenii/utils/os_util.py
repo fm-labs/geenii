@@ -1,12 +1,14 @@
 import os
 from shutil import which
 
+
 def get_os_name() -> str:
     platform = os.environ.get("PLATFORM", "").lower()
     if platform in ("windows", "linux", "darwin"):
         return platform
     # Fallback to sys.platform if PLATFORM env var is not set or unrecognized
     import sys
+
     if sys.platform.startswith("win"):
         return "windows"
     elif sys.platform.startswith("linux"):

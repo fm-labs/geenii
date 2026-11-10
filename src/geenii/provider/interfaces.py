@@ -1,8 +1,15 @@
 import abc
 
-from geenii.datamodels import CompletionResponse, ImageGenerationApiResponse, AudioTranscriptionApiResponse, \
-    AudioSpeechGenerationApiResponse, AudioTranslationApiResponse, ChatCompletionResponse, ChatCompletionRequest, \
-    AIModelInfo
+from geenii.datamodels import (
+    CompletionResponse,
+    ImageGenerationApiResponse,
+    AudioTranscriptionApiResponse,
+    AudioSpeechGenerationApiResponse,
+    AudioTranslationApiResponse,
+    ChatCompletionResponse,
+    ChatCompletionRequest,
+    AIModelInfo,
+)
 
 
 class AIProvider(abc.ABC):
@@ -40,7 +47,9 @@ class AICompletionProvider(abc.ABC):
     """
 
     @abc.abstractmethod
-    def generate_completion(self, model: str, prompt: str, **kwargs) -> CompletionResponse:
+    def generate_completion(
+        self, model: str, prompt: str, **kwargs
+    ) -> CompletionResponse:
         """Get an AI completion for the given prompt"""
         pass
 
@@ -52,7 +61,9 @@ class AIChatCompletionProvider(abc.ABC):
     """
 
     @abc.abstractmethod
-    def generate_chat_completion(self, request: ChatCompletionRequest, tool_registry = None) -> ChatCompletionResponse:
+    def generate_chat_completion(
+        self, request: ChatCompletionRequest, tool_registry=None
+    ) -> ChatCompletionResponse:
         """Get an AI chat completion with tooling support for the given prompt and tools"""
         pass
 
@@ -64,7 +75,9 @@ class AIImageGeneratorProvider(abc.ABC):
     """
 
     @abc.abstractmethod
-    def generate_image(self, model: str, prompt: str, **kwargs) -> ImageGenerationApiResponse:
+    def generate_image(
+        self, model: str, prompt: str, **kwargs
+    ) -> ImageGenerationApiResponse:
         """Generate an image based on the given prompt"""
         pass
 
@@ -76,7 +89,9 @@ class AISpeechGeneratorProvider(abc.ABC):
     """
 
     @abc.abstractmethod
-    def generate_speech(self, model: str, text: str, **kwargs) -> AudioSpeechGenerationApiResponse:
+    def generate_speech(
+        self, model: str, text: str, **kwargs
+    ) -> AudioSpeechGenerationApiResponse:
         """Convert the given text into speech"""
         pass
 
@@ -88,7 +103,9 @@ class AIAudioTranscriptionProvider(abc.ABC):
     """
 
     @abc.abstractmethod
-    def generate_audio_transcription(self, model: str, audio: bytes | str, **kwargs) -> AudioTranscriptionApiResponse:
+    def generate_audio_transcription(
+        self, model: str, audio: bytes | str, **kwargs
+    ) -> AudioTranscriptionApiResponse:
         """Convert the given audio into text"""
         pass
 
@@ -100,10 +117,12 @@ class AIAudioTranslationProvider(abc.ABC):
     """
 
     @abc.abstractmethod
-    def generate_audio_translation(self, model: str, audio: bytes | str, target_language: str,
-                                   **kwargs) -> AudioTranslationApiResponse:
+    def generate_audio_translation(
+        self, model: str, audio: bytes | str, target_language: str, **kwargs
+    ) -> AudioTranslationApiResponse:
         """Translate the given audio into the target language"""
         pass
+
 
 # class AITextTranslationProvider(abc.ABC):
 #     """Abstract base class for AI text translation providers.

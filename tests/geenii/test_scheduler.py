@@ -37,8 +37,12 @@ def _spawn_grandchild_cmd(pidfile) -> list[str]:
 
 def test_timeout_kills_command_and_its_children(tmp_path, caplog):
     pidfile = tmp_path / "pid"
-    task = ScheduledTask(name="slow", interval="cron:* * * * *",
-                         cmd=_spawn_grandchild_cmd(pidfile), timeout=0.5)
+    task = ScheduledTask(
+        name="slow",
+        interval="cron:* * * * *",
+        cmd=_spawn_grandchild_cmd(pidfile),
+        timeout=0.5,
+    )
     task.load()
 
     t0 = time.time()
@@ -57,10 +61,17 @@ def test_stop_kills_running_command(tmp_path):
 
     async def main():
         sched = Scheduler(ProcessManager(str(tmp_path / "procs")))
-        await sched.add_task(ScheduledTask(name="long", interval="cron:* * * * *",
-                                           cmd=_spawn_grandchild_cmd(pidfile)))
+        await sched.add_task(
+            ScheduledTask(
+                name="long",
+                interval="cron:* * * * *",
+                cmd=_spawn_grandchild_cmd(pidfile),
+            )
+        )
         await sched.start()
-        await asyncio.sleep(0.05)  # let the main loop compute its initial schedule first
+        await asyncio.sleep(
+            0.05
+        )  # let the main loop compute its initial schedule first
         sched._schedule["long"] = datetime.now(timezone.utc) - timedelta(seconds=1)
         grandchild = int(await asyncio.to_thread(_wait_for_file, pidfile))
         await sched.stop()
@@ -74,8 +85,11 @@ def test_stop_kills_running_command(tmp_path):
 
 def test_command_runs_as_process_manager_process(tmp_path):
     pm = ProcessManager(str(tmp_path / "procs"))
-    task = ScheduledTask(name="echo task", interval="cron:* * * * *",
-                         cmd=["sh", "-c", "echo one; echo two; echo err >&2"])
+    task = ScheduledTask(
+        name="echo task",
+        interval="cron:* * * * *",
+        cmd=["sh", "-c", "echo one; echo two; echo err >&2"],
+    )
     task.load()
     asyncio.run(task.run(pm))
 
@@ -87,12 +101,18 @@ def test_command_runs_as_process_manager_process(tmp_path):
         return info, await pm.output(run_id), await pm.output(run_id, stream="stderr")
 
     info, out, err = asyncio.run(check())
-    assert (info.state, info.exit_code, info.cmd) == (ProcessState.COMPLETED, 0, task.cmd)
+    assert (info.state, info.exit_code, info.cmd) == (
+        ProcessState.COMPLETED,
+        0,
+        task.cmd,
+    )
     assert (out, err) == ("one\ntwo\n", "err\n")
 
 
 def test_failed_command_is_logged_with_run_id(tmp_path, caplog):
-    task = ScheduledTask(name="fails", interval="cron:* * * * *", cmd=["sh", "-c", "exit 4"])
+    task = ScheduledTask(
+        name="fails", interval="cron:* * * * *", cmd=["sh", "-c", "exit 4"]
+    )
     task.load()
     with caplog.at_level(logging.ERROR, logger="geenii.scheduler"):
         asyncio.run(task.run(ProcessManager(str(tmp_path / "procs"))))
@@ -138,9 +158,16 @@ def test_callable_receives_params_and_env():
     def no_args():
         calls.append("no-args")
 
-    t1 = ScheduledTask(name="a", interval="cron:* * * * *", run_fn=with_args,
-                       params=["x", "y"], env={"K": "V"})
-    t2 = ScheduledTask(name="b", interval="cron:* * * * *", run_fn=no_args, params=["ignored"])
+    t1 = ScheduledTask(
+        name="a",
+        interval="cron:* * * * *",
+        run_fn=with_args,
+        params=["x", "y"],
+        env={"K": "V"},
+    )
+    t2 = ScheduledTask(
+        name="b", interval="cron:* * * * *", run_fn=no_args, params=["ignored"]
+    )
     t1.load()
     t2.load()
     asyncio.run(t1.run())
@@ -159,36 +186,66 @@ def test_callable_with_unsupported_signature_fails_to_load():
 
 def test_duplicate_task_names_are_rejected(tmp_path):
     config = tmp_path / "scheduler.json"
-    config.write_text(json.dumps({"tasks": [
-        {"name": "dup", "interval": "cron:* * * * *", "cmd": ["true"]},
-        {"name": "dup", "interval": "cron:*/5 * * * *", "cmd": ["false"]},
-    ]}))
+    config.write_text(
+        json.dumps(
+            {
+                "tasks": [
+                    {"name": "dup", "interval": "cron:* * * * *", "cmd": ["true"]},
+                    {"name": "dup", "interval": "cron:*/5 * * * *", "cmd": ["false"]},
+                ]
+            }
+        )
+    )
     sched = Scheduler()
     sched.load_config(config)
     assert [t.cmd for t in sched.tasks] == [["true"]]
 
     with pytest.raises(ValueError):
-        asyncio.run(sched.add_task(ScheduledTask(name="dup", interval="cron:* * * * *", cmd=["true"])))
+        asyncio.run(
+            sched.add_task(
+                ScheduledTask(name="dup", interval="cron:* * * * *", cmd=["true"])
+            )
+        )
 
 
 def test_config_fields_are_loaded(tmp_path):
     config = tmp_path / "scheduler.json"
-    config.write_text(json.dumps({"tasks": [
-        {"name": "t", "interval": "cron:* * * * *", "cmd": ["true"],
-         "timeout": 12, "allow_overlap": True, "working_dir": str(tmp_path)},
-    ]}))
+    config.write_text(
+        json.dumps(
+            {
+                "tasks": [
+                    {
+                        "name": "t",
+                        "interval": "cron:* * * * *",
+                        "cmd": ["true"],
+                        "timeout": 12,
+                        "allow_overlap": True,
+                        "working_dir": str(tmp_path),
+                    },
+                ]
+            }
+        )
+    )
     sched = Scheduler()
     sched.load_config(config)
     task = sched.tasks[0]
-    assert (task.timeout, task.allow_overlap, str(task.working_dir)) == (12, True, str(tmp_path))
+    assert (task.timeout, task.allow_overlap, str(task.working_dir)) == (
+        12,
+        True,
+        str(tmp_path),
+    )
 
 
 def test_overlapping_run_is_skipped(caplog):
     async def main():
         sched = Scheduler()
-        await sched.add_task(ScheduledTask(name="busy", interval="cron:* * * * *", cmd=["sleep", "30"]))
+        await sched.add_task(
+            ScheduledTask(name="busy", interval="cron:* * * * *", cmd=["sleep", "30"])
+        )
         await sched.start()
-        await asyncio.sleep(0.05)  # let the main loop compute its initial schedule first
+        await asyncio.sleep(
+            0.05
+        )  # let the main loop compute its initial schedule first
         past = datetime.now(timezone.utc) - timedelta(seconds=1)
         sched._schedule["busy"] = past
         await asyncio.sleep(1.2)
@@ -226,11 +283,13 @@ def test_reload_config_while_running(tmp_path):
     def write(tasks):
         config.write_text(json.dumps({"tasks": tasks}))
 
-    write([
-        {"name": "keep", "interval": "cron:0 0 1 1 *", "cmd": ["true"]},
-        {"name": "retime", "interval": "cron:0 0 1 1 *", "cmd": ["true"]},
-        {"name": "gone", "interval": "cron:0 0 1 1 *", "cmd": ["sleep", "30"]},
-    ])
+    write(
+        [
+            {"name": "keep", "interval": "cron:0 0 1 1 *", "cmd": ["true"]},
+            {"name": "retime", "interval": "cron:0 0 1 1 *", "cmd": ["true"]},
+            {"name": "gone", "interval": "cron:0 0 1 1 *", "cmd": ["sleep", "30"]},
+        ]
+    )
 
     async def main():
         sched = Scheduler()
@@ -240,11 +299,18 @@ def test_reload_config_while_running(tmp_path):
         await sched.run_now("gone")  # a run in progress when its task is removed
         keep_next = sched._schedule["keep"]
 
-        write([
-            {"name": "keep", "interval": "cron:0 0 1 1 *", "cmd": ["true"], "timeout": 5},
-            {"name": "retime", "interval": "cron:*/5 * * * *", "cmd": ["true"]},
-            {"name": "new", "interval": "cron:0 0 1 1 *", "cmd": ["true"]},
-        ])
+        write(
+            [
+                {
+                    "name": "keep",
+                    "interval": "cron:0 0 1 1 *",
+                    "cmd": ["true"],
+                    "timeout": 5,
+                },
+                {"name": "retime", "interval": "cron:*/5 * * * *", "cmd": ["true"]},
+                {"name": "new", "interval": "cron:0 0 1 1 *", "cmd": ["true"]},
+            ]
+        )
         changes = await sched.reload_config(config)
         state = {
             "names": [t.name for t in sched.tasks],
@@ -259,7 +325,11 @@ def test_reload_config_while_running(tmp_path):
         return changes, state
 
     changes, state = asyncio.run(main())
-    assert changes == {"added": ["new"], "removed": ["gone"], "updated": ["keep", "retime"]}
+    assert changes == {
+        "added": ["new"],
+        "removed": ["gone"],
+        "updated": ["keep", "retime"],
+    }
     assert state == {
         "names": ["keep", "retime", "new"],
         "keep_unchanged": True,

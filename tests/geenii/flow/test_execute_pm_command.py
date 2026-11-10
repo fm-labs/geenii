@@ -21,7 +21,9 @@ def daemon_socket():
     # Unix socket paths are limited to ~104 bytes on macOS; pytest's tmp_path is often longer
     d = tempfile.mkdtemp(prefix="pmflow", dir="/tmp" if os.path.isdir("/tmp") else None)
     socket_path = os.path.join(d, "pm.sock")
-    service = ProcessManagerService(socket_path, pm=ProcessManager(os.path.join(d, "procs")))
+    service = ProcessManagerService(
+        socket_path, pm=ProcessManager(os.path.join(d, "procs"))
+    )
     loop = asyncio.new_event_loop()
     started = threading.Event()
 
@@ -44,19 +46,26 @@ def daemon_socket():
 
 
 def _step(socket_path, step_id="a", **config):
-    return {"id": step_id, "processor": "execute_pm_command",
-            "config": {"socket": socket_path, "poll_interval": 0.05, **config}}
+    return {
+        "id": step_id,
+        "processor": "execute_pm_command",
+        "config": {"socket": socket_path, "poll_interval": 0.05, **config},
+    }
 
 
 def _run(*steps):
     events = []
-    result = Flow("t", list(steps)).run(on_event=lambda e: events.append((e, time.monotonic())))
+    result = Flow("t", list(steps)).run(
+        on_event=lambda e: events.append((e, time.monotonic()))
+    )
     return result, events
 
 
 def test_waits_and_streams_output(daemon_socket):
-    script = ("import sys, time; print('one', flush=True); time.sleep(0.3); "
-              "print('err ✓', file=sys.stderr); print('two'); sys.stdout.write('no newline')")
+    script = (
+        "import sys, time; print('one', flush=True); time.sleep(0.3); "
+        "print('err ✓', file=sys.stderr); print('two'); sys.stdout.write('no newline')"
+    )
     result, events = _run(_step(daemon_socket, command=[sys.executable, "-c", script]))
     out = result.get("a").output
     assert result.get("a").status == "success"
@@ -64,7 +73,11 @@ def test_waits_and_streams_output(daemon_socket):
     assert out["stderr"] == "err ✓\n"
     assert (out["state"], out["rc"]) == ("completed", 0)
     assert len(out["process_id"]) == 12
-    assert out["system_pid"] == ProcessManagerClient(daemon_socket).status(out["process_id"])["system_pid"] > 0
+    assert (
+        out["system_pid"]
+        == ProcessManagerClient(daemon_socket).status(out["process_id"])["system_pid"]
+        > 0
+    )
 
     streamed = [(e.type, e.data) for e, _ in events if e.type in ("stdout", "stderr")]
     assert [d for t, d in streamed if t == "stdout"] == ["one", "two", "no newline"]
@@ -78,9 +91,11 @@ def test_waits_and_streams_output(daemon_socket):
 def test_follows_output_across_chunks(daemon_socket, monkeypatch):
     monkeypatch.setattr(execute_pm_command, "CHUNK_SIZE", 16)
     expected = [f"line {i} é😀 " + "x" * (i % 23) for i in range(60)]
-    script = ("import time\nfor i in range(60):\n"
-              "    print(f'line {i} é😀 ' + 'x' * (i % 23), flush=True)\n"
-              "    if i % 10 == 0: time.sleep(0.05)\n")
+    script = (
+        "import time\nfor i in range(60):\n"
+        "    print(f'line {i} é😀 ' + 'x' * (i % 23), flush=True)\n"
+        "    if i % 10 == 0: time.sleep(0.05)\n"
+    )
     result, events = _run(_step(daemon_socket, command=[sys.executable, "-c", script]))
     assert result.get("a").output["stdout"] == "".join(line + "\n" for line in expected)
     assert [e.data for e, _ in events if e.type == "stdout"] == expected
@@ -88,20 +103,31 @@ def test_follows_output_across_chunks(daemon_socket, monkeypatch):
 
 def test_no_wait_returns_after_start(daemon_socket):
     started = time.monotonic()
-    result, _ = _run(_step(daemon_socket, command=["sleep", "30"], pid="bg-sleep", wait=False))
+    result, _ = _run(
+        _step(daemon_socket, command=["sleep", "30"], pid="bg-sleep", wait=False)
+    )
     assert time.monotonic() - started < 3
     client = ProcessManagerClient(daemon_socket)
     status = client.status("bg-sleep")
     assert status["state"] == "running"
-    assert result.get("a").output == {"process_id": "bg-sleep", "system_pid": status["system_pid"],
-                                      "state": "running", "rc": None, "stdout": None, "stderr": None}
+    assert result.get("a").output == {
+        "process_id": "bg-sleep",
+        "system_pid": status["system_pid"],
+        "state": "running",
+        "rc": None,
+        "stdout": None,
+        "stderr": None,
+    }
     client.kill("bg-sleep")
 
 
 def test_output_references_and_check(daemon_socket):
     result, _ = _run(
         _step(daemon_socket, "a", command="printf hello"),
-        {**_step(daemon_socket, "b", command="echo ${a.stdout} | tr a-z A-Z"), "depends_on": "a"},
+        {
+            **_step(daemon_socket, "b", command="echo ${a.stdout} | tr a-z A-Z"),
+            "depends_on": "a",
+        },
         _step(daemon_socket, "c", command="echo bad >&2; exit 3", check=True),
     )
     assert result.get("b").output["stdout"] == "HELLO\n"
@@ -111,7 +137,9 @@ def test_output_references_and_check(daemon_socket):
 
 def test_timeout_kills_process(daemon_socket):
     started = time.monotonic()
-    result, _ = _run(_step(daemon_socket, command=["sleep", "30"], pid="slow", timeout=0.3))
+    result, _ = _run(
+        _step(daemon_socket, command=["sleep", "30"], pid="slow", timeout=0.3)
+    )
     assert result.get("a").status == "failed"
     assert "did not finish within 0.3s" in result.get("a").error
     assert time.monotonic() - started < 10

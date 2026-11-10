@@ -28,17 +28,24 @@ def _reload_if_live(config: str) -> None:
     if client is None:
         return
     changes = client.call("scheduler.reload")
-    summary = ", ".join(f"{k}: {', '.join(v)}" for k, v in changes.items() if v) or "no changes"
+    summary = (
+        ", ".join(f"{k}: {', '.join(v)}" for k, v in changes.items() if v)
+        or "no changes"
+    )
     click.echo(f"Reloaded the running daemon ({summary}).")
 
 
 def _flags(task: dict) -> str:
-    return " ".join(f for f in [
-        "oneshot" if task.get("interval", "").startswith("at:") else "",
-        "env" if task.get("env") else "",
-        f"timeout={task['timeout']:g}s" if task.get("timeout") else "",
-        "overlap" if task.get("allow_overlap") else "",
-    ] if f)
+    return " ".join(
+        f
+        for f in [
+            "oneshot" if task.get("interval", "").startswith("at:") else "",
+            "env" if task.get("env") else "",
+            f"timeout={task['timeout']:g}s" if task.get("timeout") else "",
+            "overlap" if task.get("allow_overlap") else "",
+        ]
+        if f
+    )
 
 
 @click.group()
@@ -48,8 +55,13 @@ def scheduler():
 
 
 @scheduler.command(name="start")
-@click.option("--config", "-c", default=DEFAULT_CONFIG_PATH,
-              help="Path to scheduler config JSON file.", show_default=True)
+@click.option(
+    "--config",
+    "-c",
+    default=DEFAULT_CONFIG_PATH,
+    help="Path to scheduler config JSON file.",
+    show_default=True,
+)
 def start_scheduler(config):
     """Alias for `geenii daemon start --scheduler-config CONFIG`.
 
@@ -59,13 +71,20 @@ def start_scheduler(config):
     from geenii.cli.daemon_cli import start_daemon
 
     if not os.path.isfile(config):
-        click.echo(f"Warning: config file not found: {config}; the scheduler starts without tasks.")
+        click.echo(
+            f"Warning: config file not found: {config}; the scheduler starts without tasks."
+        )
     start_daemon(None, config)
 
 
 @scheduler.command(name="status")
-@click.option("--config", "-c", default=DEFAULT_CONFIG_PATH,
-              help="Path to scheduler config JSON file.", show_default=True)
+@click.option(
+    "--config",
+    "-c",
+    default=DEFAULT_CONFIG_PATH,
+    help="Path to scheduler config JSON file.",
+    show_default=True,
+)
 def status_scheduler(config):
     """Show tasks with their next/last run and whether they are running.
 
@@ -87,10 +106,18 @@ def status_scheduler(config):
         table.add_column("Last Run ID", style="dim")
         table.add_column("State")
         for task in status["tasks"]:
-            cmd = " ".join(task["cmd"]) if task.get("cmd") else (task.get("module") or "")
-            table.add_row(task["name"], task["interval"], cmd, task["next_run"] or "-",
-                          task["last_run"] or "-", task.get("last_run_id") or "-",
-                          "[bold]running[/bold]" if task["running"] else "idle")
+            cmd = (
+                " ".join(task["cmd"]) if task.get("cmd") else (task.get("module") or "")
+            )
+            table.add_row(
+                task["name"],
+                task["interval"],
+                cmd,
+                task["next_run"] or "-",
+                task["last_run"] or "-",
+                task.get("last_run_id") or "-",
+                "[bold]running[/bold]" if task["running"] else "idle",
+            )
         console.print(table)
         return
 
@@ -111,17 +138,32 @@ def status_scheduler(config):
 
     for task in sched.tasks:
         cmd = " ".join(task.cmd) if task.cmd else task.module
-        table.add_row(task.name, task.interval, cmd, task.next_run().isoformat(), _flags({
-            "interval": task.interval, "env": task.env, "timeout": task.timeout,
-            "allow_overlap": task.allow_overlap,
-        }))
+        table.add_row(
+            task.name,
+            task.interval,
+            cmd,
+            task.next_run().isoformat(),
+            _flags(
+                {
+                    "interval": task.interval,
+                    "env": task.env,
+                    "timeout": task.timeout,
+                    "allow_overlap": task.allow_overlap,
+                }
+            ),
+        )
 
     console.print(table)
 
 
 @scheduler.command(name="list")
-@click.option("--config", "-c", default=DEFAULT_CONFIG_PATH,
-              help="Path to scheduler config JSON file.", show_default=True)
+@click.option(
+    "--config",
+    "-c",
+    default=DEFAULT_CONFIG_PATH,
+    help="Path to scheduler config JSON file.",
+    show_default=True,
+)
 def list_tasks(config):
     """List all configured tasks (from the config file, including disabled ones)."""
     if not os.path.isfile(config):
@@ -148,16 +190,34 @@ def list_tasks(config):
 @scheduler.command(name="add")
 @click.argument("name")
 @click.argument("cmd", nargs=-1, required=True)
-@click.option("--interval", "-i", required=True,
-              help="Schedule: 'cron:EXPRESSION' or 'at:DATETIME'.")
-@click.option("--env", "-e", multiple=True, help="Environment variable in KEY=VALUE format.")
+@click.option(
+    "--interval",
+    "-i",
+    required=True,
+    help="Schedule: 'cron:EXPRESSION' or 'at:DATETIME'.",
+)
+@click.option(
+    "--env", "-e", multiple=True, help="Environment variable in KEY=VALUE format."
+)
 @click.option("--disabled", is_flag=True, help="Add the task in disabled state.")
-@click.option("--timeout", "-t", type=click.FloatRange(min=0, min_open=True), default=None,
-              help="Kill the task if it runs longer than this many seconds.")
-@click.option("--allow-overlap", is_flag=True,
-              help="Start a new run even if the previous run is still in progress.")
-@click.option("--config", default=DEFAULT_CONFIG_PATH,
-              help="Path to scheduler config JSON file.", show_default=True)
+@click.option(
+    "--timeout",
+    "-t",
+    type=click.FloatRange(min=0, min_open=True),
+    default=None,
+    help="Kill the task if it runs longer than this many seconds.",
+)
+@click.option(
+    "--allow-overlap",
+    is_flag=True,
+    help="Start a new run even if the previous run is still in progress.",
+)
+@click.option(
+    "--config",
+    default=DEFAULT_CONFIG_PATH,
+    help="Path to scheduler config JSON file.",
+    show_default=True,
+)
 def add_task(name, cmd, interval, env, disabled, timeout, allow_overlap, config):
     """Add a task to the scheduler config.
 
@@ -217,8 +277,12 @@ def add_task(name, cmd, interval, env, disabled, timeout, allow_overlap, config)
 
 @scheduler.command(name="remove")
 @click.argument("name")
-@click.option("--config", default=DEFAULT_CONFIG_PATH,
-              help="Path to scheduler config JSON file.", show_default=True)
+@click.option(
+    "--config",
+    default=DEFAULT_CONFIG_PATH,
+    help="Path to scheduler config JSON file.",
+    show_default=True,
+)
 def remove_task(name, config):
     """Remove a task from the scheduler config.
 
@@ -248,8 +312,13 @@ def remove_task(name, config):
 
 
 @scheduler.command(name="reload")
-@click.option("--config", "-c", default=DEFAULT_CONFIG_PATH,
-              help="Path to scheduler config JSON file.", show_default=True)
+@click.option(
+    "--config",
+    "-c",
+    default=DEFAULT_CONFIG_PATH,
+    help="Path to scheduler config JSON file.",
+    show_default=True,
+)
 def reload_config(config):
     """Make the running daemon re-read its scheduler config (after editing the file by hand)."""
     client, reason = _live_daemon(config)
@@ -261,10 +330,18 @@ def reload_config(config):
 
 @scheduler.command(name="run")
 @click.argument("name")
-@click.option("--config", "-c", default=DEFAULT_CONFIG_PATH,
-              help="Path to scheduler config JSON file.", show_default=True)
-@click.option("--local", is_flag=True,
-              help="Run in this process and wait for the result, even if the daemon is running.")
+@click.option(
+    "--config",
+    "-c",
+    default=DEFAULT_CONFIG_PATH,
+    help="Path to scheduler config JSON file.",
+    show_default=True,
+)
+@click.option(
+    "--local",
+    is_flag=True,
+    help="Run in this process and wait for the result, even if the daemon is running.",
+)
 def run_task(name, config, local):
     """Run a single task immediately (bypassing its schedule).
 
@@ -300,7 +377,10 @@ def run_task(name, config, local):
         await task.run(pm)
         if not task.last_run_id:
             return None  # a Python callable: nothing captured
-        return (await pm.output(task.last_run_id), await pm.output(task.last_run_id, stream="stderr"))
+        return (
+            await pm.output(task.last_run_id),
+            await pm.output(task.last_run_id, stream="stderr"),
+        )
 
     captured = asyncio.run(run_and_collect())
     if captured:

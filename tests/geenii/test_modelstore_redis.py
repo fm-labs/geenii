@@ -6,6 +6,7 @@ from geenii.utils.modelstore import RedisModelStore, ModelStore
 
 from test_modelstore import TestModelStore, MyModel
 
+
 @pytest.fixture(scope="session")
 def redis_container():
     # Pin an image tag for reproducibility
@@ -31,10 +32,14 @@ def redis_client(redis_url):
 
 @pytest.mark.skip(reason="Redis is not available")
 class TestRedisModelStore(TestModelStore):
-
     @pytest.fixture(autouse=True)
     def _setup(self, redis_client):
         self.redis = redis_client
 
     def get_store(self) -> ModelStore:
-        return RedisModelStore(model_class=MyModel, key_field="id", redis=self.redis, collection_name="test")
+        return RedisModelStore(
+            model_class=MyModel,
+            key_field="id",
+            redis=self.redis,
+            collection_name="test",
+        )

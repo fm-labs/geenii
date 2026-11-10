@@ -53,11 +53,17 @@ def test_merged_env_overlays_without_mutating_os_environ(monkeypatch):
 
 def test_spawn_and_pump_lines(tmp_path):
     async def main():
-        p = await proc.spawn(["sh", "-c", "echo $PROC_VAR; pwd; echo err >&2"],
-                             env={"PROC_VAR": "hello"}, cwd=str(tmp_path))
+        p = await proc.spawn(
+            ["sh", "-c", "echo $PROC_VAR; pwd; echo err >&2"],
+            env={"PROC_VAR": "hello"},
+            cwd=str(tmp_path),
+        )
         out, err = [], []
-        await asyncio.gather(proc.pump_lines(p.stdout, out.append),
-                             proc.pump_lines(p.stderr, err.append), p.wait())
+        await asyncio.gather(
+            proc.pump_lines(p.stdout, out.append),
+            proc.pump_lines(p.stderr, err.append),
+            p.wait(),
+        )
         return p, out, err
 
     p, out, err = asyncio.run(main())
@@ -97,7 +103,10 @@ def test_terminate_kills_the_whole_process_group(tmp_path):
 def test_terminate_escalates_to_sigkill():
     async def main():
         # Ignores SIGTERM, so only the SIGKILL after the grace period stops it
-        p = await proc.spawn(["sh", "-c", "trap '' TERM; while :; do sleep 0.1; done"], capture_output=False)
+        p = await proc.spawn(
+            ["sh", "-c", "trap '' TERM; while :; do sleep 0.1; done"],
+            capture_output=False,
+        )
         await asyncio.sleep(0.2)
         t0 = time.time()
         rc = await proc.terminate(p, grace=0.5)
@@ -119,7 +128,9 @@ def test_terminate_on_exited_process_returns_exit_code():
 
 def test_terminate_sync_kills_the_whole_process_group(tmp_path):
     pidfile = tmp_path / "pid"
-    p = subprocess.Popen(_grandchild_cmd(pidfile), start_new_session=proc.USE_PROCESS_GROUPS)
+    p = subprocess.Popen(
+        _grandchild_cmd(pidfile), start_new_session=proc.USE_PROCESS_GROUPS
+    )
     grandchild = asyncio.run(_read_pidfile(pidfile))
     assert proc.terminate_sync(p, grace=1.0) == -signal.SIGTERM
     _assert_dead(grandchild)

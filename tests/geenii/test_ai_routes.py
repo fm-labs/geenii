@@ -5,7 +5,11 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from geenii.datamodels import AudioTranscriptionApiResponse, CompletionErrorResponse, CompletionResponse
+from geenii.datamodels import (
+    AudioTranscriptionApiResponse,
+    CompletionErrorResponse,
+    CompletionResponse,
+)
 from geenii.server import ai_routes
 from geenii.server.server import app
 
@@ -29,16 +33,21 @@ def _chat(client, context_id=None):
     return client.post("/api/v1/ai/chat/completion", json=body)
 
 
-@pytest.mark.parametrize("context_id", [
-    "../../../escaped",
-    "..",
-    "a/b",
-    "/etc",
-    "x" * 65,
-    "with space",
-    "dot.dot",
-])
-def test_chat_completion_rejects_unsafe_context_id(client, sessions_dir, tmp_path, context_id):
+@pytest.mark.parametrize(
+    "context_id",
+    [
+        "../../../escaped",
+        "..",
+        "a/b",
+        "/etc",
+        "x" * 65,
+        "with space",
+        "dot.dot",
+    ],
+)
+def test_chat_completion_rejects_unsafe_context_id(
+    client, sessions_dir, tmp_path, context_id
+):
     response = _chat(client, context_id)
 
     assert response.status_code == 400
@@ -74,7 +83,9 @@ def test_ai_handlers_are_sync():
 
 
 def _completion_response(text="ok"):
-    return CompletionResponse(id=uuid.uuid4().hex, timestamp=int(time.time()), output=[], output_text=text)
+    return CompletionResponse(
+        id=uuid.uuid4().hex, timestamp=int(time.time()), output=[], output_text=text
+    )
 
 
 def test_completion_forwards_model_parameters(client, monkeypatch):
@@ -86,35 +97,64 @@ def test_completion_forwards_model_parameters(client, monkeypatch):
 
     monkeypatch.setattr(ai_routes.ai, "generate_completion", fake_generate_completion)
 
-    response = client.post("/api/v1/ai/completion", json={
-        "model": "fake:test", "prompt": "hi", "system": ["be brief"], "temperature": 0.2, "max_tokens": 64,
-        "stream": True,
-    })
+    response = client.post(
+        "/api/v1/ai/completion",
+        json={
+            "model": "fake:test",
+            "prompt": "hi",
+            "system": ["be brief"],
+            "temperature": 0.2,
+            "max_tokens": 64,
+            "stream": True,
+        },
+    )
 
     assert response.status_code == 200
-    assert calls == [{"model": "fake:test", "prompt": "hi", "stream": False,
-                      "source": "api", "task": "completion",
-                      "system": ["be brief"], "temperature": 0.2, "max_tokens": 64}]  # unset (None) params dropped
+    assert calls == [
+        {
+            "model": "fake:test",
+            "prompt": "hi",
+            "stream": False,
+            "source": "api",
+            "task": "completion",
+            "system": ["be brief"],
+            "temperature": 0.2,
+            "max_tokens": 64,
+        }
+    ]  # unset (None) params dropped
 
 
 def test_provider_error_returns_502_problem(client, monkeypatch):
-    monkeypatch.setattr(ai_routes.ai, "generate_completion",
-                        lambda **kwargs: CompletionErrorResponse(error="provider down"))
+    monkeypatch.setattr(
+        ai_routes.ai,
+        "generate_completion",
+        lambda **kwargs: CompletionErrorResponse(error="provider down"),
+    )
 
-    response = client.post("/api/v1/ai/completion", json={"model": "fake:test", "prompt": "hi"})
+    response = client.post(
+        "/api/v1/ai/completion", json={"model": "fake:test", "prompt": "hi"}
+    )
 
     assert response.status_code == 502
-    assert response.json() == {"error": "provider down", "status": 502, "detail": "provider down"}
+    assert response.json() == {
+        "error": "provider down",
+        "status": 502,
+        "detail": "provider down",
+    }
 
 
 def test_malformed_model_id_returns_400(client):
-    response = client.post("/api/v1/ai/completion", json={"model": "no-provider-prefix", "prompt": "hi"})
+    response = client.post(
+        "/api/v1/ai/completion", json={"model": "no-provider-prefix", "prompt": "hi"}
+    )
 
     assert response.status_code == 400
     assert "provider:model" in response.json()["detail"]
 
 
-def test_chat_completion_forwards_system_and_parameters(client, sessions_dir, monkeypatch):
+def test_chat_completion_forwards_system_and_parameters(
+    client, sessions_dir, monkeypatch
+):
     requests = []
     real = ai_routes.ai.generate_chat_completion
 
@@ -131,16 +171,28 @@ def test_chat_completion_forwards_system_and_parameters(client, sessions_dir, mo
     assert requests[-1].system == [ai_routes.DEFAULT_CHAT_SYSTEM_PROMPT]
     assert tags[-1] == {"source": "api", "task": "chat_completion"}
 
-    response = client.post("/api/v1/ai/chat/completion", json={
-        "model": "fake:test", "prompt": "again", "context_id": "c1", "system": ["custom"], "temperature": 0.7,
-    })
+    response = client.post(
+        "/api/v1/ai/chat/completion",
+        json={
+            "model": "fake:test",
+            "prompt": "again",
+            "context_id": "c1",
+            "system": ["custom"],
+            "temperature": 0.7,
+        },
+    )
     assert response.status_code == 200
     assert requests[-1].system == ["custom"]
     assert requests[-1].temperature == 0.7
-    assert [m.role for m in requests[-1].messages] == ["user", "assistant"]  # history from the first turn
+    assert [m.role for m in requests[-1].messages] == [
+        "user",
+        "assistant",
+    ]  # history from the first turn
 
 
-def test_chat_completion_provider_error_returns_502_and_keeps_memory_clean(client, sessions_dir, monkeypatch):
+def test_chat_completion_provider_error_returns_502_and_keeps_memory_clean(
+    client, sessions_dir, monkeypatch
+):
     def boom(request, **kwargs):
         raise RuntimeError("provider down")
 
@@ -162,7 +214,12 @@ def test_audio_translate_returns_501(client):
 
 
 def test_ai_operation_ids_are_unique():
-    ids = [op["operationId"] for path, ops in app.openapi()["paths"].items() if "/ai/" in path for op in ops.values()]
+    ids = [
+        op["operationId"]
+        for path, ops in app.openapi()["paths"].items()
+        if "/ai/" in path
+        for op in ops.values()
+    ]
     assert len(ids) == len(set(ids))
     assert any("generate_audio_translation" in i for i in ids)
 
@@ -175,7 +232,10 @@ def upload_dir(tmp_path, monkeypatch):
 
 
 def _transcribe(client, data: bytes, content_type="audio/wav", filename="clip.wav"):
-    return client.post("/api/v1/ai/audio/transcribe", files={"input_blob": (filename, data, content_type)})
+    return client.post(
+        "/api/v1/ai/audio/transcribe",
+        files={"input_blob": (filename, data, content_type)},
+    )
 
 
 def test_transcribe_deletes_upload_after_request(client, upload_dir, monkeypatch):
@@ -186,7 +246,9 @@ def test_transcribe_deletes_upload_after_request(client, upload_dir, monkeypatch
         assert open(request.input_file, "rb").read() == b"RIFF-audio"
         return AudioTranscriptionApiResponse(id="t1", timestamp=0, output_text="hello")
 
-    monkeypatch.setattr(ai_routes.ai, "generate_audio_transcription", fake_transcription)
+    monkeypatch.setattr(
+        ai_routes.ai, "generate_audio_transcription", fake_transcription
+    )
 
     response = _transcribe(client, b"RIFF-audio", filename="../../evil.wav")
 
@@ -199,8 +261,11 @@ def test_transcribe_deletes_upload_after_request(client, upload_dir, monkeypatch
 def test_transcribe_rejects_oversized_upload(client, upload_dir, monkeypatch):
     monkeypatch.setattr(ai_routes, "MAX_AUDIO_UPLOAD_BYTES", 10)
     monkeypatch.setattr(ai_routes, "_UPLOAD_CHUNK_SIZE", 4)
-    monkeypatch.setattr(ai_routes.ai, "generate_audio_transcription",
-                        lambda request: pytest.fail("provider must not be called"))
+    monkeypatch.setattr(
+        ai_routes.ai,
+        "generate_audio_transcription",
+        lambda request: pytest.fail("provider must not be called"),
+    )
 
     response = _transcribe(client, b"x" * 11)
 

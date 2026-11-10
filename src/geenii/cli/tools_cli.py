@@ -10,10 +10,12 @@ def _init_tool_registry():
     init_mcp_server_tools(tool_registry)
     return tool_registry
 
+
 @click.group()
 def tools():
     """Manage and execute tools."""
     pass
+
 
 @tools.command("list")
 def list_tools():
@@ -22,6 +24,7 @@ def list_tools():
     tool_registry = _init_tool_registry()
     for tool in tool_registry.list_tools():
         click.echo(f"- {tool.name}: {tool.short_description} ({tool.type})")
+
 
 @tools.command("inspect")
 @click.argument("tool_name")
@@ -41,7 +44,9 @@ def inspect_tool(tool_name):
 
 @tools.command("call")
 @click.argument("tool_name")
-@click.option("--args", "-a", multiple=True, help="Arguments for the tool in key=value format.")
+@click.option(
+    "--args", "-a", multiple=True, help="Arguments for the tool in key=value format."
+)
 def call_tool(tool_name, **kwargs):
     """Call a tool by name with the provided arguments."""
     click.echo(f"Calling tool {tool_name} with arguments: {kwargs}")
@@ -63,7 +68,7 @@ def call_tool(tool_name, **kwargs):
     try:
         tool_registry = _init_tool_registry()
         env = {}
-        #result = tool_registry.invoke(tool_name, args=parsed_kwargs, env=env, **kwargs)
+        # result = tool_registry.invoke(tool_name, args=parsed_kwargs, env=env, **kwargs)
         tool = tool_registry.get(tool_name)
         result = invoke_tool(tool, args=parsed_kwargs, env=env, caller_id="cli:tools")
         print("--- Result ---")

@@ -30,7 +30,11 @@ def _list_scripts(skill: SkillSpec) -> list[str]:
 
 
 def _skill_summary(skill: SkillSpec, agent_registry: AgentRegistry) -> dict:
-    used_by = sorted(a.name for a in agent_registry.configs.values() if skill.name in (a.skills or []))
+    used_by = sorted(
+        a.name
+        for a in agent_registry.configs.values()
+        if skill.name in (a.skills or [])
+    )
     return {
         **skill.model_dump(exclude={"tool_filters"}),
         "source": str(Path(skill.path).parent),
@@ -40,18 +44,27 @@ def _skill_summary(skill: SkillSpec, agent_registry: AgentRegistry) -> dict:
 
 
 @router.get("/")
-def list_skills(skill_registry: SkillRegistry = Depends(dep_skill_registry),
-                agent_registry: AgentRegistry = Depends(dep_agent_registry)) -> list[dict]:
+def list_skills(
+    skill_registry: SkillRegistry = Depends(dep_skill_registry),
+    agent_registry: AgentRegistry = Depends(dep_agent_registry),
+) -> list[dict]:
     """
     List the skills in the app's skill registry, sorted by name.
     """
-    return [_skill_summary(skill_registry.get(name), agent_registry) for name in sorted(skill_registry.names())]
+    return [
+        _skill_summary(skill_registry.get(name), agent_registry)
+        for name in sorted(skill_registry.names())
+    ]
 
 
-@router.get("/{name}", responses={404: {"model": Problem, "description": "Skill not found"}})
-def get_skill(name: str,
-              skill_registry: SkillRegistry = Depends(dep_skill_registry),
-              agent_registry: AgentRegistry = Depends(dep_agent_registry)) -> dict:
+@router.get(
+    "/{name}", responses={404: {"model": Problem, "description": "Skill not found"}}
+)
+def get_skill(
+    name: str,
+    skill_registry: SkillRegistry = Depends(dep_skill_registry),
+    agent_registry: AgentRegistry = Depends(dep_agent_registry),
+) -> dict:
     """
     The skill summary plus its `instructions` (the markdown body of SKILL.md).
     """

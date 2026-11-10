@@ -22,9 +22,9 @@ from dataclasses import dataclass, field
 logger = logging.getLogger(__name__)
 
 _FILTER_RE = re.compile(
-    r'^(?P<tool>[A-Za-z_][A-Za-z0-9_-]*)'
-    r'(?:\((?P<param>[A-Za-z_][A-Za-z0-9_]*):'
-    r'(?P<pattern>[^)]*)\))?$'
+    r"^(?P<tool>[A-Za-z_][A-Za-z0-9_-]*)"
+    r"(?:\((?P<param>[A-Za-z_][A-Za-z0-9_]*):"
+    r"(?P<pattern>[^)]*)\))?$"
 )
 
 
@@ -100,23 +100,23 @@ class ToolFilterSet:
         current = []
         depth = 0
         for ch in raw:
-            if ch == '(':
+            if ch == "(":
                 depth += 1
                 current.append(ch)
-            elif ch == ')':
+            elif ch == ")":
                 depth -= 1
                 current.append(ch)
                 if depth == 0:
-                    tokens.append(''.join(current).strip())
+                    tokens.append("".join(current).strip())
                     current = []
-            elif ch in (',', ' ', '\t', '\n') and depth == 0:
-                piece = ''.join(current).strip()
+            elif ch in (",", " ", "\t", "\n") and depth == 0:
+                piece = "".join(current).strip()
                 if piece:
                     tokens.append(piece)
                 current = []
             else:
                 current.append(ch)
-        piece = ''.join(current).strip()
+        piece = "".join(current).strip()
         if piece:
             tokens.append(piece)
         return tokens

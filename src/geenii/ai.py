@@ -6,24 +6,49 @@ import uuid
 from datetime import UTC, datetime
 
 from geenii.config import GEENII_CACHE_DIR
-from geenii.datamodels import CompletionResponse, CompletionErrorResponse, \
-    ChatCompletionRequest, ImageGenerationApiRequest, ImageGenerationApiResponse, \
-    AudioGenerationApiRequest, AudioSpeechGenerationApiResponse, AudioTranscriptionApiRequest, \
-    AudioTranscriptionApiResponse, \
-    ModelMessage, AIModelInfo, AIProviderInfo, ChatCompletionResponse, Usage, USAGE_VERSION
-from geenii.provider.interfaces import AICompletionProvider, AIProvider, AIImageGeneratorProvider, \
-    AISpeechGeneratorProvider, AIAudioTranscriptionProvider, AIAudioTranslationProvider, AIChatCompletionProvider
+from geenii.datamodels import (
+    CompletionResponse,
+    CompletionErrorResponse,
+    ChatCompletionRequest,
+    ImageGenerationApiRequest,
+    ImageGenerationApiResponse,
+    AudioGenerationApiRequest,
+    AudioSpeechGenerationApiResponse,
+    AudioTranscriptionApiRequest,
+    AudioTranscriptionApiResponse,
+    ModelMessage,
+    AIModelInfo,
+    AIProviderInfo,
+    ChatCompletionResponse,
+    Usage,
+    USAGE_VERSION,
+)
+from geenii.provider.interfaces import (
+    AICompletionProvider,
+    AIProvider,
+    AIImageGeneratorProvider,
+    AISpeechGeneratorProvider,
+    AIAudioTranscriptionProvider,
+    AIAudioTranslationProvider,
+    AIChatCompletionProvider,
+)
 from geenii.tool.registry import ToolRegistry
 from geenii.utils.cached import cached
 from geenii.utils.json_util import append_jsonl
 
-type AIProviderType = AICompletionProvider | AIImageGeneratorProvider | AISpeechGeneratorProvider \
-                      | AIAudioTranscriptionProvider | AIAudioTranslationProvider | AIProvider
+type AIProviderType = (
+    AICompletionProvider
+    | AIImageGeneratorProvider
+    | AISpeechGeneratorProvider
+    | AIAudioTranscriptionProvider
+    | AIAudioTranslationProvider
+    | AIProvider
+)
 
 SUPPORTED_PROVIDERS = ["geenii", "ollama", "openai", "anthropic"]
 
 
-#@cached(ttl=3600)
+# @cached(ttl=3600)
 def enumerate_providers() -> list[AIProviderInfo]:
     """
     Enumerate all available AI providers by checking the provider modules.
@@ -75,7 +100,9 @@ def split_model_id(model_id: str) -> tuple[str, str]:
         if len(parts) == 2:
             return parts[0].strip(), parts[1].strip()
 
-    raise ValueError(f"Invalid model ID format: {model_id}. Expected 'provider:model_name'.")
+    raise ValueError(
+        f"Invalid model ID format: {model_id}. Expected 'provider:model_name'."
+    )
 
 
 def _import_provider_class(name: str) -> type:
@@ -84,7 +111,9 @@ def _import_provider_class(name: str) -> type:
     try:
         module = importlib.import_module(module_path)
     except ImportError as exc:
-        raise ValueError(f"Unknown provider '{name}': could not import {module_path}") from exc
+        raise ValueError(
+            f"Unknown provider '{name}': could not import {module_path}"
+        ) from exc
     cls = getattr(module, "ai_provider_class", None)
     if cls is None:
         raise ValueError(
@@ -101,15 +130,19 @@ def get_ai_provider(provider: str) -> AIProviderType:
     :return: The AIProvider instance for the specified provider.
     """
     if ":" in provider:
-        raise ValueError(f"Invalid provider ID format: {provider}. "
-                         f"Found unexpected ':' character in provider name. "
-                         f"Did you mean to use a model ID? Use 'get_ai_provider_from_model_id' instead.")
+        raise ValueError(
+            f"Invalid provider ID format: {provider}. "
+            f"Found unexpected ':' character in provider name. "
+            f"Did you mean to use a model ID? Use 'get_ai_provider_from_model_id' instead."
+        )
 
     cls = _import_provider_class(provider.lower())
     return cls()
 
 
-def get_ai_provider_from_model_id(model_id: str, iface = None) -> tuple[AIProviderType, str, str]:
+def get_ai_provider_from_model_id(
+    model_id: str, iface=None
+) -> tuple[AIProviderType, str, str]:
     """
     Get the AI provider instance based on the model ID.
 
@@ -128,36 +161,51 @@ def get_ai_completion_provider(model_id: str) -> tuple[AICompletionProvider, str
     return get_ai_provider_from_model_id(model_id, AICompletionProvider)
 
 
-def get_ai_image_generator_provider(model_id: str) -> tuple[AIImageGeneratorProvider, str, str]:
+def get_ai_image_generator_provider(
+    model_id: str,
+) -> tuple[AIImageGeneratorProvider, str, str]:
     """
     Get the AI image generator provider instance based on the provider name.
     """
     return get_ai_provider_from_model_id(model_id, AIImageGeneratorProvider)
 
 
-def get_ai_audio_generator_provider(model_id: str) -> tuple[AISpeechGeneratorProvider, str, str]:
+def get_ai_audio_generator_provider(
+    model_id: str,
+) -> tuple[AISpeechGeneratorProvider, str, str]:
     """
     Get the AI audio generator provider instance based on the provider name.
     """
     return get_ai_provider_from_model_id(model_id, AISpeechGeneratorProvider)
 
 
-def get_ai_audio_transcription_provider(model_id: str) -> tuple[AIAudioTranscriptionProvider, str, str]:
+def get_ai_audio_transcription_provider(
+    model_id: str,
+) -> tuple[AIAudioTranscriptionProvider, str, str]:
     """
     Get the AI audio transcriber provider instance based on the provider name.
     """
     return get_ai_provider_from_model_id(model_id, AIAudioTranscriptionProvider)
 
 
-def get_ai_audio_translation_provider(model_id: str) -> tuple[AIAudioTranslationProvider, str, str]:
+def get_ai_audio_translation_provider(
+    model_id: str,
+) -> tuple[AIAudioTranslationProvider, str, str]:
     """
     Get the AI audio transcriber provider instance based on the provider name.
     """
     return get_ai_provider_from_model_id(model_id, AIAudioTranslationProvider)
 
 
-def generate_completion(model: str, prompt: str, stream: bool = False, *,
-                        source: str | None = None, task: str | None = None, **kwargs) -> CompletionResponse:
+def generate_completion(
+    model: str,
+    prompt: str,
+    stream: bool = False,
+    *,
+    source: str | None = None,
+    task: str | None = None,
+    **kwargs,
+) -> CompletionResponse:
     """
     Generate a completion using the specified AI provider and model.
 
@@ -168,52 +216,56 @@ def generate_completion(model: str, prompt: str, stream: bool = False, *,
     # best effort, for logging a call whose model id is invalid
     provider, model_name = None, model
     try:
-        #publish_event(["ai.completion.requested"], {"request": request.model_dump()})
+        # publish_event(["ai.completion.requested"], {"request": request.model_dump()})
 
         ai, provider, model_name = get_ai_completion_provider(model)
 
         completion_kwargs = {
-            'prompt': prompt,
-            'stream': stream,
-            'model': model_name, # use only the model name without provider prefix
-            **kwargs
+            "prompt": prompt,
+            "stream": stream,
+            "model": model_name,  # use only the model name without provider prefix
+            **kwargs,
         }
         response = ai.generate_completion(**completion_kwargs)
 
         # Publish the completion response event
-        #publish_event(["ai.completion.completed"], {"response": response.model_dump()})
+        # publish_event(["ai.completion.completed"], {"response": response.model_dump()})
 
-        #_log_request_response(request, response)
-        _ai_usage_log(provider, model_name, None, response.usage, source=source, task=task)
+        # _log_request_response(request, response)
+        _ai_usage_log(
+            provider, model_name, None, response.usage, source=source, task=task
+        )
         return response
     except Exception as e:
         print(f"Error in {model} completion API: {str(e)}")
 
         # Publish the error event
-        #publish_event(["ai.completion.error"], {"error": str(e), "request": request.model_dump()})
+        # publish_event(["ai.completion.error"], {"error": str(e), "request": request.model_dump()})
         _log_failed_call(provider, model_name, model, None, e, source=source, task=task)
 
         return CompletionErrorResponse(error=str(e))
     finally:
-        #if response:
+        # if response:
         #    print(f"Completion response: {response.model_dump()}")
         #    response.save()
         #    print("Completion response saved.")
         pass
 
 
-def generate_chat_completion_deprecated(model: str,
-                                        prompt: str,
-                                        system: str | None = None,
-                                        messages: list[ModelMessage] | None = None,
-                                        tools: set[str] = None,
-                                        tool_registry = None,
-                                        output_format: str = None,
-                                        output_schema: dict = None,
-                                        stream: bool = False,
-                                        source: str | None = None,
-                                        task: str | None = None,
-                                        **kwargs) -> CompletionResponse:
+def generate_chat_completion_deprecated(
+    model: str,
+    prompt: str,
+    system: str | None = None,
+    messages: list[ModelMessage] | None = None,
+    tools: set[str] = None,
+    tool_registry=None,
+    output_format: str = None,
+    output_schema: dict = None,
+    stream: bool = False,
+    source: str | None = None,
+    task: str | None = None,
+    **kwargs,
+) -> CompletionResponse:
     """
     Generate an assistant completion using the specified AI provider and model.
     `source` and `task` are passed to the usage log (see generate_chat_completion).
@@ -229,11 +281,18 @@ def generate_chat_completion_deprecated(model: str,
         stream=stream,
         # model_parameters=kwargs
     )
-    return generate_chat_completion(request, tool_registry=tool_registry, source=source, task=task)
+    return generate_chat_completion(
+        request, tool_registry=tool_registry, source=source, task=task
+    )
 
 
-def generate_chat_completion(request: ChatCompletionRequest, tool_registry: ToolRegistry = None, *,
-                             source: str | None = None, task: str | None = None) -> ChatCompletionResponse:
+def generate_chat_completion(
+    request: ChatCompletionRequest,
+    tool_registry: ToolRegistry = None,
+    *,
+    source: str | None = None,
+    task: str | None = None,
+) -> ChatCompletionResponse:
     """
     Generate an assistant completion using the specified AI provider and model.
 
@@ -251,7 +310,9 @@ def generate_chat_completion(request: ChatCompletionRequest, tool_registry: Tool
     try:
         ai, provider_name, model_name = get_ai_completion_provider(request.model)
         if not isinstance(ai, AIChatCompletionProvider):
-            raise RuntimeError(f"Invalid AI provider: {provider_name} does not support assistant completions.")
+            raise RuntimeError(
+                f"Invalid AI provider: {provider_name} does not support assistant completions."
+            )
 
         _ai_log("completion.request", request)
 
@@ -261,22 +322,39 @@ def generate_chat_completion(request: ChatCompletionRequest, tool_registry: Tool
         # pass through context ID from request to response, if not set by the provider implementation
         response.context_id = response.context_id or request.context_id
         _ai_log("completion.response", response)
-        _ai_usage_log(provider_name, model_name, response.context_id, response.usage, source=source, task=task)
+        _ai_usage_log(
+            provider_name,
+            model_name,
+            response.context_id,
+            response.usage,
+            source=source,
+            task=task,
+        )
         return response
     except Exception as e:
         print(f"Error in {request.model} assistant API: {str(e)}")
-        _log_failed_call(provider_name, model_name, request.model, request.context_id, e, source=source, task=task)
-        #return ErrorApiResponse(error=str(e))
+        _log_failed_call(
+            provider_name,
+            model_name,
+            request.model,
+            request.context_id,
+            e,
+            source=source,
+            task=task,
+        )
+        # return ErrorApiResponse(error=str(e))
         raise e
 
 
-def generate_image(request: ImageGenerationApiRequest) -> ImageGenerationApiResponse | CompletionErrorResponse:
+def generate_image(
+    request: ImageGenerationApiRequest,
+) -> ImageGenerationApiResponse | CompletionErrorResponse:
     """
     Generate an image using the specified AI provider and model.
     """
     try:
         # Publish the image generation request event
-        #publish_event(["ai.image.generate"], {"request": request.model_dump()})
+        # publish_event(["ai.image.generate"], {"request": request.model_dump()})
 
         ai, provider, model = get_ai_image_generator_provider(request.model)
 
@@ -285,37 +363,41 @@ def generate_image(request: ImageGenerationApiRequest) -> ImageGenerationApiResp
         response = ai.generate_image(model=model, **args)
 
         # Publish the image generation response event
-        #publish_event(["ai.image.generated"], {"response": response.model_dump()})
+        # publish_event(["ai.image.generated"], {"response": response.model_dump()})
 
         return response
-        #return ErrorApiResponse(error="Image generation is not supported yet.")
+        # return ErrorApiResponse(error="Image generation is not supported yet.")
     except Exception as e:
         # Publish the error event
-        #publish_event(["ai.image.generate.error"], {"error": str(e), "request": request.model_dump()})
+        # publish_event(["ai.image.generate.error"], {"error": str(e), "request": request.model_dump()})
         return CompletionErrorResponse(error=str(e))
 
 
-def generate_speech(request: AudioGenerationApiRequest) -> AudioSpeechGenerationApiResponse | CompletionErrorResponse:
+def generate_speech(
+    request: AudioGenerationApiRequest,
+) -> AudioSpeechGenerationApiResponse | CompletionErrorResponse:
     """
     Generate speech from text using the specified AI provider and model.
     """
     try:
         ai, provider, model = get_ai_audio_generator_provider(request.model)
-        response = ai.generate_speech(model=model,
-                                      text=request.text)
+        response = ai.generate_speech(model=model, text=request.text)
         return response
     except Exception as e:
         return CompletionErrorResponse(error=str(e))
 
 
-def generate_audio_transcription(request: AudioTranscriptionApiRequest) -> AudioTranscriptionApiResponse | CompletionErrorResponse:
+def generate_audio_transcription(
+    request: AudioTranscriptionApiRequest,
+) -> AudioTranscriptionApiResponse | CompletionErrorResponse:
     """
     Generate a transcription from audio using the specified AI provider and model.
     """
     try:
         ai, provider, model = get_ai_audio_transcription_provider(request.model)
-        response = ai.generate_audio_transcription(model=model,
-                                                   audio=request.input_file)
+        response = ai.generate_audio_transcription(
+            model=model, audio=request.input_file
+        )
         return response
     except Exception as e:
         return CompletionErrorResponse(error=str(e))
@@ -340,23 +422,46 @@ _MAX_ERROR_LENGTH = 500
 def _error_text(e: Exception) -> str:
     """One-line error text for the logs, e.g. "RuntimeError: provider down"."""
     text = " ".join(f"{type(e).__name__}: {e}".split())
-    return text if len(text) <= _MAX_ERROR_LENGTH else text[:_MAX_ERROR_LENGTH - 1] + "…"
+    return (
+        text if len(text) <= _MAX_ERROR_LENGTH else text[: _MAX_ERROR_LENGTH - 1] + "…"
+    )
 
 
-def _log_failed_call(provider: str | None, model: str, model_id: str, context_id: str | None, e: Exception, *,
-                     source: str | None, task: str | None) -> None:
+def _log_failed_call(
+    provider: str | None,
+    model: str,
+    model_id: str,
+    context_id: str | None,
+    e: Exception,
+    *,
+    source: str | None,
+    task: str | None,
+) -> None:
     """Record a failed completion in the daily log and the usage log (empty usage plus `error`)."""
     error = _error_text(e)
     try:
-        _ai_log("completion.error", {"model": model_id, "context_id": context_id, "error": error})
-        _ai_usage_log(provider, model, context_id, None, source=source, task=task, error=error)
+        _ai_log(
+            "completion.error",
+            {"model": model_id, "context_id": context_id, "error": error},
+        )
+        _ai_usage_log(
+            provider, model, context_id, None, source=source, task=task, error=error
+        )
     except Exception as log_error:
         # never hide the original error behind a logging failure
         print(f"Could not log failed completion: {log_error}")
 
 
-def _ai_usage_log(provider: str | None, model: str, context_id: str | None, usage: Usage | None, *,
-                  source: str | None = None, task: str | None = None, error: str | None = None):
+def _ai_usage_log(
+    provider: str | None,
+    model: str,
+    context_id: str | None,
+    usage: Usage | None,
+    *,
+    source: str | None = None,
+    task: str | None = None,
+    error: str | None = None,
+):
     """
     Log AI usage data to a file for tracking and analysis. `error` is set for failed calls (with no usage).
     `usage` is written without its unset fields, and as `{}` if there is none.

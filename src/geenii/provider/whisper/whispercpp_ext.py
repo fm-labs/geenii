@@ -6,9 +6,15 @@ import json
 from geenii.config import WHISPERCPP_IMAGE
 
 
-def run_whisper_cli_transcribe(input_file: str, input_dir: str = "audios",
-                               model_dir: str = "models", model_file="ggml-base.bin",
-                               output_dir: str = "audios", output_file=None, output_format="json") -> str | dict:
+def run_whisper_cli_transcribe(
+    input_file: str,
+    input_dir: str = "audios",
+    model_dir: str = "models",
+    model_file="ggml-base.bin",
+    output_dir: str = "audios",
+    output_file=None,
+    output_format="json",
+) -> str | dict:
     """
     Run the whisper-cli Docker container to transcribe audio files.
 
@@ -27,12 +33,16 @@ def run_whisper_cli_transcribe(input_file: str, input_dir: str = "audios",
     if not os.path.exists(model_dir):
         raise FileNotFoundError(f"Model directory does not exist: {model_dir}")
     if not os.path.exists(os.path.join(model_dir, model_file)):
-        raise FileNotFoundError(f"Model file does not exist: {os.path.join(model_dir, model_file)}")
+        raise FileNotFoundError(
+            f"Model file does not exist: {os.path.join(model_dir, model_file)}"
+        )
 
     if not os.path.exists(input_dir):
         raise FileNotFoundError(f"Input directory does not exist: {input_dir}")
     if not os.path.exists(os.path.join(input_dir, input_file)):
-        raise FileNotFoundError(f"Input file does not exist: {os.path.join(input_dir, input_file)}")
+        raise FileNotFoundError(
+            f"Input file does not exist: {os.path.join(input_dir, input_file)}"
+        )
 
     if output_file is None:
         base_name, _ = os.path.splitext(input_file)
@@ -42,24 +52,33 @@ def run_whisper_cli_transcribe(input_file: str, input_dir: str = "audios",
     # output_file = "input.wav"
     whisper_cmd = f"whisper-cli -m /models/{model_file} -f /audios/{input_file} --output-{output_format} --output-file /output/{output_file} --font-path /audios/CourierNewBold.ttf --temperature 0.0 --language en"
 
-    command = ["docker", "run", "--rm",
-               "-v", f"{realpath(model_dir)}:/models:ro",
-               "-v", f"{realpath(input_dir)}:/audios:ro",
-               "-v", f"{realpath(output_dir)}:/output:rw", ]
+    command = [
+        "docker",
+        "run",
+        "--rm",
+        "-v",
+        f"{realpath(model_dir)}:/models:ro",
+        "-v",
+        f"{realpath(input_dir)}:/audios:ro",
+        "-v",
+        f"{realpath(output_dir)}:/output:rw",
+    ]
 
     # if output_format == "words":
     #    # add ttf font mount for karaoke output
     #    command += ["-v", f"{realpath(input_dir)}:/fonts/CourierNewBold.ttf"]
 
     command += [WHISPERCPP_IMAGE, whisper_cmd]
-    print(f"Running {" ".join(command)}")
+    print(f"Running {' '.join(command)}")
 
     p = subprocess.run(command, capture_output=True)
     print(f"Return code: {p.returncode}")
     if p.returncode != 0:
         print(p.stderr.decode("utf-8"))
-        raise RuntimeError(f"Whisper CLI failed with return code {p.returncode}. "
-                           f"Command: {' '.join(command)}")
+        raise RuntimeError(
+            f"Whisper CLI failed with return code {p.returncode}. "
+            f"Command: {' '.join(command)}"
+        )
 
     stdout = p.stdout.decode("utf-8").strip()
     stderr = p.stderr.decode("utf-8").strip()
@@ -76,7 +95,7 @@ def run_whisper_cli_transcribe(input_file: str, input_dir: str = "audios",
         raise FileNotFoundError(f"Output file was not created: {output_path}")
 
     transcription = None
-    with open(output_path, 'r') as f:
+    with open(output_path, "r") as f:
         transcription = f.read().strip()
 
     if output_format == "json":  # or output_format == "json-full":
@@ -88,7 +107,9 @@ def run_whisper_cli_transcribe(input_file: str, input_dir: str = "audios",
     return transcription
 
 
-def run_whisper_server_in_docker(model_dir: str = "models", model_file="ggml-base.bin") -> None:
+def run_whisper_server_in_docker(
+    model_dir: str = "models", model_file="ggml-base.bin"
+) -> None:
     """
     Run the whisper-server in Docker container to transcribe audio files.
 
@@ -101,14 +122,22 @@ def run_whisper_server_in_docker(model_dir: str = "models", model_file="ggml-bas
     if not os.path.exists(model_dir):
         raise FileNotFoundError(f"Model directory does not exist: {model_dir}")
     if not os.path.exists(os.path.join(model_dir, model_file)):
-        raise FileNotFoundError(f"Model file does not exist: {os.path.join(model_dir, model_file)}")
+        raise FileNotFoundError(
+            f"Model file does not exist: {os.path.join(model_dir, model_file)}"
+        )
 
     whisper_cmd = f"whisper-server -m /models/{model_file} --host 0.0.0.0 --port 8766 --language en"
 
-    command = ["docker", "run", "--rm",
-               #"--gpus", "all",
-               "-v", f"{realpath(model_dir)}:/models:ro",
-               "-p", "8766:8766",]
+    command = [
+        "docker",
+        "run",
+        "--rm",
+        # "--gpus", "all",
+        "-v",
+        f"{realpath(model_dir)}:/models:ro",
+        "-p",
+        "8766:8766",
+    ]
 
     command += [WHISPERCPP_IMAGE, whisper_cmd]
     print(f"Running {' '.join(command)}")
@@ -117,8 +146,10 @@ def run_whisper_server_in_docker(model_dir: str = "models", model_file="ggml-bas
     print(f"Return code: {p.returncode}")
     if p.returncode != 0:
         print(p.stderr.decode("utf-8"))
-        raise RuntimeError(f"Whisper Server failed with return code {p.returncode}. "
-                           f"Command: {' '.join(command)}")
+        raise RuntimeError(
+            f"Whisper Server failed with return code {p.returncode}. "
+            f"Command: {' '.join(command)}"
+        )
 
     stdout = p.stdout.decode("utf-8").strip()
     stderr = p.stderr.decode("utf-8").strip()

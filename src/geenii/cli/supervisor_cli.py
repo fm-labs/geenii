@@ -43,14 +43,19 @@ def _reload_if_live(ctx, config: str) -> None:
     if client is None:
         return
     changes = client.call("supervisor.reload")
-    summary = ", ".join(f"{k}: {', '.join(v)}" for k, v in changes.items() if v) or "no changes"
+    summary = (
+        ", ".join(f"{k}: {', '.join(v)}" for k, v in changes.items() if v)
+        or "no changes"
+    )
     click.echo(f"Reloaded the running daemon ({summary}).")
 
 
 def _client(ctx) -> DaemonClient:
     client = DaemonClient(ctx.obj or None)
     if not client.is_available():
-        click.echo(f"The geenii daemon is not running ({client.socket_path}). Start it with `geenii daemon start`.")
+        click.echo(
+            f"The geenii daemon is not running ({client.socket_path}). Start it with `geenii daemon start`."
+        )
         raise SystemExit(1)
     return client
 
@@ -64,8 +69,13 @@ def _call(client: DaemonClient, method: str, params: dict | None = None):
 
 
 @click.group()
-@click.option("--socket", "-s", default=None, envvar=list(SOCKET_ENV_VARS),
-              help="Path to the geenii daemon's Unix socket.")
+@click.option(
+    "--socket",
+    "-s",
+    default=None,
+    envvar=list(SOCKET_ENV_VARS),
+    help="Path to the geenii daemon's Unix socket.",
+)
 @click.pass_context
 def supervisor(ctx, socket):
     """Keep long-running processes up (runs inside the geenii daemon).
@@ -118,8 +128,17 @@ def status(ctx, as_json):
 @supervisor.command(name="start")
 @click.argument("name")
 @click.argument("cmd", nargs=-1, required=True)
-@click.option("--no-restart", is_flag=True, help="Run once; don't restart the process when it exits.")
-@click.option("--env", "-e", multiple=True, help="Environment variable in KEY=VALUE format (repeatable).")
+@click.option(
+    "--no-restart",
+    is_flag=True,
+    help="Run once; don't restart the process when it exits.",
+)
+@click.option(
+    "--env",
+    "-e",
+    multiple=True,
+    help="Environment variable in KEY=VALUE format (repeatable).",
+)
 @click.option("--cwd", "-d", default=None, help="Working directory.")
 @click.pass_context
 def start(ctx, name, cmd, no_restart, env, cwd):
@@ -134,17 +153,27 @@ def start(ctx, name, cmd, no_restart, env, cwd):
       geenii supervisor start web -- python -m http.server 8000
     """
     env_dict = _parse_env(env)
-    _call(_client(ctx), "supervisor.ensure", {
-        "name": name, "cmd": list(cmd), "restart": not no_restart,
-        "env": env_dict or None, "cwd": cwd,
-    })
+    _call(
+        _client(ctx),
+        "supervisor.ensure",
+        {
+            "name": name,
+            "cmd": list(cmd),
+            "restart": not no_restart,
+            "env": env_dict or None,
+            "cwd": cwd,
+        },
+    )
     click.echo(f"Supervising '{name}'.")
 
 
 @supervisor.command(name="stop")
 @click.argument("name")
-@click.option("--keep", is_flag=True,
-              help="Keep the configuration (listed as stopped) so `restart` can start it again.")
+@click.option(
+    "--keep",
+    is_flag=True,
+    help="Keep the configuration (listed as stopped) so `restart` can start it again.",
+)
 @click.pass_context
 def stop(ctx, name, keep):
     """Stop NAME (and everything it started) and stop supervising it."""
@@ -163,7 +192,9 @@ def restart(ctx, name):
 
 @supervisor.command(name="logs")
 @click.argument("name")
-@click.option("--tail", "-n", default=100, show_default=True, help="Number of lines to show.")
+@click.option(
+    "--tail", "-n", default=100, show_default=True, help="Number of lines to show."
+)
 @click.pass_context
 def logs(ctx, name, tail):
     """Show the recent output of NAME (stdout, stderr and supervisor events)."""
@@ -172,7 +203,13 @@ def logs(ctx, name, tail):
 
 
 @supervisor.command(name="list")
-@click.option("--config", "-c", default=DEFAULT_SERVICES_CONFIG, show_default=True, help=CONFIG_OPTION_HELP)
+@click.option(
+    "--config",
+    "-c",
+    default=DEFAULT_SERVICES_CONFIG,
+    show_default=True,
+    help=CONFIG_OPTION_HELP,
+)
 def list_services(config):
     """List the services declared in the config file (including disabled ones)."""
     services = _read_file(config).get("services", [])
@@ -180,21 +217,42 @@ def list_services(config):
         click.echo(f"No services configured in {config}.")
         return
     for svc in services:
-        flags = " ".join(f for f in [
-            "" if svc.get("enabled", True) else "(disabled)",
-            "" if svc.get("restart", True) else "(no restart)",
-        ] if f)
-        click.echo(f"  {svc.get('name', '?'):<20} {' '.join(svc.get('cmd', []))} {flags}".rstrip())
+        flags = " ".join(
+            f
+            for f in [
+                "" if svc.get("enabled", True) else "(disabled)",
+                "" if svc.get("restart", True) else "(no restart)",
+            ]
+            if f
+        )
+        click.echo(
+            f"  {svc.get('name', '?'):<20} {' '.join(svc.get('cmd', []))} {flags}".rstrip()
+        )
 
 
 @supervisor.command(name="add")
 @click.argument("name")
 @click.argument("cmd", nargs=-1, required=True)
-@click.option("--no-restart", is_flag=True, help="Run once per daemon start; don't restart when it exits.")
-@click.option("--env", "-e", multiple=True, help="Environment variable in KEY=VALUE format (repeatable).")
+@click.option(
+    "--no-restart",
+    is_flag=True,
+    help="Run once per daemon start; don't restart when it exits.",
+)
+@click.option(
+    "--env",
+    "-e",
+    multiple=True,
+    help="Environment variable in KEY=VALUE format (repeatable).",
+)
 @click.option("--cwd", "-d", default=None, help="Working directory.")
 @click.option("--disabled", is_flag=True, help="Add the service in disabled state.")
-@click.option("--config", "-c", default=DEFAULT_SERVICES_CONFIG, show_default=True, help=CONFIG_OPTION_HELP)
+@click.option(
+    "--config",
+    "-c",
+    default=DEFAULT_SERVICES_CONFIG,
+    show_default=True,
+    help=CONFIG_OPTION_HELP,
+)
 @click.pass_context
 def add_service(ctx, name, cmd, no_restart, env, cwd, disabled, config):
     """Declare service NAME running CMD in the config file.
@@ -230,7 +288,13 @@ def add_service(ctx, name, cmd, no_restart, env, cwd, disabled, config):
 
 @supervisor.command(name="remove")
 @click.argument("name")
-@click.option("--config", "-c", default=DEFAULT_SERVICES_CONFIG, show_default=True, help=CONFIG_OPTION_HELP)
+@click.option(
+    "--config",
+    "-c",
+    default=DEFAULT_SERVICES_CONFIG,
+    show_default=True,
+    help=CONFIG_OPTION_HELP,
+)
 @click.pass_context
 def remove_service(ctx, name, config):
     """Remove service NAME from the config file (a running daemon stops it)."""
@@ -251,7 +315,13 @@ def remove_service(ctx, name, config):
 
 
 @supervisor.command(name="reload")
-@click.option("--config", "-c", default=DEFAULT_SERVICES_CONFIG, show_default=True, help=CONFIG_OPTION_HELP)
+@click.option(
+    "--config",
+    "-c",
+    default=DEFAULT_SERVICES_CONFIG,
+    show_default=True,
+    help=CONFIG_OPTION_HELP,
+)
 @click.pass_context
 def reload_services(ctx, config):
     """Make the running daemon apply its services file (after editing it by hand).

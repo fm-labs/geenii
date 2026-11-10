@@ -9,7 +9,11 @@ from fastapi.responses import StreamingResponse
 from geenii.chat_models import ContentPart, TextContent
 from geenii.config import GEENII_CHAT_SESSIONS_DIR
 from geenii.datamodels import ChatMessage, ChatStreamEvent, Problem
-from geenii.server.chat_sessions import ChatSessionInfo, ChatSessionNotFound, ChatSessionStore
+from geenii.server.chat_sessions import (
+    ChatSessionInfo,
+    ChatSessionNotFound,
+    ChatSessionStore,
+)
 from geenii.server.web_runner import AgentBusyError
 
 logger = logging.getLogger(__name__)
@@ -22,10 +26,14 @@ logger = logging.getLogger(__name__)
 #
 # Handlers are plain `def`: agents block (provider HTTP, tools), so they run in FastAPI's threadpool.
 
-router = APIRouter(prefix="/chats", tags=["chat"], responses={
-    400: {"model": Problem, "description": "Invalid request"},
-    404: {"model": Problem, "description": "Chat not found"},
-})
+router = APIRouter(
+    prefix="/chats",
+    tags=["chat"],
+    responses={
+        400: {"model": Problem, "description": "Invalid request"},
+        404: {"model": Problem, "description": "Chat not found"},
+    },
+)
 
 NDJSON_MEDIA_TYPE = "application/x-ndjson"
 
@@ -38,7 +46,9 @@ def dep_chat_sessions(request: Request) -> ChatSessionStore:
         with _store_lock:
             store = getattr(request.app.state, "chat_sessions", None)
             if store is None:
-                store = ChatSessionStore(GEENII_CHAT_SESSIONS_DIR, request.app.state.agent_registry)
+                store = ChatSessionStore(
+                    GEENII_CHAT_SESSIONS_DIR, request.app.state.agent_registry
+                )
                 request.app.state.chat_sessions = store
     return store
 
@@ -86,13 +96,17 @@ class ChatInteractionResponse(pydantic.BaseModel):
 
 
 @router.get("")
-def list_chats(store: ChatSessionStore = Depends(dep_chat_sessions)) -> list[ChatSessionInfo]:
+def list_chats(
+    store: ChatSessionStore = Depends(dep_chat_sessions),
+) -> list[ChatSessionInfo]:
     """List agent chat sessions, most recently updated first."""
     return store.list()
 
 
 @router.post("", status_code=201)
-def create_chat(request: ChatCreateRequest, store: ChatSessionStore = Depends(dep_chat_sessions)) -> ChatSessionInfo:
+def create_chat(
+    request: ChatCreateRequest, store: ChatSessionStore = Depends(dep_chat_sessions)
+) -> ChatSessionInfo:
     """Create a chat session with the given agent."""
     try:
         return store.create(request.agent, title=request.title)
@@ -101,7 +115,9 @@ def create_chat(request: ChatCreateRequest, store: ChatSessionStore = Depends(de
 
 
 @router.get("/{context_id}")
-def get_chat(context_id: str, store: ChatSessionStore = Depends(dep_chat_sessions)) -> ChatSessionInfo:
+def get_chat(
+    context_id: str, store: ChatSessionStore = Depends(dep_chat_sessions)
+) -> ChatSessionInfo:
     return _get(store, context_id)
 
 
@@ -114,12 +130,19 @@ def delete_chat(context_id: str, store: ChatSessionStore = Depends(dep_chat_sess
 
 
 @router.get("/{context_id}/messages")
-def get_chat_messages(context_id: str, store: ChatSessionStore = Depends(dep_chat_sessions)) -> list[ChatMessage]:
+def get_chat_messages(
+    context_id: str, store: ChatSessionStore = Depends(dep_chat_sessions)
+) -> list[ChatMessage]:
     """The conversation history (the agent's memory)."""
     info = _get(store, context_id)
     return [
-        ChatMessage(id=m.id, timestamp=m.timestamp, context_id=context_id, message=m,
-                    sender_id="user" if m.role == "user" else info.agent)
+        ChatMessage(
+            id=m.id,
+            timestamp=m.timestamp,
+            context_id=context_id,
+            message=m,
+            sender_id="user" if m.role == "user" else info.agent,
+        )
         for m in store.history(context_id)
     ]
 
@@ -129,13 +152,24 @@ def _ndjson(events: Iterator[ChatStreamEvent]) -> Iterator[str]:
         yield event.model_dump_json() + "\n"
 
 
-@router.post("/{context_id}/messages", responses={
-    200: {"description": "NDJSON stream of ChatStreamEvent objects, one per line",
-          "content": {NDJSON_MEDIA_TYPE: {}}},
-    409: {"model": Problem, "description": "A turn is already running in this chat"},
-})
-def post_chat_message(context_id: str, request: ChatPostMessageRequest,
-                      store: ChatSessionStore = Depends(dep_chat_sessions)):
+@router.post(
+    "/{context_id}/messages",
+    responses={
+        200: {
+            "description": "NDJSON stream of ChatStreamEvent objects, one per line",
+            "content": {NDJSON_MEDIA_TYPE: {}},
+        },
+        409: {
+            "model": Problem,
+            "description": "A turn is already running in this chat",
+        },
+    },
+)
+def post_chat_message(
+    context_id: str,
+    request: ChatPostMessageRequest,
+    store: ChatSessionStore = Depends(dep_chat_sessions),
+):
     """
     Send a message to the chat's agent and stream its turn as NDJSON `ChatStreamEvent`s
     (`message`, `status`, `error`, terminated by `done`).
@@ -153,18 +187,26 @@ def post_chat_message(context_id: str, request: ChatPostMessageRequest,
 
 
 @router.post("/{context_id}/interactions/{interaction_id}", status_code=204)
-def respond_to_interaction(context_id: str, interaction_id: str, response: ChatInteractionResponse,
-                           store: ChatSessionStore = Depends(dep_chat_sessions)):
+def respond_to_interaction(
+    context_id: str,
+    interaction_id: str,
+    response: ChatInteractionResponse,
+    store: ChatSessionStore = Depends(dep_chat_sessions),
+):
     """Answer an approval request of the running turn (e.g. choice "Allow" or "Deny")."""
     _get(store, context_id)
     runner = store.get_runner(context_id)
     if not runner or not runner.respond(interaction_id, response.choice):
-        raise HTTPException(status_code=404, detail=f"No pending interaction {interaction_id}.")
+        raise HTTPException(
+            status_code=404, detail=f"No pending interaction {interaction_id}."
+        )
     return Response(status_code=204)
 
 
 @router.post("/{context_id}/cancel", status_code=204)
-def cancel_chat_turn(context_id: str, store: ChatSessionStore = Depends(dep_chat_sessions)):
+def cancel_chat_turn(
+    context_id: str, store: ChatSessionStore = Depends(dep_chat_sessions)
+):
     """Cancel the running turn: pending approvals are rejected and the stream ends at the next message."""
     _get(store, context_id)
     runner = store.get_runner(context_id)
@@ -178,7 +220,9 @@ _NOT_IMPLEMENTED = {501: {"model": Problem, "description": "Not implemented"}}
 
 @router.post("/{context_id}/files", responses=_NOT_IMPLEMENTED)
 def upload_files(context_id: str):
-    raise HTTPException(status_code=501, detail="Chat file uploads are not implemented yet.")
+    raise HTTPException(
+        status_code=501, detail="Chat file uploads are not implemented yet."
+    )
 
 
 @router.get("/{context_id}/files", responses=_NOT_IMPLEMENTED)

@@ -24,7 +24,7 @@ class ToolRegistry:
     def register(self, tool: Tool) -> None:
         """Register a tool instance. Raises ValueError on duplicate names."""
         if tool.name in self._tools:
-            #raise ValueError(f"Tool {tool.name!r} is already registered")
+            # raise ValueError(f"Tool {tool.name!r} is already registered")
             logger.warning(f"Tool {tool.name!r} already registered")
             return
         self._tools[tool.name] = tool
@@ -64,11 +64,11 @@ class ToolRegistry:
         """
         registered: list[McpTool] = []
         for defn in tool_definitions:
-            #prefixed_name = f"{mcp_server_id}_{defn['name']}"
+            # prefixed_name = f"{mcp_server_id}_{defn['name']}"
             tool = McpTool(
-                name=defn['name'],
+                name=defn["name"],
                 mcp_server_id=mcp_server_id,
-                description=defn.get("description", ""), #.strip().split("\n")[0],
+                description=defn.get("description", ""),  # .strip().split("\n")[0],
                 input_schema=defn.get("input_schema", {}),
             )
             self.register(tool)
@@ -93,8 +93,12 @@ class ToolRegistry:
         """
 
         def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
-            logger.debug(f"Registering tool {name or fn.__name__!r} via fn decorator {fn.__module__}.{fn.__qualname__}")
-            self.register_function(fn, name=name, description=description, parameters=parameters)
+            logger.debug(
+                f"Registering tool {name or fn.__name__!r} via fn decorator {fn.__module__}.{fn.__qualname__}"
+            )
+            self.register_function(
+                fn, name=name, description=description, parameters=parameters
+            )
             return fn
 
         return decorator
@@ -194,5 +198,3 @@ def _params_from_signature(fn: Callable[..., Any]) -> dict:
     if required:
         schema["required"] = required
     return schema
-
-

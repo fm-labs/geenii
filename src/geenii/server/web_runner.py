@@ -4,7 +4,11 @@ import threading
 from typing import Iterator
 
 from geenii.agent.base_agent import BaseAgent
-from geenii.chat_models import ContentPart, ToolCallResultContent, UserInteractionContent
+from geenii.chat_models import (
+    ContentPart,
+    ToolCallResultContent,
+    UserInteractionContent,
+)
 from geenii.datamodels import (
     ChatDoneEvent,
     ChatErrorEvent,
@@ -63,8 +67,12 @@ class WebAgentRunner:
         self.hitl.reset()
 
         events: queue.Queue = queue.Queue()
-        threading.Thread(target=self._run_turn, args=(content, events), daemon=True,
-                         name=f"agent-turn-{self.agent.context_id}").start()
+        threading.Thread(
+            target=self._run_turn,
+            args=(content, events),
+            daemon=True,
+            name=f"agent-turn-{self.agent.context_id}",
+        ).start()
         return self._read(events)
 
     @staticmethod
@@ -80,7 +88,11 @@ class WebAgentRunner:
             for message in messages:
                 if self._cancelled.is_set():
                     break
-                interaction_ids = [p.interaction_id for p in message.content if isinstance(p, UserInteractionContent)]
+                interaction_ids = [
+                    p.interaction_id
+                    for p in message.content
+                    if isinstance(p, UserInteractionContent)
+                ]
                 for interaction_id in interaction_ids:
                     # answerable from now on, even before the agent starts waiting
                     self.hitl.expect(interaction_id)
@@ -92,7 +104,9 @@ class WebAgentRunner:
                 elif any(isinstance(p, ToolCallResultContent) for p in message.content):
                     events.put(ChatStatusEvent(status="thinking"))
         except Exception as e:
-            logger.exception(f"Agent run failed for context {self.agent.context_id}", exc_info=e)
+            logger.exception(
+                f"Agent run failed for context {self.agent.context_id}", exc_info=e
+            )
             final = ChatErrorEvent(error=str(e))
         finally:
             messages.close()

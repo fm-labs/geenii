@@ -23,6 +23,7 @@ String values in a step config may reference earlier results with ``${...}``:
 A string that is exactly one reference gets the raw value, otherwise the
 references are interpolated as text. Use ``$${`` for a literal ``${``.
 """
+
 import importlib
 import inspect
 import json
@@ -121,7 +122,9 @@ class FlowSnapshot(pydantic.BaseModel):
     status: Literal["running", "success", "failed", "aborted"]
     started_at: datetime
     updated_at: datetime
-    steps: list[StepResult] = []  # finished (and, at the end, skipped) steps, in execution order
+    steps: list[
+        StepResult
+    ] = []  # finished (and, at the end, skipped) steps, in execution order
     running: list[str] = []
     pending: list[str] = []
 
@@ -134,7 +137,12 @@ class FlowSnapshot(pydantic.BaseModel):
     def to_json(self, indent: int | None = 2) -> str:
         # the input is stored as is and may not be JSON serializable: fall back to str() for it
         data = self.model_dump(mode="json", exclude={"input"})
-        data = {"context_id": data.pop("context_id"), "flow": data.pop("flow"), "input": self.input, **data}
+        data = {
+            "context_id": data.pop("context_id"),
+            "flow": data.pop("flow"),
+            "input": self.input,
+            **data,
+        }
         return json.dumps(data, indent=indent, default=str)
 
     def save(self, path: str | Path):
@@ -158,8 +166,14 @@ class FlowContext:
     to on_event one at a time.
     """
 
-    def __init__(self, flow_name: str, input_data: Any = None, variables: dict | None = None,
-                 on_event: Callable[[StepEvent], None] | None = None, context_id: str | None = None):
+    def __init__(
+        self,
+        flow_name: str,
+        input_data: Any = None,
+        variables: dict | None = None,
+        on_event: Callable[[StepEvent], None] | None = None,
+        context_id: str | None = None,
+    ):
         # unique id of the run; generated unless given
         self.id = context_id or uuid.uuid4().hex
         self.flow_name = flow_name
@@ -234,7 +248,9 @@ _REF_FULL = re.compile(r"\$\{([^}]+)\}")
 def _config_references(value: Any) -> set[str]:
     """The ${...} references (without the braces) in strings inside value; $${...} escapes are skipped"""
     if isinstance(value, str):
-        return {m.group(1) for m in _REF.finditer(value) if not m.group(0).startswith("$$")}
+        return {
+            m.group(1) for m in _REF.finditer(value) if not m.group(0).startswith("$$")
+        }
     if isinstance(value, dict):
         return set().union(*(_config_references(v) for v in value.values()))
     if isinstance(value, (list, tuple)):
@@ -268,7 +284,9 @@ class FlowProcessor:
 
     def __init__(self, config: dict | None = None):
         config = config or {}
-        self.config = self.config_model.model_validate(config) if self.config_model else config
+        self.config = (
+            self.config_model.model_validate(config) if self.config_model else config
+        )
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({self.config})"
@@ -283,16 +301,19 @@ _PROCESSOR_REGISTRY: dict[str, type[FlowProcessor]] = {}
 
 def register_processor(name: str):
     """Class decorator registering a processor type under a short name"""
+
     def decorator(cls: type[FlowProcessor]) -> type[FlowProcessor]:
         cls.type_name = name
         _PROCESSOR_REGISTRY[name] = cls
         return cls
+
     return decorator
 
 
 def list_processor_types() -> dict[str, type[FlowProcessor]]:
     """All registered processor types by name, including the built-in processors"""
     import geenii.flow.processor  # noqa: F401 - registers the built-in processors
+
     return dict(sorted(_PROCESSOR_REGISTRY.items()))
 
 
@@ -301,9 +322,12 @@ def get_step_processor_class(processor: str) -> type[FlowProcessor]:
         module_name, class_name = processor.split(":", 1)
         cls = getattr(importlib.import_module(module_name), class_name, None)
         if cls is None:
-            raise FlowError(f"Processor class '{class_name}' not found in '{module_name}'")
+            raise FlowError(
+                f"Processor class '{class_name}' not found in '{module_name}'"
+            )
     else:
         import geenii.flow.processor  # noqa: F401 - registers the built-in processors
+
         cls = _PROCESSOR_REGISTRY.get(processor)
         if cls is None:
             raise FlowError(f"Unknown processor type '{processor}'")
@@ -317,9 +341,14 @@ class Flow:
     Assembles the steps to a workflow
     """
 
-    def __init__(self, name: str, steps: list[FlowStepSpec | dict] | None = None,
-                 edges: list[FlowEdge | dict | tuple[str, str]] | None = None, variables: dict | None = None,
-                 max_workers: int = 1):
+    def __init__(
+        self,
+        name: str,
+        steps: list[FlowStepSpec | dict] | None = None,
+        edges: list[FlowEdge | dict | tuple[str, str]] | None = None,
+        variables: dict | None = None,
+        max_workers: int = 1,
+    ):
         self.name = name
         self.steps: list[FlowStepSpec] = []
         self._edges: list[FlowEdge] = []
@@ -341,7 +370,9 @@ class Flow:
         self.steps.append(step)
         return step
 
-    def add_edge(self, edge: FlowEdge | dict | tuple[str, str] | str, to_step: str | None = None) -> FlowEdge:
+    def add_edge(
+        self, edge: FlowEdge | dict | tuple[str, str] | str, to_step: str | None = None
+    ) -> FlowEdge:
         """Add an edge: add_edge("a", "b"), add_edge(("a", "b")) or add_edge(FlowEdge(...))"""
         if isinstance(edge, str):
             edge = FlowEdge(from_step=edge, to_step=to_step)
@@ -376,7 +407,9 @@ class Flow:
         for e in self.edges:
             for step_id in (e.from_step, e.to_step):
                 if step_id not in ids:
-                    raise FlowError(f"Edge {e.from_step} -> {e.to_step}: unknown step '{step_id}'")
+                    raise FlowError(
+                        f"Edge {e.from_step} -> {e.to_step}: unknown step '{step_id}'"
+                    )
             preds[e.to_step].append(e.from_step)
         return preds
 
@@ -424,9 +457,13 @@ class Flow:
         order: list[FlowStepSpec] = []
         remaining = list(self.steps)
         while remaining:
-            ready = next((s for s in remaining if all(p in done for p in preds[s.id])), None)
+            ready = next(
+                (s for s in remaining if all(p in done for p in preds[s.id])), None
+            )
             if ready is None:
-                raise FlowError(f"Cycle between steps: {', '.join(s.id for s in remaining)}")
+                raise FlowError(
+                    f"Cycle between steps: {', '.join(s.id for s in remaining)}"
+                )
             remaining.remove(ready)
             done.add(ready.id)
             order.append(ready)
@@ -445,7 +482,9 @@ class Flow:
 
         lines = [f"flowchart {direction}"]
         for s in self.steps:
-            lines.append(f'    {node[s.id]}["{label(s.id)}<br/>({label(s.processor)})"]')
+            lines.append(
+                f'    {node[s.id]}["{label(s.id)}<br/>({label(s.processor)})"]'
+            )
         for e in self.edges:
             lines.append(f"    {node[e.from_step]} --> {node[e.to_step]}")
         return "\n".join(lines) + "\n"
@@ -469,7 +508,9 @@ class Flow:
             '    node [shape=box, style=rounded, fontname="Helvetica"];',
         ]
         for s in self.steps:
-            lines.append(f'    {quote(s.id)} [label="{esc(s.id)}\\n{esc(s.processor)}"];')
+            lines.append(
+                f'    {quote(s.id)} [label="{esc(s.id)}\\n{esc(s.processor)}"];'
+            )
         for e in self.edges:
             lines.append(f"    {quote(e.from_step)} -> {quote(e.to_step)};")
         lines.append("}")
@@ -477,8 +518,13 @@ class Flow:
 
     @classmethod
     def from_dict(cls, data: dict) -> "Flow":
-        return cls(name=data["name"], steps=data.get("steps", []), edges=data.get("edges"),
-                   variables=data.get("vars"), max_workers=data.get("max_workers", 1))
+        return cls(
+            name=data["name"],
+            steps=data.get("steps", []),
+            edges=data.get("edges"),
+            variables=data.get("vars"),
+            max_workers=data.get("max_workers", 1),
+        )
 
     @classmethod
     def from_file(cls, path: str | Path) -> "Flow":
@@ -526,10 +572,14 @@ class Flow:
             raise FlowError(f"Unsupported flow file type '{path.suffix}'")
         path.write_text(text)
 
-    def run(self, input_data: Any = None, on_event: Callable[[StepEvent], None] | None = None,
-            max_workers: int | None = None,
-            snapshot: str | Path | Callable[[FlowSnapshot], None] | None = None,
-            context_id: str | None = None) -> FlowResult:
+    def run(
+        self,
+        input_data: Any = None,
+        on_event: Callable[[StepEvent], None] | None = None,
+        max_workers: int | None = None,
+        snapshot: str | Path | Callable[[FlowSnapshot], None] | None = None,
+        context_id: str | None = None,
+    ) -> FlowResult:
         """
         Run the flow. max_workers overrides Flow.max_workers for this run.
         context_id identifies the run (FlowContext.id); a random id is generated if not given.
@@ -545,8 +595,13 @@ class Flow:
         preds = self.predecessors()
         for warning in self.check_references():
             logger.warning("Flow '%s': %s", self.name, warning)
-        ctx = FlowContext(self.name, input_data=input_data, variables=self.variables, on_event=on_event,
-                          context_id=context_id)
+        ctx = FlowContext(
+            self.name,
+            input_data=input_data,
+            variables=self.variables,
+            on_event=on_event,
+            context_id=context_id,
+        )
         results: dict[str, StepResult] = {}
         # outputs of finished steps; a failed step with on_error="continue" contributes None
         outputs: dict[str, Any] = {}
@@ -560,8 +615,12 @@ class Flow:
             if snapshot is None:
                 return
             snap = FlowSnapshot(
-                context_id=ctx.id, flow=flow_dict, input=input_data, status=snapshot_status,
-                started_at=started_at, updated_at=datetime.now(timezone.utc),
+                context_id=ctx.id,
+                flow=flow_dict,
+                input=input_data,
+                status=snapshot_status,
+                started_at=started_at,
+                updated_at=datetime.now(timezone.utc),
                 steps=[results[s.id] for s in order if s.id in results],
                 running=[s.id for s in running.values()],
                 pending=[s.id for s in pending],
@@ -572,8 +631,13 @@ class Flow:
                 logger.warning("Cannot save snapshot of flow '%s': %s", self.name, e)
 
         save_snapshot("running")
-        executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix=f"flow-{self.name}") \
-            if workers > 1 else _InlineExecutor()
+        executor = (
+            ThreadPoolExecutor(
+                max_workers=workers, thread_name_prefix=f"flow-{self.name}"
+            )
+            if workers > 1
+            else _InlineExecutor()
+        )
         try:
             while True:
                 # start every ready step (all predecessors finished), in execution order
@@ -583,8 +647,14 @@ class Flow:
                             break
                         if all(p in results for p in preds[spec.id]):
                             pending.remove(spec)
-                            step_input = _step_input(preds[spec.id], outputs, input_data)
-                            running[executor.submit(self._execute_step, spec, step_input, ctx)] = spec
+                            step_input = _step_input(
+                                preds[spec.id], outputs, input_data
+                            )
+                            running[
+                                executor.submit(
+                                    self._execute_step, spec, step_input, ctx
+                                )
+                            ] = spec
                 if not running:
                     break
 
@@ -613,27 +683,48 @@ class Flow:
             results[spec.id] = StepResult(step_id=spec.id, status="skipped")
             pending.remove(spec)
         save_snapshot(status)
-        return FlowResult(name=self.name, context_id=ctx.id, status=status, steps=[results[s.id] for s in order])
+        return FlowResult(
+            name=self.name,
+            context_id=ctx.id,
+            status=status,
+            steps=[results[s.id] for s in order],
+        )
 
-    def _execute_step(self, spec: FlowStepSpec, input_data: Any, ctx: FlowContext) -> StepResult:
+    def _execute_step(
+        self, spec: FlowStepSpec, input_data: Any, ctx: FlowContext
+    ) -> StepResult:
         ctx.emit("step.start", {"processor": spec.processor}, step_id=spec.id)
         started = time.monotonic()
         try:
-            step = get_step_processor_class(spec.processor)(config=ctx.resolve(spec.config))
+            step = get_step_processor_class(spec.processor)(
+                config=ctx.resolve(spec.config)
+            )
             output = self._drive(step, spec, input_data, ctx)
-            output = _dump(step.output_model.model_validate(output) if step.output_model else output)
+            output = _dump(
+                step.output_model.model_validate(output)
+                if step.output_model
+                else output
+            )
             result = StepResult(step_id=spec.id, status="success", output=output)
         except FlowAborted as e:
             result = StepResult(step_id=spec.id, status="aborted", error=str(e))
         except Exception as e:
             logger.warning("Step '%s' failed: %s", spec.id, e)
-            result = StepResult(step_id=spec.id, status="failed", error=f"{type(e).__name__}: {e}")
+            result = StepResult(
+                step_id=spec.id, status="failed", error=f"{type(e).__name__}: {e}"
+            )
         result.duration = time.monotonic() - started
-        ctx.emit("step.end", {"status": result.status, "error": result.error}, step_id=spec.id)
+        ctx.emit(
+            "step.end",
+            {"status": result.status, "error": result.error},
+            step_id=spec.id,
+        )
         return result
 
     @staticmethod
-    def _drive(step: FlowProcessor, spec: FlowStepSpec, input_data: Any, ctx: FlowContext) -> Any:
+    def _drive(
+        step: FlowProcessor, spec: FlowStepSpec, input_data: Any, ctx: FlowContext
+    ) -> Any:
         gen = step.process(input_data, ctx)
         if not inspect.isgenerator(gen):
             return gen

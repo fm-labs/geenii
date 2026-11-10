@@ -7,6 +7,7 @@ and `python -m geenii.pm.process_manager_service` keep working; both run the
 daemon. The former unprefixed methods (start, status, ...) remain available
 as aliases of pm.start, pm.status, ...
 """
+
 from __future__ import annotations
 
 import sys
@@ -21,12 +22,15 @@ from geenii.pm.process_manager import ProcessManager
 class ProcessManagerService(DaemonServer):
     """A daemon whose ProcessHost uses the given ProcessManager (and an idle scheduler)."""
 
-    def __init__(self, socket_path: Optional[str] = None, pm: Optional[ProcessManager] = None) -> None:
+    def __init__(
+        self, socket_path: Optional[str] = None, pm: Optional[ProcessManager] = None
+    ) -> None:
         super().__init__(ProcessHost(pm=pm), socket_path)
 
 
 def main() -> None:
     from geenii.daemon.server import main as daemon_main
+
     args = sys.argv[1:]
     # Former usage: `python -m geenii.pm.process_manager_service [SOCKET_PATH]`
     if args and not args[0].startswith("-"):

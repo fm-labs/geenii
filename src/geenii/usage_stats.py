@@ -8,6 +8,7 @@ and only after new lines were appended. `usage_stats()` then merges the cached d
 Days are local server days: timestamps with an offset are converted to local time, and older lines without one
 were written in local time already.
 """
+
 from __future__ import annotations
 
 import glob
@@ -31,7 +32,13 @@ logger = logging.getLogger(__name__)
 CACHE_VERSION = 1
 
 # counters summed per (provider, model, source, task) and day
-TOKEN_FIELDS = ("input_tokens", "output_tokens", "total_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+TOKEN_FIELDS = (
+    "input_tokens",
+    "output_tokens",
+    "total_tokens",
+    "cache_read_input_tokens",
+    "cache_creation_input_tokens",
+)
 COUNTER_FIELDS = ("calls", "failed", *TOKEN_FIELDS, "duration_ms", "timed_calls")
 
 # dimensions a breakdown can be grouped by
@@ -51,8 +58,14 @@ def _cache_dir() -> str:
 
 def _row_key(entry: dict) -> str:
     # lines written before source/task were logged have neither
-    return json.dumps([entry.get("provider") or "unknown", entry.get("model") or "unknown",
-                       entry.get("source") or "untagged", entry.get("task") or "untagged"])
+    return json.dumps(
+        [
+            entry.get("provider") or "unknown",
+            entry.get("model") or "unknown",
+            entry.get("source") or "untagged",
+            entry.get("task") or "untagged",
+        ]
+    )
 
 
 def _local_time(timestamp: str) -> datetime | None:
@@ -91,8 +104,12 @@ def aggregate_log_file(path: str) -> dict[str, DayAggregate]:
             ts = _local_time(entry.get("timestamp"))
             if ts is None:
                 continue
-            day = days.setdefault(ts.date().isoformat(), {"rows": {}, "hours": [0] * 24})
-            day["rows"].setdefault(_row_key(entry), Counter()).update(_entry_counters(entry))
+            day = days.setdefault(
+                ts.date().isoformat(), {"rows": {}, "hours": [0] * 24}
+            )
+            day["rows"].setdefault(_row_key(entry), Counter()).update(
+                _entry_counters(entry)
+            )
             day["hours"][ts.hour] += 1
     return days
 
@@ -117,25 +134,44 @@ class UsageStatsCache:
     def _cache_file(self, path: str) -> str:
         return os.path.join(self.cache_dir, Path(path).stem + ".json")
 
-    def _read_cache_file(self, path: str, signature: tuple[int, int]) -> dict[str, DayAggregate] | None:
+    def _read_cache_file(
+        self, path: str, signature: tuple[int, int]
+    ) -> dict[str, DayAggregate] | None:
         try:
             with open(self._cache_file(path), "r") as f:
                 data = json.load(f)
         except (OSError, ValueError):
             return None
-        if data.get("version") != CACHE_VERSION or tuple(data.get("signature") or ()) != signature:
+        if (
+            data.get("version") != CACHE_VERSION
+            or tuple(data.get("signature") or ()) != signature
+        ):
             return None
-        return {day: {"rows": {k: Counter(v) for k, v in agg["rows"].items()}, "hours": agg["hours"]}
-                for day, agg in data["days"].items()}
+        return {
+            day: {
+                "rows": {k: Counter(v) for k, v in agg["rows"].items()},
+                "hours": agg["hours"],
+            }
+            for day, agg in data["days"].items()
+        }
 
-    def _write_cache_file(self, path: str, signature: tuple[int, int], days: dict[str, DayAggregate]) -> None:
+    def _write_cache_file(
+        self, path: str, signature: tuple[int, int], days: dict[str, DayAggregate]
+    ) -> None:
         """Atomic write; a failure only costs a recalculation after a restart."""
         target = self._cache_file(path)
         try:
             os.makedirs(self.cache_dir, exist_ok=True)
             fd, tmp = tempfile.mkstemp(dir=self.cache_dir, suffix=".tmp")
             with os.fdopen(fd, "w") as f:
-                json.dump({"version": CACHE_VERSION, "signature": list(signature), "days": days}, f)
+                json.dump(
+                    {
+                        "version": CACHE_VERSION,
+                        "signature": list(signature),
+                        "days": days,
+                    },
+                    f,
+                )
             os.replace(tmp, target)
         except OSError as e:
             logger.warning(f"Could not write usage stats cache {target}: {e}")
@@ -170,7 +206,9 @@ class UsageStatsCache:
                     target = merged.setdefault(day, {"rows": {}, "hours": [0] * 24})
                     for key, counters in agg["rows"].items():
                         target["rows"].setdefault(key, Counter()).update(counters)
-                    target["hours"] = [a + b for a, b in zip(target["hours"], agg["hours"])]
+                    target["hours"] = [
+                        a + b for a, b in zip(target["hours"], agg["hours"])
+                    ]
         return merged
 
 
@@ -179,12 +217,21 @@ _default_cache = UsageStatsCache()
 
 def _totals(counters: Counter) -> dict:
     result = {field: counters.get(field, 0) for field in COUNTER_FIELDS}
-    result["avg_duration_ms"] = round(result["duration_ms"] / result["timed_calls"]) if result["timed_calls"] else None
+    result["avg_duration_ms"] = (
+        round(result["duration_ms"] / result["timed_calls"])
+        if result["timed_calls"]
+        else None
+    )
     return result
 
 
-def usage_stats(start: date | None = None, end: date | None = None, *, refresh: bool = False,
-                cache: UsageStatsCache | None = None) -> dict:
+def usage_stats(
+    start: date | None = None,
+    end: date | None = None,
+    *,
+    refresh: bool = False,
+    cache: UsageStatsCache | None = None,
+) -> dict:
     """
     Usage between `start` and `end` (inclusive, local days). `end` defaults to today and `start` to the first
     day with usage. The daily series has an entry for every day of the range, with zeros for days without calls.
@@ -199,7 +246,9 @@ def usage_stats(start: date | None = None, end: date | None = None, *, refresh: 
 
     total = Counter()
     hours = [0] * 24
-    breakdowns: dict[str, dict[str, Counter]] = {d: {} for d in (*DIMENSIONS, "model_id")}
+    breakdowns: dict[str, dict[str, Counter]] = {
+        d: {} for d in (*DIMENSIONS, "model_id")
+    }
     daily = []
     day = start
     while day <= end:
@@ -211,16 +260,30 @@ def usage_stats(start: date | None = None, end: date | None = None, *, refresh: 
                 provider, model, source, task = json.loads(key)
                 day_total.update(counters)
                 by_provider[provider] += counters.get("total_tokens", 0)
-                for dimension, value in (("provider", provider), ("model", model), ("source", source),
-                                         ("task", task), ("model_id", f"{provider}:{model}")):
+                for dimension, value in (
+                    ("provider", provider),
+                    ("model", model),
+                    ("source", source),
+                    ("task", task),
+                    ("model_id", f"{provider}:{model}"),
+                ):
                     breakdowns[dimension].setdefault(value, Counter()).update(counters)
             hours = [a + b for a, b in zip(hours, agg["hours"])]
         total.update(day_total)
-        daily.append({"date": day.isoformat(), **_totals(day_total), "tokens_by_provider": dict(by_provider)})
+        daily.append(
+            {
+                "date": day.isoformat(),
+                **_totals(day_total),
+                "tokens_by_provider": dict(by_provider),
+            }
+        )
         day += timedelta(days=1)
 
     def breakdown(dimension: str) -> list[dict]:
-        rows = [{"key": key, **_totals(counters)} for key, counters in breakdowns[dimension].items()]
+        rows = [
+            {"key": key, **_totals(counters)}
+            for key, counters in breakdowns[dimension].items()
+        ]
         return sorted(rows, key=lambda r: (-r["total_tokens"], -r["calls"], r["key"]))
 
     return {

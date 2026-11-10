@@ -2,6 +2,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def cleanup(*args):
     """Perform maintenance tasks"""
     logger.info("Performing cleanup tasks...")

@@ -18,34 +18,46 @@ from geenii.utils.cached import cached
 from geenii.utils.json_util import append_jsonl
 
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 def init_builtin_tools(registry: ToolRegistry):
     registry.register(ReadTool())
     registry.register(WriteTool())
-    registry.register(ComputerTool(
-        name="bash",
-        description="Execute a shell command on the local machine and return its output.",
-        input_schema={
-            "type": "object",
-            "properties": {
-                "command": {"type": "string", "description": "The shell command to execute. The command must be a single-line string, e.g. 'ls -la /tmp'."}
+    registry.register(
+        ComputerTool(
+            name="bash",
+            description="Execute a shell command on the local machine and return its output.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "The shell command to execute. The command must be a single-line string, e.g. 'ls -la /tmp'.",
+                    }
+                },
+                "required": ["command"],
             },
-            "required": ["command"]
-        },
-    ))
-    registry.register(ComputerTool(
-        name="python",
-        description="Execute a python script and return its output.",
-        input_schema={
-            "type": "object",
-            "properties": {
-                "command": {"type": "string", "description": "The python command to execute without the binary name, e.g. '-m mymodule script.py'."}
+        )
+    )
+    registry.register(
+        ComputerTool(
+            name="python",
+            description="Execute a python script and return its output.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "The python command to execute without the binary name, e.g. '-m mymodule script.py'.",
+                    }
+                },
+                "required": ["command"],
             },
-            "required": ["command"]
-        },
-        command_template="python3 {command}",
-    ))
+            command_template="python3 {command}",
+        )
+    )
     init_core_tools(registry)
 
 
@@ -63,15 +75,19 @@ def read_mcp_server_tools(server_name) -> list[dict]:
             tools = mcp_client.list_tools()
         except Exception as e:
             # try again after a short delay in case the server is still starting up
-            logger.warning(f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds...")
+            logger.warning(
+                f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds..."
+            )
             try:
-               time.sleep(1)
-               tools = mcp_client.list_tools()
+                time.sleep(1)
+                tools = mcp_client.list_tools()
             except Exception as e:
-               logger.error(f"Error listing tools from MCP server {server_name} on second attempt: {e}. Skipping this server.")
-               return []
-            #logger.error(f"Error listing tools from MCP server {server_name}: {e}.")
-            #return []
+                logger.error(
+                    f"Error listing tools from MCP server {server_name} on second attempt: {e}. Skipping this server."
+                )
+                return []
+            # logger.error(f"Error listing tools from MCP server {server_name}: {e}.")
+            # return []
         return tools
     except Exception as e:
         logger.error(f"Error retrieving tools from MCP server {server_name}: {e}")
@@ -100,16 +116,24 @@ def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] = None)
         except Exception as e:
             logger.error(f"Error connecting to MCP server {server_name}: {e}")
             continue
-            
 
-def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = None, caller_id: str = "anonymous",
-                secret_keys: set[str] | None = None) -> ToolCallResult:
+
+def invoke_tool(
+    tool: Tool,
+    args: dict[str, str],
+    env: dict,
+    cwd: str | None = None,
+    caller_id: str = "anonymous",
+    secret_keys: set[str] | None = None,
+) -> ToolCallResult:
     """`secret_keys` are env vars whose values are redacted in the logs, on top of the name-based redaction."""
     result = None
     cwd = cwd or GEENII_WORKING_DIR
     ctx = ToolCallContext(cwd=cwd, caller_id=caller_id)
     try:
-        logger.info(f"Invoking tool {tool.name} with args: {args}, env: {_redact_env_vars(env, secret_keys)}, cwd: {cwd}, tool_ctx_id: {ctx.id}")
+        logger.info(
+            f"Invoking tool {tool.name} with args: {args}, env: {_redact_env_vars(env, secret_keys)}, cwd: {cwd}, tool_ctx_id: {ctx.id}"
+        )
         result = tool.invoke(args=args, env=env, ctx=ctx)
         logger.info(f"Tool result for {tool.name}, tool_ctx_id: {ctx.id}: {result}")
         return result
@@ -119,7 +143,14 @@ def invoke_tool(tool: Tool, args: dict[str, str], env: dict, cwd: str | None = N
         result = e
         raise e from e
     finally:
-        _log_tool_call(tool.name, args, _redact_env_vars(env, secret_keys), cwd, caller_id=caller_id, result=result)
+        _log_tool_call(
+            tool.name,
+            args,
+            _redact_env_vars(env, secret_keys),
+            cwd,
+            caller_id=caller_id,
+            result=result,
+        )
 
 
 # matched anywhere in a name
@@ -130,20 +161,30 @@ _SENSITIVE_NAME_PARTS = ("pass", "passwd", "pat")
 
 def _is_sensitive_env_var(name: str) -> bool:
     name = name.lower()
-    return any(s in name for s in _SENSITIVE_KEYS) or any(p in _SENSITIVE_NAME_PARTS for p in name.split("_"))
+    return any(s in name for s in _SENSITIVE_KEYS) or any(
+        p in _SENSITIVE_NAME_PARTS for p in name.split("_")
+    )
 
 
-def _redact_env_vars(env_vars: dict[str, str], secret_keys: set[str] | None = None) -> dict[str, str]:
+def _redact_env_vars(
+    env_vars: dict[str, str], secret_keys: set[str] | None = None
+) -> dict[str, str]:
     """A copy of env_vars with sensitive values redacted. The input is left untouched, since it is passed on to the tool."""
     secret_keys = secret_keys or set()
-    return {k: "REDACTED" if k in secret_keys or _is_sensitive_env_var(k) else v
-            for k, v in env_vars.items()}
+    return {
+        k: "REDACTED" if k in secret_keys or _is_sensitive_env_var(k) else v
+        for k, v in env_vars.items()
+    }
 
-def _log_tool_call(tool_name, args: dict[str, str],
-                   env: dict[str, str],
-                   cwd: str | None,
-                   caller_id: str,
-                   result: ToolCallResult | Exception | None = None):
+
+def _log_tool_call(
+    tool_name,
+    args: dict[str, str],
+    env: dict[str, str],
+    cwd: str | None,
+    caller_id: str,
+    result: ToolCallResult | Exception | None = None,
+):
 
     now = datetime.now()
     date_formatted = now.strftime("%Y-%m-%d")
@@ -157,12 +198,15 @@ def _log_tool_call(tool_name, args: dict[str, str],
             "exception": str(result),
             "traceback": traceback.format_exc(),
         }
-    append_jsonl(log_file, {
-        "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S"),
-        "caller_id": caller_id,
-        "tool": tool_name,
-        "args": args,
-        "env": env,
-        "cwd": cwd,
-        "result": result,
-    })
+    append_jsonl(
+        log_file,
+        {
+            "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S"),
+            "caller_id": caller_id,
+            "tool": tool_name,
+            "args": args,
+            "env": env,
+            "cwd": cwd,
+            "result": result,
+        },
+    )

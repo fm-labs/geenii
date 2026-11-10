@@ -43,7 +43,9 @@ class BaseTask(abc.ABC):
         """
         The run method should be implemented by subclasses to perform the task's work and yield messages or other content as needed.
         """
-        yield ModelMessage(role="assistant", content=[TextContent(text="Not implemented.")])
+        yield ModelMessage(
+            role="assistant", content=[TextContent(text="Not implemented.")]
+        )
 
 
 class BaseAgentTask(BaseTask, abc.ABC):

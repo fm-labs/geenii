@@ -9,9 +9,16 @@ from pathlib import Path
 from typing import Any
 
 from geenii import config
-from geenii.tool.common import Tool, expand_vars, ToolCallResult, ToolCallContext, to_tool_call_result
+from geenii.tool.common import (
+    Tool,
+    expand_vars,
+    ToolCallResult,
+    ToolCallContext,
+    to_tool_call_result,
+)
 
 logger = logging.getLogger(__name__)
+
 
 class ComputerTool(Tool):
     """A tool that executes a command on the local machine."""
@@ -27,27 +34,46 @@ class ComputerTool(Tool):
         self.type = "computer"
         self.command_template = command_template
 
-    def invoke(self, args: dict[str,Any], env: dict[str, str] | None = None, *, ctx: ToolCallContext) -> ToolCallResult:
+    def invoke(
+        self,
+        args: dict[str, Any],
+        env: dict[str, str] | None = None,
+        *,
+        ctx: ToolCallContext,
+    ) -> ToolCallResult:
         working_dir = ctx.cwd
         # todo check if tool execution is permitted in given working_dir
 
         command = args.get("command")
         if not command:
-            raise ValueError(f"Missing 'command' argument for ComputerTool {self.name!r}")
+            raise ValueError(
+                f"Missing 'command' argument for ComputerTool {self.name!r}"
+            )
         if self.command_template is not None:
             # `command` is in args too, so it must not be passed twice
             command = self.command_template.format(**{**args, "command": command})
 
-        logger.info(f"Executing ComputerTool command: {command} in working directory={working_dir}")
+        logger.info(
+            f"Executing ComputerTool command: {command} in working directory={working_dir}"
+        )
         subprocess_id = uuid.uuid4().hex[:8]
         # logged before expansion and with env names only, since env may hold secrets
-        logger.info(f"ComputerTool [{subprocess_id}] Spawning command={command!r} environment={sorted(env or {})} cwd={working_dir}")
+        logger.info(
+            f"ComputerTool [{subprocess_id}] Spawning command={command!r} environment={sorted(env or {})} cwd={working_dir}"
+        )
         command = expand_vars(command, env or {})
 
         _env = os.environ.copy()
         if env:
             _env.update(env)
-        p = subprocess.run(command, shell=True, capture_output=True, text=True, env=_env, cwd=working_dir)
+        p = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            env=_env,
+            cwd=working_dir,
+        )
         logger.info(f"ComputerTool [{subprocess_id}] Standard output: {p.stdout}")
         logger.info(f"ComputerTool [{subprocess_id}] Standard error: {p.stderr}")
         logger.info(f"ComputerTool [{subprocess_id}] Return code: {p.returncode}")
@@ -59,19 +85,20 @@ class ComputerTool(Tool):
             json_data = json.loads(out)
         except json.decoder.JSONDecodeError:
             pass
-        if not isinstance(json_data, dict): # and not isinstance(json_data, list):
+        if not isinstance(json_data, dict):  # and not isinstance(json_data, list):
             json_data = None
 
         err = p.stderr.strip()
         _output = f"stdout:\n{out}\nstderr:\n{err}"
         if p.returncode != 0:
-            _output += f"\nEXITED WITH NON-ZERO EXIT CODE: { p.returncode}"
+            _output += f"\nEXITED WITH NON-ZERO EXIT CODE: {p.returncode}"
             return ToolCallResult(text=_output, is_error=True)
-        return ToolCallResult(text=_output, is_error=False, structured_content=json_data)
+        return ToolCallResult(
+            text=_output, is_error=False, structured_content=json_data
+        )
 
 
 class AppleScriptTool(ComputerTool):
-
     """A ComputerTool that executes AppleScript commands on MacOS."""
 
     def __init__(
@@ -80,13 +107,15 @@ class AppleScriptTool(ComputerTool):
         description: str = "",
         input_schema: dict | None = None,
     ):
-        super().__init__(name, description, input_schema, command_template="osascript -e '{command}'")
-        
+        super().__init__(
+            name, description, input_schema, command_template="osascript -e '{command}'"
+        )
+
 
 class ReadTool(Tool):
     """A Tool that reads data from a source."""
 
-    NAME = 'read'
+    NAME = "read"
     DESCRIPTION = "Read data from a source"
     INPUT_SCHEMA = {
         "type": "object",
@@ -99,12 +128,19 @@ class ReadTool(Tool):
     def __init__(self):
         super().__init__(self.NAME, self.DESCRIPTION, self.INPUT_SCHEMA)
 
-    def invoke(self, args: dict[str, Any], env: dict[str, str] | None = None, *,
-               ctx: ToolCallContext) -> ToolCallResult:
+    def invoke(
+        self,
+        args: dict[str, Any],
+        env: dict[str, str] | None = None,
+        *,
+        ctx: ToolCallContext,
+    ) -> ToolCallResult:
         file_path = args.get("file_path")
         try:
             if not file_path or not isinstance(file_path, str):
-                raise ValueError(f"Invalid file_path argument for ReadTool {self.name!r}")
+                raise ValueError(
+                    f"Invalid file_path argument for ReadTool {self.name!r}"
+                )
 
             wd = ctx.cwd
             file_path = _normalize_path(file_path, wd)
@@ -125,7 +161,7 @@ class ReadTool(Tool):
 class WriteTool(Tool):
     """A Tool that writes data to a source."""
 
-    NAME = 'write'
+    NAME = "write"
     DESCRIPTION = "Write data to a source"
     INPUT_SCHEMA = {
         "type": "object",
@@ -138,7 +174,7 @@ class WriteTool(Tool):
 
     def __init__(self):
         super().__init__(self.NAME, self.DESCRIPTION, self.INPUT_SCHEMA)
-        
+
     def invoke(
         self,
         args: dict[str, Any],
@@ -150,7 +186,9 @@ class WriteTool(Tool):
         contents = args.get("contents", "")
         try:
             if not file_path or not isinstance(file_path, str):
-                raise ValueError(f"Invalid file_path argument for WriteTool {self.name!r}")
+                raise ValueError(
+                    f"Invalid file_path argument for WriteTool {self.name!r}"
+                )
 
             wd = ctx.cwd
             file_path = _normalize_path(file_path, wd)
@@ -203,5 +241,3 @@ def is_file_in_allowed_dir(file_path: str | Path, wd: str) -> bool:
         # null bytes, embedded NULs, unresolvable paths, symlink loops
         return False
     return target != wd and wd in target.parents
-
-

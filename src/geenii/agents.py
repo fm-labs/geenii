@@ -40,19 +40,19 @@ class Agent(BaseAgent):
         if self._initialized:
             return
 
-        #init_builtin_tools(self._tool_registry)
-        #if self.mcp_servers:
+        # init_builtin_tools(self._tool_registry)
+        # if self.mcp_servers:
         #    init_mcp_server_tools(self._tool_registry, self.mcp_servers)
 
-        #self._tool_registry.register_function(self.about_me, name="about_me")
-        #self.allowed_tools.add("about_me")
+        # self._tool_registry.register_function(self.about_me, name="about_me")
+        # self.allowed_tools.add("about_me")
 
         # check if all allowed tools are available
         _allowed_tools = set()
         for tool_name in self.allowed_tools:
             if not self.tools.has(tool_name):
                 logging.warning(f"Tool {tool_name} not found in tools registry")
-                #continue
+                # continue
             _allowed_tools.add(tool_name)
         self.allowed_tools = _allowed_tools
 
@@ -69,7 +69,6 @@ class Agent(BaseAgent):
         """
         logger.debug("Handling macros for message: %s", message)
         if isinstance(message, str):
-
             # direct agent call using '@' prefix
             # e.g. '@my-agent PROMPT'
             if message.startswith("@"):
@@ -79,8 +78,12 @@ class Agent(BaseAgent):
                 message = parts[1] if len(parts) > 1 else ""
                 logger.info("Agent macro: agent=%s message=%s", agent_name, message)
                 # handoff to the agent
-                self.enqueue_task(HandoffTask(agent=self, target_agent_name=agent_name, prompt=message))
-                return True # signal to stop message handling
+                self.enqueue_task(
+                    HandoffTask(
+                        agent=self, target_agent_name=agent_name, prompt=message
+                    )
+                )
+                return True  # signal to stop message handling
 
             # slash commands using '/' prefix
             # maps to builtin tasks or
@@ -100,7 +103,9 @@ class Agent(BaseAgent):
                     self.enqueue_task(MemoryCompactionTask(agent=self, prompt=prompt))
                     return True
                 elif skill_name in INFO_COMMANDS:
-                    self.enqueue_task(InfoCommandTask(agent=self, command=skill_name, args=prompt))
+                    self.enqueue_task(
+                        InfoCommandTask(agent=self, command=skill_name, args=prompt)
+                    )
                     return True
                 # elif skill_name == "memo":
                 #     self.enqueue_task(StorePersistentMemoryTask(agent=self, message=prompt))
@@ -109,45 +114,56 @@ class Agent(BaseAgent):
                 #     self.enqueue_task(RetrievePersistentMemoryTask(agent=self, message=prompt))
                 #     return True
                 else:
-                    self.enqueue_task(ActivateSkillTask(agent=self, skill_name=skill_name, prompt=prompt))
+                    self.enqueue_task(
+                        ActivateSkillTask(
+                            agent=self, skill_name=skill_name, prompt=prompt
+                        )
+                    )
                     return True
 
             # direct tool call using ':' prefix
             if message.startswith(":"):
                 parts = message.split(" ", maxsplit=1)
                 tool_name = parts[0][1:]
-                args_str = parts[1] if len(parts) > 1 else "" # key=value key2="value 2"
+                args_str = (
+                    parts[1] if len(parts) > 1 else ""
+                )  # key=value key2="value 2"
                 args = {}
                 try:
                     for part in shlex.split(args_str):
                         if "=" not in part:
-                            raise ValueError(f"Invalid argument '{part}', expected key=value")
+                            raise ValueError(
+                                f"Invalid argument '{part}', expected key=value"
+                            )
                         key, value = part.split("=", maxsplit=1)
                         args[key] = value
                 except ValueError as e:
                     logger.warning("Tool macro: %s", e)
-                    return True # signal to stop message handling
+                    return True  # signal to stop message handling
 
                 # tool_registry: ToolRegistry = ToolRegistry()
                 # init_builtin_tools(tool_registry)
-                # 
+                #
                 # tool = tool_registry.get(tool_name)
                 # result = tool.invoke(args=args, env={})
                 call_id = f"usr-{tool_name}-{time.time()}"
-                self.enqueue_task(ToolCallTask(agent=self, tool_name=tool_name, arguments=args, call_id=call_id))
+                self.enqueue_task(
+                    ToolCallTask(
+                        agent=self, tool_name=tool_name, arguments=args, call_id=call_id
+                    )
+                )
                 return True
-                
 
         return None
-    
+
     def _handle_message(self, message: str | list[ContentPart]):
         if self._handle_makros(message):
             return
-        
+
         self.enqueue_task(FindBestSkillTask(self, prompt=message_to_prompt(message)))
         self.enqueue_task(LLMTask(self, message=message))
-        #self.enqueue_task(PlanTask(self, prompt=message_to_prompt(message)))
-        #self.enqueue_task(LLMTask(self, message="Execute the plan and call the necessary tools to complete the task."))
+        # self.enqueue_task(PlanTask(self, prompt=message_to_prompt(message)))
+        # self.enqueue_task(LLMTask(self, message="Execute the plan and call the necessary tools to complete the task."))
 
 
 class RoutingAgent(Agent):
@@ -175,9 +191,9 @@ class ProcessManagerAgent(Agent):
         if self._initialized:
             return
 
-        #init_builtin_tools(self._tool_registry)
-        #init_process_tools(self._tool_registry, self._pm)
-        #if self.mcp_servers:
+        # init_builtin_tools(self._tool_registry)
+        # init_process_tools(self._tool_registry, self._pm)
+        # if self.mcp_servers:
         #    init_mcp_server_tools(self._tool_registry, self.mcp_servers)
 
         self._initialized = True

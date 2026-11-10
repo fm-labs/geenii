@@ -46,8 +46,13 @@ class ChatSessionStore:
     Each session gets its own agent instance (own memory and HITL controller), cached in an LRU of runners.
     """
 
-    def __init__(self, base_dir: Path | str, agent_registry: AgentRegistry, max_runners: int = 32,
-                 approval_timeout: float = 300):
+    def __init__(
+        self,
+        base_dir: Path | str,
+        agent_registry: AgentRegistry,
+        max_runners: int = 32,
+        approval_timeout: float = 300,
+    ):
         self.base_dir = Path(base_dir)
         self.agent_registry = agent_registry
         self.max_runners = max_runners
@@ -60,7 +65,9 @@ class ChatSessionStore:
     def session_dir(self, context_id: str) -> Path:
         """Directory of a session; rejects any context_id that could leave the base directory."""
         if not CONTEXT_ID_RE.fullmatch(context_id or ""):
-            raise ValueError("Invalid context_id: expected 1-64 characters of [A-Za-z0-9_-].")
+            raise ValueError(
+                "Invalid context_id: expected 1-64 characters of [A-Za-z0-9_-]."
+            )
         base = self.base_dir.resolve()
         path = (base / context_id).resolve()
         if path.parent != base:
@@ -97,7 +104,9 @@ class ChatSessionStore:
             try:
                 sessions.append(ChatSessionInfo.model_validate_json(meta.read_text()))
             except (OSError, pydantic.ValidationError) as e:
-                logger.warning(f"Skipping unreadable chat session {meta.parent.name}: {e}")
+                logger.warning(
+                    f"Skipping unreadable chat session {meta.parent.name}: {e}"
+                )
         return sorted(sessions, key=lambda s: s.updated_at, reverse=True)
 
     def touch(self, context_id: str, prompt: str | None = None) -> ChatSessionInfo:
@@ -107,7 +116,11 @@ class ChatSessionStore:
             info.updated_at = datetime.now(UTC)
             if not info.title and prompt and prompt.strip():
                 title = " ".join(prompt.split())
-                info.title = title if len(title) <= TITLE_MAX_LENGTH else title[:TITLE_MAX_LENGTH - 1] + "…"
+                info.title = (
+                    title
+                    if len(title) <= TITLE_MAX_LENGTH
+                    else title[: TITLE_MAX_LENGTH - 1] + "…"
+                )
             self._write_meta(info)
             return info
 
@@ -125,7 +138,9 @@ class ChatSessionStore:
             runner = self._runners.get(context_id)
         if runner:
             return list(runner.agent.message_history)
-        return list(FileChatMemory(str(self.session_dir(context_id) / MEMORY_FILE)).messages)
+        return list(
+            FileChatMemory(str(self.session_dir(context_id) / MEMORY_FILE)).messages
+        )
 
     # -- runners ---------------------------------------------------------------
 
@@ -140,7 +155,9 @@ class ChatSessionStore:
 
             spec = self.agent_registry.get_config(info.agent)
             if spec is None:
-                raise ValueError(f"Agent '{info.agent}' of chat {context_id} is no longer configured.")
+                raise ValueError(
+                    f"Agent '{info.agent}' of chat {context_id} is no longer configured."
+                )
             hitl = WebHumanInTheLoopController(approval_timeout=self.approval_timeout)
             memory = FileChatMemory(str(self.session_dir(context_id) / MEMORY_FILE))
             agent = init_agent(spec, context_id=context_id, memory=memory, hitl=hitl)

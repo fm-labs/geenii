@@ -1,13 +1,11 @@
 """Tests for the FakeProvider and agent loop integration."""
 
-
 from geenii.chat_models import TextContent, ToolCallContent
 from geenii.datamodels import ChatCompletionRequest
 from geenii.provider.fake.provider import FakeProvider
 
 
 class TestFakeProvider:
-
     def test_returns_queued_text(self):
         provider = FakeProvider()
         provider.enqueue("Hello!")
@@ -32,8 +30,12 @@ class TestFakeProvider:
         provider.enqueue("First")
         provider.enqueue("Second")
 
-        r1 = provider.generate_chat_completion(ChatCompletionRequest(prompt="a", model="fake:test"))
-        r2 = provider.generate_chat_completion(ChatCompletionRequest(prompt="b", model="fake:test"))
+        r1 = provider.generate_chat_completion(
+            ChatCompletionRequest(prompt="a", model="fake:test")
+        )
+        r2 = provider.generate_chat_completion(
+            ChatCompletionRequest(prompt="b", model="fake:test")
+        )
 
         assert r1.output[0].text == "First"
         assert r2.output[0].text == "Second"
@@ -64,7 +66,9 @@ class TestFakeProvider:
     def test_reset_clears_state(self):
         provider = FakeProvider()
         provider.enqueue("will be cleared")
-        provider.generate_chat_completion(ChatCompletionRequest(prompt="x", model="fake:test"))
+        provider.generate_chat_completion(
+            ChatCompletionRequest(prompt="x", model="fake:test")
+        )
         provider.reset()
 
         assert len(provider.requests) == 0
@@ -74,7 +78,9 @@ class TestFakeProvider:
         provider = FakeProvider()
         provider.enqueue("ok")
 
-        response = provider.generate_chat_completion(ChatCompletionRequest(prompt="x", model="fake:test"))
+        response = provider.generate_chat_completion(
+            ChatCompletionRequest(prompt="x", model="fake:test")
+        )
 
         assert response.usage.input_tokens == 10
         assert response.usage.output_tokens == 20

@@ -11,7 +11,6 @@ from geenii.tool.registry import ToolRegistry
 logger = logging.getLogger(__name__)
 
 
-
 def init_core_tools(tool_registry: ToolRegistry) -> None:
 
     # tool_registry = ToolRegistry()
@@ -73,7 +72,6 @@ def init_core_tools(tool_registry: ToolRegistry) -> None:
     #
     #     return f"Contents successfully written to {file_path}"
 
-
     @tool_registry.tool()
     def display_desktop_notification(
         message: str, title: str = "Message from Geenii"
@@ -106,7 +104,6 @@ def init_core_tools(tool_registry: ToolRegistry) -> None:
         if result.returncode != 0:
             return f"Failed to send notification: {result.stderr.strip()}"
         return f"Notification sent: {title} - {message}"
-
 
     # @tool_registry.tool()
     # def get_weather_forecast(location: str) -> str:

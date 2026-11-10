@@ -38,7 +38,7 @@ def init_logging():
                 get_rotating_file_log_handler("geenii"),
             ],
         )
-    #logging.getLogger("httpx").setLevel(logging.WARNING)
+    # logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def get_console_log_handler():

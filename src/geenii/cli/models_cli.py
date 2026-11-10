@@ -4,13 +4,15 @@ from geenii.ai import enumerate_models
 from rich.console import Console
 from rich.table import Table
 
+
 @click.group()
 def models():
     pass
 
+
 @models.command(name="list")
-@click.option("-p","--provider")
-@click.option("-l","--locality")
+@click.option("-p", "--provider")
+@click.option("-l", "--locality")
 def list_models(provider: str, locality: str):
     """List all available models"""
 
@@ -25,9 +27,11 @@ def list_models(provider: str, locality: str):
 
     for m in ai_models:
         if provider is not None and provider != m.provider:
-           continue
+            continue
         if locality is not None and locality != m.locality:
             continue
 
-        table.add_row(m.name, m.provider, m.description, m.locality, ",".join(m.capabilities))
+        table.add_row(
+            m.name, m.provider, m.description, m.locality, ",".join(m.capabilities)
+        )
     Console().print(table)

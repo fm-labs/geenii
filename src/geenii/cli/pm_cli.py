@@ -13,8 +13,13 @@ def _client(ctx) -> ProcessManagerClient:
 
 
 @click.group()
-@click.option("--socket", "-s", default=None, envvar=list(SOCKET_ENV_VARS),
-              help="Path to the geenii daemon's Unix socket.")
+@click.option(
+    "--socket",
+    "-s",
+    default=None,
+    envvar=list(SOCKET_ENV_VARS),
+    help="Path to the geenii daemon's Unix socket.",
+)
 @click.pass_context
 def pm(ctx, socket):
     """Manage background processes."""
@@ -30,17 +35,22 @@ def ping(ctx):
     if client.is_available():
         click.echo("Process manager is running.")
     else:
-        click.echo("Process manager is not reachable (is `geenii daemon start` running?).")
+        click.echo(
+            "Process manager is not reachable (is `geenii daemon start` running?)."
+        )
         raise SystemExit(1)
 
 
 @pm.command()
-@click.option("--socket", "-s", default=None, help="Path to the Unix socket to listen on.")
+@click.option(
+    "--socket", "-s", default=None, help="Path to the Unix socket to listen on."
+)
 @click.pass_context
 def serve(ctx, socket):
     """Alias for `geenii daemon start`: runs the daemon, which hosts the process manager."""
     from geenii.cli.daemon_cli import start_daemon
     from geenii.daemon.server import DEFAULT_SCHEDULER_CONFIG
+
     start_daemon(socket or ctx.obj or None, DEFAULT_SCHEDULER_CONFIG)
 
 
@@ -69,8 +79,12 @@ def status(ctx, process_id):
 @pm.command()
 @click.argument("process_id")
 @click.option("--stream", type=click.Choice(["stdout", "stderr"]), default="stdout")
-@click.option("--tail", "-n", default=None, type=int, help="Show only the last N lines.")
-@click.option("--offset", default=None, type=int, help="Start reading at this byte position.")
+@click.option(
+    "--tail", "-n", default=None, type=int, help="Show only the last N lines."
+)
+@click.option(
+    "--offset", default=None, type=int, help="Start reading at this byte position."
+)
 @click.option("--limit", default=None, type=int, help="Read at most this many bytes.")
 @click.pass_context
 def output(ctx, process_id, stream, tail, offset, limit):
@@ -78,13 +92,17 @@ def output(ctx, process_id, stream, tail, offset, limit):
     if tail is not None and (offset is not None or limit is not None):
         raise click.UsageError("--tail cannot be combined with --offset/--limit")
     client = _client(ctx)
-    text = client.output(process_id, stream=stream, tail=tail, offset=offset, limit=limit)
+    text = client.output(
+        process_id, stream=stream, tail=tail, offset=offset, limit=limit
+    )
     click.echo(text, nl=False)
 
 
 @pm.command()
 @click.argument("process_id")
-@click.option("--timeout", "-t", type=float, default=None, help="Give up after this many seconds.")
+@click.option(
+    "--timeout", "-t", type=float, default=None, help="Give up after this many seconds."
+)
 @click.pass_context
 def wait(ctx, process_id, timeout):
     """Wait until a background process has finished and print its final state.
@@ -114,8 +132,13 @@ def kill(ctx, process_id, force):
 
 
 @pm.command(name="list")
-@click.option("--all", "-a", "include_finished", is_flag=True,
-              help="Include finished processes from disk.")
+@click.option(
+    "--all",
+    "-a",
+    "include_finished",
+    is_flag=True,
+    help="Include finished processes from disk.",
+)
 @click.pass_context
 def list_procs(ctx, include_finished):
     """List background processes."""
@@ -153,23 +176,35 @@ def _parse_duration(value: str) -> float:
     try:
         return float(text[:-1]) * unit if unit else float(text)
     except ValueError:
-        raise click.BadParameter(f"{value!r} is not a duration like 90s, 15m, 12h or 7d")
+        raise click.BadParameter(
+            f"{value!r} is not a duration like 90s, 15m, 12h or 7d"
+        )
 
 
 @pm.command()
-@click.option("--max-age", default=None,
-              help="Remove processes finished longer ago than this (e.g. 12h, 7d). "
-                   "Default: GEENII_PM_GC_MAX_AGE, or 7 days.")
-@click.option("--state", "states", multiple=True,
-              type=click.Choice(["completed", "failed", "killed", "orphaned"]),
-              help="Only collect processes in this state (repeatable). Default: completed, failed, killed.")
+@click.option(
+    "--max-age",
+    default=None,
+    help="Remove processes finished longer ago than this (e.g. 12h, 7d). "
+    "Default: GEENII_PM_GC_MAX_AGE, or 7 days.",
+)
+@click.option(
+    "--state",
+    "states",
+    multiple=True,
+    type=click.Choice(["completed", "failed", "killed", "orphaned"]),
+    help="Only collect processes in this state (repeatable). Default: completed, failed, killed.",
+)
 @click.option("--dry-run", "-n", is_flag=True, help="Only show what would be removed.")
 @click.pass_context
 def gc(ctx, max_age, states, dry_run):
     """Remove on-disk logs of old finished processes."""
     client = _client(ctx)
-    removed = client.gc(_parse_duration(max_age) if max_age else None,
-                        states=list(states) or None, dry_run=dry_run)
+    removed = client.gc(
+        _parse_duration(max_age) if max_age else None,
+        states=list(states) or None,
+        dry_run=dry_run,
+    )
     for pid in removed:
         click.echo(f"  {pid}")
     verb = "Would remove" if dry_run else "Removed"

@@ -8,12 +8,15 @@ def read_toml(path: str) -> dict:
     # Prefer stdlib tomllib if available (Python 3.11+)
     try:
         import tomllib  # type: ignore
+
         data = tomllib.loads(content.decode("utf-8"))
     except ModuleNotFoundError:
         try:
             import toml  # type: ignore
         except ModuleNotFoundError:
-            raise RuntimeError("Error: Need 'tomllib' (Python 3.11+) or 'toml' package to read TOML.")
+            raise RuntimeError(
+                "Error: Need 'tomllib' (Python 3.11+) or 'toml' package to read TOML."
+            )
         data = toml.loads(content.decode("utf-8"))
     if not isinstance(data, dict):
         data = {}
@@ -28,6 +31,7 @@ def write_toml(path: str, data: dict) -> None:
 
     try:
         import tomli_w
+
         with open(path, "wb") as f:
             tomli_w.dump(data, f)
     except ModuleNotFoundError:

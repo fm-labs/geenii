@@ -186,10 +186,12 @@ from geenii.tool.registry import ToolRegistry
 
 registry = ToolRegistry()
 
+
 @registry.tool()
 def greet(name: str) -> str:
     """Say hello."""
     return f"Hello, {name}!"
+
 
 # or explicitly:
 registry.register_function(my_fn, name="my_tool", description="...", parameters={...})
@@ -273,15 +275,15 @@ from geenii.tool.tool_filter import ToolFilter, ToolFilterSet
 
 # Parse a single filter
 f = ToolFilter.parse("Bash(command:uname *)")
-f.allows("bash", {"command": "uname -a"})   # True
-f.allows("bash", {"command": "rm -rf /"})    # False
+f.allows("bash", {"command": "uname -a"})  # True
+f.allows("bash", {"command": "rm -rf /"})  # False
 
 # Parse a set
 fs = ToolFilterSet.parse("Bash(command:uname *), Bash(command:date *), read")
-fs.allows("bash", {"command": "date +%Y"})   # True
-fs.allows("read", {})                        # True
+fs.allows("bash", {"command": "date +%Y"})  # True
+fs.allows("read", {})  # True
 fs.allows("bash", {"command": "curl evil"})  # False
-fs.tool_names()                              # {"bash", "read"}
+fs.tool_names()  # {"bash", "read"}
 ```
 
 ## CLI

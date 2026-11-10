@@ -18,7 +18,7 @@ def info():
         click.echo(f"{key}: {value}")
 
 
-def flatten_dict(d: dict, parent_key: str = '', sep: str = '.') -> dict:
+def flatten_dict(d: dict, parent_key: str = "", sep: str = ".") -> dict:
     items = []
     for k, v in d.items():
         new_key = f"{parent_key}{sep}{k}" if parent_key else k
@@ -27,7 +27,9 @@ def flatten_dict(d: dict, parent_key: str = '', sep: str = '.') -> dict:
         elif isinstance(v, list):
             for i, item in enumerate(v):
                 if isinstance(item, dict):
-                    items.extend(flatten_dict(item, f"{new_key}{sep}{i}", sep=sep).items())
+                    items.extend(
+                        flatten_dict(item, f"{new_key}{sep}{i}", sep=sep).items()
+                    )
                 else:
                     items.append((f"{parent_key}{sep}{i}", item))
         else:

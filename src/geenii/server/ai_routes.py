@@ -10,12 +10,24 @@ from geenii import ai
 from geenii.ai import enumerate_models
 from geenii.chat_models import TextContent
 from geenii.config import DEFAULT_AUDIO_TRANSCRIPTION_MODEL, GEENII_CHAT_SESSIONS_DIR
-from geenii.datamodels import CompletionErrorResponse, CompletionRequest, CompletionResponse, ChatCompletionRequest, \
-    ChatCompletionResponse, ImageGenerationApiResponse, \
-    ImageGenerationApiRequest, AudioGenerationApiRequest, AudioSpeechGenerationApiResponse, \
-    AudioTranscriptionApiRequest, \
-    AudioTranscriptionApiResponse, AudioTranslationApiResponse, AudioTranslationApiRequest, AIModelInfo, ModelMessage, \
-    Problem
+from geenii.datamodels import (
+    CompletionErrorResponse,
+    CompletionRequest,
+    CompletionResponse,
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    ImageGenerationApiResponse,
+    ImageGenerationApiRequest,
+    AudioGenerationApiRequest,
+    AudioSpeechGenerationApiResponse,
+    AudioTranscriptionApiRequest,
+    AudioTranscriptionApiResponse,
+    AudioTranslationApiResponse,
+    AudioTranslationApiRequest,
+    AIModelInfo,
+    ModelMessage,
+    Problem,
+)
 from geenii.memory import FileChatMemory
 from geenii.utils.os_util import get_user_home_dir
 
@@ -46,7 +58,10 @@ _UPLOAD_CHUNK_SIZE = 1024 * 1024
 def _chat_session_dir(context_id: str) -> Path:
     """Resolve the session directory for a client-supplied context_id, rejecting anything that could escape it."""
     if not _CONTEXT_ID_RE.fullmatch(context_id):
-        raise HTTPException(status_code=400, detail="Invalid context_id: expected 1-64 characters of [A-Za-z0-9_-].")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid context_id: expected 1-64 characters of [A-Za-z0-9_-].",
+        )
     base = GEENII_CHAT_SESSIONS_DIR.resolve()
     path = (base / context_id).resolve()
     if path.parent != base:
@@ -73,8 +88,17 @@ def _unwrap(result):
 
 def _model_kwargs(request: CompletionRequest) -> dict:
     """Generation parameters to forward to the provider. None values are dropped so provider defaults apply."""
-    kwargs = request.model_dump(include={"system", "temperature", "top_p", "max_tokens", "output_format",
-                                         "output_schema", "model_parameters"})
+    kwargs = request.model_dump(
+        include={
+            "system",
+            "temperature",
+            "top_p",
+            "max_tokens",
+            "output_format",
+            "output_schema",
+            "model_parameters",
+        }
+    )
     return {k: v for k, v in kwargs.items() if v is not None and v != {}}
 
 
@@ -96,7 +120,6 @@ def models() -> list[AIModelInfo]:
 #     raise NotImplementedError("Model downloading is not implemented yet.")
 
 
-
 @router.post("/completion")
 def completion(request: CompletionRequest) -> CompletionResponse:
     """
@@ -105,14 +128,16 @@ def completion(request: CompletionRequest) -> CompletionResponse:
     Streaming is not supported by this endpoint; `stream` is ignored.
     """
     _check_model_id(request.model)
-    return _unwrap(ai.generate_completion(
-        model=request.model,
-        prompt=request.prompt,
-        stream=False,
-        source="api",
-        task="completion",
-        **_model_kwargs(request),
-    ))
+    return _unwrap(
+        ai.generate_completion(
+            model=request.model,
+            prompt=request.prompt,
+            stream=False,
+            source="api",
+            task="completion",
+            **_model_kwargs(request),
+        )
+    )
 
 
 @router.post("/chat/completion")
@@ -128,13 +153,21 @@ def chat_completion(request: ChatCompletionRequest) -> ChatCompletionResponse:
     context_memory_dir = _chat_session_dir(context_id)
     context_memory_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Chat completion request with context_id={context_id}, model={request.model}, prompt={request.prompt}")
-    memory = FileChatMemory(f"{context_memory_dir}/memory.jsonl", create=True, restore=True)
+    logger.info(
+        f"Chat completion request with context_id={context_id}, model={request.model}, prompt={request.prompt}"
+    )
+    memory = FileChatMemory(
+        f"{context_memory_dir}/memory.jsonl", create=True, restore=True
+    )
 
     messages = list(memory.messages)
-    logger.info(f"Loaded {len(messages)} messages from memory for context_id={context_id}")
+    logger.info(
+        f"Loaded {len(messages)} messages from memory for context_id={context_id}"
+    )
     if len(messages) > 10:
-        logger.warning(f"Memory for context_id={context_id} has {len(messages)} messages, which may exceed token limits for some models. Consider implementing memory management strategies.")
+        logger.warning(
+            f"Memory for context_id={context_id} has {len(messages)} messages, which may exceed token limits for some models. Consider implementing memory management strategies."
+        )
         # todo compact memory
 
     _request = ChatCompletionRequest(
@@ -148,14 +181,22 @@ def chat_completion(request: ChatCompletionRequest) -> ChatCompletionResponse:
         _request.system = [DEFAULT_CHAT_SYSTEM_PROMPT]
 
     try:
-        response = ai.generate_chat_completion(request=_request, source="api", task="chat_completion")
+        response = ai.generate_chat_completion(
+            request=_request, source="api", task="chat_completion"
+        )
     except Exception as e:
         logger.error(f"Error during chat completion for context_id={context_id}: {e}")
         raise HTTPException(status_code=502, detail=str(e))
 
     # Append the user message and assistant response to memory
-    memory.append(ModelMessage(role="user", content=[TextContent(type="text", text=request.prompt)]))
-    memory.append(ModelMessage(role="assistant", content=response.output, usage=response.usage))
+    memory.append(
+        ModelMessage(
+            role="user", content=[TextContent(type="text", text=request.prompt)]
+        )
+    )
+    memory.append(
+        ModelMessage(role="assistant", content=response.output, usage=response.usage)
+    )
 
     return response
 
@@ -172,7 +213,9 @@ def generate_image(request: ImageGenerationApiRequest) -> ImageGenerationApiResp
 
 # AUDIO GENERATION - TEXT-TO-SPEECH
 @router.post("/audio/speech")
-def generate_speech(request: AudioGenerationApiRequest) -> AudioSpeechGenerationApiResponse:
+def generate_speech(
+    request: AudioGenerationApiRequest,
+) -> AudioSpeechGenerationApiResponse:
     """
     Generate speech from text using the specified AI provider and model.
     """
@@ -197,8 +240,10 @@ def _save_upload(file: UploadFile, max_bytes: int) -> Path:
             while chunk := file.file.read(_UPLOAD_CHUNK_SIZE):
                 size += len(chunk)
                 if size > max_bytes:
-                    raise HTTPException(status_code=413,
-                                        detail=f"Audio file too large (max {max_bytes // (1024 * 1024)} MB).")
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Audio file too large (max {max_bytes // (1024 * 1024)} MB).",
+                    )
                 out.write(chunk)
     except BaseException:
         save_path.unlink(missing_ok=True)
@@ -207,8 +252,13 @@ def _save_upload(file: UploadFile, max_bytes: int) -> Path:
 
 
 # AUDIO TRANSCRIPTION - SPEECH-TO-TEXT
-@router.post("/audio/transcribe", responses={413: {"model": Problem, "description": "Audio file too large"}})
-def generate_audio_transcription(input_blob: UploadFile = File(...)) -> AudioTranscriptionApiResponse:
+@router.post(
+    "/audio/transcribe",
+    responses={413: {"model": Problem, "description": "Audio file too large"}},
+)
+def generate_audio_transcription(
+    input_blob: UploadFile = File(...),
+) -> AudioTranscriptionApiResponse:
     """
     Generate a transcription from audio using the specified AI provider and model.
 
@@ -216,23 +266,36 @@ def generate_audio_transcription(input_blob: UploadFile = File(...)) -> AudioTra
     """
     file = input_blob
     if not file.content_type or not file.content_type.startswith("audio/"):
-        raise HTTPException(status_code=400, detail=f"Expected audio/*, got {file.content_type}")
+        raise HTTPException(
+            status_code=400, detail=f"Expected audio/*, got {file.content_type}"
+        )
 
     save_path = _save_upload(file, MAX_AUDIO_UPLOAD_BYTES)
     try:
-        return _unwrap(ai.generate_audio_transcription(AudioTranscriptionApiRequest(
-            model=DEFAULT_AUDIO_TRANSCRIPTION_MODEL,
-            input_file=str(save_path),
-        )))
+        return _unwrap(
+            ai.generate_audio_transcription(
+                AudioTranscriptionApiRequest(
+                    model=DEFAULT_AUDIO_TRANSCRIPTION_MODEL,
+                    input_file=str(save_path),
+                )
+            )
+        )
     finally:
         save_path.unlink(missing_ok=True)
 
 
 # AUDIO TRANSLATION - SPEECH-TO-TEXT (TRANSLATED)
-@router.post("/audio/translate", responses={501: {"model": Problem, "description": "Not implemented"}})
-def generate_audio_translation(request: AudioTranslationApiRequest) -> AudioTranslationApiResponse:
+@router.post(
+    "/audio/translate",
+    responses={501: {"model": Problem, "description": "Not implemented"}},
+)
+def generate_audio_translation(
+    request: AudioTranslationApiRequest,
+) -> AudioTranslationApiResponse:
     """
     Translate audio into text in the target language. Not implemented yet.
     """
-    #return ai_service.generate_audio_translation(request)
-    raise HTTPException(status_code=501, detail="Audio translation is not implemented yet.")
+    # return ai_service.generate_audio_translation(request)
+    raise HTTPException(
+        status_code=501, detail="Audio translation is not implemented yet."
+    )

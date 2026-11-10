@@ -13,13 +13,25 @@ MASKED = "********"
 def root_file(mcp_dirs):
     root, _ = mcp_dirs
     root.parent.mkdir(parents=True)
-    root.write_text(json.dumps({
-        "env": {"TOKEN": "abc"},
-        "mcpServers": {
-            "local": {"command": "echo", "args": ["hi"], "env": {"API_KEY": "secret"}, "cwd": "/tmp"},
-            "remote": {"url": "http://h/mcp", "headers": {"Authorization": "Bearer ${TOKEN}"}},
-        },
-    }))
+    root.write_text(
+        json.dumps(
+            {
+                "env": {"TOKEN": "abc"},
+                "mcpServers": {
+                    "local": {
+                        "command": "echo",
+                        "args": ["hi"],
+                        "env": {"API_KEY": "secret"},
+                        "cwd": "/tmp",
+                    },
+                    "remote": {
+                        "url": "http://h/mcp",
+                        "headers": {"Authorization": "Bearer ${TOKEN}"},
+                    },
+                },
+            }
+        )
+    )
     return root
 
 
@@ -43,20 +55,31 @@ def stored(root_file):
 
 # ---------- list / config ----------
 
+
 def test_list_masks_env(client):
     servers = {s["name"]: s for s in client.get("/api/v1/mcp/servers").json()}
-    assert servers["local"] == {"name": "local", "type": "stdio", "url": None, "command": "echo",
-                                "args": ["hi"], "env": {"API_KEY": MASKED}}
+    assert servers["local"] == {
+        "name": "local",
+        "type": "stdio",
+        "url": None,
+        "command": "echo",
+        "args": ["hi"],
+        "env": {"API_KEY": MASKED},
+    }
     assert servers["remote"]["type"] == "http"
     assert "headers" not in servers["remote"]
 
 
 def test_config_masks_env_and_headers(client):
     assert client.get("/api/v1/mcp/servers/local/config").json() == {
-        "command": "echo", "args": ["hi"], "env": {"API_KEY": MASKED}, "cwd": "/tmp",
+        "command": "echo",
+        "args": ["hi"],
+        "env": {"API_KEY": MASKED},
+        "cwd": "/tmp",
     }
     assert client.get("/api/v1/mcp/servers/remote/config").json() == {
-        "url": "http://h/mcp", "headers": {"Authorization": MASKED},
+        "url": "http://h/mcp",
+        "headers": {"Authorization": MASKED},
     }
 
 
@@ -66,83 +89,129 @@ def test_config_of_unknown_server_is_404(client):
 
 # ---------- create ----------
 
+
 def test_create(client, root_file):
-    response = client.post("/api/v1/mcp/servers", json={"name": "new-server_1", "config": {
-        "url": "http://x/${TOKEN}", "headers": {"X-Key": "k"},
-    }})
+    response = client.post(
+        "/api/v1/mcp/servers",
+        json={
+            "name": "new-server_1",
+            "config": {
+                "url": "http://x/${TOKEN}",
+                "headers": {"X-Key": "k"},
+            },
+        },
+    )
 
     assert response.status_code == 201
     assert response.json()["name"] == "new-server_1"
     # written as sent, placeholders kept
-    assert stored(root_file)["new-server_1"] == {"url": "http://x/${TOKEN}", "headers": {"X-Key": "k"}}
-    assert "new-server_1" in [s["name"] for s in client.get("/api/v1/mcp/servers").json()]
+    assert stored(root_file)["new-server_1"] == {
+        "url": "http://x/${TOKEN}",
+        "headers": {"X-Key": "k"},
+    }
+    assert "new-server_1" in [
+        s["name"] for s in client.get("/api/v1/mcp/servers").json()
+    ]
 
 
 def test_create_existing_name_is_409(client, root_file):
-    response = client.post("/api/v1/mcp/servers", json={"name": "local", "config": {"command": "x"}})
+    response = client.post(
+        "/api/v1/mcp/servers", json={"name": "local", "config": {"command": "x"}}
+    )
     assert response.status_code == 409
     assert stored(root_file)["local"]["command"] == "echo"
 
 
 def test_create_name_taken_in_project_file_is_409(client, project_file):
-    response = client.post("/api/v1/mcp/servers", json={"name": "project_only", "config": {"command": "x"}})
+    response = client.post(
+        "/api/v1/mcp/servers", json={"name": "project_only", "config": {"command": "x"}}
+    )
     assert response.status_code == 409
 
 
 @pytest.mark.parametrize("name", ["", "with space", "slash/name", "dot.name", "ümlaut"])
 def test_create_invalid_name_is_400(client, name):
-    response = client.post("/api/v1/mcp/servers", json={"name": name, "config": {"command": "x"}})
+    response = client.post(
+        "/api/v1/mcp/servers", json={"name": name, "config": {"command": "x"}}
+    )
     assert response.status_code == 400
 
 
-@pytest.mark.parametrize("config", [
-    {},
-    {"cwd": "/tmp"},
-    {"command": "x", "args": "not a list"},
-    {"command": "x", "args": ["ok", 1]},
-    {"command": "x", "env": ["A=b"]},
-    {"command": "x", "env": {"A": 1}},
-    {"url": "http://x", "headers": {"A": None}},
-])
+@pytest.mark.parametrize(
+    "config",
+    [
+        {},
+        {"cwd": "/tmp"},
+        {"command": "x", "args": "not a list"},
+        {"command": "x", "args": ["ok", 1]},
+        {"command": "x", "env": ["A=b"]},
+        {"command": "x", "env": {"A": 1}},
+        {"url": "http://x", "headers": {"A": None}},
+    ],
+)
 def test_create_invalid_config_is_400(client, root_file, config):
-    response = client.post("/api/v1/mcp/servers", json={"name": "bad", "config": config})
+    response = client.post(
+        "/api/v1/mcp/servers", json={"name": "bad", "config": config}
+    )
     assert response.status_code == 400
     assert "bad" not in stored(root_file)
 
 
 def test_create_with_masked_value_is_400(client, root_file):
-    response = client.post("/api/v1/mcp/servers", json={"name": "bad", "config": {"command": "x", "env": {"A": MASKED}}})
+    response = client.post(
+        "/api/v1/mcp/servers",
+        json={"name": "bad", "config": {"command": "x", "env": {"A": MASKED}}},
+    )
     assert response.status_code == 400
     assert "bad" not in stored(root_file)
 
 
 # ---------- update ----------
 
+
 def test_update_keeps_masked_values(client, root_file):
-    response = client.put("/api/v1/mcp/servers/local", json={
-        "command": "cat", "env": {"API_KEY": MASKED, "NEW": "n"},
-    })
+    response = client.put(
+        "/api/v1/mcp/servers/local",
+        json={
+            "command": "cat",
+            "env": {"API_KEY": MASKED, "NEW": "n"},
+        },
+    )
 
     assert response.status_code == 200
     assert response.json()["command"] == "cat"
     # keys left out (args, cwd) are removed
-    assert stored(root_file)["local"] == {"command": "cat", "env": {"API_KEY": "secret", "NEW": "n"}}
+    assert stored(root_file)["local"] == {
+        "command": "cat",
+        "env": {"API_KEY": "secret", "NEW": "n"},
+    }
 
 
 def test_update_keeps_masked_header_with_placeholder(client, root_file):
-    client.put("/api/v1/mcp/servers/remote", json={"url": "http://h2/mcp", "headers": {"Authorization": MASKED}})
-    assert stored(root_file)["remote"] == {"url": "http://h2/mcp", "headers": {"Authorization": "Bearer ${TOKEN}"}}
+    client.put(
+        "/api/v1/mcp/servers/remote",
+        json={"url": "http://h2/mcp", "headers": {"Authorization": MASKED}},
+    )
+    assert stored(root_file)["remote"] == {
+        "url": "http://h2/mcp",
+        "headers": {"Authorization": "Bearer ${TOKEN}"},
+    }
 
 
 def test_update_replaces_value_and_removes_left_out_key(client, root_file):
-    client.put("/api/v1/mcp/servers/local", json={"command": "echo", "env": {"API_KEY": "changed"}})
+    client.put(
+        "/api/v1/mcp/servers/local",
+        json={"command": "echo", "env": {"API_KEY": "changed"}},
+    )
     client.put("/api/v1/mcp/servers/remote", json={"url": "http://h/mcp"})
     assert stored(root_file)["local"]["env"] == {"API_KEY": "changed"}
     assert stored(root_file)["remote"] == {"url": "http://h/mcp"}
 
 
 def test_update_with_unknown_masked_key_is_400(client, root_file):
-    response = client.put("/api/v1/mcp/servers/local", json={"command": "echo", "env": {"OTHER": MASKED}})
+    response = client.put(
+        "/api/v1/mcp/servers/local", json={"command": "echo", "env": {"OTHER": MASKED}}
+    )
     assert response.status_code == 400
     assert stored(root_file)["local"]["command"] == "echo"
 
@@ -153,13 +222,22 @@ def test_update_invalid_config_is_400(client, root_file):
 
 
 def test_update_unknown_server_is_404(client, root_file):
-    assert client.put("/api/v1/mcp/servers/nope", json={"command": "x"}).status_code == 404
+    assert (
+        client.put("/api/v1/mcp/servers/nope", json={"command": "x"}).status_code == 404
+    )
     assert "nope" not in stored(root_file)
 
 
 def test_update_project_only_server_is_409(client, project_file):
-    assert client.put("/api/v1/mcp/servers/project_only", json={"command": "x"}).status_code == 409
-    assert json.loads(project_file.read_text())["mcpServers"]["project_only"] == {"command": "p"}
+    assert (
+        client.put(
+            "/api/v1/mcp/servers/project_only", json={"command": "x"}
+        ).status_code
+        == 409
+    )
+    assert json.loads(project_file.read_text())["mcpServers"]["project_only"] == {
+        "command": "p"
+    }
 
 
 def test_update_drops_cached_client(client):
@@ -179,6 +257,7 @@ def test_update_drops_cached_client(client):
 
 
 # ---------- delete ----------
+
 
 def test_delete(client, root_file):
     response = client.delete("/api/v1/mcp/servers/local")

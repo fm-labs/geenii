@@ -13,6 +13,7 @@ def skills():
     """Manage skills."""
     pass
 
+
 @skills.command(name="list")
 def list_skills():
     """List all registered skills."""
@@ -23,7 +24,13 @@ def list_skills():
 
 @skills.command(name="inspect")
 @click.argument("name")
-@click.option("instructions", "--instructions", "-i", is_flag=True, help="Show the instructions for the skill.")
+@click.option(
+    "instructions",
+    "--instructions",
+    "-i",
+    is_flag=True,
+    help="Show the instructions for the skill.",
+)
 def inspect_skill(name: str, instructions: bool):
     """
     Show details for a specific skill.
@@ -63,19 +70,22 @@ def install_skill(name: str, source: str):
 
     # validate source
     if not source.startswith("file://"):
-        click_error("Currently only local file sources are supported. Please provide a source in the format 'file://path/to/skill'.")
+        click_error(
+            "Currently only local file sources are supported. Please provide a source in the format 'file://path/to/skill'."
+        )
         return
 
-    src_dir = source[len("file://"):]
+    src_dir = source[len("file://") :]
     if not os.path.isdir(src_dir):
         click_error(f"Dir '{src_dir}' does not exist.")
         return
 
     # make sure target directory does not already exist
     if os.path.exists(target_dir):
-        click_error(f"Skill '{name}' already exists. Please choose a different name or remove the existing skill first.")
+        click_error(
+            f"Skill '{name}' already exists. Please choose a different name or remove the existing skill first."
+        )
         return
 
     shutil.copytree(src_dir, target_dir)
     click_success(f"Skill '{name}' installed successfully from '{source}'.")
-

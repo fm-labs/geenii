@@ -6,6 +6,7 @@ from geenii import config
 aio_redis_global = aioredis.Redis | None
 redis_global = redis.Redis | None
 
+
 def get_global_aioredis_client() -> aioredis.Redis:
     global aio_redis_global
     if aio_redis_global is None:

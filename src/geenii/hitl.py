@@ -5,16 +5,20 @@ import time
 from pathlib import Path
 import httpx
 
+
 class HumanInTheLoopController(abc.ABC):
     """
     This class can be used to handle human-in-the-loop interactions for tool call approvals or other decision points in the agent's process.
     """
+
     # True if the human answers through the agent's own message stream (e.g. a web chat).
     # The agent then forwards its approval requests (UserInteractionContent messages) to the caller.
     interactive: bool = False
 
     @abc.abstractmethod
-    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
+    def request_tool_execution(
+        self, tool_name: str, arguments: dict, call_id: str
+    ) -> bool:
         """
         Abstract method to implement logic for approving or rejecting tool execution requests.
         :param tool_name: The name of the tool that is requested to be executed.
@@ -29,7 +33,10 @@ class NoHumanInTheLoopController(HumanInTheLoopController):
     """
     HITL handler that automatically approves all tool execution requests without any human intervention.
     """
-    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
+
+    def request_tool_execution(
+        self, tool_name: str, arguments: dict, call_id: str
+    ) -> bool:
         return True
 
 
@@ -41,37 +48,50 @@ class FileTicketHumanInTheLoopController(HumanInTheLoopController):
     - It then waits for an approval file to be created with the same call ID, which indicates that a human has approved the request.
     - If the approval file is detected within a certain timeout period, it returns True to approve the tool execution; otherwise, it returns False to reject it.
     """
+
     def __init__(self, ticket_dir: str, approval_timeout: int = 300):
         self.approval_timeout = approval_timeout
         self.ticket_path = Path(ticket_dir).resolve()
         self.ticket_path.mkdir(parents=True, exist_ok=True)
 
-    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
+    def request_tool_execution(
+        self, tool_name: str, arguments: dict, call_id: str
+    ) -> bool:
         ticket_file = self.ticket_path / f"{call_id}.json"
         approval_file = self.ticket_path / f"{call_id}.approved"
         rejected_file = self.ticket_path / f"{call_id}.rejected"
 
         # Create the ticket file with tool execution details
         with ticket_file.open("w") as f:
-            json.dump({
-                "tool_name": tool_name,
-                "arguments": arguments,
-                "call_id": call_id,
-                "timestamp": time.time(),
-            }, f, indent=2)
+            json.dump(
+                {
+                    "tool_name": tool_name,
+                    "arguments": arguments,
+                    "call_id": call_id,
+                    "timestamp": time.time(),
+                },
+                f,
+                indent=2,
+            )
 
-        print(f"Created HITL ticket for tool '{tool_name}' with call ID '{call_id}'. Waiting for approval...")
+        print(
+            f"Created HITL ticket for tool '{tool_name}' with call ID '{call_id}'. Waiting for approval..."
+        )
 
         # Wait for the approval file to be created
         start_time = time.time()
         approved = False
         while time.time() - start_time < self.approval_timeout:
             if approval_file.exists():
-                print(f"Approval received for call ID '{call_id}'. Approving tool execution.")
+                print(
+                    f"Approval received for call ID '{call_id}'. Approving tool execution."
+                )
                 approved = True
                 break
             elif rejected_file.exists():
-                print(f"Rejection received for call ID '{call_id}'. Rejecting tool execution.")
+                print(
+                    f"Rejection received for call ID '{call_id}'. Rejecting tool execution."
+                )
                 approved = False
                 break
             time.sleep(1)
@@ -92,25 +112,36 @@ class HttpPollHumanInTheLoopController(HumanInTheLoopController):
     - The endpoint is expected to return a JSON response with an "approved" field
     - The handler waits for the response and returns True if approved, or False if rejected or if a timeout occurs.
     """
+
     def __init__(self, approval_endpoint: str, approval_timeout: int = 300):
         self.approval_endpoint = approval_endpoint
         self.approval_timeout = approval_timeout
 
-    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
+    def request_tool_execution(
+        self, tool_name: str, arguments: dict, call_id: str
+    ) -> bool:
         with httpx.Client() as client:
             try:
-                response = client.post(self.approval_endpoint, json={
-                    "tool_name": tool_name,
-                    "arguments": arguments,
-                    "call_id": call_id,
-                }, timeout=self.approval_timeout)
+                response = client.post(
+                    self.approval_endpoint,
+                    json={
+                        "tool_name": tool_name,
+                        "arguments": arguments,
+                        "call_id": call_id,
+                    },
+                    timeout=self.approval_timeout,
+                )
                 response.raise_for_status()
                 data = response.json()
                 approved = data.get("approved", False)
                 if approved:
-                    print(f"Approval received for call ID '{call_id}'. Approving tool execution.")
+                    print(
+                        f"Approval received for call ID '{call_id}'. Approving tool execution."
+                    )
                 else:
-                    print(f"Rejection received for call ID '{call_id}'. Rejecting tool execution.")
+                    print(
+                        f"Rejection received for call ID '{call_id}'. Rejecting tool execution."
+                    )
                 return approved
             except Exception as e:
                 print(f"Error while requesting approval for call ID '{call_id}': {e}")
@@ -125,6 +156,7 @@ class WebHumanInTheLoopController(HumanInTheLoopController):
     - Unanswered requests are rejected after approval_timeout seconds, and all of them when `cancel()` is called.
     An answer may arrive before the agent starts waiting; it is kept until then.
     """
+
     interactive = True
 
     APPROVE_CHOICES = {"allow", "approve", "yes"}
@@ -176,7 +208,9 @@ class WebHumanInTheLoopController(HumanInTheLoopController):
         for event in events:
             event.set()
 
-    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
+    def request_tool_execution(
+        self, tool_name: str, arguments: dict, call_id: str
+    ) -> bool:
         with self._lock:
             if self._cancelled:
                 return False

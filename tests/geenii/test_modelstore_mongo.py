@@ -14,6 +14,7 @@ def create_mongodb_testcontainer():
 
 mongo_container = create_mongodb_testcontainer()
 
+
 @pytest.fixture(scope="session")
 def mongo_db():
     # Choose a MongoDB image tag you want to pin for reproducibility
@@ -25,9 +26,11 @@ def mongo_db():
 @pytest.fixture(scope="session")
 def mongo_client(mongo_db):
     from pymongo import MongoClient
+
     client = MongoClient(mongo_db.get_connection_url())
     yield client
     client.close()
+
 
 # @pytest.fixture(scope="module", autouse=True)
 # def setup(request):
@@ -46,7 +49,6 @@ def mongo_client(mongo_db):
 #     pass
 
 
-
 @pytest.mark.skip(reason="MongoDB is not available")
 def test_mongodb_client(mongo_client):
     # from geenii.db.mongodb import get_mongo_client
@@ -58,13 +60,16 @@ def test_mongodb_client(mongo_client):
     assert "local" in db_names
 
 
-
 @pytest.mark.skip(reason="MongoDB is not available")
 class TestMongoDbModelStore(TestModelStore):
-
     @pytest.fixture(autouse=True)
     def _setup(self, mongo_client):
         self.mongo = mongo_client
 
     def get_store(self) -> ModelStore:
-        return MongoDbModelStore(model_class=MyModel, key_field="id", collection_name="test", mongo=self.mongo)
+        return MongoDbModelStore(
+            model_class=MyModel,
+            key_field="id",
+            collection_name="test",
+            mongo=self.mongo,
+        )

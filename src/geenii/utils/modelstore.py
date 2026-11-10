@@ -16,8 +16,7 @@ from geenii.config import MONGODB_DB_NAME
 
 
 class ModelStore(abc.ABC):
-
-    def __init__(self, model_class=pydantic.BaseModel, key_field: str = 'uuid'):
+    def __init__(self, model_class=pydantic.BaseModel, key_field: str = "uuid"):
         self.key_field = key_field
         self.model_class = model_class
 
@@ -68,7 +67,7 @@ class ModelStore(abc.ABC):
 
 
 class InMemoryModelStore(ModelStore):
-    def __init__(self, model_class=pydantic.BaseModel, key_field: str = 'uuid'):
+    def __init__(self, model_class=pydantic.BaseModel, key_field: str = "uuid"):
         super().__init__(model_class=model_class, key_field=key_field)
         self.store = {}
 
@@ -93,12 +92,13 @@ class InMemoryModelStore(ModelStore):
         return True
 
     def find(self, query: Optional[dict] = None) -> List[pydantic.BaseModel]:
-        raise NotImplementedError("Find method is not implemented for InMemoryModelStore.")
-
+        raise NotImplementedError(
+            "Find method is not implemented for InMemoryModelStore."
+        )
 
 
 class SerializedInMemoryModelStore(ModelStore):
-    def __init__(self, model_class=pydantic.BaseModel, key_field: str = 'uuid'):
+    def __init__(self, model_class=pydantic.BaseModel, key_field: str = "uuid"):
         super().__init__(model_class=model_class, key_field=key_field)
         self.store = {}
 
@@ -118,7 +118,11 @@ class SerializedInMemoryModelStore(ModelStore):
 
     def read(self, key) -> pydantic.BaseModel | None:
         doc = self.store.get(key)
-        return ModelStore.dict_to_model(model_class=self.model_class, data=doc) if doc else None
+        return (
+            ModelStore.dict_to_model(model_class=self.model_class, data=doc)
+            if doc
+            else None
+        )
 
     def delete(self, key: str) -> bool:
         if key in self.store:
@@ -126,11 +130,19 @@ class SerializedInMemoryModelStore(ModelStore):
         return True
 
     def find(self, query: Optional[dict] = None) -> List[pydantic.BaseModel]:
-        raise NotImplementedError("Find method is not implemented for SerializedInMemoryModelStore.")
+        raise NotImplementedError(
+            "Find method is not implemented for SerializedInMemoryModelStore."
+        )
 
 
 class RedisModelStore(ModelStore):
-    def __init__(self, redis: Redis, collection_name="", model_class=pydantic.BaseModel, key_field: str = 'uuid'):
+    def __init__(
+        self,
+        redis: Redis,
+        collection_name="",
+        model_class=pydantic.BaseModel,
+        key_field: str = "uuid",
+    ):
         super().__init__(model_class=model_class, key_field=key_field)
         self.redis = redis
         self.collection_name = collection_name
@@ -157,9 +169,13 @@ class RedisModelStore(ModelStore):
     def read(self, key: str) -> pydantic.BaseModel | None:
         json_str = self.redis.get(self._build_redis_key(key))
         doc = json.loads(json_str) if json_str else None
-        #if doc is None:
+        # if doc is None:
         #    raise KeyError(f"Key '{self._build_redis_key(key)}' not found in RedisModelStore.")
-        return ModelStore.dict_to_model(model_class=self.model_class, data=doc) if doc else None
+        return (
+            ModelStore.dict_to_model(model_class=self.model_class, data=doc)
+            if doc
+            else None
+        )
 
     def delete(self, key: str) -> bool:
         self.redis.delete(self._build_redis_key(key))
@@ -169,10 +185,14 @@ class RedisModelStore(ModelStore):
         raise NotImplementedError("Find method is not implemented for RedisModelStore.")
 
 
-
 class MongoDbModelStore(ModelStore):
-
-    def __init__(self, mongo: MongoClient, collection_name: str, model_class=pydantic.BaseModel, key_field: str = 'uuid'):
+    def __init__(
+        self,
+        mongo: MongoClient,
+        collection_name: str,
+        model_class=pydantic.BaseModel,
+        key_field: str = "uuid",
+    ):
         super().__init__(model_class=model_class, key_field=key_field)
         self.collection_name = collection_name
         self.collection = get_mongo_collection(mongo, MONGODB_DB_NAME, collection_name)
@@ -193,11 +213,17 @@ class MongoDbModelStore(ModelStore):
             raise ValueError("Model must have a key to update.")
 
         model_dict = ModelStore.model_to_dict(model)
-        self.collection.update_one({self.key_field: key}, {'$set': model_dict}, upsert=True)
+        self.collection.update_one(
+            {self.key_field: key}, {"$set": model_dict}, upsert=True
+        )
 
     def read(self, key: str) -> pydantic.BaseModel | None:
         doc = self.collection.find_one({self.key_field: key})
-        return ModelStore.dict_to_model(model_class=self.model_class, data=doc) if doc else None
+        return (
+            ModelStore.dict_to_model(model_class=self.model_class, data=doc)
+            if doc
+            else None
+        )
 
     def delete(self, key: str) -> None:
         result = self.collection.delete_one({self.key_field: key})
@@ -216,7 +242,9 @@ class MongoDbModelStore(ModelStore):
 
 def build_model_store(model_class, collection_name) -> ModelStore:
     mongo_client = get_mongo_client()
-    return MongoDbModelStore(mongo=mongo_client, collection_name=collection_name, model_class=model_class)
+    return MongoDbModelStore(
+        mongo=mongo_client, collection_name=collection_name, model_class=model_class
+    )
 
 
 # class PyObjectId(ObjectId):
