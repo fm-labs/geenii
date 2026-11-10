@@ -5,7 +5,7 @@ environment, producing distributable artifacts, and building the Docker image.
 
 ## Prerequisites
 
-- Python 3.13+
+- Python 3.14+
 - [uv](https://docs.astral.sh/uv/) (package manager and task runner)
 - [Docker](https://www.docker.com/) (for image builds)
 - [PyInstaller](https://pyinstaller.org/) (bundled as a dev dependency)
@@ -153,7 +153,7 @@ GitHub Actions workflows in `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `ci.yml` | Push/PR to `main` | Lint with ruff, run pytest on Python 3.13 + 3.14 |
+| `ci.yml` | Push/PR to `main` | Lint with ruff, run pytest on Python 3.14 + 3.14 |
 | `publish.yml` | Tag `v*` | Build PyInstaller binaries for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64; create GitHub release with tarballs + checksums |
 | `publish_image_multiarch.yml` | Tag `v*` | Build Docker images for linux/amd64 + linux/arm64, push to Docker Hub, create multi-arch manifest, smoke test |
 

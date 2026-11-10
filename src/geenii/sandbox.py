@@ -8,7 +8,7 @@ from typing import Literal
 
 from geenii.config import GEENII_CACHE_DIR
 
-SANDBOX_PYTHON3_BASEIMAGE = "python:3.13-slim"
+SANDBOX_PYTHON3_BASEIMAGE = "python:3.14-slim"
 
 
 def run_docker_subprocess(command: list[str], timeout: int = 30, env: dict | None = None) -> tuple[int, str, str]:
@@ -253,7 +253,7 @@ class PythonSandbox(Sandbox):
         self.script_args = script_args
 
     def dockerlines(self) -> str:
-        dockerfile_str = "FROM python:3.13-alpine\nENV PYTHONUNBUFFERED=1\nWORKDIR /app\n"
+        dockerfile_str = "FROM python:3.14-alpine\nENV PYTHONUNBUFFERED=1\nWORKDIR /app\n"
         if os.path.exists(os.path.join(self.app_dir, "requirements.txt")):
             dockerfile_str += "COPY ./requirements.txt ./\nRUN pip3 install -r ./requirements.txt\n"
         if os.path.exists(os.path.join(self.app_dir, "pyproject.toml")):

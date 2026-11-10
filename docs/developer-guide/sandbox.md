@@ -74,7 +74,7 @@ constraints through function parameters when the use case demands it (e.g.
 
 | Runtime | Base image | Dependency handling |
 |---|---|---|
-| `python` | `python:3.13-alpine` | `requirements.txt` via pip; `pyproject.toml` + `uv.lock` via uv |
+| `python` | `python:3.14-alpine` | `requirements.txt` via pip; `pyproject.toml` + `uv.lock` via uv |
 | `node` | `node:latest` | None (npm install not yet wired) |
 | `bash` | `bash:latest` | None |
 

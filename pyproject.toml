@@ -2,7 +2,7 @@
 name = "geenii"
 version = "0.3.4"
 description = "A versatile AI agent toolkit"
-requires-python = ">=3.13,<4.0"
+requires-python = ">=3.14,<4.0"
 authors = [
     { name = "fm-labs", email = "code@fmlabs.dev" },
 ]
