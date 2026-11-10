@@ -429,7 +429,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
 
         :param prompt: The prompt string to generate a completion for.
         :param kwargs: The keyword arguments for the Ollama API request.
-                        - model: The model to use for the completion (default is 'gpt-3.5-turbo').
+                        - model: The model to use for the completion.
         :return:
         """
         # print("OLLAMA COMPLETION", prompt, kwargs)

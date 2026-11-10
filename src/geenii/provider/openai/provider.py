@@ -62,7 +62,7 @@ class OpenAIProvider(
     A class to represent the OpenAI provider for XAI.
     """
 
-    DEFAULT_MODEL = "gpt-3.5-turbo"
+    DEFAULT_MODEL = config.OPENAI_CHATGPT_DEFAULT_MODEL or "gpt-4o-mini"
     DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant, that gives short and concise answers. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer. Always use the tools if you can. If you don't know the answer, say you don't know and don't try to make up an answer."
 
     DEFAULT_TEMPERATURE = 0.1
@@ -136,6 +136,7 @@ class OpenAIProvider(
                     "2024-",
                     "2025-",
                     "2026-",
+                    "2027-",
                     "image",
                     "audio",
                     "tts",
@@ -165,7 +166,7 @@ class OpenAIProvider(
         Get openai completion for the given prompt via OpenAI Responses API.
 
         :param prompt: The prompt string to generate a completion for.
-        :param model: The model to use for the completion (default is 'gpt-3.5-turbo').
+        :param model: The model to use for the completion (default is 'gpt-4o-mini').
         :param kwargs: The keyword arguments for the OpenAI API request.
             Supported kwargs include:
                 - system: Optional system instructions to include in the prompt.

@@ -69,7 +69,7 @@ def init_global_agent_registry(registry: AgentRegistry | None = None, projects: 
         }
     )
     # chatgpt
-    registry._agent_configs.update({"chatgpt": AgentSpec(name="chatgpt", model="openai:gpt-3.5-turbo", scope="global")})
+    registry._agent_configs.update({"chatgpt": AgentSpec(name="chatgpt", model="openai:gpt-4o-mini", scope="global")})
     # anthropic
     registry._agent_configs.update(
         {"claude": AgentSpec(name="claude", model="anthropic:claude-opus-4-6", scope="global")}
