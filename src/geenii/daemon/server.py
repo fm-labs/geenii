@@ -106,7 +106,7 @@ class DaemonServer:
     async def _socket_is_live(self) -> bool:
         try:
             _, writer = await asyncio.open_unix_connection(self._socket_path)
-        except (ConnectionRefusedError, FileNotFoundError, OSError):
+        except ConnectionRefusedError, FileNotFoundError, OSError:
             return False
         writer.close()
         await writer.wait_closed()
@@ -133,13 +133,13 @@ class DaemonServer:
                     )
                     continue
                 await self._write(writer, await self._dispatch(request))
-        except (ConnectionResetError, BrokenPipeError):
+        except ConnectionResetError, BrokenPipeError:
             pass
         finally:
             writer.close()
             try:
                 await writer.wait_closed()
-            except (ConnectionResetError, BrokenPipeError):
+            except ConnectionResetError, BrokenPipeError:
                 pass
 
     async def _dispatch(self, request: dict) -> dict[str, Any]:

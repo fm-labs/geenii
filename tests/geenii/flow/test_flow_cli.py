@@ -281,7 +281,10 @@ def test_list_flows(runner, tmp_path, monkeypatch):
     for name in ("b.yaml", "a.toml", "notes.txt"):
         (user_dir / name).write_text("")
     (project_dir / "c.json").write_text("{}")
-    dirs = lambda: [str(user_dir), str(project_dir), str(tmp_path / "missing")]
+
+    def dirs():
+        return [str(user_dir), str(project_dir), str(tmp_path / "missing")]
+
     monkeypatch.setattr(geenii.config, "flow_dirs", dirs)
     monkeypatch.setattr(geenii.g, "flow_dirs", dirs)
 

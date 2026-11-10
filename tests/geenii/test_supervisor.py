@@ -296,7 +296,11 @@ def test_apply_services(tmp_path):
         # Unchanged file: nothing happens
         assert await sup.apply_services(
             read_services(_services_file(tmp_path, [svc("a"), svc("b")]))
-        ) == {"started": [], "stopped": [], "restarted": []}
+        ) == {
+            "started": [],
+            "stopped": [],
+            "restarted": [],
+        }
 
         # b stopped by hand is started again by a reload
         await sup.stop_process("b")

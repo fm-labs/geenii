@@ -123,8 +123,7 @@ def flow():
     "snapshot_path",
     type=click.Path(dir_okay=False),
     default=None,
-    help="Write the flow, its input and the step results to this JSON file "
-    "while the flow runs and when it ends.",
+    help="Write the flow, its input and the step results to this JSON file while the flow runs and when it ends.",
 )
 @click.option(
     "--context-id", default=None, help="Id of the run (default: a generated id)."

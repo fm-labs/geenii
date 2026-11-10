@@ -266,7 +266,7 @@ def _get_item(value: Any, key: str, ref: str) -> Any:
         if isinstance(value, (list, tuple)):
             return value[int(key)]
         return getattr(value, key)
-    except (KeyError, IndexError, ValueError, AttributeError):
+    except KeyError, IndexError, ValueError, AttributeError:
         raise FlowError(f"Cannot resolve '{key}' in reference '${{{ref}}}'") from None
 
 

@@ -100,8 +100,7 @@ def gc_processes(
     max_age: float | None = Query(
         None,
         ge=0,
-        description="Minimum seconds since a process finished "
-        "(default: GEENII_PM_GC_MAX_AGE, or 7 days)",
+        description="Minimum seconds since a process finished (default: GEENII_PM_GC_MAX_AGE, or 7 days)",
     ),
     state: list[Literal["completed", "failed", "killed", "orphaned"]] | None = Query(
         None, description="States to collect (default: completed, failed, killed)"

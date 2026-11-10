@@ -690,12 +690,7 @@ class FindBestAgentTask(BaseAgentTask):
             desc = (
                 (agent.description or "No description available.").strip().rstrip(".")
             )
-            return (
-                f"[{agent.name}]\n"
-                f"  purpose: {desc}\n"
-                f"  tools: {tools}\n"
-                f"  skills: {skills}"
-            )
+            return f"[{agent.name}]\n  purpose: {desc}\n  tools: {tools}\n  skills: {skills}"
 
         agents_str = "\n".join(
             format_agent(a) for a in self.agent_registry.configs.values()

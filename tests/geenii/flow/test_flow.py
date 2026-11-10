@@ -290,8 +290,7 @@ def test_from_file(tmp_path):
 
     yml = tmp_path / "flow.yml"
     yml.write_text(
-        "name: f\nsteps:\n  - id: a\n    processor: echo\n    config:\n      message: ${vars.x}\n"
-        "vars:\n  x: z\n"
+        "name: f\nsteps:\n  - id: a\n    processor: echo\n    config:\n      message: ${vars.x}\nvars:\n  x: z\n"
     )
     assert Flow.from_file(yml).run().output == {"message": "z"}
 

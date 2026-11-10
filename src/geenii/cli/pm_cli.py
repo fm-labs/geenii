@@ -185,8 +185,7 @@ def _parse_duration(value: str) -> float:
 @click.option(
     "--max-age",
     default=None,
-    help="Remove processes finished longer ago than this (e.g. 12h, 7d). "
-    "Default: GEENII_PM_GC_MAX_AGE, or 7 days.",
+    help="Remove processes finished longer ago than this (e.g. 12h, 7d). Default: GEENII_PM_GC_MAX_AGE, or 7 days.",
 )
 @click.option(
     "--state",

@@ -75,7 +75,7 @@ def _accepts_params_env(fn: Callable) -> bool:
     """True if fn can be called as fn(params, env); False if it only takes no arguments."""
     try:
         sig = inspect.signature(fn)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return False
     try:
         sig.bind([], None)
@@ -203,8 +203,7 @@ class ScheduledTask:
         await self._prune_runs(pm)
         if done.exit_code != 0:
             raise RuntimeError(
-                f"Command exited with code {done.exit_code} "
-                f"(output: geenii pm output {info.pid} [--stream stderr])"
+                f"Command exited with code {done.exit_code} (output: geenii pm output {info.pid} [--stream stderr])"
             )
 
     def _run_id_prefix(self) -> str:

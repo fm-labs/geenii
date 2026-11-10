@@ -27,8 +27,7 @@ class ExecutePmCommandConfig(pydantic.BaseModel):
     )
     wait: bool = pydantic.Field(
         True,
-        description="Wait for the process to finish, streaming its output; "
-        "otherwise return right after starting it",
+        description="Wait for the process to finish, streaming its output; otherwise return right after starting it",
     )
     timeout: float | None = pydantic.Field(
         None,
@@ -185,7 +184,6 @@ class ExecutePmCommandProcessor(FlowProcessor):
         )
         if c.check and output.state != "completed":
             raise RuntimeError(
-                f"Process {process_id} {output.state} with exit code {output.rc}: "
-                f"{output.stderr.strip()[-500:]}"
+                f"Process {process_id} {output.state} with exit code {output.rc}: {output.stderr.strip()[-500:]}"
             )
         return output

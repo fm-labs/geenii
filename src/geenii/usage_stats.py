@@ -71,7 +71,7 @@ def _row_key(entry: dict) -> str:
 def _local_time(timestamp: str) -> datetime | None:
     try:
         ts = datetime.fromisoformat(timestamp)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return ts.astimezone() if ts.tzinfo else ts
 
@@ -140,7 +140,7 @@ class UsageStatsCache:
         try:
             with open(self._cache_file(path), "r") as f:
                 data = json.load(f)
-        except (OSError, ValueError):
+        except OSError, ValueError:
             return None
         if (
             data.get("version") != CACHE_VERSION

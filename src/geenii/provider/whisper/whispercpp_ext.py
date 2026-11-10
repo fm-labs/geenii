@@ -76,8 +76,7 @@ def run_whisper_cli_transcribe(
     if p.returncode != 0:
         print(p.stderr.decode("utf-8"))
         raise RuntimeError(
-            f"Whisper CLI failed with return code {p.returncode}. "
-            f"Command: {' '.join(command)}"
+            f"Whisper CLI failed with return code {p.returncode}. Command: {' '.join(command)}"
         )
 
     stdout = p.stdout.decode("utf-8").strip()
@@ -147,8 +146,7 @@ def run_whisper_server_in_docker(
     if p.returncode != 0:
         print(p.stderr.decode("utf-8"))
         raise RuntimeError(
-            f"Whisper Server failed with return code {p.returncode}. "
-            f"Command: {' '.join(command)}"
+            f"Whisper Server failed with return code {p.returncode}. Command: {' '.join(command)}"
         )
 
     stdout = p.stdout.decode("utf-8").strip()

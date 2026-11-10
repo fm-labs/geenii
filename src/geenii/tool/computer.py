@@ -238,7 +238,7 @@ def is_file_in_allowed_dir(file_path: str | Path, wd: str) -> bool:
         logger.debug(f"check is_file_in_working_dir file_path={file_path} wd={wd}")
         wd = Path(wd).resolve(strict=False)
         target = Path(file_path).resolve(strict=False)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         # null bytes, embedded NULs, unresolvable paths, symlink loops
         return False
     return target != wd and wd in target.parents

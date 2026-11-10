@@ -71,7 +71,7 @@ class DaemonClient:
         try:
             self.call("ping")
             return True
-        except (ConnectionRefusedError, FileNotFoundError, OSError):
+        except ConnectionRefusedError, FileNotFoundError, OSError:
             return False
 
     def info(self) -> dict:
