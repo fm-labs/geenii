@@ -148,7 +148,7 @@ def read_root_mcp_config() -> dict:
     except FileNotFoundError:
         data = {}
     if not isinstance(data, dict):
-        raise ValueError(f"{path} does not contain a JSON object.")
+        raise ValueError(f"{path} does not contain a JSON object.")  # noqa: TRY004 - invalid file content, not a wrong argument type
     data.setdefault("mcpServers", {})
     return data
 

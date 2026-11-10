@@ -266,12 +266,12 @@ class BaseAgent(BotInterface, abc.ABC):
                             logger.critical(
                                 f"Task {task} yielded an invalid message of type {type(result)}: {result}"
                             )
-                            raise ValueError(
+                            raise TypeError(
                                 f"Unsupported task response type: {type(result)}"
                             )
                 else:
                     logger.critical(f"Unsupported task type: {type(task)}")
-                    raise ValueError(f"Unsupported task type: {type(task)}")
+                    raise TypeError(f"Unsupported task type: {type(task)}")
             except Exception as e:
                 logger.exception(
                     f"Error processing task {task.__class__.__name__}: {e!s}",

@@ -93,7 +93,7 @@ def read_services(config_path: str | Path) -> list[ProcConfig]:
     config_path = Path(config_path)
     data = json.loads(config_path.read_text())
     if not isinstance(data, dict):
-        raise ValueError(
+        raise ValueError(  # noqa: TRY004 - invalid file content, not a wrong argument type
             f"{config_path}: expected a JSON object with a 'services' list"
         )
 

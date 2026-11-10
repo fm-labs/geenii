@@ -310,7 +310,7 @@ def generate_chat_completion(
     try:
         ai, provider_name, model_name = get_ai_completion_provider(request.model)
         if not isinstance(ai, AIChatCompletionProvider):
-            raise RuntimeError(
+            raise TypeError(
                 f"Invalid AI provider: {provider_name} does not support assistant completions."
             )
 

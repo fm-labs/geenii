@@ -216,4 +216,4 @@ class McpClient:
                 base64str = r.blob
                 f.write(base64.b64decode(base64str))
         else:
-            raise Exception(f"Unsupported resource type: {type(r)}")
+            raise TypeError(f"Unsupported resource type: {type(r)}")

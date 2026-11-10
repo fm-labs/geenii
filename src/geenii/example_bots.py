@@ -58,7 +58,7 @@ class SimpleBot(BotInterface):
             elif isinstance(message, list):
                 prompt = " ".join([content.to_text() for content in message])
             else:
-                raise ValueError("Unsupported message format")
+                raise TypeError("Unsupported message format")
 
             response = generate_chat_completion_deprecated(
                 model=model_id,

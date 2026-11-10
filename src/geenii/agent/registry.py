@@ -70,7 +70,7 @@ class AgentSpec(pydantic.BaseModel):
         """
         header, _ = read_frontmatter_file(md_path)
         if not isinstance(header, dict):
-            raise ValueError(
+            raise ValueError(  # noqa: TRY004 - invalid file content, not a wrong argument type
                 f"Invalid agent configuration in {md_path}: expected frontmatter to be a dictionary."
             )
         header["file_path"] = md_path
