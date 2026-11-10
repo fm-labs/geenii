@@ -23,9 +23,8 @@ jobs:
     - name: Display scan results
       run: |
         echo "Repo scan completed with exit code: ${{ steps.repo-scan.outputs.exit-code }}"
-        echo ""
         echo "Scan output:"
-        echo "${{ steps.repo-scan.outputs.scan-output }}"
+        echo "${{ steps.repo-scan.outputs.scan-output }}" || echo "No scan output"
         
     - name: Check scan status
       run: |
