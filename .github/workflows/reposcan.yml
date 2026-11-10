@@ -16,16 +16,19 @@ jobs:
       
     - name: Run Repo Scan
       id: repo-scan
-      uses: fm-labs/action-repo-scan@v1.0.2
+      uses: fm-labs/action-repo-scan@v1.0.3
       with:
         path: '.'  # Optional: defaults to '.'
-        
-#    - name: Display scan results
-#      run: |
-#        echo "Repo scan completed with exit code: ${{ steps.repo-scan.outputs.exit-code }}"
-#        echo "Scan output:"
-#        echo "${{ steps.repo-scan.outputs.scan-output }}" || echo "No scan output"
-        
+      continue-on-error: true   # so the upload still runs if the scan exits non-zero
+
+    - name: Upload scan result
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: repo-scan-result
+        path: ${{ steps.scan.outputs.scan-file || '.repo-scan/scan-result.json' }}
+        if-no-files-found: warn
+
     - name: Check scan status
       run: |
         if [ "${{ steps.repo-scan.outputs.exit-code }}" != "0" ]; then
@@ -33,4 +36,11 @@ jobs:
           exit 1
         else
           echo "Repo scan passed successfully!"
-        fi
+        fi        
+
+#    - name: Display scan results
+#      run: |
+#        echo "Repo scan completed with exit code: ${{ steps.repo-scan.outputs.exit-code }}"
+#        echo "Scan output:"
+#        echo "${{ steps.repo-scan.outputs.scan-output }}" || echo "No scan output"
+
