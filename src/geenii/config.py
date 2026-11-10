@@ -33,7 +33,7 @@ GEENII_CACHE_DISABLED = (
 )
 
 # Default minimum age (seconds since a process finished) before the process manager's gc removes it
-PM_GC_MAX_AGE = float(os.environ.get("GEENII_PM_GC_MAX_AGE", 7 * 24 * 3600))
+PM_GC_MAX_AGE = float(os.environ.get("GEENII_PM_GC_MAX_AGE", str(7 * 24 * 3600)))
 
 # GEENII_BIN = os.getenv("GEENII_BIN", "geenii")
 

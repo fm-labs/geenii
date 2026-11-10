@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -9,7 +11,7 @@ from geenii.skills import SkillSpec
 
 
 class FakeSkillRegistry:
-    SKILLS = {
+    SKILLS: ClassVar[dict] = {
         "weather": SkillSpec(
             name="weather", description="Get the weather forecast", path="/tmp/weather"
         ),

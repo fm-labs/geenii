@@ -1,6 +1,7 @@
 import logging
 import shlex
 import time
+from typing import ClassVar
 
 from geenii.agent.base import message_to_prompt
 from geenii.agent.base_agent import BaseAgent
@@ -25,7 +26,7 @@ class Agent(BaseAgent):
     """Default Agent"""
 
     # Slash commands handled by _handle_makros; any other "/<name>" activates the skill <name>.
-    BUILTIN_COMMANDS: dict[str, str] = {
+    BUILTIN_COMMANDS: ClassVar[dict[str, str]] = {
         "clear": "Clear the conversation memory",
         "compact": "Summarize and compact the conversation memory",
         # read-only info commands, answered without calling the model

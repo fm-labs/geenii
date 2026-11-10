@@ -6,7 +6,7 @@ import os
 import subprocess
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from geenii import config
 from geenii.tool.common import (
@@ -117,7 +117,7 @@ class ReadTool(Tool):
 
     NAME = "read"
     DESCRIPTION = "Read data from a source"
-    INPUT_SCHEMA = {
+    INPUT_SCHEMA: ClassVar[dict] = {
         "type": "object",
         "properties": {
             "file_path": {"type": "string"},
@@ -163,7 +163,7 @@ class WriteTool(Tool):
 
     NAME = "write"
     DESCRIPTION = "Write data to a source"
-    INPUT_SCHEMA = {
+    INPUT_SCHEMA: ClassVar[dict] = {
         "type": "object",
         "properties": {
             "file_path": {"type": "string"},

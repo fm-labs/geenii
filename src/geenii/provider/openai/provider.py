@@ -4,6 +4,7 @@ import logging
 import os
 import time
 import uuid
+from typing import ClassVar
 
 from openai import OpenAI
 
@@ -68,13 +69,13 @@ class OpenAIProvider(
     DEFAULT_MAX_TOKENS = 4096
     DEFAULT_MAX_TOOL_CALLS = 5
 
-    IMAGE_MODELS = {
+    IMAGE_MODELS: ClassVar[dict] = {
         "gpt-image-1": {"sizes": ["1024x1024", "auto"]},
         "dall-e-2": {"sizes": ["256x256", "512x512", "1024x1024"]},
         "dall-e-3": {"sizes": ["1024x1024", "1792x1024", "1024x1792"]},
     }
 
-    TRANSCRIPTION_MODELS = {
+    TRANSCRIPTION_MODELS: ClassVar[dict] = {
         "whisper-1": {},
         "gpt-4o-transcribe": {},
         "gpt-4o-mini-transcribe": {},

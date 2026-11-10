@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 from collections.abc import Generator, Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from geenii.tool.common import ToolCallResult
 from geenii.tool.mcp_tool import McpTool
@@ -512,7 +512,7 @@ class ToolFilterTask(BaseAgentTask):
     If nothing fits well, pick the closest options and lower the confidence score.
     """.strip()
 
-    OUTPUT_SCHEMA = {
+    OUTPUT_SCHEMA: ClassVar[dict] = {
         "type": "object",
         "properties": {
             "tools": {"type": "array", "items": {"type": "string"}},
@@ -658,7 +658,7 @@ class FindBestAgentTask(BaseAgentTask):
     }
     """.strip()
 
-    OUTPUT_SCHEMA = {
+    OUTPUT_SCHEMA: ClassVar[dict] = {
         "type": "object",
         "properties": {
             "agent": {"type": "string", "description": "Selected agent name"},
@@ -828,7 +828,7 @@ class FindBestSkillTask(BaseAgentTask):
     If no skill fits well, pick the closest option or 'NONE' and lower the confidence score.
     """.strip()
 
-    OUTPUT_SCHEMA = {
+    OUTPUT_SCHEMA: ClassVar[dict] = {
         "type": "object",
         "properties": {
             "skill": {"type": "string"},

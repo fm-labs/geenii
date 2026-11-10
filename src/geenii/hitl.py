@@ -3,6 +3,7 @@ import json
 import threading
 import time
 from pathlib import Path
+from typing import ClassVar
 
 import httpx
 
@@ -160,7 +161,7 @@ class WebHumanInTheLoopController(HumanInTheLoopController):
 
     interactive = True
 
-    APPROVE_CHOICES = {"allow", "approve", "yes"}
+    APPROVE_CHOICES: ClassVar[set[str]] = {"allow", "approve", "yes"}
 
     def __init__(self, approval_timeout: float = 300):
         self.approval_timeout = approval_timeout
