@@ -13,7 +13,8 @@ type JsonViewProps = ReactJsonViewProps & {
 
 const JsonView = ({src, collapsed, className, ...props}: JsonViewProps) => {
 
-  const defaultClassName = "max-w-[500px]"
+  // wrap long lines (e.g. digests, urls) so the json never forces horizontal overflow
+  const defaultClassName = "max-w-[500px] whitespace-pre-wrap [overflow-wrap:anywhere]"
   const clsName = cn(defaultClassName, className)
 
   const [isCopied, setIsCopied] = React.useState(false);
@@ -32,7 +33,7 @@ const JsonView = ({src, collapsed, className, ...props}: JsonViewProps) => {
   }
 
   return (
-    <div className={"rounded-md border bg-muted p-2 overflow-y-scroll mb-2 max-h-100 "}>
+    <div className={"rounded-md border bg-muted p-2 overflow-y-scroll overflow-x-hidden mb-2 max-h-100 min-w-0 max-w-full"}>
       <div className={"flex justify-start mb-2 text-sm text-muted-foreground gap-1"}>
         <div>
           <Button size={"sm"} variant={"secondary"} title={"Copy"}

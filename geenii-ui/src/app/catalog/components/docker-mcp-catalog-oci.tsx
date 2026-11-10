@@ -6,6 +6,8 @@ import {
 import { Button } from '@/components/ui/button.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
+import { Input } from '@/components/ui/input.tsx'
+import JsonView from '@/components/json-view.tsx'
 import DockerMcpCatalogConfigBuilder from '@/app/catalog/components/docker-mcp-catalog-config-builder.tsx'
 
 /**
@@ -751,8 +753,18 @@ const DockerMcpCatalogOci = () => {
   const [selectedServerKey, setSelectedServerKey] = React.useState<string | null>(null)
   const [selectedServer, setSelectedServer] = React.useState<DockerMcpCatalogServerDef | null>(null)
 
-  // const [searchTerm, setSearchTerm] = React.useState<string>("");
-  // const [searchFilter, setSearchFilter] = React.useState<any>({"hasTools": false, "hasConfig": false, "hasSecrets": false, "hasOauth": false, "hasNoConfig": false, "hasNoSecrets": false});
+  const [searchTerm, setSearchTerm] = React.useState<string>('')
+  const [category, setCategory] = React.useState<string>('')
+  const [rawJsonKeys, setRawJsonKeys] = React.useState<Set<string>>(new Set())
+
+  const toggleRawJson = (key: string) => {
+    setRawJsonKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   const registry = catalog && catalog?.servers ? catalog.servers:null
 
@@ -774,62 +786,48 @@ const DockerMcpCatalogOci = () => {
 
   const toolCount = React.useMemo(() => {
       if (!registry) return 0;
-      let count = 0;
-      Object.values(registry).forEach((item: any) => {
-          if (item.tools && Array.isArray(item.tools)) {
-              count += item.tools.length;
-          }
-      });
-      return count;
+      return registry.reduce((count, record) => {
+          const tools = record.snapshot?.server?.tools
+          return count + (Array.isArray(tools) ? tools.length : 0)
+      }, 0)
   }, [registry])
 
-  // const filteredRegistry = React.useMemo(() => {
-  //     if (!registry) return {};
-  //
-  //     const filtered: { [key: string]: any } = {};
-  //
-  //     if (searchTerm.trim() !== "") {
-  //         const lowerSearchTerm = searchTerm.toLowerCase();
-  //         Object.entries(registry).forEach(([key, item]: [string, any]) => {
-  //             if (
-  //                 key.toLowerCase().includes(lowerSearchTerm) ||
-  //                 (item.title && item.title.toLowerCase().includes(lowerSearchTerm)) ||
-  //                 (item.description && item.description.toLowerCase().includes(lowerSearchTerm)) ||
-  //                 (item.tags && item.tags.some((tag: string) => tag.toLowerCase().includes(lowerSearchTerm)))
-  //             ) {
-  //                 filtered[key] = item;
-  //             }
-  //         });
-  //     }
-  //
-  //     // apply additional filters
-  //     Object.entries(registry).forEach(([key, item]: [string, any]) => {
-  //         let matches = true;
-  //         if (searchFilter.hasTools && (!item.tools || item.tools.length === 0)) {
-  //             matches = false;
-  //         }
-  //         if (searchFilter.hasConfig && (!itemHasConfig(item) || !itemHasEnv(item))) {
-  //             matches = false;
-  //         }
-  //         if (searchFilter.hasSecrets && !itemHasSecrets(item)) {
-  //             matches = false;
-  //         }
-  //         if (searchFilter.hasOauth && itemHasOauth(item)) {
-  //             matches = false;
-  //         }
-  //         if (searchFilter.hasNoConfig && (itemHasConfig(item) || itemHasEnv(item))) {
-  //             matches = false;
-  //         }
-  //         if (searchFilter.hasNoSecrets && itemHasSecrets(item)) {
-  //             matches = false;
-  //         }
-  //         if (matches) {
-  //             filtered[key] = item;
-  //         }
-  //     });
-  //
-  //     return filtered;
-  // }, [registry, searchTerm, searchFilter]);
+  const getCategory = (server: DockerMcpCatalogServerDef): string => {
+      const value = server?.metadata?.category
+      return typeof value === 'string' ? value.trim().toLowerCase() : ''
+  }
+
+  // categories with server counts, most used first
+  const categories = React.useMemo(() => {
+      if (!registry) return []
+      const counts = new Map<string, number>()
+      registry.forEach((record) => {
+          const cat = getCategory(record.snapshot.server)
+          if (cat) counts.set(cat, (counts.get(cat) || 0) + 1)
+      })
+      return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  }, [registry])
+
+  const filteredServers = React.useMemo(() => {
+      if (!registry) return []
+      const term = searchTerm.trim().toLowerCase()
+      if (!term && !category) return registry
+
+      return registry.filter((record) => {
+          const server = record.snapshot.server
+          if (category && getCategory(server) !== category) return false
+          if (!term) return true
+          const haystack = [
+              server.name,
+              server.title,
+              server.description,
+              server.metadata?.category,
+              ...(server.metadata?.tags || []),
+              ...(server.tools || []).map((tool: any) => tool?.name),
+          ]
+          return haystack.some((value) => typeof value === 'string' && value.toLowerCase().includes(term))
+      })
+  }, [registry, searchTerm, category])
 
 
   const typeEmojis: { [key: string]: string } = {
@@ -842,53 +840,38 @@ const DockerMcpCatalogOci = () => {
     return typeEmojis[type] || '❓'
   }
 
+  const numberFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
+  const formatCount = (value: unknown) => typeof value === 'number' ? numberFormat.format(value) : null
+
   return (
     <div>
-      {/*<div>*/}
-      {/*    <Input value={searchTerm} placeholder={"Search..."} className={"mb-4"}*/}
-      {/*           onChange={(e) => setSearchTerm(e.target.value)} />*/}
-
-      {/*    <div className={"flex flex-row mb-4"}>*/}
-      {/*        <div className={"mr-4"}>*/}
-      {/*            <input type="checkbox" id="hasTools" checked={searchFilter.hasTools}*/}
-      {/*                   onChange={(e) => setSearchFilter({...searchFilter, hasTools: e.target.checked})} />*/}
-      {/*            <label htmlFor="hasTools" className={"ml-1"}>Has Tools</label>*/}
-      {/*        </div>*/}
-      {/*        <div className={"mr-4"}>*/}
-      {/*            <input type="checkbox" id="hasConfig" checked={searchFilter.hasConfig}*/}
-      {/*                   onChange={(e) => setSearchFilter({...searchFilter, hasConfig: e.target.checked, hasNoConfig: false})} />*/}
-      {/*            <label htmlFor="hasConfig" className={"ml-1"}>Requires Config</label>*/}
-      {/*        </div>*/}
-      {/*        <div className={"mr-4"}>*/}
-      {/*            <input type="checkbox" id="hasSecrets" checked={searchFilter.hasSecrets}*/}
-      {/*                   onChange={(e) => setSearchFilter({...searchFilter, hasSecrets: e.target.checked, hasNoSecrets: false})} />*/}
-      {/*            <label htmlFor="hasSecrets" className={"ml-1"}>Requires Secrets</label>*/}
-      {/*        </div>*/}
-      {/*        <div className={"mr-4"}>*/}
-      {/*            <input type="checkbox" id="hasOauth" checked={searchFilter.hasOauth}*/}
-      {/*                   onChange={(e) => setSearchFilter({...searchFilter, hasOauth: e.target.checked})} />*/}
-      {/*            <label htmlFor="hasOauth" className={"ml-1"}>Has Oauth</label>*/}
-      {/*        </div>*/}
-      {/*        <div className={"mr-4"}>*/}
-      {/*            <input type="checkbox" id="hasNoConfig" checked={searchFilter.hasNoConfig}*/}
-      {/*                   onChange={(e) => setSearchFilter({...searchFilter, hasNoConfig: e.target.checked, hasConfig: false})} />*/}
-      {/*            <label htmlFor="hasNoConfig" className={"ml-1"}>No Config Required</label>*/}
-      {/*        </div>*/}
-      {/*        <div className={"mr-4"}>*/}
-      {/*            <input type="checkbox" id="hasNoSecrets" checked={searchFilter.hasNoSecrets}*/}
-      {/*                   onChange={(e) => setSearchFilter({...searchFilter, hasNoSecrets: e.target.checked, hasSecrets: false})} />*/}
-      {/*            <label htmlFor="hasNoSecrets" className={"ml-1"}>No Secrets Required</label>*/}
-      {/*        </div>*/}
-      {/*    </div>*/}
-      {/*</div>*/}
-      {/*<div className={'flex flex-row mb-2 text-muted-foreground'}>*/}
-      {/*  {registry && Object.keys(registry).length} servers in registry.{' '}*/}
-      {/*  {toolCount} tools available.{' '}*/}
-      {/*  {Object.keys(filteredRegistry).length} servers match filters.*/}
-      {/*</div>*/}
-      {catalog?.servers && catalog?.servers?.map((record) => {
+      <div className={'flex flex-row gap-2 mb-4'}>
+        <Input value={searchTerm}
+               placeholder={'Search servers, tools, tags...'}
+               className={'flex-1'}
+               onChange={(e) => setSearchTerm(e.target.value)} />
+        <select value={category}
+                aria-label={'Filter by category'}
+                className={'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs dark:bg-input/30'}
+                onChange={(e) => setCategory(e.target.value)}>
+          <option value={''}>All categories</option>
+          {categories.map(([cat, count]) => (
+            <option key={cat} value={cat}>{cat} ({count})</option>
+          ))}
+        </select>
+      </div>
+      <div className={'flex flex-row mb-2 text-sm text-muted-foreground'}>
+        {registry?.length || 0} servers in registry.{' '}
+        {toolCount} tools available.{' '}
+        {(searchTerm.trim() || category) && `${filteredServers.length} servers match.`}
+      </div>
+      {filteredServers.map((record) => {
         const server = record.snapshot.server
         const key = server.name
+        const metadata = server?.metadata || {}
+        const pulls = formatCount(metadata.pulls)
+        const githubStars = formatCount(metadata.githubStars)
+        const serverCategory = getCategory(server)
         return (
           <div key={server.name} className={'border px-4 py-2 mb-2 rounded-xl hover:bg-accent'}>
             <div className={'flex justify-between items-center'}>
@@ -906,6 +889,19 @@ const DockerMcpCatalogOci = () => {
                 <p
                   className={'text-xs text-muted-foreground mb-1 max-h-8 overflow-hidden hover:max-h-16 hover:overflow-y-scroll'}>{server?.description}</p>
 
+                <div className={'flex flex-row flex-wrap gap-x-2 mb-1 text-xs text-muted-foreground'}>
+                  {metadata.owner && <div title={'Owner'}>👤 {metadata.owner}</div>}
+                  {serverCategory && (
+                    <button type={'button'} title={'Filter by this category'}
+                            className={'cursor-pointer hover:underline'}
+                            onClick={() => setCategory(serverCategory)}>
+                      🏷️ {serverCategory}
+                    </button>
+                  )}
+                  {pulls && <div title={`${metadata.pulls} Docker pulls`}>⬇️ {pulls} pulls</div>}
+                  {githubStars && <div title={`${metadata.githubStars} GitHub stars`}>⭐ {githubStars} GitHub stars</div>}
+                </div>
+
                 <div className={'flex flex-row'}>
                   <div className={"text-xs text-muted-foreground mr-1"}>🛠️ {server?.tools?.length || 0} tools</div>
                   <div className={"text-xs text-muted-foreground mr-1"}>{(itemHasConfig(server) || itemHasEnv(server)) && ("⚙️ Requires configuration")}</div>
@@ -918,10 +914,13 @@ const DockerMcpCatalogOci = () => {
                   <div className={'text-xs text-muted-foreground mr-1'}>
                     📚 <a rel={'noreferrer noopener'} href={server?.source} target={'_blank'}>Source</a>
                   </div>
+                  <div className={'text-xs text-muted-foreground mr-1'}>
+                    <button type={'button'} className={'cursor-pointer hover:underline'}
+                            onClick={() => toggleRawJson(key)}>
+                      {'{ }'} {rawJsonKeys.has(key) ? 'Hide JSON' : 'JSON'}
+                    </button>
+                  </div>
                 </div>
-                {/*<div>
-                                    <JsonView src={item} collapsed={true} />
-                                </div>*/}
                 <div className={'flex flex-wrap space-x-1'}>
                   {server?.tools?.map((tool: any) => (
                     <div key={tool.name}><Badge>{tool.name}</Badge></div>
@@ -935,6 +934,11 @@ const DockerMcpCatalogOci = () => {
                         setSelectedServer(server)
                       }}>Add Server</Button>
             </div>
+            {rawJsonKeys.has(key) && (
+              <div className={'mt-2'}>
+                <JsonView src={record} className={'max-w-full text-xs'} />
+              </div>
+            )}
             {selectedServer?.title===server.title && <div>
               <Dialog onOpenChange={() => setSelectedServerKey(null)}
                       open={selectedServerKey!==null}>

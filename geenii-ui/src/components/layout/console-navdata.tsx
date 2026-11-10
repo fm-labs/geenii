@@ -2,25 +2,7 @@
 export const data = {
   navMain: [
     {
-      title: 'Playground',
-      url: '#',
-      items: [
-        {
-          title: 'Completions Playground',
-          url: '#/console/playground/completions',
-        },
-        {
-          title: 'Tools Playground',
-          url: '#/console/playground/tools',
-        },
-        {
-          title: 'Xchat Playground',
-          url: '#/console/playground/xchat',
-        },
-      ],
-    },
-    {
-      title: 'Configure',
+      title: 'Manage',
       url: '#',
       items: [
         {
@@ -32,7 +14,7 @@ export const data = {
           url: '#/console/configure/skills',
         },
         {
-          title: 'MCP',
+          title: 'MCP Servers',
           url: '#/console/configure/mcp-servers',
         },
         {
@@ -58,19 +40,19 @@ export const data = {
       ],
     },
     {
-      title: 'Catalog',
+      title: 'Install from Catalog',
       url: '#',
       items: [
+        // {
+        //   title: 'Apps',
+        //   url: '#/console/catalog/apps',
+        // },
         {
-          title: 'Apps',
-          url: '#/console/catalog/apps',
-        },
-        {
-          title: 'Models',
+          title: 'Ollama Models',
           url: '#/console/catalog/models',
         },
         {
-          title: 'MCP Servers',
+          title: 'Docker MCP Servers',
           url: '#/console/catalog/mcp',
         },
       ],
@@ -95,6 +77,24 @@ export const data = {
           title: 'Settings',
           url: '#/console/system/settings',
           //isActive: true,
+        },
+      ],
+    },
+    {
+      title: 'Playground',
+      url: '#',
+      items: [
+        {
+          title: 'Completions Playground',
+          url: '#/console/playground/completions',
+        },
+        {
+          title: 'Tools Playground',
+          url: '#/console/playground/tools',
+        },
+        {
+          title: 'Chat Playground',
+          url: '#/console/playground/xchat',
         },
       ],
     },
