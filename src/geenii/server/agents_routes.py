@@ -3,11 +3,11 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Annotated
 
 import pydantic
 import yaml
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.params import Depends
 from starlette.requests import Request
 
@@ -16,6 +16,7 @@ from geenii.agent.registry import AgentRegistry, AgentSpec
 from geenii.agents import Agent
 from geenii.config import agent_paths
 from geenii.datamodels import AgentCommand, Problem
+from geenii.g import init_global_agent_registry
 from geenii.skills import SkillRegistry
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ AgentScope = Literal["user", "project", "global"]
 
 class AgentSpecInput(pydantic.BaseModel):
     """The frontmatter of an agent spec file: AgentSpec without `file_path` and `scope`, which are set at load time."""
+
     model_config = pydantic.ConfigDict(extra="forbid")
 
     name: str
@@ -71,11 +73,18 @@ def dep_agent_registry(request: Request) -> AgentRegistry:
 def dep_agent_env_store() -> AgentEnvStore:
     return AgentEnvStore()
 
+
 @router.get("/")
-def list_agents(agent_registry: AgentRegistry = Depends(dep_agent_registry)):
+def list_agents(
+    refresh: Annotated[int, Query()] = 0,
+    agent_registry: AgentRegistry = Depends(dep_agent_registry),
+):
     """
     List all configured agents.
     """
+    if refresh == 1:
+        agent_registry = init_global_agent_registry(agent_registry, projects=True)
+
     agents = agent_registry.configs.values()
     agents_list = []
     for agent in agents:
@@ -83,8 +92,12 @@ def list_agents(agent_registry: AgentRegistry = Depends(dep_agent_registry)):
     return agents_list
 
 
-@router.get("/{name}", responses={404: {"model": Problem, "description": "Agent not found"}})
-def get_agent(name: str, agent_registry: AgentRegistry = Depends(dep_agent_registry)) -> dict:
+@router.get(
+    "/{name}", responses={404: {"model": Problem, "description": "Agent not found"}}
+)
+def get_agent(
+    name: str, agent_registry: AgentRegistry = Depends(dep_agent_registry)
+) -> dict:
     """
     The agent's spec plus its `instructions` (the markdown body of the spec file).
     """
@@ -110,24 +123,35 @@ def _agent_dir(scope: str) -> Path:
 def _render_spec_file(spec: AgentSpecInput, instructions: str) -> str:
     # empty values are left out, so the file only holds what was set
     front = {k: v for k, v in spec.model_dump().items() if v not in (None, "", [], {})}
-    header = yaml.safe_dump(front, sort_keys=False, allow_unicode=True, default_flow_style=False, width=1000)
+    header = yaml.safe_dump(
+        front, sort_keys=False, allow_unicode=True, default_flow_style=False, width=1000
+    )
     body = instructions.strip()
     return f"---\n{header}---\n" + (f"\n{body}\n" if body else "")
 
 
-def _write_spec_file(path: Path, spec: AgentSpecInput, instructions: str, scope: str,
-                     agent_registry: AgentRegistry) -> AgentSpec:
+def _write_spec_file(
+    path: Path,
+    spec: AgentSpecInput,
+    instructions: str,
+    scope: str,
+    agent_registry: AgentRegistry,
+) -> AgentSpec:
     """Writes the file atomically, then loads it into the registry like load_from_directory() would."""
     content = _render_spec_file(spec, instructions)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+        fd, tmp = tempfile.mkstemp(
+            dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
+        )
         with os.fdopen(fd, "w") as f:
             f.write(content)
         os.replace(tmp, path)
     except OSError as e:
         logger.error(f"Could not write agent spec '{path}': {e}")
-        raise HTTPException(status_code=500, detail=f"Could not write '{path}': {e.strerror or e}")
+        raise HTTPException(
+            status_code=500, detail=f"Could not write '{path}': {e.strerror or e}"
+        )
     loaded = AgentSpec.from_md_file(str(path))
     loaded.scope = scope
     agent_registry.configs[loaded.name] = loaded
@@ -135,32 +159,57 @@ def _write_spec_file(path: Path, spec: AgentSpecInput, instructions: str, scope:
     return loaded
 
 
-@router.post("/", status_code=201, responses={
-    400: {"model": Problem, "description": "Invalid agent name"},
-    409: {"model": Problem, "description": "Agent or spec file already exists"},
-})
-def create_agent(request: AgentCreateRequest, agent_registry: AgentRegistry = Depends(dep_agent_registry)) -> dict:
+@router.post(
+    "/",
+    status_code=201,
+    responses={
+        400: {"model": Problem, "description": "Invalid agent name"},
+        409: {"model": Problem, "description": "Agent or spec file already exists"},
+    },
+)
+def create_agent(
+    request: AgentCreateRequest,
+    agent_registry: AgentRegistry = Depends(dep_agent_registry),
+) -> dict:
     """
     Create an agent: writes `<agent dir of scope>/<name>.md` and adds it to the registry.
     """
     name = request.spec.name
     if not AGENT_NAME_PATTERN.match(name):
-        raise HTTPException(status_code=400, detail="Agent names may only contain letters, digits, - and _.")
+        raise HTTPException(
+            status_code=400,
+            detail="Agent names may only contain letters, digits, - and _.",
+        )
     if agent_registry.get_config(name) is not None:
         raise HTTPException(status_code=409, detail=f"Agent '{name}' already exists.")
     path = _agent_dir(request.scope) / f"{name}.md"
     if path.exists():
-        raise HTTPException(status_code=409, detail=f"The file '{path}' already exists.")
-    return _agent_detail(_write_spec_file(path, request.spec, request.instructions, request.scope, agent_registry))
+        raise HTTPException(
+            status_code=409, detail=f"The file '{path}' already exists."
+        )
+    return _agent_detail(
+        _write_spec_file(
+            path, request.spec, request.instructions, request.scope, agent_registry
+        )
+    )
 
 
-@router.put("/{name}", responses={
-    400: {"model": Problem, "description": "Spec name does not match"},
-    404: {"model": Problem, "description": "Agent not found"},
-    409: {"model": Problem, "description": "Spec file for a built-in agent already exists"},
-})
-def update_agent(name: str, request: AgentUpdateRequest,
-                 agent_registry: AgentRegistry = Depends(dep_agent_registry)) -> dict:
+@router.put(
+    "/{name}",
+    responses={
+        400: {"model": Problem, "description": "Spec name does not match"},
+        404: {"model": Problem, "description": "Agent not found"},
+        409: {
+            "model": Problem,
+            "description": "Spec file for a built-in agent already exists",
+        },
+    },
+)
+def update_agent(
+    name: str,
+    request: AgentUpdateRequest,
+    agent_registry: AgentRegistry = Depends(dep_agent_registry),
+) -> dict:
     """
     Replace an agent's spec file. A built-in agent (no spec file) gets a new file in the user agent directory,
     which replaces it.
@@ -175,12 +224,23 @@ def update_agent(name: str, request: AgentUpdateRequest,
     else:
         path, scope = _agent_dir("user") / f"{name}.md", "user"
         if path.exists():
-            raise HTTPException(status_code=409, detail=f"The file '{path}' already exists.")
-    return _agent_detail(_write_spec_file(path, request.spec, request.instructions, scope, agent_registry))
+            raise HTTPException(
+                status_code=409, detail=f"The file '{path}' already exists."
+            )
+    return _agent_detail(
+        _write_spec_file(
+            path, request.spec, request.instructions, scope, agent_registry
+        )
+    )
 
 
-@router.get("/{name}/commands", responses={404: {"model": Problem, "description": "Agent not found"}})
-def list_agent_commands(name: str, agent_registry: AgentRegistry = Depends(dep_agent_registry)) -> list[AgentCommand]:
+@router.get(
+    "/{name}/commands",
+    responses={404: {"model": Problem, "description": "Agent not found"}},
+)
+def list_agent_commands(
+    name: str, agent_registry: AgentRegistry = Depends(dep_agent_registry)
+) -> list[AgentCommand]:
     """
     Slash commands the agent understands: the built-in commands, then one per configured skill
     ("/<skill>" activates the skill). Commands are listed without the leading slash.
@@ -189,19 +249,22 @@ def list_agent_commands(name: str, agent_registry: AgentRegistry = Depends(dep_a
     if spec is None:
         raise HTTPException(status_code=404, detail=f"Agent '{name}' not found.")
 
-    commands = [AgentCommand(command=c, description=d) for c, d in Agent.BUILTIN_COMMANDS.items()]
+    commands = [
+        AgentCommand(command=c, description=d)
+        for c, d in Agent.BUILTIN_COMMANDS.items()
+    ]
     skills = SkillRegistry()
     for skill_name in sorted(spec.skills or []):
         # the macro handler matches lowercased names, and built-in commands win over skills
         if skill_name.lower() in Agent.BUILTIN_COMMANDS:
-            logger.warning(f"Skill '{skill_name}' of agent '{name}' is shadowed by the built-in command '/{skill_name.lower()}'.")
+            logger.warning(
+                f"Skill '{skill_name}' of agent '{name}' is shadowed by the built-in command '/{skill_name.lower()}'."
+            )
             continue
-        try:
-            skill = skills.load(skill_name)
-        except Exception as e:
-            logger.warning(f"Skipping skill '{skill_name}' of agent '{name}': {e}")
-            continue
+
+        skill = skills.load(skill_name)
         if skill is None:
+            logger.warning(f"Skill '{skill_name}' of agent '{name}' failed to load.")
             continue
         commands.append(AgentCommand(command=skill.name, description=skill.description))
     return commands
@@ -213,12 +276,19 @@ def _require_agent(name: str, agent_registry: AgentRegistry) -> None:
 
 
 def _agent_env(name: str, env_store: AgentEnvStore) -> AgentEnv:
-    return AgentEnv(vars=env_store.get_vars(name), secrets=sorted(env_store.secret_keys(name)))
+    return AgentEnv(
+        vars=env_store.get_vars(name), secrets=sorted(env_store.secret_keys(name))
+    )
 
 
-@router.get("/{name}/env", responses={404: {"model": Problem, "description": "Agent not found"}})
-def get_agent_env(name: str, agent_registry: AgentRegistry = Depends(dep_agent_registry),
-                  env_store: AgentEnvStore = Depends(dep_agent_env_store)) -> AgentEnv:
+@router.get(
+    "/{name}/env", responses={404: {"model": Problem, "description": "Agent not found"}}
+)
+def get_agent_env(
+    name: str,
+    agent_registry: AgentRegistry = Depends(dep_agent_registry),
+    env_store: AgentEnvStore = Depends(dep_agent_env_store),
+) -> AgentEnv:
     """
     The agent's environment variables, and the names of its secrets. Applies to agent instances created afterwards.
     """
@@ -226,12 +296,19 @@ def get_agent_env(name: str, agent_registry: AgentRegistry = Depends(dep_agent_r
     return _agent_env(name, env_store)
 
 
-@router.put("/{name}/env/vars", responses={
-    400: {"model": Problem, "description": "Invalid variable name"},
-    404: {"model": Problem, "description": "Agent not found"},
-})
-def set_agent_env_vars(name: str, values: dict[str, str], agent_registry: AgentRegistry = Depends(dep_agent_registry),
-                       env_store: AgentEnvStore = Depends(dep_agent_env_store)) -> AgentEnv:
+@router.put(
+    "/{name}/env/vars",
+    responses={
+        400: {"model": Problem, "description": "Invalid variable name"},
+        404: {"model": Problem, "description": "Agent not found"},
+    },
+)
+def set_agent_env_vars(
+    name: str,
+    values: dict[str, str],
+    agent_registry: AgentRegistry = Depends(dep_agent_registry),
+    env_store: AgentEnvStore = Depends(dep_agent_env_store),
+) -> AgentEnv:
     """
     Replace all environment variables of the agent.
     """
@@ -243,13 +320,20 @@ def set_agent_env_vars(name: str, values: dict[str, str], agent_registry: AgentR
     return _agent_env(name, env_store)
 
 
-@router.put("/{name}/env/secrets/{key}", responses={
-    400: {"model": Problem, "description": "Invalid secret name"},
-    404: {"model": Problem, "description": "Agent not found"},
-})
-def set_agent_secret(name: str, key: str, secret: SecretValue,
-                     agent_registry: AgentRegistry = Depends(dep_agent_registry),
-                     env_store: AgentEnvStore = Depends(dep_agent_env_store)) -> AgentEnv:
+@router.put(
+    "/{name}/env/secrets/{key}",
+    responses={
+        400: {"model": Problem, "description": "Invalid secret name"},
+        404: {"model": Problem, "description": "Agent not found"},
+    },
+)
+def set_agent_secret(
+    name: str,
+    key: str,
+    secret: SecretValue,
+    agent_registry: AgentRegistry = Depends(dep_agent_registry),
+    env_store: AgentEnvStore = Depends(dep_agent_env_store),
+) -> AgentEnv:
     """
     Create or replace a secret of the agent.
     """
@@ -262,9 +346,16 @@ def set_agent_secret(name: str, key: str, secret: SecretValue,
     return _agent_env(name, env_store)
 
 
-@router.delete("/{name}/env/secrets/{key}", responses={404: {"model": Problem, "description": "Agent or secret not found"}})
-def delete_agent_secret(name: str, key: str, agent_registry: AgentRegistry = Depends(dep_agent_registry),
-                        env_store: AgentEnvStore = Depends(dep_agent_env_store)) -> AgentEnv:
+@router.delete(
+    "/{name}/env/secrets/{key}",
+    responses={404: {"model": Problem, "description": "Agent or secret not found"}},
+)
+def delete_agent_secret(
+    name: str,
+    key: str,
+    agent_registry: AgentRegistry = Depends(dep_agent_registry),
+    env_store: AgentEnvStore = Depends(dep_agent_env_store),
+) -> AgentEnv:
     """
     Delete a secret of the agent.
     """

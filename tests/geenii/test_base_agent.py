@@ -84,7 +84,9 @@ def test_runs_exactly_max_tasks_then_stops():
 
     msgs = _run(agent)
 
-    assert msgs == ["tick"] * BaseAgent.MAX_TASKS + [f"Maximum number of tasks reached: {BaseAgent.MAX_TASKS}"]
+    assert msgs == ["tick"] * BaseAgent.MAX_TASKS + [
+        f"Maximum number of tasks reached: {BaseAgent.MAX_TASKS}"
+    ]
     _assert_queue_settled(agent)
 
 
@@ -125,22 +127,32 @@ def test_agent_runs_llm_tool_call_round_trip(monkeypatch):
     provider = FakeProvider()
     provider.enqueue_tool_call("add", {"a": 2, "b": 3})
     provider.enqueue("The answer is 5.")
-    monkeypatch.setattr(tasks_mod, "generate_chat_completion",
-                        lambda request, **kwargs: provider.generate_chat_completion(request))
+    monkeypatch.setattr(
+        tasks_mod,
+        "generate_chat_completion",
+        lambda request, **kwargs: provider.generate_chat_completion(request),
+    )
 
     registry = ToolRegistry()
     registry.register(PythonFunctionTool(name="add", handler=lambda a, b: a + b))
     skills = SkillRegistry()
     skills.skills.clear()
-    agent = Agent("test-agent", model="fake:test", allowed_tools={"add"}, memory=ShortTermChatMemory(),
-                  tool_registry=registry, skill_registry=skills)
+    agent = Agent(
+        "test-agent",
+        model="fake:test",
+        allowed_tools={"add"},
+        memory=ShortTermChatMemory(),
+        tool_registry=registry,
+        skill_registry=skills,
+    )
 
     msgs = list(agent.process("what is 2 + 3?"))
 
     parts = [m.content[0] for m in msgs]
+    # the tool call is streamed before its result
+    assert isinstance(parts[0], ToolCallContent) and parts[0].name == "add"
     assert any(isinstance(p, ToolCallResultContent) and p.result == "5" for p in parts)
     assert isinstance(parts[-1], TextContent) and parts[-1].text == "The answer is 5."
-    assert not any(isinstance(p, ToolCallContent) for p in parts)
     _assert_queue_settled(agent)
 
 

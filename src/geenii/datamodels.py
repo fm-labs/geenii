@@ -1,26 +1,27 @@
 import uuid
-from datetime import datetime, UTC
-from typing import List, Any, Set, Literal, Optional, Annotated
+from datetime import UTC, datetime
+from typing import Annotated, Any, Literal
 
 import pydantic
 
 from geenii import config
-from geenii.chat_models import ContentPart
+from geenii.chat_models import ContentPart, TextContent
 
 
 class AIProviderInfo(pydantic.BaseModel):
     name: str
     configured: bool = False
-    #description: str | None = None
-    #website: str | None = None
-    #models: List[str] | None = pydantic.Field(default_factory=list)
+    # description: str | None = None
+    # website: str | None = None
+    # models: List[str] | None = pydantic.Field(default_factory=list)
+
 
 class AIModelInfo(pydantic.BaseModel):
     provider: str
     name: str
-    locality: Literal["local","cloud","mixed"]  # "local" or "cloud"
+    locality: Literal["local", "cloud", "mixed"]  # "local" or "cloud"
     description: str | None = None
-    capabilities: List[str] | None = pydantic.Field(default_factory=list)
+    capabilities: list[str] | None = pydantic.Field(default_factory=list)
     metadata: dict | None = pydantic.Field(default_factory=dict)
     installed: bool = False
 
@@ -42,7 +43,10 @@ class Usage(pydantic.BaseModel):
     Providers map their own counts to this convention. Fields a provider does not report stay None;
     `model_dump(exclude_none=True)` is the form written to the usage log.
     """
-    model_config = pydantic.ConfigDict(extra="ignore")  # tolerate unknown keys, e.g. when reading old log lines
+
+    model_config = pydantic.ConfigDict(
+        extra="ignore"
+    )  # tolerate unknown keys, e.g. when reading old log lines
 
     input_tokens: int = 0
     output_tokens: int = 0
@@ -76,7 +80,11 @@ class Usage(pydantic.BaseModel):
     @property
     def uncached_input_tokens(self) -> int:
         """Input tokens neither read from nor written to the prompt cache."""
-        return self.input_tokens - (self.cache_read_input_tokens or 0) - (self.cache_creation_input_tokens or 0)
+        return (
+            self.input_tokens
+            - (self.cache_read_input_tokens or 0)
+            - (self.cache_creation_input_tokens or 0)
+        )
 
     @classmethod
     def from_log_entry(cls, entry: dict) -> "Usage":
@@ -87,7 +95,9 @@ class Usage(pydantic.BaseModel):
         usage = cls.model_validate(entry.get("usage") or {})
         if entry.get("usage_version") is None and entry.get("provider") == "anthropic":
             # version 1: anthropic's input_tokens (and so total_tokens) left out the cached input
-            cached = (usage.cache_read_input_tokens or 0) + (usage.cache_creation_input_tokens or 0)
+            cached = (usage.cache_read_input_tokens or 0) + (
+                usage.cache_creation_input_tokens or 0
+            )
             usage.input_tokens += cached
             usage.total_tokens += cached
         return usage
@@ -131,6 +141,11 @@ class SystemMessage(pydantic.BaseModel):
     def to_dict(self) -> dict:
         return self.model_dump(mode="python")
 
+    @classmethod
+    def from_text(cls, text: str) -> "SystemMessage":
+        return cls(content=[TextContent(text=text)])
+
+
 # class StreamMessage(pydantic.BaseModel):
 #     type: str = "stream"
 #     content: list[ContentPart] = pydantic.Field(default_factory=list)
@@ -149,12 +164,14 @@ WireMessage = Annotated[
 
 class AgentCommand(pydantic.BaseModel):
     """A slash command an agent understands (sent as "/<command> [args]")."""
+
     command: str  # without the leading slash
     description: str = ""
 
 
 class ChatMessage(pydantic.BaseModel):
     """Chat message envelope"""
+
     id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex)
     timestamp: datetime = pydantic.Field(default_factory=lambda: datetime.now(UTC))
     sender_id: str
@@ -163,6 +180,7 @@ class ChatMessage(pydantic.BaseModel):
 
 
 # Chat stream events (NDJSON lines of POST /chats/{context_id}/messages)
+
 
 class ChatMessageEvent(pydantic.BaseModel):
     type: Literal["message"] = "message"
@@ -190,6 +208,7 @@ ChatStreamEvent = Annotated[
 
 # Completion
 
+
 class CompletionErrorResponse(pydantic.BaseModel):
     error: str
 
@@ -197,7 +216,7 @@ class CompletionErrorResponse(pydantic.BaseModel):
 class CompletionRequest(pydantic.BaseModel):
     prompt: str
     model: str = config.DEFAULT_COMPLETION_MODEL
-    system: List[str] | None = None
+    system: list[str] | None = None
     # Model tweaking parameters
     temperature: float | None = None
     top_p: float | None = None
@@ -220,9 +239,10 @@ class BaseCompletionResponse(pydantic.BaseModel):
     error: str | None = None
     model_result: dict | None = None
 
+
 class CompletionResponse(BaseCompletionResponse):
     # prompt: str
-    output: List[ContentPart] | None = None
+    output: list[ContentPart] | None = None
     output_text: str | None = None
     reasoning_output: str | None = None
     # Token usage; None if the provider did not report any
@@ -232,17 +252,17 @@ class CompletionResponse(BaseCompletionResponse):
 # Chat completion
 class ChatCompletionRequest(CompletionRequest):
     # Conversation history (for chat completions)
-    messages: List[ModelMessage] | None = None
+    messages: list[ModelMessage] | None = None
     # Tooling support
-    tools: Set[str] | None = None
+    tools: set[str] | None = None
     # Context ID for the completion request
     context_id: str | None = None
 
 
 class ChatCompletionResponse(CompletionResponse):
-    prompt: str # todo deprecated
+    prompt: str  # todo deprecated
     # The response may include additional information about the tools used
-    tools_used: List[str] | None = None
+    tools_used: list[str] | None = None
     # The context ID for the completion request
     context_id: str | None = None
 
@@ -260,7 +280,7 @@ class ImageGenerationApiRequest(pydantic.BaseModel):
 
 class ImageGenerationApiResponse(BaseCompletionResponse):
     prompt: str
-    output: List[ContentPart] | None = None  # contains either 'base64' or 'url' keys
+    output: list[ContentPart] | None = None  # contains either 'base64' or 'url' keys
     # url: str | None = None  # URL to the generated audio file
     # base64: str | None = None  # Base64 encoded audio data, if applicable
 
@@ -278,7 +298,7 @@ class AudioGenerationApiRequest(pydantic.BaseModel):
 
 class AudioSpeechGenerationApiResponse(BaseCompletionResponse):
     text: str
-    output: List[dict] | None = None  # contains either 'base64' or 'url' keys
+    output: list[dict] | None = None  # contains either 'base64' or 'url' keys
     url: str | None = None  # URL to the generated audio file
     base64: str | None = None  # Base64 encoded audio data, if applicable
 
@@ -323,7 +343,7 @@ class MCPServerConfig(pydantic.BaseModel):
     name: str
     url: str | None = None
     command: str | None = None
-    args: List[str] | None = pydantic.Field(default_factory=list)
+    args: list[str] | None = pydantic.Field(default_factory=list)
     env: dict[str, str] | None = pydantic.Field(default_factory=dict)
 
 
@@ -331,19 +351,22 @@ class MCPServerInfo(pydantic.BaseModel):
     name: str
     status: str | None = None
     description: str | None = None
-    tools: List[dict] | None = pydantic.Field(default_factory=list)
-    resources: List[dict] | None = pydantic.Field(default_factory=list)
-    prompts: List[dict] | None = pydantic.Field(default_factory=list)
+    tools: list[dict] | None = pydantic.Field(default_factory=list)
+    resources: list[dict] | None = pydantic.Field(default_factory=list)
+    prompts: list[dict] | None = pydantic.Field(default_factory=list)
 
 
 # Standard error model (Problem Details, RFC 7807)
 class Problem(pydantic.BaseModel):
-    error: str = pydantic.Field(..., description="Short, human-readable summary of the problem type")
+    error: str = pydantic.Field(
+        ..., description="Short, human-readable summary of the problem type"
+    )
     status: int = pydantic.Field(..., description="HTTP status code")
-    detail: Optional[str] = pydantic.Field(None, description="Human-readable explanation specific to this occurrence")
-    #problem_type: str = pydantic.Field(default="about:blank", description="URI identifying the problem type")
-    #instance: Optional[str] = Field(None, description="URI reference that identifies the specific occurrence")
-    #errors: Optional[dict[str, Any]] = Field(
+    detail: str | None = pydantic.Field(
+        None, description="Human-readable explanation specific to this occurrence"
+    )
+    # problem_type: str = pydantic.Field(default="about:blank", description="URI identifying the problem type")
+    # instance: Optional[str] = Field(None, description="URI reference that identifies the specific occurrence")
+    # errors: Optional[dict[str, Any]] = Field(
     #    None, description="Optional field for validation or field-specific errors"
-    #)
-
+    # )

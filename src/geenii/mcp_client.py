@@ -39,7 +39,6 @@ class McpClient:
         self._cache = {}  # cache for tools, prompt, resources
         self._client = self._init_client()
 
-
     def _init_client(self) -> Client:
 
         server_config = self.server_config.copy()
@@ -49,7 +48,9 @@ class McpClient:
             mode = "legacy"
             del server_config["legacy"]
 
-        logger.info(f"MCP {self.server_name}: Connecting to MCP server '{self.server_name}' mode: {mode}")
+        logger.info(
+            f"MCP {self.server_name}: Connecting to MCP server '{self.server_name}' mode: {mode}"
+        )
         return Client(
             transport=MCPConfig(mcpServers={self.server_name: server_config}),
             mode=mode,
@@ -72,8 +73,8 @@ class McpClient:
         # placeholder for later impl
         pass
 
-    async def _progress_handler(self,
-        progress: float, total: float | None, message: str | None
+    async def _progress_handler(
+        self, progress: float, total: float | None, message: str | None
     ) -> None:
         if total:
             print(f"{progress / total:6.1%}  {message or ''}")
@@ -98,7 +99,9 @@ class McpClient:
                 pass
             self._connected = False
             self._info = None
-            logger.info(f"MCP {self.server_name}: Closed MCP connection for '{self.server_name}'")
+            logger.info(
+                f"MCP {self.server_name}: Closed MCP connection for '{self.server_name}'"
+            )
 
     async def _list(self, kind: str, fetch):
         await self._ensure_connected()
@@ -120,7 +123,9 @@ class McpClient:
 
     async def _call_tool(self, tool_name: str, args: dict) -> any:
         await self._ensure_connected()
-        logger.info(f"MCP {self.server_name}: Calling tool '{tool_name}' with args {args}")
+        logger.info(
+            f"MCP {self.server_name}: Calling tool '{tool_name}' with args {args}"
+        )
         result = await self._client.call_tool_mcp(tool_name, arguments=args)
         logger.info(
             f"MCP {self.server_name}: Tool call result for '{tool_name}': {result}"
@@ -144,12 +149,12 @@ class McpClient:
             "server_capabilities": self.list_server_capabilities(),
             "name": self.server_name,
             "tools": self.list_tools(),
-            "resources": self.list_resources(),
+            # "resources": self.list_resources(),
             # "prompts": self.list_prompts(),
         }
         self._info = info_dict
         return info_dict
-    
+
     def list_server_capabilities(self) -> dict | None:
         run_sync(self._ensure_connected())
         data = self._client.server_capabilities

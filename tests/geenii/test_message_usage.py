@@ -1,4 +1,5 @@
 """ModelMessage.usage: the usage of a model call is on the first message created from its response, and only there."""
+
 import pytest
 
 from geenii.agent import base_agent as base_agent_mod
@@ -21,8 +22,11 @@ def isolated_cache_dir(tmp_path, monkeypatch):
 @pytest.fixture
 def provider(monkeypatch):
     provider = FakeProvider()
-    monkeypatch.setattr(tasks_mod, "generate_chat_completion",
-                        lambda request, **kwargs: provider.generate_chat_completion(request))
+    monkeypatch.setattr(
+        tasks_mod,
+        "generate_chat_completion",
+        lambda request, **kwargs: provider.generate_chat_completion(request),
+    )
     return provider
 
 
@@ -31,8 +35,14 @@ def _agent() -> Agent:
     registry.register(PythonFunctionTool(name="add", handler=lambda a, b: a + b))
     skills = SkillRegistry()
     skills.skills.clear()
-    return Agent("tester", model="fake:test", allowed_tools={"add"}, memory=ShortTermChatMemory(),
-                 tool_registry=registry, skill_registry=skills)
+    return Agent(
+        "tester",
+        model="fake:test",
+        allowed_tools={"add"},
+        memory=ShortTermChatMemory(),
+        tool_registry=registry,
+        skill_registry=skills,
+    )
 
 
 def _total(messages) -> int:
@@ -53,10 +63,12 @@ def test_final_answer_carries_usage(provider):
 
 def test_usage_is_counted_once_per_model_call(provider):
     # call 1: two parallel tool calls in one response; call 2: the answer
-    provider.enqueue_parts([
-        ToolCallContent(name="add", arguments={"a": 1, "b": 2}, call_id="c1"),
-        ToolCallContent(name="add", arguments={"a": 3, "b": 4}, call_id="c2"),
-    ])
+    provider.enqueue_parts(
+        [
+            ToolCallContent(name="add", arguments={"a": 1, "b": 2}, call_id="c1"),
+            ToolCallContent(name="add", arguments={"a": 3, "b": 4}, call_id="c2"),
+        ]
+    )
     provider.enqueue("3 and 7")
     agent = _agent()
 
@@ -64,24 +76,65 @@ def test_usage_is_counted_once_per_model_call(provider):
 
     history = agent.message_history
     tool_calls = [m for m in history if isinstance(m.content[0], ToolCallContent)]
-    assert [m.usage is not None for m in tool_calls] == [True, False]  # only the response's first message
+    assert [m.usage is not None for m in tool_calls] == [
+        True,
+        False,
+    ]  # only the response's first message
     assert all(m.usage is None for m in history if m.role in ("user", "tool"))
     assert history[-1].usage is not None
     assert _total(history) == 2 * 30  # two model calls
 
 
+def test_streamed_messages_carry_the_usage_of_every_call(provider):
+    # the tool-calling response's usage reaches the stream too, not only the history
+    provider.enqueue_parts(
+        [ToolCallContent(name="add", arguments={"a": 1, "b": 2}, call_id="c1")]
+    )
+    provider.enqueue("3")
+    agent = _agent()
+
+    streamed = list(agent.process("add"))
+
+    assert isinstance(streamed[0].content[0], ToolCallContent)
+    assert (
+        _total(streamed)
+        == _total(agent.message_history)
+        == agent.usage.total_tokens
+        == 2 * 30
+    )
+    # the call is stored once, before its result
+    roles = [(m.role, type(m.content[0]).__name__) for m in agent.message_history]
+    assert roles == [
+        ("user", "TextContent"),
+        ("assistant", "ToolCallContent"),
+        ("tool", "ToolCallResultContent"),
+        ("assistant", "TextContent"),
+    ]
+
+
 def test_usage_survives_file_memory(tmp_path):
     path = tmp_path / "memory.jsonl"
     memory = FileChatMemory(str(path))
-    memory.append(ModelMessage(role="assistant", content=[TextContent(text="hi")],
-                               usage=Usage(input_tokens=5, output_tokens=1, cache_read_input_tokens=4)))
+    memory.append(
+        ModelMessage(
+            role="assistant",
+            content=[TextContent(text="hi")],
+            usage=Usage(input_tokens=5, output_tokens=1, cache_read_input_tokens=4),
+        )
+    )
 
     [restored] = FileChatMemory(str(path)).messages
-    assert restored.usage == Usage(input_tokens=5, output_tokens=1, cache_read_input_tokens=4)
+    assert restored.usage == Usage(
+        input_tokens=5, output_tokens=1, cache_read_input_tokens=4
+    )
 
 
 def test_messages_without_usage_still_load():
-    old = {"type": "message", "role": "assistant", "content": [{"type": "text", "text": "hi"}]}
+    old = {
+        "type": "message",
+        "role": "assistant",
+        "content": [{"type": "text", "text": "hi"}],
+    }
     assert ModelMessage.model_validate(old).usage is None
 
 
@@ -96,6 +149,7 @@ def test_compaction_summary_carries_usage(provider):
 
 
 # -- Agent.usage: the agent counts its model calls internally ---------------------
+
 
 def test_usage_addition():
     a = Usage(input_tokens=10, output_tokens=2, cache_read_input_tokens=4)
@@ -127,8 +181,11 @@ def test_agent_counts_every_model_call(provider):
 def test_agent_counts_skill_selection(provider):
     agent = _agent()
     from geenii.skills import SkillSpec
+
     for name in ("alpha", "beta"):
-        agent.skills.register(SkillSpec(name=name, description=f"{name} skill", path=f"/tmp/{name}"))
+        agent.skills.register(
+            SkillSpec(name=name, description=f"{name} skill", path=f"/tmp/{name}")
+        )
     provider.enqueue('{"skill": "NONE", "confidence": 0.1, "rationale": "-"}')
     provider.enqueue("answer")
 
@@ -171,4 +228,7 @@ def test_self_shows_agent_usage(provider):
     provider.enqueue("hi")
     list(agent.process("hello"))
     [after] = list(agent.process("/self"))
-    assert "30 tokens (10 in, 20 out) in 1 model call since the agent was started" in after.to_text()
+    assert (
+        "30 tokens (10 in, 20 out) in 1 model call since the agent was started"
+        in after.to_text()
+    )

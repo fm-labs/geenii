@@ -7,7 +7,11 @@ import click
 from mcp_types import CallToolResult
 
 from geenii.config import GEENII_CACHE_DIR
-from geenii.mcp_config import get_mcp_config, get_mcp_config_for_server, get_mcp_client_for_server
+from geenii.mcp_config import (
+    get_mcp_config,
+    get_mcp_config_for_server,
+    get_mcp_client_for_server,
+)
 
 
 @click.group()
@@ -107,7 +111,7 @@ def server_tool_info(server_id, tool_name):
             for tool in tools:
                 name = tool.get("name", "")
                 if name == tool_name:
-                    #return tool
+                    # return tool
                     click.echo(json.dumps(tool, indent=2, default=str))
                     break
         return None
@@ -118,12 +122,18 @@ def server_tool_info(server_id, tool_name):
         client.close()
 
 
-
 @server.command("tool_exec")
 @click.argument("server_id")
 @click.argument("tool_name")
-@click.option("--arg", "-a", multiple=True, help="Tool arguments in key=value format. (Multiple allowed)")
-@click.option("--json-args", "-j", default=None, help="Tool arguments as a JSON string.")
+@click.option(
+    "--arg",
+    "-a",
+    multiple=True,
+    help="Tool arguments in key=value format. (Multiple allowed)",
+)
+@click.option(
+    "--json-args", "-j", default=None, help="Tool arguments as a JSON string."
+)
 def server_tool_exec(server_id, tool_name, arg, json_args):
     """Execute a tool on a server."""
     if json_args:
@@ -135,20 +145,24 @@ def server_tool_exec(server_id, tool_name, arg, json_args):
         args = {}
         for a in arg:
             if "=" not in a:
-                raise click.ClickException(f"Invalid argument format: '{a}'. Expected key=value.")
+                raise click.ClickException(
+                    f"Invalid argument format: '{a}'. Expected key=value."
+                )
             key, value = a.split("=", 1)
             args[key] = value
 
     client = get_mcp_client_for_server(server_id)
     try:
         result: CallToolResult = client.call_tool(tool_name, args)
-        #click.echo(json.dumps(result.model_dump(), indent=2, default=str))
+        # click.echo(json.dumps(result.model_dump(), indent=2, default=str))
         if hasattr(result, "content") and len(result.content) > 0:
             content = result.content[0]
             if hasattr(content, "text"):
                 click.echo(content.text)
             if hasattr(content, "structured_content"):
-                click.echo(json.dumps(content.structured_content, indent=2, default=str))
+                click.echo(
+                    json.dumps(content.structured_content, indent=2, default=str)
+                )
         else:
             click.echo(json.dumps(result, indent=2, default=str))
     finally:
@@ -160,7 +174,9 @@ def server_tool_exec(server_id, tool_name, arg, json_args):
 @click.argument("resource_name")
 @click.option("--download", is_flag=True, help="Download the resource to a file.")
 @click.option("--overwrite", is_flag=True, help="Overwrite existing resource.")
-def server_resource(server_id: str, resource_name: str, download: bool, overwrite: bool):
+def server_resource(
+    server_id: str, resource_name: str, download: bool, overwrite: bool
+):
     """List tools provided by a server."""
     client = get_mcp_client_for_server(server_id)
     try:
@@ -189,5 +205,5 @@ def _resource_cache_path(server_id: str, resource_name: str) -> Path:
     if "://" in resource_name:
         resource_path = resource_name.split("://", 1)[1]
     else:
-        resource_path = hashlib.md5(resource_name.encode('utf-8')).hexdigest()
+        resource_path = hashlib.md5(resource_name.encode("utf-8")).hexdigest()
     return Path(GEENII_CACHE_DIR) / "mcp" / server_id / "r" / resource_path

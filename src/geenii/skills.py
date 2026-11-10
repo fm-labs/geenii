@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class SkillSpec(pydantic.BaseModel):
-    model_config = pydantic.ConfigDict(ignored_types=(cached_property,), arbitrary_types_allowed=True)
+    model_config = pydantic.ConfigDict(
+        ignored_types=(cached_property,), arbitrary_types_allowed=True
+    )
 
     path: str
     name: str
@@ -38,18 +40,27 @@ class SkillSpec(pydantic.BaseModel):
         md_path = skill_path / "SKILL.md"
         skill_header, skill_body = read_frontmatter_file(str(md_path))
         if not skill_header or not isinstance(skill_header, dict):
-            raise ValueError(f"Malformed skill markdown file: missing or invalid header in '{str(md_path)}'")
+            raise ValueError(
+                f"Malformed skill markdown file: missing or invalid header in '{str(md_path)}'"
+            )
         if "name" not in skill_header or "description" not in skill_header:
             raise ValueError(
-                f"Malformed skill markdown file: missing required 'name' or 'description' fields in header of '{str(md_path)}'")
+                f"Malformed skill markdown file: missing required 'name' or 'description' fields in header of '{str(md_path)}'"
+            )
         raw_triggers = skill_header.get("triggers", "")
         if isinstance(raw_triggers, list):
             triggers = [t.strip().lower() for t in raw_triggers if t.strip()]
         else:
-            triggers = [t.strip().lower() for t in re.split(r'[,\s]+', str(raw_triggers)) if t.strip()]
+            triggers = [
+                t.strip().lower()
+                for t in re.split(r"[,\s]+", str(raw_triggers))
+                if t.strip()
+            ]
 
         raw_allowed_tools = skill_header.get("allowed-tools", "")
-        tool_filters = ToolFilterSet.parse(raw_allowed_tools) if raw_allowed_tools else None
+        tool_filters = (
+            ToolFilterSet.parse(raw_allowed_tools) if raw_allowed_tools else None
+        )
         allowed_tool_names = list(tool_filters.tool_names()) if tool_filters else []
 
         return SkillSpec(
@@ -96,15 +107,18 @@ class SkillRegistry:
 
             skill_dir = locate_skill_path(skill_name)
             if not skill_dir:
-                #raise KeyError(f"Skill '{skill_name}' not found.")
-                logger.warning(f"Skill '{skill_name}' does not exist or is not a directory.")
+                # raise KeyError(f"Skill '{skill_name}' not found.")
+                logger.warning(
+                    f"Skill '{skill_name}' does not exist or is not a directory."
+                )
                 return None
             skill = SkillSpec.from_path(skill_dir)
             self.register(skill)
             return skill
         except Exception as e:
             logger.critical(f"Error while loading skill: {str(e)}", exc_info=False)
-            raise e
+            # raise e
+            return None
 
     def match_triggers(self, prompt: str) -> list[str]:
         """Return skill names whose triggers match words in the prompt (case-insensitive, word-boundary)."""
@@ -112,7 +126,7 @@ class SkillRegistry:
         matched = []
         for name, skill in self.skills.items():
             for trigger in skill.triggers:
-                if re.search(r'\b' + re.escape(trigger) + r'\b', prompt_lower):
+                if re.search(r"\b" + re.escape(trigger) + r"\b", prompt_lower):
                     matched.append(name)
                     break
         return matched
@@ -125,7 +139,9 @@ class SkillRegistry:
     def register_all_from_directory(self, directory: str) -> None:
         base_path = Path(directory)
         if not base_path.is_dir():
-            logger.warning(f"Skill directory '{directory}' does not exist or is not a directory.")
+            logger.warning(
+                f"Skill directory '{directory}' does not exist or is not a directory."
+            )
             return
 
         for item in base_path.iterdir():
@@ -136,7 +152,10 @@ class SkillRegistry:
                         skill = SkillSpec.from_path(str(skill_md_path.parent))
                         self.register(skill)
                     except Exception as e:
-                        logger.critical(f"Error while loading skill from '{item}': {str(e)}", exc_info=False)
+                        logger.critical(
+                            f"Error while loading skill from '{item}': {str(e)}",
+                            exc_info=False,
+                        )
 
 
 # def build_skill_spec(skill_path: Path | str) -> SkillSpec:
@@ -207,7 +226,12 @@ def register_skill_scripts(skill: SkillSpec, tool_registry) -> list[str]:
             name=tool_name,
             description=f"Script from skill '{skill.name}': {script.stem}",
             script_path=str(resolved),
-            input_schema={"type": "object", "properties": {"args": {"type": "string", "description": "The tool arguments"}}},
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "args": {"type": "string", "description": "The tool arguments"}
+                },
+            },
         )
         tool_registry.register(tool)
         registered.append(tool_name)

@@ -31,7 +31,7 @@ logging.basicConfig(
             show_path=True,  # hide file path
             rich_tracebacks=False,  # beautiful exception tracebacks
         )
-    ]
+    ],
 )
 
 # dotenv.load_dotenv(GEENII_DIR + "/.env", override=True, verbose=True)
@@ -74,9 +74,11 @@ logging.basicConfig(
 #
 #     return scheduler
 
+
 async def initialize_agent_registry():
     print("Initializing agent registry...")
     return init_global_agent_registry(projects=True)
+
 
 async def initialize_tool_registry():
     print("Initializing tool registry...")
@@ -94,10 +96,12 @@ async def initialize_tool_registry():
 #     print(f"Initialized {len(apps.apps)} apps: {list(apps.apps.keys())}")
 #     return apps
 
+
 async def initialize_skill_registry():
     print("Initializing skill registry...")
     skill_registry = init_global_skill_registry()
     return skill_registry
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -110,7 +114,7 @@ async def lifespan(app: FastAPI):
     # Apps
     # app.state.app_registry = await initialize_app_registry()
     # Supervisor
-    #app.state.supervisor = await initialize_supervisor()
+    # app.state.supervisor = await initialize_supervisor()
     # Scheduler
     # app.state.scheduler = await initialize_scheduler(app.state.supervisor)
     # Redis
@@ -148,13 +152,11 @@ async def unhandled_exception_middleware(request: Request, call_next):
     try:
         return await call_next(request)
     except Exception as exc:
-        logging.error(f"Unhandled exception: {exc}", exc_info=False)
-        problem = Problem(error="Internal Server Error",
-                          status=500,
-                          detail=str(exc))
-        return JSONResponse(status_code=500,
-                            content=problem.model_dump(),
-                            media_type="application/json")
+        logging.error(f"Unhandled exception: {exc}", exc_info=True)
+        problem = Problem(error="Internal Server Error", status=500, detail=str(exc))
+        return JSONResponse(
+            status_code=500, content=problem.model_dump(), media_type="application/json"
+        )
 
 
 # Note: Middlewares are executed in reverse order of addition (LIFO)
@@ -190,15 +192,21 @@ app.add_middleware(
 #     timeout=30.0
 # )
 
+
 # Global exception handlers that emit Problem JSON responses
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_: Request, exc: HTTPException):
-    problem = Problem(error=exc.detail or exc.status_code,
-                      status=exc.status_code,
-                      detail=str(exc.detail))
-    return JSONResponse(status_code=exc.status_code,
-                        content=problem.model_dump(),
-                        media_type="application/json")
+    problem = Problem(
+        error=exc.detail or exc.status_code,
+        status=exc.status_code,
+        detail=str(exc.detail),
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=problem.model_dump(),
+        media_type="application/json",
+    )
+
 
 app.include_router(app_router, prefix="")
 
@@ -285,8 +293,14 @@ if __name__ == "__main__":
 
     GEENII_SERVER_HOST = os.getenv("GEENII_SERVER_HOST", "127.0.0.1")
     GEENII_SERVER_PORT = os.getenv("GEENII_SERVER_PORT", "33311")
-    uvicorn.run(app, host=GEENII_SERVER_HOST, port=int(GEENII_SERVER_PORT),
-                workers=1, reload=False, log_level="info")
+    uvicorn.run(
+        app,
+        host=GEENII_SERVER_HOST,
+        port=int(GEENII_SERVER_PORT),
+        workers=1,
+        reload=False,
+        log_level="info",
+    )
 
 # async def serve():
 #     config = uvicorn.Config(app, host="127.0.0.1", port=33311, log_level="info")
