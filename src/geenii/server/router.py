@@ -3,7 +3,7 @@ from fastapi.params import Security
 
 from geenii.server.agents_routes import router as agents_router
 from geenii.server.ai_routes import router as ai_router
-from geenii.server.api_routes import router as api_router
+from geenii.server.public_routes import router as public_router
 from geenii.server.chat_routes import router as chat_router
 from geenii.server.mcp_routes import router as mcp_router
 from geenii.server.pm_routes import router as pm_router
@@ -28,7 +28,7 @@ from geenii.server.tools_routes import router as tools_router
 API_ROUTE_PREFIX = "/api/v1"
 
 app_router = APIRouter()
-app_router.include_router(api_router, prefix=API_ROUTE_PREFIX)
+app_router.include_router(public_router, prefix=API_ROUTE_PREFIX)
 app_router.include_router(pm_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(agents_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(tools_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
