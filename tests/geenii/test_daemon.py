@@ -438,3 +438,37 @@ def test_broken_services_file_does_not_stop_the_daemon(short_dir):
         assert client.call("ping") == "pong"
         with pytest.raises(RuntimeError, match="JSONDecodeError"):
             client.call("supervisor.reload")
+
+
+def test_scheduler_routes_edit_and_run_in_live_daemon(short_dir):
+    """The HTTP scheduler routes against a real daemon: add a task, it gets loaded, run it now."""
+    from fastapi.testclient import TestClient
+
+    from geenii.server import daemon_routes
+    from geenii.server.server import app
+
+    config = os.path.join(short_dir, "scheduler.json")
+    with open(config, "w") as f:
+        f.write('{"tasks": []}')
+    marker = os.path.join(short_dir, "ran")
+    host = _make_host(short_dir)
+    host.scheduler_config = config
+    server = DaemonServer(host, os.path.join(short_dir, "d.sock"))
+
+    with RunningDaemon(server) as client:
+        app.dependency_overrides[daemon_routes.dep_daemon_client] = lambda: client
+        try:
+            http = TestClient(app)
+            task = {"name": "touch", "interval": "cron:0 0 1 1 *", "cmd": ["touch", marker]}
+            resp = http.post("/api/v1/scheduler/tasks", json=task)
+            assert resp.status_code == 201
+            assert resp.json()["reload"]["changes"]["added"] == ["touch"]
+
+            tasks = http.get("/api/v1/scheduler/config").json()["tasks"]
+            assert tasks[0]["live"]["next_run"]
+
+            assert http.post("/api/v1/scheduler/tasks/touch/run").status_code == 202
+            _wait_until(lambda: os.path.exists(marker))
+            assert http.post("/api/v1/scheduler/tasks/missing/run").status_code == 404
+        finally:
+            app.dependency_overrides.pop(daemon_routes.dep_daemon_client, None)

@@ -15,7 +15,6 @@ geenii daemon start --scheduler-config /path/to/scheduler.json
 
 # older forms, now aliases for the above
 geenii scheduler start --config /path/to/scheduler.json
-geenii-scheduler /path/to/.geenii/scheduler.json
 ```
 
 The daemon loads the config and checks for due tasks every second. It runs

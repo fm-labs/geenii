@@ -69,6 +69,14 @@ export const data = {
           title: 'Usage stats',
           url: '#/console/system/stats',
         },
+        {
+          title: 'Scheduler',
+          url: '#/console/system/scheduler',
+        },
+        {
+          title: 'Processes',
+          url: '#/console/system/processes',
+        },
         // {
         //   title: 'Plugins',
         //   url: '#/console/system/plugins',

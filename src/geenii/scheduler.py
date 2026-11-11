@@ -48,6 +48,7 @@ import pydantic
 from croniter import croniter
 
 from geenii.pm.process_manager import ProcessManager, ProcessState
+from geenii.tool.common import expand_vars
 
 logger = logging.getLogger(__name__)
 

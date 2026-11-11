@@ -1,6 +1,6 @@
 import * as React from 'react'
 import {
-  BotIcon, CheckIcon, ChevronRightIcon, CopyIcon, CpuIcon, FolderIcon, HardDriveIcon, MemoryStickIcon, PackageIcon,
+  ActivityIcon, BotIcon, CheckIcon, ChevronRightIcon, CopyIcon, CpuIcon, FolderIcon, HardDriveIcon, MemoryStickIcon, PackageIcon,
   RefreshCwIcon, TagIcon, TerminalIcon, UserIcon, VariableIcon, XIcon,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge.tsx'
@@ -151,8 +151,84 @@ const Expandable = ({ title, children }: { title: string, children: React.ReactN
   )
 }
 
+/** Response of GET /api/v1/daemon/status, see geenii/server/daemon_routes.py */
+type DaemonStatus = {
+  running: boolean
+  socket: string
+  error: string | null
+  info: {
+    pid: number
+    socket: string
+    uptime_s: number
+    pm: { running: number }
+    scheduler: { status: string, config: string | null, tasks: number, running_tasks: number }
+    supervisor: { config: string | null, desired: number, running: number }
+  } | null
+}
+
+const fmtSeconds = (s: number) => fmtUptime(Date.now() / 1000 - s)
+
+/** Status of the geenii daemon (process manager, scheduler, supervisor) */
+const DaemonStatusSection = ({ refreshKey }: { refreshKey: number }) => {
+  const { fetchJson } = useApi()
+  const [status, setStatus] = React.useState<DaemonStatus | null>(null)
+  const [error, setError] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    let cancelled = false
+    fetchJson('/api/v1/daemon/status')
+      .then((data: DaemonStatus) => {
+        if (cancelled) return
+        setStatus(data)
+        setError(null)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        console.error('Error fetching daemon status:', err)
+        setError(err?.message || 'Unknown error')
+      })
+    return () => { cancelled = true }
+  }, [fetchJson, refreshKey])
+
+  const info = status?.info
+  const badge = error
+    ? <Badge variant="outline" className="text-destructive">unknown</Badge>
+    : !status
+      ? <Skeleton className="h-5 w-16" />
+      : (
+        <Badge variant={status.running ? 'secondary' : 'outline'} className="gap-1.5">
+          <span className={cn('size-1.5 rounded-full', status.running ? 'bg-emerald-500' : 'bg-destructive')} />
+          {status.running ? 'running' : 'not running'}
+        </Badge>
+      )
+
+  return (
+    <Section icon={ActivityIcon} title="Daemon"
+             description={<span className="flex items-center gap-2">Process manager, scheduler and supervisor {badge}</span>}>
+      {error && <div className="text-sm text-destructive">Failed to load daemon status: {error}</div>}
+      {status && !status.running && (
+        <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+          <span>{status.error}</span>
+          <KeyValueList rows={[['Socket', status.socket, status.socket]]} />
+        </div>
+      )}
+      {info && (
+        <KeyValueList rows={[
+          ['PID', String(info.pid), String(info.pid)],
+          ['Uptime', fmtSeconds(info.uptime_s)],
+          ['Socket', info.socket, info.socket],
+          ['Processes', `${info.pm.running} running`],
+          ['Scheduler', `${info.scheduler.status} · ${info.scheduler.tasks} task(s), ${info.scheduler.running_tasks} running`],
+          ['Services', `${info.supervisor.running} of ${info.supervisor.desired} running`],
+        ]} />
+      )}
+    </Section>
+  )
+}
+
 const SystemInfoView = () => {
   const { api } = useApi()
+  const [refreshKey, setRefreshKey] = React.useState(0)
   const [data, setData] = React.useState<SystemInfo | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
@@ -174,6 +250,11 @@ const SystemInfoView = () => {
     fetchInfo()
   }, [fetchInfo])
 
+  const refresh = () => {
+    setRefreshKey((k) => k + 1)
+    fetchInfo()
+  }
+
   const sys = data?.system?.system
   const disk = data?.system?.disk_usage?.['/']
   const binaries = Object.entries(data?.system?.binaries ?? {})
@@ -184,7 +265,7 @@ const SystemInfoView = () => {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-end">
-        <Button size="sm" variant="ghost" onClick={fetchInfo} disabled={loading}>
+        <Button size="sm" variant="ghost" onClick={refresh} disabled={loading}>
           <RefreshCwIcon className={loading ? 'animate-spin' : ''} /> Refresh
         </Button>
       </div>
@@ -223,6 +304,8 @@ const SystemInfoView = () => {
           </div>
 
           <div className="grid gap-4 xl:grid-cols-2">
+            <DaemonStatusSection refreshKey={refreshKey} />
+
             <Section icon={FolderIcon} title="Directories">
               <KeyValueList rows={([
                 ['Working dir', data.app.geenii_working_dir],

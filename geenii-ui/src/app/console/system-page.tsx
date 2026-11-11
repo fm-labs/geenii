@@ -5,6 +5,8 @@ import Header from '@/components/header.tsx'
 import SystemInfoView from '@/app/console/components/system-info-view.tsx'
 import SettingsView from '@/app/console/settings-view.tsx'
 import UsageStatsView from '@/app/console/components/usage-stats-view.tsx'
+import SchedulerConfigView from '@/app/console/components/scheduler-config-view.tsx'
+import ProcessManagerView from '@/app/console/components/process-manager-view.tsx'
 
 const SystemPage = () => {
   const { params } = useRoute()
@@ -18,6 +20,10 @@ const SystemPage = () => {
         return <SettingsView />
       case 'stats':
         return <UsageStatsView />
+      case 'scheduler':
+        return <SchedulerConfigView />
+      case 'processes':
+        return <ProcessManagerView />
       default:
         return <div>Section {section} not found</div>
     }

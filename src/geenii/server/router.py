@@ -5,9 +5,11 @@ from geenii.server.agents_routes import router as agents_router
 from geenii.server.ai_routes import router as ai_router
 from geenii.server.public_routes import router as public_router
 from geenii.server.chat_routes import router as chat_router
+from geenii.server.daemon_routes import router as daemon_router
 from geenii.server.mcp_routes import router as mcp_router
 from geenii.server.pm_routes import router as pm_router
 from geenii.server.projects_routes import router as projects_router
+from geenii.server.scheduler_routes import router as scheduler_router
 from geenii.server.security import dep_current_user
 from geenii.server.skills_routes import router as skills_router
 from geenii.server.stats_routes import router as stats_router
@@ -29,6 +31,8 @@ API_ROUTE_PREFIX = "/api/v1"
 
 app_router = APIRouter()
 app_router.include_router(public_router, prefix=API_ROUTE_PREFIX)
+app_router.include_router(daemon_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
+app_router.include_router(scheduler_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(pm_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(agents_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(tools_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
