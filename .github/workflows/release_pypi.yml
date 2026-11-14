@@ -55,6 +55,12 @@ jobs:
           python-version: '3.14'
       - name: Build sdist and wheel
         run: uv build --no-sources
+      - name: Check wheel
+        run: |
+          # -I keeps the current directory off sys.path
+          # --isolated uses a fresh environment, with nothing reused from a previous run.
+          uv run --isolated --no-project --with dist/*.whl \
+            python -I -c "import geenii, importlib.metadata as m; print(m.version('geenii'))"
       - name: Check distribution metadata
         run: uvx twine check --strict dist/*
       - uses: actions/upload-artifact@v7
@@ -123,16 +129,14 @@ jobs:
         # Only TestPyPI is used as the index, which works because the package has no
         # required dependencies. New uploads can take a minute to appear, so retry.
         run: |
-          for attempt in 1 2 3 4 5 6; do
-            if uv run --isolated --no-project --no-cache \
-                --index-url https://test.pypi.org/simple/ --with "geenii==${VERSION}" \
-                python -c "import importlib.metadata as m, geenii; assert m.version('geenii') == '${VERSION}'"; then
-              exit 0
-            fi
-            echo "geenii ${VERSION} not installable from TestPyPI yet (attempt ${attempt}), retrying in 20s ..."
-            sleep 20
+          for i in 1 2 3 4 5 6; do
+            uv run --no-project --refresh \
+              --index https://test.pypi.org/simple/ \
+              --index-strategy unsafe-best-match \
+              --with "geenii==${VERSION}" \
+              python -c "import geenii; print(geenii.__version__)" && exit 0
+            echo "Not available yet, retrying..."; sleep 20
           done
-          echo "::error::geenii ${VERSION} could not be installed from TestPyPI."
           exit 1
 
 #  publish-pypi:
