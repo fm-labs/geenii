@@ -1,6 +1,6 @@
 [project]
 name = "geenii"
-version = "0.3.4"
+version = "0.4.0"
 description = "A versatile AI agent toolkit"
 requires-python = ">=3.14,<4.0"
 authors = [
@@ -89,13 +89,8 @@ ignore = [
     "E402",
     "E501",
     "PERF402",
-    "TRY401"
+    "TRY401",
 ]
 select = [
-    "E",   # pycodestyle errors
-    #"W",   # pycodestyle warnings
-    #"F",   # pyflakes
-    #"I",   # isort
-    #"UP",  # pyupgrade
-    #"B",   # flake8-bugbear
+    "E",
 ]
