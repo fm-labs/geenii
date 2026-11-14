@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["python-v*"]
 
 # Actions are pinned to commit SHAs (updated by Dependabot).
 permissions:
@@ -24,7 +24,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           version=$(uv version --short)
-          if [[ "${TAG}" != "v${version}" ]]; then
+          if [[ "${TAG}" != "python-v${version}" ]]; then
             echo "::error::Tag ${TAG} does not match the package version ${version} in pyproject.toml (expected v${version})."
             exit 1
           fi
@@ -79,14 +79,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
           PRERELEASE: ${{ needs.check-version.outputs.prerelease }}
+          TITLE: "Geenii Python SDK"
         run: |
           flags=()
           if [[ "${PRERELEASE}" == "true" ]]; then
             flags+=(--prerelease)
           fi
-          gh release create "python-${TAG}" dist/* \
+          gh release create "${TAG}" dist/* \
             --repo "${GITHUB_REPOSITORY}" \
-            --title "Geenii Python SDK ${TAG}" \
+            --title "${TITLE} ${TAG}" \
             --generate-notes \
             --verify-tag \
             "${flags[@]}"
