@@ -256,7 +256,7 @@ class LLMTask(BaseAgentTask):
 
     def execute(self) -> Iterator[ModelMessage]:
         full_system_prompt = self._build_system_prompt()
-        prompt = message_to_prompt(self.message)
+        prompt = message_to_prompt(self.message) or ""
         allowed_tools = self.allowed_tools  # if self.allowed_tools else self._compute_effective_tools()
         # message history (last MAX_MESSAGE_HISTORY messages)
         input_messages = list(self.agent.message_history[-self.MAX_MESSAGE_HISTORY :])

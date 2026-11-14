@@ -128,19 +128,16 @@ class Agent(BaseAgent):
                     logger.warning("Tool macro: %s", e)
                     return True  # signal to stop message handling
 
-                # tool_registry: ToolRegistry = ToolRegistry()
-                # init_builtin_tools(tool_registry)
-                #
-                # tool = tool_registry.get(tool_name)
+                # tool = self.tools.get(tool_name)
                 # result = tool.invoke(args=args, env={})
-                call_id = f"usr-{tool_name}-{time.time()}"
+                call_id = f"call-{tool_name}-{time.time()}"
                 self.enqueue_task(ToolCallTask(agent=self, tool_name=tool_name, arguments=args, call_id=call_id))
                 return True
 
         return None
 
     def _handle_message(self, message: str | list[ContentPart]):
-        if self._handle_makros(message):
+        if self._handle_makros(message) is not None:
             return
 
         self.enqueue_task(FindBestSkillTask(self, prompt=message_to_prompt(message)))

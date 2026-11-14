@@ -41,6 +41,7 @@ class BaseAgent(BotInterface, abc.ABC):
         name,
         model: str | None = None,
         system_prompt: str | None = None,
+        developer_prompt: str | None = None,
         description: str | None = None,
         allowed_tools: set[str] | None = None,
         mcp_servers: set[str] | None = None,
@@ -60,7 +61,7 @@ class BaseAgent(BotInterface, abc.ABC):
         self.description = description
         self.model = model or DEFAULT_COMPLETION_MODEL
         self.system_prompt = system_prompt or DEFAULT_AGENT_SYSTEM_PROMPT
-        self.developer_prompt = ""
+        self.developer_prompt = developer_prompt or ""
         self.context_id = context_id or uuid.uuid7().hex
         self.allowed_tools: set[str] = allowed_tools or set()
         self.mcp_servers: set[str] = mcp_servers or set()

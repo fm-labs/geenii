@@ -9,8 +9,10 @@ import dotenv
 
 from geenii.utils.os_util import get_user_home_dir
 
+
 def _envvar(var: str, default: str | None = None) -> str | None:
     return os.environ.get(var, default)
+
 
 APP_VERSION = "0.3.4"
 
