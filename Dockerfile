@@ -8,7 +8,9 @@ RUN apk add --no-cache \
     python3-dev \
     libffi-dev zlib-dev curl ccache zstd-dev
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=docker.io/astral/uv:latest /uv /uvx /bin/
+#COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+#RUN pip install uv
 # Install python dependencies
 COPY ./pyproject.toml ./uv.lock /builder/
 RUN uv sync --no-cache-dir --frozen --no-install-project
@@ -67,9 +69,10 @@ RUN addgroup --gid 33311 -S geenii && adduser --uid 33311 -S geenii -G geenii &&
     chown -R geenii:geenii /home/geenii
 
 # Binaries
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+#COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=docker.io/astral/uv:latest /uv /uvx /bin/
 #COPY --from=builder /builder/dist/geenii /usr/bin/geenii
-COPY --from=builder /builder/dist/geenii /opt/geenii/bin/geenii
+COPY --from=builder /builder/dist/geenii /opt/geenii/bin/
 RUN chmod +x /opt/geenii/bin/geenii && ln -sf /opt/geenii/bin/geenii /usr/bin/geenii
 
 #COPY ./container/entrypoint.sh /usr/bin/entrypoint

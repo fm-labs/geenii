@@ -63,33 +63,33 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-#  github-release:
-#    name: Create GitHub release
-#    needs: [check-version, build]
-#    runs-on: ubuntu-latest
-#    permissions:
-#      contents: write
-#    steps:
-#      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-#        with:
-#          name: dist
-#          path: dist/
-#      - name: Create release with distributions attached
-#        env:
-#          GH_TOKEN: ${{ github.token }}
-#          TAG: ${{ github.ref_name }}
-#          PRERELEASE: ${{ needs.check-version.outputs.prerelease }}
-#        run: |
-#          flags=()
-#          if [[ "${PRERELEASE}" == "true" ]]; then
-#            flags+=(--prerelease)
-#          fi
-#          gh release create "sdk-${TAG}" dist/* \
-#            --repo "${GITHUB_REPOSITORY}" \
-#            --title "${TAG} SDK" \
-#            --generate-notes \
-#            --verify-tag \
-#            "${flags[@]}"
+  github-release:
+    name: Create GitHub release
+    needs: [check-version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+      - name: Create release with distributions attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ needs.check-version.outputs.prerelease }}
+        run: |
+          flags=()
+          if [[ "${PRERELEASE}" == "true" ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "python-${TAG}" dist/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "Geenii Python SDK ${TAG}" \
+            --generate-notes \
+            --verify-tag \
+            "${flags[@]}"
 
   # A dry run on TestPyPI; if the upload or the install check fails, nothing is published to PyPI.
   publish-testpypi:
