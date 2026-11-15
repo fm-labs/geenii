@@ -113,7 +113,7 @@ def agent_cli(
     if (not prompt or prompt == "-") and not sys.stdin.isatty():
         if prompt == "-":
             prompt = None
-        stdin_str = click.get_text_stream("stdin").read()
+        stdin_str = sys.stdin.read()
         if stdin_str is not None and len(stdin_str) > 0:
             click.echo("stdin: " + stdin_str)
             prompt = stdin_str
