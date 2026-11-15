@@ -108,11 +108,11 @@ fn set_status(app: &AppHandle, status: ServerStatus) {
 
 /// Starts the server on app startup, unless running in dev mode without an override.
 pub fn autostart(app: &AppHandle) {
-    // if tauri::is_dev() && std::env::var_os(BIN_OVERRIDE_ENV).is_none() {
-    //     println!("Dev mode: not starting the server (set {BIN_OVERRIDE_ENV} to start one).");
-    //     set_status(app, ServerStatus::Disabled);
-    //     return;
-    // }
+    if tauri::is_dev() && std::env::var_os(BIN_OVERRIDE_ENV).is_none() {
+        println!("Dev mode: not starting the server (set {BIN_OVERRIDE_ENV} to start one).");
+        set_status(app, ServerStatus::Disabled);
+        return;
+    }
     start_server(app);
 }
 
