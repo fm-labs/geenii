@@ -107,7 +107,12 @@ def agent_cli(
     Run an agent with the given name and initial prompt.
     Optionally override skills, tools, model, model parameters, system instructions, developer instructions, and output format.
     """
-    if not sys.stdin.isatty():
+    # Read the prompt from stdin only when none was given (or it is "-") and stdin is
+    # piped. Reading unconditionally blocks forever when the caller leaves stdin open
+    # (e.g. a scheduled task inheriting the server's stdin).
+    if (not prompt or prompt == "-") and not sys.stdin.isatty():
+        if prompt == "-":
+            prompt = None
         stdin_str = click.get_text_stream("stdin").read()
         if stdin_str is not None and len(stdin_str) > 0:
             click.echo("stdin: " + stdin_str)

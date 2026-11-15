@@ -62,6 +62,7 @@ async def spawn(
     capture_output: bool = True,
     stdout: IO | None = None,
     stderr: IO | None = None,
+    stdin: IO | int | None = asyncio.subprocess.DEVNULL,
     limit: int = STREAM_LINE_LIMIT,
 ) -> asyncio.subprocess.Process:
     """Start cmd (an argument vector, no shell) in its own process group.
@@ -71,11 +72,14 @@ async def spawn(
                            otherwise the child inherits the caller's streams.
     :param stdout: Explicit target for stdout (e.g. an open log file); overrides capture_output.
     :param stderr: Explicit target for stderr; overrides capture_output.
+    :param stdin: Source for stdin.  Defaults to /dev/null so children never inherit
+                  (and block reading) the caller's stdin; pass None to inherit it.
     :param limit: Maximum line length for the stream readers.
     """
     pipe = asyncio.subprocess.PIPE if capture_output else None
     return await asyncio.create_subprocess_exec(
         *cmd,
+        stdin=stdin,
         stdout=stdout if stdout is not None else pipe,
         stderr=stderr if stderr is not None else pipe,
         env=merged_env(env),
