@@ -1,5 +1,5 @@
 {
-  "version": "v0.4.0.dev7",
+  "version": "v0.4.0.dev8",
   "url": "https://github.com/fm-labs/geenii/releases/download/{version}/geenii-{target}-{version}.tar.gz",
   "binary": "geenii/geenii",
   "args": [
@@ -13,8 +13,8 @@
   "port": 33311,
   "sha256": {
     "darwin-amd64": "",
-    "darwin-arm64": "ab48996e68cbc01cb84565c2d10267116ac44138525c12f9af641754098fefdc",
-    "linux-amd64": "9e1236009b505392213a5e52033d1066d240482b8cc09e3589c3b2af826e7ccf",
-    "linux-arm64": "c8314341a488ad66e6aee1c235795d94ced69746b99321859a1cda9af7e19e7e"
+    "darwin-arm64": "b7a987b1ee6f6c08af06ed594c124fb1436a9eeded7cc4ad409b2a4aab912792",
+    "linux-amd64": "8444f23331c500fa107621c131f28498c0fda2f17906a848005a666671304c40",
+    "linux-arm64": "019562bb2f22817ab8103dc32191fcf893108e16a6a7b455698102980ca7d73b"
   }
 }
