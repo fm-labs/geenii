@@ -57,6 +57,8 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
     DEFAULT_TEMPERATURE = 0.2
     DEFAULT_MAX_TOKENS = 4096
 
+    API_VERSION = 2
+
     def __init__(self, **kwargs):
         super().__init__(name="anthropic")
         self._client = None
@@ -67,7 +69,12 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
             logger.info(
                 f"Initializing AnthropicAIProvider with api key {config.ANTHROPIC_API_KEY[0:16]}..{config.ANTHROPIC_API_KEY[-4:]}"
             )
-            self._client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+            if self.API_VERSION == 1:
+                # Anthropic(default_headers={"anthropic-version": "2023-06-01"}) # 1.x
+                self._client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY, default_headers={"anthropic-version": "2023-06-01"})
+            else:
+                # Anthropic(default_headers={"anthropic-version": "2026-10-21"}) # 2.x
+                self._client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY, default_headers={"anthropic-version": "2026-10-21"})
         return self._client
 
     def is_configured(self) -> bool:
@@ -142,13 +149,23 @@ class AnthropicAIProvider(AIProvider, AIChatCompletionProvider):
                 f"ANTHROPIC: Generating chat completion model={model} with {len(input_messages)} input messages"
             )
 
-            create_kwargs = {
-                "model": model,
-                "messages": input_messages,
-                "max_tokens": max_tokens,
-                "temperature": temperature,
-                "output_config": output_config,
-            }
+            if self.API_VERSION == 1:
+                create_kwargs = {
+                    "model": model,
+                    "messages": input_messages,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                    "output_config": output_config,
+                }
+            else:
+                create_kwargs = {
+                    "model": model,
+                    "messages": input_messages,
+                    "max_tokens": max_tokens,
+                    # In 2.x, passing temperature directly raises a TypeError, and changing the header doesn’t fix that.
+                    # "temperature": temperature,
+                    "output_config": output_config,
+                }
             print(create_kwargs)
 
             if system_blocks:
