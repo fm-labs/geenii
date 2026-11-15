@@ -1,9 +1,10 @@
 bak/
 dist/
 node_modules/
-src-tauri/
 src-tauri/gen/android/
+src-tauri/gen/schemas/
 src-tauri/binaries/
+src-tauri/target/
 public/assets/
 
 # Logs
