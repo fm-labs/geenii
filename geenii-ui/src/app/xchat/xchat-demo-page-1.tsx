@@ -12,6 +12,8 @@ import {
 } from '@/components/xchat'
 import XchatLayout from '@/components/layout/xchat-layout.tsx'
 import { BackendSwitcher } from '@/components/xchat/backend-switcher.tsx'
+import Link from '@/features/routing/link.tsx'
+import { ArrowLeftIcon } from 'lucide-react'
 
 const ECHO = 'echo'
 
@@ -48,7 +50,8 @@ const XchatDemoPage1 = () => {
     <ChatProvider backend={backend} onError={(error) => notify.error(error)}>
       <XchatLayout sidebarHeader={
          <BackendSwitcher backends={[ECHO, ...agentNames]} defaultBackend={selected} onChange={setSelected} />
-      }>
+      }
+                   header={<div className={"p-4"}><Link to={'/console'}>&lt; Back to console</Link></div>}>
         <Chat
           className={'w-full max-w-3xl mx-auto px-4 min-h-svh'}
           empty={<div className={'text-center'}>
