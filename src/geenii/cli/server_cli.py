@@ -276,8 +276,13 @@ def _run_foreground(endpoint: Endpoint, reload: bool, log_file: str | None) -> N
     pid = os.getpid()
     _write_state(pid, endpoint, log_file)
     click.echo(f"Starting geenii server on {endpoint} (pid {pid})")
+    # --reload needs the import string. Otherwise pass the app object: a real import
+    # statement is what PyInstaller follows, so the frozen build bundles geenii.server.
+    app = APP_IMPORT
+    if not reload:
+        from geenii.server.server import app
     try:
-        uvicorn.run(APP_IMPORT, reload=reload, workers=1, log_level="info", **listen)
+        uvicorn.run(app, reload=reload, workers=1, log_level="info", **listen)
     finally:
         _remove_state(pid)
         if sock is not None:
