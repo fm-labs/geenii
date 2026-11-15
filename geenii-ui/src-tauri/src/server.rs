@@ -13,7 +13,8 @@
 //! command); `server_restart` retries after a failure.
 //!
 //! `GEENII_SERVER_BIN=/path/to/geenii` skips the download and runs that binary
-//! instead. In dev mode the server is only started when that variable is set.
+//! instead. In dev mode with `GEENII_DESKTOP_DEV_MODE=true` the server is not started
+//! automatically.
 
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
@@ -32,6 +33,7 @@ use tokio::io::AsyncWriteExt;
 
 const MANIFEST_JSON: &str = include_str!("../server-release.json");
 const BIN_OVERRIDE_ENV: &str = "GEENII_SERVER_BIN";
+const DEV_MODE_ENV: &str = "GEENII_DESKTOP_DEV_MODE";
 pub const STATUS_EVENT: &str = "server-status";
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
 /// How long a stopping server gets to shut down after SIGTERM before it is killed.
@@ -74,7 +76,7 @@ impl ReleaseManifest {
 pub enum ServerStatus {
     #[default]
     Idle,
-    /// Not managed by the app (dev mode without GEENII_SERVER_BIN).
+    /// Not started automatically (dev mode with GEENII_DESKTOP_DEV_MODE=true).
     Disabled,
     Checking,
     Downloading { downloaded: u64, total: Option<u64> },
@@ -106,10 +108,11 @@ fn set_status(app: &AppHandle, status: ServerStatus) {
     let _ = app.emit(STATUS_EVENT, status);
 }
 
-/// Starts the server on app startup, unless running in dev mode without an override.
+/// Starts the server on app startup, unless running in dev mode with
+/// `GEENII_DESKTOP_DEV_MODE=true` (then the server is started manually, e.g. from the panel).
 pub fn autostart(app: &AppHandle) {
-    if tauri::is_dev() && std::env::var_os(BIN_OVERRIDE_ENV).is_none() {
-        println!("Dev mode: not starting the server (set {BIN_OVERRIDE_ENV} to start one).");
+    if tauri::is_dev() && std::env::var(DEV_MODE_ENV).is_ok_and(|v| v == "true") {
+        println!("Dev mode ({DEV_MODE_ENV}=true): not starting the server.");
         set_status(app, ServerStatus::Disabled);
         return;
     }
@@ -294,6 +297,38 @@ pub fn desktop_info(app: AppHandle) -> Result<DesktopInfo, String> {
         server_bin_override: std::env::var(BIN_OVERRIDE_ENV).ok(),
         server_log: log_path(&app).ok().map(|p| p.display().to_string()),
     })
+}
+
+/// The last `lines` lines (at most 1000) of the server log; empty if there is no log yet.
+#[tauri::command]
+pub async fn server_log(app: AppHandle, lines: Option<usize>) -> Result<String, String> {
+    let path = log_path(&app)?;
+    let lines = lines.unwrap_or(200).min(1000);
+    tauri::async_runtime::spawn_blocking(move || read_tail(&path, lines))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Reads the last `max_lines` lines of a file, looking at no more than its last 256 KB.
+fn read_tail(path: &Path, max_lines: usize) -> Result<String, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    const MAX_BYTES: u64 = 256 * 1024;
+    let mut file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
+        Err(e) => return Err(format!("open {}: {e}", path.display())),
+    };
+    let len = file.metadata().map_err(|e| e.to_string())?.len();
+    let start = len.saturating_sub(MAX_BYTES);
+    file.seek(SeekFrom::Start(start)).map_err(|e| e.to_string())?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+    let text = String::from_utf8_lossy(&bytes);
+    let mut all: Vec<&str> = text.lines().collect();
+    if start > 0 && !all.is_empty() {
+        all.remove(0); // probably cut off mid-line
+    }
+    Ok(all[all.len().saturating_sub(max_lines)..].join("\n"))
 }
 
 fn log_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -705,6 +740,23 @@ mod tests {
         // 200: orphaned (parent launchd); 202: parent gone. 201: live app instance.
         // 203/204/205: not our binaries.
         assert_eq!(find_orphans(ps, &prefixes, app), vec![200, 202]);
+    }
+
+    #[test]
+    fn read_tail_returns_last_lines() {
+        let dir = temp_dir();
+        let path = dir.join("server.log");
+        assert_eq!(read_tail(&path, 5).unwrap(), "");
+        std::fs::write(&path, "a\nb\nc\nd\n").unwrap();
+        assert_eq!(read_tail(&path, 2).unwrap(), "c\nd");
+        assert_eq!(read_tail(&path, 10).unwrap(), "a\nb\nc\nd");
+        // Larger than the read window: the partial first line is dropped.
+        let big: String = (0..40_000).map(|i| format!("line {i}\n")).collect();
+        std::fs::write(&path, &big).unwrap();
+        assert_eq!(read_tail(&path, 2).unwrap(), "line 39998\nline 39999");
+        let window = read_tail(&path, 1000).unwrap();
+        assert!(window.lines().all(|l| l.starts_with("line ")));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

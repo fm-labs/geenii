@@ -426,6 +426,7 @@ pub fn run() {
             server::server_start,
             server::server_stop,
             server::server_restart,
+            server::server_log,
             server::desktop_info
         ])
         .register_uri_scheme_protocol("geenii", |ctx, request| {

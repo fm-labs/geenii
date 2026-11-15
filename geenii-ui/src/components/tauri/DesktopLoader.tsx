@@ -1,5 +1,5 @@
 import React from 'react'
-import { CircleCheck, CircleDashed, CircleX, LoaderCircle, RotateCw } from 'lucide-react'
+import { CircleCheck, CircleDashed, CircleX, LoaderCircle, Play, RotateCw } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { cn } from 'cn'
 import { APP_NAME } from '@/constants.ts'
@@ -90,7 +90,7 @@ const ServerDetail = ({ status, version }: { status: ServerStatus | null; versio
     case 'ready':
       return <Detail>{status.external ? 'Using a server that was already running.' : `Server ${version} is running.`}</Detail>
     case 'disabled':
-      return <Detail>The server is not managed by the app. Start it yourself.</Detail>
+      return <Detail>Autostart is off (GEENII_DESKTOP_DEV_MODE=true). Start a server yourself, or start it here.</Detail>
     case 'stopped':
       return <Detail error>The server was stopped.</Detail>
     case 'failed':
@@ -138,6 +138,11 @@ const DesktopLoader = ({ startup }: { startup: DesktopStartup }) => {
               {server.state === 'error' && (
                 <Button size="sm" variant="outline" onClick={startup.restartServer}>
                   <RotateCw /> Restart server
+                </Button>
+              )}
+              {server.status?.state === 'disabled' && (
+                <Button size="sm" variant="outline" onClick={startup.restartServer}>
+                  <Play /> Start server
                 </Button>
               )}
             </Step>

@@ -19,7 +19,7 @@ export type DesktopInfo = {
 /** Mirrors `server::ServerStatus` (serde tag "state", kebab-case). */
 export type ServerStatus =
   | { state: 'idle' }
-  | { state: 'disabled' }
+  | { state: 'disabled' } // autostart off (GEENII_DESKTOP_DEV_MODE=true)
   | { state: 'checking' }
   | { state: 'downloading'; downloaded: number; total: number | null }
   | { state: 'installing' }
@@ -76,6 +76,11 @@ export function stopServer(): Promise<void> {
 
 export function restartServer(): Promise<void> {
   return invoke<void>('server_restart')
+}
+
+/** The last `lines` lines of the server log (max 1000); empty if there is none yet. */
+export function getServerLog(lines = 200): Promise<string> {
+  return invoke<string>('server_log', { lines })
 }
 
 export function onServerStatus(handler: (status: ServerStatus) => void): Promise<UnlistenFn> {
