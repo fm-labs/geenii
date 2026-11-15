@@ -1,7 +1,6 @@
 import React from 'react'
 import { AppContext } from './app-context.tsx'
 import { XAI_API_INFO_CHECK_INTERVAL_MS } from '../constants.ts'
-import TauriWrapper from '../components/tauri/TauriWrapper.tsx'
 import { ApiContext } from '@/context/api-context.tsx'
 
 // @ts-ignore
@@ -108,15 +107,15 @@ export const AppContextProvider: React.FC<React.PropsWithChildren> = ({ children
     )
   }
 
-  if (isTauri) {
-    return (
-      <AppContext.Provider value={contextValue}>
-        <TauriWrapper>
-          {children}
-        </TauriWrapper>
-      </AppContext.Provider>
-    )
-  }
+  // if (isTauri) {
+  //   return (
+  //     <AppContext.Provider value={contextValue}>
+  //       <TauriWrapper>
+  //         {children}
+  //       </TauriWrapper>
+  //     </AppContext.Provider>
+  //   )
+  // }
 
   return (
     <AppContext.Provider value={contextValue}>

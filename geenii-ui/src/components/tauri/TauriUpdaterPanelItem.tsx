@@ -5,6 +5,7 @@ import { InfoIcon, MonitorCogIcon, MonitorIcon, RefreshCcw, RefreshCcwDot } from
 import useNotification from '@/hooks/useNotification.ts'
 import { TAURI_UPDATER_CHECK_INTERVAL } from '@/constants.ts'
 import '@/Animate.scss'
+import PanelIconButton from '@/components/tauri/PanelIconButton.tsx'
 
 const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -117,21 +118,20 @@ const TauriUpdaterPanelItem = () => {
   }
 
   if (!updateStatus) {
-    return <div>
-      <span title={'You are using the latest version. Click to check for updates.'} className={'cursor-pointer hover:bg-accent rounded'}>
-        <InfoIcon size={16} onClick={handleCheckUpdate} className={getIconClass()} />
-      </span>
-    </div>
+    return (
+      <PanelIconButton title={'You are using the latest version. Click to check for updates.'} onClick={handleCheckUpdate}>
+        <InfoIcon size={14} className={getIconClass()} />
+      </PanelIconButton>
+    )
   }
-
 
   return (
     <div>
-      <div className={'flex space-x-1 justify-self-start text-sm'}>
+      <div className={'flex items-center gap-1 text-sm'}>
 
-        <span title={updateStatus}>
-          <RefreshCcw size={16} onClick={handleCheckUpdate} className={getIconClass()} />
-        </span>
+        <PanelIconButton title={updateStatus} onClick={handleCheckUpdate}>
+          <RefreshCcw size={14} className={getIconClass()} />
+        </PanelIconButton>
         <div>{updateStatus}</div>
 
         {updateInfo && (

@@ -1,9 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App.tsx";
+import { isTauri } from '@tauri-apps/api/core'
+import WebApp from "./web-app.tsx";
+import DesktopApp from '@/desktop-app.tsx'
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-      <App />
+    {isTauri() ? <DesktopApp /> : <WebApp />}
   </React.StrictMode>,
 );

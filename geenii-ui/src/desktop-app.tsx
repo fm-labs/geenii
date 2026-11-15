@@ -1,4 +1,3 @@
-import React from 'react'
 import { Bounce, ToastContainer } from 'react-toastify'
 import { AppContextProvider } from './context/app-context-provider.tsx'
 import ServerContextProvider from './context/server-context-provider.tsx'
@@ -7,19 +6,25 @@ import { ThemeProvider } from '@/components/theme-provider.tsx'
 import { ApiProvider } from '@/context/api-context.tsx'
 import './tailwind.css'
 import './App.scss'
+import TauriWrapper from '@/components/tauri/TauriWrapper.tsx'
+import DesktopStartupGate from '@/components/tauri/DesktopStartupGate.tsx'
 
-const App = () => {
-
+const DesktopApp = () => {
   return (
     <>
       <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-        <ServerContextProvider>
-          <ApiProvider>
-            <AppContextProvider>
-              <AppRouter />
-            </AppContextProvider>
-          </ApiProvider>
-        </ServerContextProvider>
+        {/* waits for Tauri IPC, the server (download/start) and its API */}
+        <DesktopStartupGate>
+          <ServerContextProvider>
+            <ApiProvider>
+              <AppContextProvider>
+                <TauriWrapper>
+                  <AppRouter />
+                </TauriWrapper>
+              </AppContextProvider>
+            </ApiProvider>
+          </ServerContextProvider>
+        </DesktopStartupGate>
         <ToastContainer
           position="top-right"
           autoClose={5000}
@@ -38,4 +43,4 @@ const App = () => {
   )
 }
 
-export default App
+export default DesktopApp
