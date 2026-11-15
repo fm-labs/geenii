@@ -16,7 +16,7 @@ COPY ./pyproject.toml ./uv.lock /builder/
 RUN uv sync --no-cache-dir --frozen --no-install-project
 
 COPY ./src/geenii /builder/src/geenii
-COPY ./README.md /builder/
+COPY ./README.md ./README*.md ./LICENSE /builder/
 
 # build using pyinstaller
 COPY ./hooks /builder/hooks
@@ -63,15 +63,13 @@ RUN apk add --no-cache \
 
 # Create non-root user and group, set permissions for geenii and home directory
 RUN addgroup --gid 33311 -S geenii && adduser --uid 33311 -S geenii -G geenii && \
-    mkdir -p /geenii && \
-    chown -R geenii:geenii /geenii && \
+    mkdir -p /workspace && \
+    chown -R geenii:geenii /workspace && \
     mkdir -p /home/geenii && \
     chown -R geenii:geenii /home/geenii
 
 # Binaries
-#COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 COPY --from=docker.io/astral/uv:latest /uv /uvx /bin/
-#COPY --from=builder /builder/dist/geenii /usr/bin/geenii
 COPY --from=builder /builder/dist/geenii /opt/geenii/bin/
 RUN chmod +x /opt/geenii/bin/geenii && ln -sf /opt/geenii/bin/geenii /usr/bin/geenii
 
