@@ -151,3 +151,54 @@ def test_add_shutdown_handlers_calls_back_on_signal():
         return fired.is_set()
 
     assert asyncio.run(main())
+
+
+def _with_open_stdin_pipe(fn):
+    """Run fn() while fd 0 is a pipe whose write end stays open (like a server
+    started by a desktop app), so a child inheriting it would block on read.
+    Returns (fn's result, write end fd); the caller closes the write end."""
+    r, w = os.pipe()
+    saved = os.dup(0)
+    os.dup2(r, 0)
+    os.close(r)
+    try:
+        return fn(), w
+    finally:
+        os.dup2(saved, 0)
+        os.close(saved)
+
+
+_READ_STDIN = ["sh", "-c", "cat; echo done"]
+
+
+def test_spawn_does_not_inherit_stdin_by_default():
+    async def main():
+        p = await proc.spawn(_READ_STDIN)
+        out, _ = await asyncio.wait_for(p.communicate(), timeout=5)
+        return p.returncode, out
+
+    (rc, out), w = _with_open_stdin_pipe(lambda: asyncio.run(main()))
+    os.close(w)
+    assert rc == 0
+    assert out.decode().split() == ["done"]
+
+
+def test_spawn_inherits_stdin_when_requested():
+    async def main():
+        p = await proc.spawn(_READ_STDIN, stdin=None)
+        return p
+
+    async def finish(p):
+        out, _ = await asyncio.wait_for(p.communicate(), timeout=5)
+        return p.returncode, out
+
+    loop = asyncio.new_event_loop()
+    try:
+        p, w = _with_open_stdin_pipe(lambda: loop.run_until_complete(main()))
+        os.write(w, b"inherited\n")
+        os.close(w)  # EOF lets the child finish
+        rc, out = loop.run_until_complete(finish(p))
+    finally:
+        loop.close()
+    assert rc == 0
+    assert out.decode().split() == ["inherited", "done"]
