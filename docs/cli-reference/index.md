@@ -83,6 +83,10 @@ geenii
 │   ├── remove NAME               # remove a task from the config (reloads the daemon)
 │   ├── reload                    # make the daemon re-read its config
 │   └── run NAME                  # run a task now (in the daemon, or --local)
+├── server
+│   ├── start [-d] [-p PORT|--uds] # run the HTTP server (API + web UI); -d to detach
+│   ├── status                    # pid, url, uptime, health
+│   └── stop                      # stop the running server
 └── supervisor
     ├── status                    # supervised processes and their state
     ├── start NAME CMD            # start and keep a process running (ad hoc)
@@ -110,6 +114,7 @@ geenii
 - [pm](pm.md) — manage background processes
 - [projects](projects.md) — list configured projects
 - [scheduler](scheduler.md) — manage and run the task scheduler
+- [server](server.md) — start, stop and inspect the HTTP server (API + web UI)
 - [supervisor](supervisor.md) — keep long-running processes up
 
 ## Related Entry Points

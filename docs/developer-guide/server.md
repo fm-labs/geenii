@@ -8,6 +8,7 @@ files.
 ## Running
 
 ```bash
+geenii server start [-d] [--reload]   # see ../cli-reference/server.md; stop with `geenii server stop`
 uvicorn --app-dir ./src geenii.server.server:app --port 33311            # normal
 uvicorn --app-dir ./src geenii.server.server:app --port 33311 --reload   # dev
 python -m geenii.server.server     # honours GEENII_SERVER_HOST (127.0.0.1) and GEENII_SERVER_PORT (33311)
