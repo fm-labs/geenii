@@ -47,10 +47,9 @@ const AgentChat = ({ agent, header, className, contextId }: {
 
   return (
     <div className={`flex flex-col ${className ?? ''}`}>
-      <ChatProvider key={chatKey} contextId={contextId} backend={backend} onError={(error) => notify.error(error)}>
-        <AgentChatHeader onNewChat={() => setChatKey((k) => k + 1)}>
-          {header ?? <h3 className="truncate text-sm font-semibold">{title}</h3>}
-        </AgentChatHeader>
+        {/*<AgentChatHeader onNewChat={() => setChatKey((k) => k + 1)}>*/}
+        {/*  {header ?? <h3 className="truncate text-sm font-semibold">{title}</h3>}*/}
+        {/*</AgentChatHeader>*/}
         <div className="min-h-0 flex-1 overflow-y-auto">
           <Chat
             className="mx-auto min-h-full w-full max-w-3xl px-4"
@@ -68,7 +67,6 @@ const AgentChat = ({ agent, header, className, contextId }: {
             inputAddons={FEATURE_VOICE_RECORDING_ENABLED && <ChatVoiceInput />}
           />
         </div>
-      </ChatProvider>
     </div>
   )
 }

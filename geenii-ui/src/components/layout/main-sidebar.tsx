@@ -34,6 +34,9 @@ import { useNavigate } from '@/app-router.tsx'
 import { useChatBackend, useChatSessions } from '@/components/xchat'
 import { BackendSwitcher } from '@/components/xchat/backend-switcher.tsx'
 import { useApi } from '@/context/api-context.tsx'
+import { xchatNavData } from '@/components/layout/xchat-navdata.tsx'
+import { consoleNavData } from '@/components/layout/console-navdata.tsx'
+import { navdata } from '@/components/layout/navdata.ts'
 
 // This is sample data
 const data = {
@@ -51,7 +54,7 @@ const data = {
     // },
     {
       title: 'New Chat',
-      url: '#/agents/default',
+      url: '#/agents/routing',
       icon: PlusSquareIcon,
       isActive: false,
     },
@@ -78,8 +81,6 @@ type MainSidebarProps = React.ComponentProps<typeof Sidebar> & {
 
 export function MainSidebar({ sidebarHeader, ...props }: MainSidebarProps) {
 
-  const [activeItem, setActiveItem] = React.useState(data.navMain[0])
-  //const [mails, setMails] = React.useState(data.mails)
   const { setOpen } = useSidebar()
   const navigate = useNavigate()
 
@@ -103,11 +104,7 @@ export function MainSidebar({ sidebarHeader, ...props }: MainSidebarProps) {
                 <a href="#/">
                   <div
                     className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                    <LayoutGridIcon className="size-4" />
-                  </div>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">Acme Inc</span>
-                    <span className="truncate text-xs">Enterprise</span>
+                    <BotIcon className="size-4" />
                   </div>
                 </a>
               </SidebarMenuButton>
@@ -126,7 +123,7 @@ export function MainSidebar({ sidebarHeader, ...props }: MainSidebarProps) {
                         hidden: false,
                       }}
                       onClick={() => {
-                        setActiveItem(item)
+                        //setActiveItem(item)
                         // const mail = data.mails.sort(() => Math.random() - 0.5)
                         // setMails(
                         //   mail.slice(
@@ -138,7 +135,7 @@ export function MainSidebar({ sidebarHeader, ...props }: MainSidebarProps) {
                         setOpen(false)
                         navigate(item.url)
                       }}
-                      isActive={activeItem?.title===item.title}
+                      //isActive={activeItem?.title===item.title}
                       className="px-2.5 md:px-2"
                     >
                       <item.icon />
@@ -151,7 +148,7 @@ export function MainSidebar({ sidebarHeader, ...props }: MainSidebarProps) {
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
-          <NavUser user={data.user} />
+          <NavUser user={navdata.user} />
         </SidebarFooter>
       </Sidebar>
 
@@ -161,18 +158,18 @@ export function MainSidebar({ sidebarHeader, ...props }: MainSidebarProps) {
         <SidebarHeader className="gap-3.5 border-b p-4">
           {sidebarHeader}
         </SidebarHeader>
-        <SidebarHeader className="gap-3.5 border-b p-4">
-          <div className="flex w-full items-center justify-between">
-            <div className="text-base font-medium text-foreground">
-              {activeItem?.title}
-            </div>
-            <Label className="flex items-center gap-2 text-sm">
-              <span>Unreads</span>
-              <Switch className="shadow-none" />
-            </Label>
-          </div>
-          <SidebarInput placeholder="Type to search..." />
-        </SidebarHeader>
+        {/*<SidebarHeader className="gap-3.5 border-b p-4">*/}
+        {/*  <div className="flex w-full items-center justify-between">*/}
+        {/*    <div className="text-base font-medium text-foreground">*/}
+        {/*      {activeItem?.title}*/}
+        {/*    </div>*/}
+        {/*    <Label className="flex items-center gap-2 text-sm">*/}
+        {/*      <span>Unreads</span>*/}
+        {/*      <Switch className="shadow-none" />*/}
+        {/*    </Label>*/}
+        {/*  </div>*/}
+        {/*  <SidebarInput placeholder="Type to search..." />*/}
+        {/*</SidebarHeader>*/}
         <SidebarContent>
           {/*<SidebarGroup className="px-0">*/}
           {/*  <SidebarGroupContent>*/}
@@ -194,7 +191,7 @@ export function MainSidebar({ sidebarHeader, ...props }: MainSidebarProps) {
           {/*    ))}*/}
           {/*  </SidebarGroupContent>*/}
           {/*</SidebarGroup>*/}
-          <XchatSessionsSidebarGroup />
+          {/*<XchatSessionsSidebarGroup />*/}
         </SidebarContent>
       </Sidebar>
     </Sidebar>

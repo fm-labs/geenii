@@ -14,7 +14,7 @@ const TauriPanel = () => {
 
   return (
     <TauriPanelProvider>
-      <div className={'TauriPanel fixed w-full left-0 bottom-0 p-2 pe-3'} style={{zIndex: 10000 }}>
+      <div className={'TauriPanel fixed right-0 bottom-0 p-2 pe-3'} style={{zIndex: 10000 }}>
         <div className={'flex items-center gap-1 justify-end text-sm'}>
           <TauriServerPanelItem />
           <TauriUpdaterPanelItem />

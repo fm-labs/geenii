@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { Skeleton } from '@/components/ui/skeleton.tsx'
 import { useApi } from '@/context/api-context.tsx'
 import { agentUrl, AgentType, shortToolName } from '@/app/agents/agent-types.ts'
+import { ModelProviderIcon } from '@/app/agents/model-provider.tsx'
 
 /** Agents starred until the user decides otherwise */
 const DEFAULT_STARRED = ['default']
@@ -66,7 +67,7 @@ const AgentIcon = ({ agent, size }: { agent: AgentType, size: TileSize }) => {
   return (
     <div
       className={cn(
-        'flex items-center justify-center font-semibold text-white select-none',
+        'relative flex items-center justify-center font-semibold text-white select-none',
         'shadow-[0_1px_2px_rgba(0,0,0,0.15),0_4px_12px_rgba(0,0,0,0.08)]',
         'transition-transform duration-200 ease-out group-active:scale-95',
         size === 'dock'
@@ -78,6 +79,11 @@ const AgentIcon = ({ agent, size }: { agent: AgentType, size: TileSize }) => {
       }}
     >
       {agentInitials(agent)}
+      <ModelProviderIcon
+        model={agent.model}
+        size={size === 'dock' ? 20 : 26}
+        className="absolute -right-1 -bottom-1 ring-2 ring-background shadow-sm"
+      />
     </div>
   )
 }
@@ -126,7 +132,10 @@ const AgentDetails = ({ agent, isStarred, onToggleStar }: {
       <div className="flex flex-col gap-2 text-xs">
         {agent.model && (
           <DetailRow icon={<BrainIcon size={14} />} label="Model">
-            <span className="truncate font-mono">{agent.model}</span>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <ModelProviderIcon model={agent.model} size={16} />
+              <span className="truncate font-mono">{agent.model}</span>
+            </span>
           </DetailRow>
         )}
         {tools.length > 0 && (

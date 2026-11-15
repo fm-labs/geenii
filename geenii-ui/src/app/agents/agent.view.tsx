@@ -1,6 +1,5 @@
 import React from 'react'
 import {
-  ArrowLeftIcon,
   BotIcon,
   BrainIcon,
   InfoIcon,
@@ -29,6 +28,19 @@ import {
   mcpServerOfTool,
   shortToolName,
 } from '@/app/agents/agent-types.ts'
+import { SidebarTrigger } from '@/components/ui/sidebar.tsx'
+import { Separator } from '@/components/ui/separator.tsx'
+import XchatLayout from '@/components/layout/xchat-layout.tsx'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList, BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb.tsx'
+import { MessageSquarePlusIcon } from 'lucide-react'
+import { useChat } from '@/components/xchat'
+import Link from '@/features/routing/link.tsx'
 
 const SectionTitle = ({ icon: Icon, children, count }: {
   icon: React.ElementType,
@@ -214,9 +226,10 @@ const AgentShortInfo = ({ agent, onShowDetails }: { agent: AgentDetailType, onSh
   const description = agent.description?.trim()
 
   return (
-    <div className="flex min-w-0 items-center gap-2">
+    <div className="flex min-w-0 items-center gap-2 px-2">
+      <SidebarTrigger className={"px-2"}></SidebarTrigger>
       <Button size="icon" variant="ghost" className="size-8 shrink-0" asChild title="All agents">
-        <a href="#/agents"><ArrowLeftIcon /></a>
+        <Link to="/"><BotIcon size={18} /></Link>
       </Button>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
@@ -287,6 +300,45 @@ const AgentDetailsDialog = ({ agent, commands, toolDescriptions, open, onOpenCha
   </Dialog>
 )
 
+
+const AgentChatHeader = ({ children, onNewChat }: { children: React.ReactNode, onNewChat: () => void }) => {
+  const hasMessages = useChat((s) => s.messages.length > 0)
+  const contextId = useChat((s) => s.contextId)
+
+  return (
+    <div className="flex shrink-0 items-center gap-2 border-b pt-2 pb-2">
+      <div className="min-w-0 flex-1">{children}</div>
+      <Button size="sm" variant="ghost" onClick={onNewChat} disabled={!hasMessages}
+              title={contextId ? `Current conversation: ${contextId}`:'New conversation'}>
+        <MessageSquarePlusIcon /> <span className="hidden sm:inline">New chat</span>
+      </Button>
+    </div>
+  )
+}
+
+const AgentChatBreadcrumbs = () => {
+  return (
+    <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+      <SidebarTrigger className="-ml-1" />
+      <Separator
+        orientation="vertical"
+        className="mr-2 data-[orientation=vertical]:h-4"
+      />
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem className="hidden md:block">
+            <BreadcrumbLink href="/">Geenii</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator className="hidden md:block" />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Chat</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    </header>
+  )
+}
+
 /**
  * One agent: a chat with it, whose header shows the agent's short info.
  * The full capabilities (model parameters, tools, skills, instructions) open in a dialog.
@@ -329,32 +381,48 @@ const AgentView = ({ name, contextId }: { name: string, contextId: string }) => 
     load()
   }, [load])
 
+
   return (
-    // fills the viewport below the nav (MainContent padding included), so the chat gets the remaining height
-    <div className="flex h-[calc(100svh-6rem)] min-h-[32rem] flex-col gap-4 md:h-[calc(100svh-7rem)]">
-      {error && (
-        <div className="flex shrink-0 items-center justify-between gap-2 rounded-lg border border-destructive/50 p-4 text-sm text-destructive">
-          <span>Failed to load agent "{name}": {error}</span>
-          <Button size="sm" variant="ghost" asChild><a href="#/agents"><ArrowLeftIcon /> Agents</a></Button>
+    <XchatLayout sidebarHeader={''
+      /*<BackendSwitcher backends={[ECHO, ...agentNames]} defaultBackend={selectedBackend} onChange={setSelectedBackend} />*/}
+                 header={<AgentChatHeader onNewChat={() => {}}>
+                   {agent && <AgentShortInfo agent={agent} onShowDetails={() => setDetailsOpen(true)} />}
+                 </AgentChatHeader>}
+                 //header={<AgentChatBreadcrumbs />}
+                 //header={agent && <AgentShortInfo agent={agent} onShowDetails={() => setDetailsOpen(true)} />}
+    >
+      <main className={'absolute left-0 w-full h-[calc(100vh-4rem)]'}>
+        <div className="content mx-auto">
+          <div className="flex flex-col py-4 px-4 flex-1">
+            {/* fills the viewport below the nav (MainContent padding included), so the chat gets the remaining height */}
+            <div className="flex h-[calc(100svh-6rem)] min-h-[32rem] flex-col gap-4 md:h-[calc(100svh-7rem)]">
+              {error && (
+                <div className="flex shrink-0 items-center justify-between gap-2 rounded-lg border border-destructive/50 p-4 text-sm text-destructive">
+                  <span>Failed to load agent "{name}": {error}</span>
+                  <Button size="sm" variant="ghost" asChild><a href="#/agents"><BotIcon /> Agents</a></Button>
+                </div>
+              )}
+
+              {loading && !agent && <Skeleton className="flex-1 rounded-xl" />}
+
+              {agent && (
+                <>
+                  <AgentChat
+                    key={agent.name}
+                    contextId={contextId}
+                    agent={agent}
+                    className="min-h-80 flex-1"
+                    //header={<AgentShortInfo agent={agent} onShowDetails={() => setDetailsOpen(true)} />}
+                  />
+                  <AgentDetailsDialog agent={agent} commands={commands} toolDescriptions={toolDescriptions}
+                                      open={detailsOpen} onOpenChange={setDetailsOpen} loading={loading} onRefresh={load} />
+                </>
+              )}
+            </div>
+          </div>
         </div>
-      )}
-
-      {loading && !agent && <Skeleton className="flex-1 rounded-xl" />}
-
-      {agent && (
-        <>
-          <AgentChat
-            key={agent.name}
-            contextId={contextId}
-            agent={agent}
-            className="min-h-80 flex-1"
-            header={<AgentShortInfo agent={agent} onShowDetails={() => setDetailsOpen(true)} />}
-          />
-          <AgentDetailsDialog agent={agent} commands={commands} toolDescriptions={toolDescriptions}
-                              open={detailsOpen} onOpenChange={setDetailsOpen} loading={loading} onRefresh={load} />
-        </>
-      )}
-    </div>
+      </main>
+    </XchatLayout>
   )
 }
 

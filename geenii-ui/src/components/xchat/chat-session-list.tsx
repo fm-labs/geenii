@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { useChat, useChatActions, useChatBackend } from '@/components/xchat/chat-context.tsx'
 import { errorMessage } from '@/components/xchat/chat-session.ts'
 import { ChatSessionInfo } from '@/components/xchat/chat.types.ts'
+import { useNavigate } from '@/app-router.tsx'
 
 export type ChatSessionsState = {
   /** The backend can list conversations */

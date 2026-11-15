@@ -14,37 +14,41 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import React from 'react'
+import { restoreSidebarOpenState } from '@/components/layout/xchat-layout-helper.ts'
 
 export default function XchatLayout(props: React.PropsWithChildren<{
   /** Rendered at the top of the sidebar, above the chat list */
   sidebarHeader?: React.ReactNode
+  header?: React.ReactNode
 }>) {
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={restoreSidebarOpenState()}>
       <XchatSidebar header={props.sidebarHeader} />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/">Geenii</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="#/console">Console</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage>New Chat</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </header>
+        {props?.header}
+        {/*<header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">*/}
+        {/*  <SidebarTrigger className="-ml-1" />*/}
+        {/*  <Separator*/}
+        {/*    orientation="vertical"*/}
+        {/*    className="mr-2 data-[orientation=vertical]:h-4"*/}
+        {/*  />*/}
+        {/*  <Breadcrumb>*/}
+        {/*    <BreadcrumbList>*/}
+        {/*      <BreadcrumbItem className="hidden md:block">*/}
+        {/*        <BreadcrumbLink href="/">Geenii</BreadcrumbLink>*/}
+        {/*      </BreadcrumbItem>*/}
+        {/*      <BreadcrumbSeparator className="hidden md:block" />*/}
+        {/*      <BreadcrumbItem className="hidden md:block">*/}
+        {/*        <BreadcrumbLink href="#/console">Console</BreadcrumbLink>*/}
+        {/*      </BreadcrumbItem>*/}
+        {/*      <BreadcrumbSeparator className="hidden md:block" />*/}
+        {/*      <BreadcrumbItem>*/}
+        {/*        <BreadcrumbPage>New Chat</BreadcrumbPage>*/}
+        {/*      </BreadcrumbItem>*/}
+        {/*    </BreadcrumbList>*/}
+        {/*  </Breadcrumb>*/}
+        {/*</header>*/}
+
         {/*<div className="flex flex-1 flex-col gap-4 p-4">*/}
         {/*  <div className="grid auto-rows-min gap-4 md:grid-cols-3">*/}
         {/*    <div className="aspect-video rounded-xl bg-muted/50" />*/}

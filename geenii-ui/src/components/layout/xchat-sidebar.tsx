@@ -1,9 +1,10 @@
-import * as React from "react"
+import * as React from 'react'
 import { MessageSquarePlusIcon, TrashIcon } from 'lucide-react'
 
 import {
   Sidebar,
-  SidebarContent, SidebarFooter,
+  SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
@@ -13,15 +14,20 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
+  SidebarRail, useSidebar,
 } from '@/components/ui/sidebar'
 import { useChatSessions } from '@/components/xchat/chat-session-list.tsx'
 import { NavUser } from '@/components/nav-user.tsx'
+import { useNavigate } from '@/app-router.tsx'
+import { navdata } from '@/components/layout/navdata.ts'
+import { storeSidebarOpenState } from '@/components/layout/xchat-layout-helper.ts'
+import { consoleNavData } from '@/components/layout/console-navdata.tsx'
+import { xchatNavData } from '@/components/layout/xchat-navdata.tsx'
 
 /** The chat session list as a sidebar group. Must be used within a ChatProvider. */
 const XchatSessionsGroup = () => {
   const { supported, canDelete, sessions, activeId, error, open, remove } = useChatSessions()
-
+  const navigate = useNavigate()
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Chats</SidebarGroupLabel>
@@ -38,7 +44,8 @@ const XchatSessionsGroup = () => {
           {sessions.map((session) => (
             <SidebarMenuItem key={session.id}>
               <SidebarMenuButton size={session.agent ? 'lg' : 'default'} isActive={session.id === activeId}
-                                 onClick={() => open(session.id)}
+                                 //onClick={() => open(session.id)}
+                                 onClick={() => navigate(`/agents/${session.agent}/${session.id}`)}
                                  title={session.agent ? `${session.title || session.id} (${session.agent})` : session.title || session.id}>
                 <div className={'flex min-w-0 flex-col'}>
                   <span className={'truncate'}>{session.title || session.id}</span>
@@ -58,27 +65,43 @@ const XchatSessionsGroup = () => {
   )
 }
 
-const data = {
-  user: {
-    name: "geenii",
-    email: "daG@geenii.io",
-    avatar: "/avatars/shadcn.jpg",
-  },
-}
-
 export function XchatSidebar({ header, ...props }: React.ComponentProps<typeof Sidebar> & {
   /** Rendered above the chat list, e.g. a backend / agent picker */
   header?: React.ReactNode
 }) {
+  const {open} = useSidebar()
+
+  // track the sidebar state in localstorage
+  React.useEffect(() => {
+    storeSidebarOpenState(open)
+  }, [open])
+
   return (
     <Sidebar {...props}>
       {header && <SidebarHeader>{header}</SidebarHeader>}
       <SidebarContent>
+        {xchatNavData.navMain.map((item) => (
+          <SidebarGroup key={item.title}>
+            <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {item.items.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild /*isActive={item.isActive}*/>
+                      <a href={item.url}>{item.title}</a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
+
         <XchatSessionsGroup />
       </SidebarContent>
       <SidebarRail />
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={navdata.user} />
       </SidebarFooter>
     </Sidebar>
   )

@@ -1,5 +1,5 @@
 // This is sample data.
-export const data = {
+export const consoleNavData = {
   navMain: [
     {
       title: 'Manage',

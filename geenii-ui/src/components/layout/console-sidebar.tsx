@@ -3,7 +3,7 @@ import * as React from 'react'
 import { SearchForm } from '@/components/search-form'
 import {
   Sidebar,
-  SidebarContent,
+  SidebarContent, SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -13,7 +13,9 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
-import { data } from '@/components/layout/console-navdata.tsx'
+import { navdata } from '@/components/layout/navdata.ts'
+import { NavUser } from '@/components/nav-user.tsx'
+import { consoleNavData } from '@/components/layout/console-navdata.tsx'
 //import { data as settingsNavData } from '@/app/console/settings-navdata.tsx'
 
 export function ConsoleSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -27,7 +29,7 @@ export function ConsoleSidebar({ ...props }: React.ComponentProps<typeof Sidebar
       </SidebarHeader>
       <SidebarContent>
         {/* We create a SidebarGroup for each parent. */}
-        {data.navMain.map((item) => (
+        {consoleNavData.navMain.map((item) => (
           <SidebarGroup key={item.title}>
             <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -62,6 +64,9 @@ export function ConsoleSidebar({ ...props }: React.ComponentProps<typeof Sidebar
         {/*</SidebarGroup>*/}
       </SidebarContent>
       <SidebarRail />
+      <SidebarFooter>
+        <NavUser user={navdata.user} />
+      </SidebarFooter>
     </Sidebar>
   )
 }
