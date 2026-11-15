@@ -3,7 +3,7 @@ import { CircleCheck, CircleDashed, CircleX, LoaderCircle, Play, RotateCw } from
 import { Button } from '@/components/ui/button.tsx'
 import { cn } from 'cn'
 import { APP_NAME } from '@/constants.ts'
-import { ServerStatus } from './desktop-runtime.ts'
+import { SERVICE_LABELS, ServiceName, ServiceStatus } from './desktop-runtime.ts'
 import { DesktopStartup } from './use-desktop-startup.ts'
 
 type StepState = DesktopStartup['tauri']['state']
@@ -27,12 +27,13 @@ const StepIcon = ({ state }: { state: StepState }) => {
   }
 }
 
-const Step = (props: React.PropsWithChildren<{ state: StepState; title: string }>) => (
+const Step = (props: React.PropsWithChildren<{ state: StepState; title: string; optional?: boolean }>) => (
   <li className="flex gap-3">
     <StepIcon state={props.state} />
     <div className="min-w-0 flex-1 space-y-1.5">
       <div className={cn('text-sm font-medium leading-5', props.state === 'pending' && 'text-muted-foreground')}>
         {props.title}
+        {props.optional && <span className="ml-1.5 text-xs font-normal text-muted-foreground">optional</span>}
       </div>
       {props.children}
     </div>
@@ -59,18 +60,26 @@ const ProgressBar = ({ value }: { value: number | null }) => (
   </div>
 )
 
-const ServerDetail = ({ status, version }: { status: ServerStatus | null; version?: string }) => {
+const ServiceDetail = ({
+  service,
+  status,
+  version,
+}: {
+  service: ServiceName
+  status: ServiceStatus | null
+  version?: string
+}) => {
   if (!status) return null
   switch (status.state) {
     case 'idle':
     case 'checking':
-      return <Detail>Looking for a running server…</Detail>
+      return <Detail>Looking for a running {service}…</Detail>
     case 'downloading': {
       const percent = status.total ? Math.min(100, Math.round((status.downloaded / status.total) * 100)) : null
       return (
         <>
           <Detail>
-            Downloading server {version} — {formatBytes(status.downloaded)}
+            Downloading geenii {version} — {formatBytes(status.downloaded)}
             {status.total ? ` of ${formatBytes(status.total)} (${percent}%)` : ''}
           </Detail>
           <ProgressBar value={percent} />
@@ -81,28 +90,33 @@ const ServerDetail = ({ status, version }: { status: ServerStatus | null; versio
     case 'installing':
       return (
         <>
-          <Detail>Verifying and unpacking server {version}…</Detail>
+          <Detail>Verifying and unpacking geenii {version}…</Detail>
           <ProgressBar value={null} />
         </>
       )
     case 'starting':
-      return <Detail>Launching server… The first start after an install can take a few seconds.</Detail>
+      return <Detail>Launching {service}… The first start after an install can take a few seconds.</Detail>
     case 'ready':
-      return <Detail>{status.external ? 'Using a server that was already running.' : `Server ${version} is running.`}</Detail>
+      return (
+        <Detail>
+          {status.external ? `Using a ${service} that was already running.` : `${SERVICE_LABELS[service]} ${version} is running.`}
+        </Detail>
+      )
     case 'disabled':
-      return <Detail>Autostart is off (GEENII_DESKTOP_DEV_MODE=true). Start a server yourself, or start it here.</Detail>
+      return <Detail>Autostart is off (GEENII_DESKTOP_DEV_MODE=true). Start a {service} yourself, or start it here.</Detail>
     case 'stopped':
-      return <Detail error>The server was stopped.</Detail>
+      return <Detail error>The {service} was stopped.</Detail>
     case 'failed':
       return <Detail error>{status.error}</Detail>
   }
 }
 
 const DesktopLoader = ({ startup }: { startup: DesktopStartup }) => {
-  const { tauri, server, backend } = startup
+  const { tauri, server, daemon, backend } = startup
   const info = tauri.info
   const providers = backend.info?.providers?.filter((p) => p.configured).map((p) => p.name) ?? []
   const showLog = (server.state === 'error' || backend.state === 'error') && info?.serverLog
+  const showDaemonLog = daemon.state === 'error' && info?.daemonLog
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10 text-foreground">
@@ -131,7 +145,7 @@ const DesktopLoader = ({ startup }: { startup: DesktopStartup }) => {
             </Step>
 
             <Step state={server.state} title="Start geenii server">
-              <ServerDetail status={server.status} version={info?.serverVersion} />
+              <ServiceDetail service="server" status={server.status} version={info?.serverVersion} />
               {info?.serverBinOverride && server.state !== 'pending' && (
                 <Detail>Using local binary {info.serverBinOverride}</Detail>
               )}
@@ -169,12 +183,39 @@ const DesktopLoader = ({ startup }: { startup: DesktopStartup }) => {
                 </>
               )}
             </Step>
+
+            <Step state={daemon.state} title="Start geenii daemon" optional>
+              <ServiceDetail service="daemon" status={daemon.status} version={info?.serverVersion} />
+              {daemon.status?.state === 'ready' && info?.daemonSocket && (
+                <Detail>
+                  Socket <span className="font-mono">{info.daemonSocket}</span>
+                </Detail>
+              )}
+              {daemon.state === 'error' && (
+                <>
+                  <Detail>The app works without it; scheduled tasks and managed processes don't run.</Detail>
+                  <Button size="sm" variant="outline" onClick={startup.restartDaemon}>
+                    <RotateCw /> Restart daemon
+                  </Button>
+                </>
+              )}
+              {daemon.status?.state === 'disabled' && (
+                <Button size="sm" variant="outline" onClick={startup.restartDaemon}>
+                  <Play /> Start daemon
+                </Button>
+              )}
+            </Step>
           </ol>
         </div>
 
         {showLog && (
           <div className="mt-4 text-center text-xs text-muted-foreground">
             Server log: <span className="select-all font-mono">{info.serverLog}</span>
+          </div>
+        )}
+        {showDaemonLog && (
+          <div className="mt-2 text-center text-xs text-muted-foreground">
+            Daemon log: <span className="select-all font-mono">{info.daemonLog}</span>
           </div>
         )}
       </div>

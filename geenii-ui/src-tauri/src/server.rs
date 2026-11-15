@@ -1,20 +1,25 @@
-//! Background geenii server.
+//! Background geenii services: the HTTP server and the daemon (process manager,
+//! scheduler, supervisor). Both run from the same pinned geenii binary.
 //!
-//! On startup the app makes sure a geenii server answers on the pinned port:
+//! On startup the app makes sure each service is up:
 //!
-//! 0. Stop servers this app started that outlived it (see `stop_orphaned_servers`).
-//! 1. If something already answers `/api/v1/health`, use it.
+//! 0. Stop instances this app started that outlived it (see `stop_orphans`).
+//! 1. If the service already answers (server: `/api/v1/health` on the pinned port;
+//!    daemon: `ping` on its Unix socket), use it.
 //! 2. Otherwise install the pinned PyInstaller onedir release (see
 //!    `server-release.json`) into `$AppCache/server/<version>/`, downloading it
 //!    from GitHub once and verifying its SHA-256 against the pinned checksum.
-//! 3. Spawn `<install>/geenii/geenii server start ...` and wait until healthy.
+//!    Both services share the install; it runs once at a time.
+//! 3. Spawn `<install>/geenii/geenii server start ...` / `... daemon start` and wait
+//!    until it answers.
 //!
-//! Progress is published as `server-status` events (and the `server_status`
-//! command); `server_restart` retries after a failure.
+//! Progress is published as `server-status` / `daemon-status` events (and the
+//! `server_status` / `daemon_status` commands). The app passes `GEENII_SOCKET` to
+//! both, so the server talks to the daemon this app checks.
 //!
 //! `GEENII_SERVER_BIN=/path/to/geenii` skips the download and runs that binary
-//! instead. In dev mode with `GEENII_DESKTOP_DEV_MODE=true` the server is not started
-//! automatically.
+//! instead. In dev mode with `GEENII_DESKTOP_DEV_MODE=true` neither service is
+//! started automatically.
 
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
@@ -34,17 +39,27 @@ use tokio::io::AsyncWriteExt;
 const MANIFEST_JSON: &str = include_str!("../server-release.json");
 const BIN_OVERRIDE_ENV: &str = "GEENII_SERVER_BIN";
 const DEV_MODE_ENV: &str = "GEENII_DESKTOP_DEV_MODE";
+/// Daemon socket overrides, checked in this order (as in geenii.daemon.client).
+const SOCKET_ENV_VARS: [&str; 2] = ["GEENII_SOCKET", "GEENII_PM_SOCKET"];
 pub const STATUS_EVENT: &str = "server-status";
+pub const DAEMON_STATUS_EVENT: &str = "daemon-status";
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
-/// How long a stopping server gets to shut down after SIGTERM before it is killed.
+/// How long a stopping service gets to shut down after SIGTERM before it is killed.
 const STOP_GRACE: Duration = Duration::from_secs(5);
+
+fn default_daemon_args() -> Vec<String> {
+    vec!["daemon".into(), "start".into()]
+}
 
 #[derive(Debug, Deserialize)]
 struct ReleaseManifest {
     version: String,
     url: String,
     binary: String,
+    /// Server arguments.
     args: Vec<String>,
+    #[serde(default = "default_daemon_args")]
+    daemon_args: Vec<String>,
     port: u16,
     sha256: HashMap<String, String>,
 }
@@ -71,9 +86,48 @@ impl ReleaseManifest {
     }
 }
 
+/// A background process the app manages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Service {
+    Server,
+    Daemon,
+}
+
+impl Service {
+    pub const ALL: [Service; 2] = [Service::Server, Service::Daemon];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Service::Server => "server",
+            Service::Daemon => "daemon",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Service::Server => "Server",
+            Service::Daemon => "Daemon",
+        }
+    }
+
+    pub fn status_event(self) -> &'static str {
+        match self {
+            Service::Server => STATUS_EVENT,
+            Service::Daemon => DAEMON_STATUS_EVENT,
+        }
+    }
+
+    fn args(self, manifest: &ReleaseManifest) -> Vec<String> {
+        match self {
+            Service::Server => manifest.args.clone(),
+            Service::Daemon => manifest.daemon_args.clone(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(tag = "state", rename_all = "kebab-case")]
-pub enum ServerStatus {
+pub enum ServiceStatus {
     #[default]
     Idle,
     /// Not started automatically (dev mode with GEENII_DESKTOP_DEV_MODE=true).
@@ -82,13 +136,40 @@ pub enum ServerStatus {
     Downloading { downloaded: u64, total: Option<u64> },
     Installing,
     Starting,
-    /// `external`: a server was already running and is used as is.
+    /// `external`: an instance was already running and is used as is.
     Ready { external: bool },
     Failed { error: String },
     Stopped,
 }
 
-/// A server process this app started.
+impl ServiceStatus {
+    /// A short, human-readable state, e.g. "running" or "downloading 42%".
+    pub fn summary(&self) -> String {
+        match self {
+            ServiceStatus::Idle => "not started".into(),
+            ServiceStatus::Disabled => "autostart off".into(),
+            ServiceStatus::Checking => "checking…".into(),
+            ServiceStatus::Downloading { downloaded, total: Some(total) } if *total > 0 => {
+                format!("downloading {}%", downloaded.saturating_mul(100) / total)
+            }
+            ServiceStatus::Downloading { .. } => "downloading…".into(),
+            ServiceStatus::Installing => "installing…".into(),
+            ServiceStatus::Starting => "starting…".into(),
+            ServiceStatus::Ready { external: false } => "running".into(),
+            ServiceStatus::Ready { external: true } => "running (external)".into(),
+            ServiceStatus::Failed { .. } => "failed".into(),
+            ServiceStatus::Stopped => "stopped".into(),
+        }
+    }
+}
+
+/// "Server: running", for menus.
+pub fn status_text(app: &AppHandle, service: Service) -> String {
+    let status = state(app, service).status.lock().unwrap().summary();
+    format!("{}: {status}", service.label())
+}
+
+/// A process this app started.
 struct ManagedChild {
     child: CommandChild,
     /// Set by the output task when the process has terminated.
@@ -96,65 +177,98 @@ struct ManagedChild {
 }
 
 #[derive(Default)]
-pub struct ServerProcess {
+struct ServiceState {
     child: Mutex<Option<ManagedChild>>,
-    status: Mutex<ServerStatus>,
+    status: Mutex<ServiceStatus>,
     busy: AtomicBool,
 }
 
-fn set_status(app: &AppHandle, status: ServerStatus) {
-    println!("server status: {status:?}");
-    *app.state::<ServerProcess>().status.lock().unwrap() = status.clone();
-    let _ = app.emit(STATUS_EVENT, status);
+#[derive(Default)]
+pub struct Services {
+    server: ServiceState,
+    daemon: ServiceState,
+    /// Serializes installing the release, which both services need.
+    install: tauri::async_runtime::Mutex<()>,
 }
 
-/// Starts the server on app startup, unless running in dev mode with
-/// `GEENII_DESKTOP_DEV_MODE=true` (then the server is started manually, e.g. from the panel).
-pub fn autostart(app: &AppHandle) {
-    if tauri::is_dev() && std::env::var(DEV_MODE_ENV).is_ok_and(|v| v == "true") {
-        println!("Dev mode ({DEV_MODE_ENV}=true): not starting the server.");
-        set_status(app, ServerStatus::Disabled);
-        return;
+fn services(app: &AppHandle) -> &Services {
+    app.state::<Services>().inner()
+}
+
+fn state(app: &AppHandle, service: Service) -> &ServiceState {
+    let services = services(app);
+    match service {
+        Service::Server => &services.server,
+        Service::Daemon => &services.daemon,
     }
-    start_server(app);
 }
 
-/// Starts the server in the background. No-op while a start is already in progress.
-pub fn start_server(app: &AppHandle) {
-    if app.state::<ServerProcess>().busy.swap(true, Ordering::SeqCst) {
+fn set_status(app: &AppHandle, service: Service, status: ServiceStatus) {
+    println!("{} status: {status:?}", service.name());
+    *state(app, service).status.lock().unwrap() = status.clone();
+    let _ = app.emit(service.status_event(), status);
+}
+
+/// Starts the server and the daemon on app startup, unless running in dev mode with
+/// `GEENII_DESKTOP_DEV_MODE=true` (then they are started manually, e.g. from the panel).
+pub fn autostart(app: &AppHandle) {
+    let skip = tauri::is_dev() && std::env::var(DEV_MODE_ENV).is_ok_and(|v| v == "true");
+    for service in Service::ALL {
+        if skip {
+            println!("Dev mode ({DEV_MODE_ENV}=true): not starting the {}.", service.name());
+            set_status(app, service, ServiceStatus::Disabled);
+        } else {
+            start_service(app, service);
+        }
+    }
+}
+
+/// Starts a service in the background. No-op while a start is already in progress.
+pub fn start_service(app: &AppHandle, service: Service) {
+    if state(app, service).busy.swap(true, Ordering::SeqCst) {
         return;
     }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         // Run in its own task so a panic is reported instead of leaving `busy` set.
         let task_app = app.clone();
-        let result = tauri::async_runtime::spawn(async move { run(&task_app).await })
+        let result = tauri::async_runtime::spawn(async move { run(&task_app, service).await })
             .await
-            .unwrap_or_else(|e| Err(format!("server startup task crashed: {e}")));
+            .unwrap_or_else(|e| Err(format!("{} startup task crashed: {e}", service.name())));
         if let Err(error) = result {
-            eprintln!("server startup failed: {error}");
-            set_status(&app, ServerStatus::Failed { error });
+            eprintln!("{} startup failed: {error}", service.name());
+            set_status(&app, service, ServiceStatus::Failed { error });
         }
-        app.state::<ServerProcess>().busy.store(false, Ordering::SeqCst);
+        state(&app, service).busy.store(false, Ordering::SeqCst);
     });
 }
 
-/// Stops the server process this app started (an external server is left alone):
+/// Stops the service process this app started (an external one is left alone):
 /// SIGTERM so it can shut down cleanly (and stop its own children), then SIGKILL
 /// if it is still running after `STOP_GRACE`. Blocks for at most `STOP_GRACE`.
-pub fn stop_server(app: &AppHandle) {
-    let managed = app.state::<ServerProcess>().child.lock().unwrap().take();
+pub fn stop_service(app: &AppHandle, service: Service) {
+    let managed = state(app, service).child.lock().unwrap().take();
     if let Some(managed) = managed {
-        terminate(managed);
-        set_status(app, ServerStatus::Stopped);
+        terminate(service, managed);
+        set_status(app, service, ServiceStatus::Stopped);
     }
 }
 
-fn terminate(ManagedChild { child, exited }: ManagedChild) {
+/// Stops all services at once; blocks for at most `STOP_GRACE`.
+pub fn stop_all(app: &AppHandle) {
+    std::thread::scope(|scope| {
+        for service in Service::ALL {
+            scope.spawn(move || stop_service(app, service));
+        }
+    });
+}
+
+fn terminate(service: Service, ManagedChild { child, exited }: ManagedChild) {
     let pid = child.pid();
+    let name = service.name();
     #[cfg(unix)]
     {
-        println!("Stopping server (pid {pid}): SIGTERM");
+        println!("Stopping {name} (pid {pid}): SIGTERM");
         // SAFETY: plain kill(2) on the pid of our own child, which has not been
         // reaped yet if `exited` is unset (the shell plugin reaps it and then sets it).
         if !exited.load(Ordering::SeqCst) && unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM) } == 0 {
@@ -165,24 +279,24 @@ fn terminate(ManagedChild { child, exited }: ManagedChild) {
         }
     }
     if exited.load(Ordering::SeqCst) {
-        println!("Server (pid {pid}) exited");
+        println!("{name} (pid {pid}) exited");
         return;
     }
-    println!("Killing server (pid {pid})");
+    println!("Killing {name} (pid {pid})");
     if let Err(e) = child.kill() {
-        eprintln!("failed to kill server: {e}");
+        eprintln!("failed to kill {name}: {e}");
     }
 }
 
-/// Stops servers this app started that outlived it: `tauri dev` restarts and crashes
-/// skip the exit hook, and a leftover would otherwise be reused as an "external" server,
-/// possibly an old version, with nobody owning its lifecycle or logs.
+/// Stops instances of `service` this app started that outlived it: `tauri dev` restarts
+/// and crashes skip the exit hook, and a leftover would otherwise be reused as an
+/// "external" one, possibly an old version, with nobody owning its lifecycle or logs.
 ///
-/// A server is ours if it runs a binary from our install dir (or `GEENII_SERVER_BIN`),
-/// and orphaned if its parent is not a running instance of this app (so the server of
-/// a second, live app instance is left alone).
+/// An instance is ours if it runs a binary from our install dir (or `GEENII_SERVER_BIN`)
+/// with this service's subcommand, and orphaned if its parent is not a running instance
+/// of this app (so the services of a second, live app instance are left alone).
 #[cfg(unix)]
-async fn stop_orphaned_servers(app: &AppHandle) {
+async fn stop_orphans(app: &AppHandle, service: Service, manifest: &ReleaseManifest) {
     let mut prefixes = Vec::new();
     if let Ok(cache) = app.path().app_cache_dir() {
         prefixes.push(format!("{}/", cache.join("server").display()));
@@ -190,6 +304,7 @@ async fn stop_orphaned_servers(app: &AppHandle) {
     if let Some(bin) = std::env::var_os(BIN_OVERRIDE_ENV) {
         prefixes.push(format!("{} ", PathBuf::from(bin).display()));
     }
+    let subcommand = service.args(manifest).into_iter().take(2).collect::<Vec<_>>().join(" ");
     let Ok(app_exe) = std::env::current_exe() else { return };
     let app_exe = app_exe.display().to_string();
 
@@ -198,24 +313,25 @@ async fn stop_orphaned_servers(app: &AppHandle) {
         Ok(output) => return eprintln!("orphan check: ps failed: {}", output.status),
         Err(e) => return eprintln!("orphan check: ps failed: {e}"),
     };
-    let orphans = find_orphans(&String::from_utf8_lossy(&output.stdout), &prefixes, &app_exe);
+    let orphans = find_orphans(&String::from_utf8_lossy(&output.stdout), &prefixes, &subcommand, &app_exe);
     if orphans.is_empty() {
         return;
     }
+    let name = service.name();
     let _ = tauri::async_runtime::spawn_blocking(move || {
         for pid in orphans {
-            stop_pid(pid);
+            stop_pid(name, pid);
         }
     })
     .await;
 }
 
 #[cfg(not(unix))]
-async fn stop_orphaned_servers(_app: &AppHandle) {}
+async fn stop_orphans(_app: &AppHandle, _service: Service, _manifest: &ReleaseManifest) {}
 
-/// Parses `ps -o pid=,ppid=,command=` output; returns the pids of our servers whose
-/// parent is not a running `app_exe`.
-fn find_orphans(ps_output: &str, prefixes: &[String], app_exe: &str) -> Vec<u32> {
+/// Parses `ps -o pid=,ppid=,command=` output; returns the pids of our `subcommand`
+/// processes (e.g. "daemon start") whose parent is not a running `app_exe`.
+fn find_orphans(ps_output: &str, prefixes: &[String], subcommand: &str, app_exe: &str) -> Vec<u32> {
     let procs: Vec<(u32, u32, &str)> = ps_output
         .lines()
         .filter_map(|line| {
@@ -230,9 +346,13 @@ fn find_orphans(ps_output: &str, prefixes: &[String], app_exe: &str) -> Vec<u32>
     let is_app = |pid: u32| {
         procs.iter().any(|&(p, _, cmd)| p == pid && (cmd == app_exe || cmd.starts_with(&format!("{app_exe} "))))
     };
+    let subcommand = format!(" {subcommand} ");
     procs
         .iter()
-        .filter(|&&(_, _, cmd)| prefixes.iter().any(|prefix| format!("{cmd} ").starts_with(prefix.as_str())))
+        .filter(|&&(_, _, cmd)| {
+            let cmd = format!("{cmd} ");
+            prefixes.iter().any(|prefix| cmd.starts_with(prefix.as_str())) && cmd.contains(&subcommand)
+        })
         .filter(|&&(_, ppid, _)| !is_app(ppid))
         .map(|&(pid, _, _)| pid)
         .collect()
@@ -240,11 +360,11 @@ fn find_orphans(ps_output: &str, prefixes: &[String], app_exe: &str) -> Vec<u32>
 
 /// SIGTERM, wait up to STOP_GRACE, then SIGKILL; for a process that is not our child.
 #[cfg(unix)]
-fn stop_pid(pid: u32) {
+fn stop_pid(name: &str, pid: u32) {
     let pid = pid as libc::pid_t;
     // SAFETY: kill(2) with a pid just read from ps; signal 0 only probes for existence.
     let alive = || unsafe { libc::kill(pid, 0) } == 0;
-    println!("Stopping orphaned server (pid {pid}): SIGTERM");
+    println!("Stopping orphaned {name} (pid {pid}): SIGTERM");
     if unsafe { libc::kill(pid, libc::SIGTERM) } != 0 {
         return;
     }
@@ -253,19 +373,42 @@ fn stop_pid(pid: u32) {
         std::thread::sleep(Duration::from_millis(50));
     }
     if alive() {
-        println!("Killing orphaned server (pid {pid})");
+        println!("Killing orphaned {name} (pid {pid})");
         unsafe { libc::kill(pid, libc::SIGKILL) };
     } else {
-        println!("Orphaned server (pid {pid}) exited");
+        println!("Orphaned {name} (pid {pid}) exited");
     }
 }
 
-#[tauri::command]
-pub fn server_status(app: AppHandle) -> ServerStatus {
-    app.state::<ServerProcess>().status.lock().unwrap().clone()
+/// The daemon's socket, resolved like geenii.daemon.client.default_socket_path
+/// (`$GEENII_SOCKET`, `$GEENII_PM_SOCKET`, else `$GEENII_CACHE_DIR/geenii.sock`).
+/// The app passes it to both services as `GEENII_SOCKET`.
+fn daemon_socket_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let env = |name: &str| std::env::var_os(name).filter(|v| !v.is_empty());
+    if let Some(path) = SOCKET_ENV_VARS.iter().find_map(|name| env(name)) {
+        return Ok(PathBuf::from(path));
+    }
+    let cache = match env("GEENII_CACHE_DIR") {
+        Some(dir) => PathBuf::from(dir),
+        None => app.path().home_dir().map_err(|e| e.to_string())?.join(".cache").join("geenii"),
+    };
+    Ok(cache.join("geenii.sock"))
 }
 
-/// What the frontend needs to know about the desktop shell and its server.
+// ---------------------------------------------------------------------------
+// Commands
+
+#[tauri::command]
+pub fn server_status(app: AppHandle) -> ServiceStatus {
+    state(&app, Service::Server).status.lock().unwrap().clone()
+}
+
+#[tauri::command]
+pub fn daemon_status(app: AppHandle) -> ServiceStatus {
+    state(&app, Service::Daemon).status.lock().unwrap().clone()
+}
+
+/// What the frontend needs to know about the desktop shell and its services.
 /// Calling it also serves as the frontend's IPC connection check.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -280,12 +423,15 @@ pub struct DesktopInfo {
     /// Set when `GEENII_SERVER_BIN` replaces the downloaded release.
     server_bin_override: Option<String>,
     server_log: Option<String>,
+    daemon_socket: Option<String>,
+    daemon_log: Option<String>,
 }
 
 #[tauri::command]
 pub fn desktop_info(app: AppHandle) -> Result<DesktopInfo, String> {
     let manifest = ReleaseManifest::load()?;
     let package = app.package_info();
+    let display = |p: Result<PathBuf, String>| p.ok().map(|p| p.display().to_string());
     Ok(DesktopInfo {
         app_name: package.name.clone(),
         app_version: package.version.to_string(),
@@ -295,14 +441,26 @@ pub fn desktop_info(app: AppHandle) -> Result<DesktopInfo, String> {
         server_version: manifest.version,
         server_url: format!("http://localhost:{}", manifest.port),
         server_bin_override: std::env::var(BIN_OVERRIDE_ENV).ok(),
-        server_log: log_path(&app).ok().map(|p| p.display().to_string()),
+        server_log: display(log_path(&app, Service::Server)),
+        daemon_socket: display(daemon_socket_path(&app)),
+        daemon_log: display(log_path(&app, Service::Daemon)),
     })
 }
 
 /// The last `lines` lines (at most 1000) of the server log; empty if there is no log yet.
 #[tauri::command]
 pub async fn server_log(app: AppHandle, lines: Option<usize>) -> Result<String, String> {
-    let path = log_path(&app)?;
+    tail_log(&app, Service::Server, lines).await
+}
+
+/// The last `lines` lines (at most 1000) of the daemon log; empty if there is no log yet.
+#[tauri::command]
+pub async fn daemon_log(app: AppHandle, lines: Option<usize>) -> Result<String, String> {
+    tail_log(&app, Service::Daemon, lines).await
+}
+
+async fn tail_log(app: &AppHandle, service: Service, lines: Option<usize>) -> Result<String, String> {
+    let path = log_path(app, service)?;
     let lines = lines.unwrap_or(200).min(1000);
     tauri::async_runtime::spawn_blocking(move || read_tail(&path, lines))
         .await
@@ -331,29 +489,57 @@ fn read_tail(path: &Path, max_lines: usize) -> Result<String, String> {
     Ok(all[all.len().saturating_sub(max_lines)..].join("\n"))
 }
 
-fn log_path(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(app.path().app_log_dir().map_err(|e| e.to_string())?.join("server.log"))
+fn log_path(app: &AppHandle, service: Service) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_log_dir()
+        .map_err(|e| e.to_string())?
+        .join(format!("{}.log", service.name())))
 }
 
 #[tauri::command]
 pub fn server_start(app: AppHandle) {
-    start_server(&app);
+    start_service(&app, Service::Server);
+}
+
+#[tauri::command]
+pub fn daemon_start(app: AppHandle) {
+    start_service(&app, Service::Daemon);
 }
 
 /// Stops the server this app started (SIGTERM, then SIGKILL after STOP_GRACE).
 /// A server the app did not start is left running.
 #[tauri::command]
 pub async fn server_stop(app: AppHandle) {
-    let _ = tauri::async_runtime::spawn_blocking(move || stop_server(&app)).await;
+    stop_blocking(app, Service::Server).await;
+}
+
+/// Stops the daemon this app started (SIGTERM, then SIGKILL after STOP_GRACE).
+/// The daemon stops the processes it manages. A daemon the app did not start is left running.
+#[tauri::command]
+pub async fn daemon_stop(app: AppHandle) {
+    stop_blocking(app, Service::Daemon).await;
 }
 
 #[tauri::command]
 pub async fn server_restart(app: AppHandle) {
-    // stop_server can block for up to STOP_GRACE.
-    let stop_app = app.clone();
-    let _ = tauri::async_runtime::spawn_blocking(move || stop_server(&stop_app)).await;
-    start_server(&app);
+    stop_blocking(app.clone(), Service::Server).await;
+    start_service(&app, Service::Server);
 }
+
+#[tauri::command]
+pub async fn daemon_restart(app: AppHandle) {
+    stop_blocking(app.clone(), Service::Daemon).await;
+    start_service(&app, Service::Daemon);
+}
+
+/// stop_service can block for up to STOP_GRACE.
+async fn stop_blocking(app: AppHandle, service: Service) {
+    let _ = tauri::async_runtime::spawn_blocking(move || stop_service(&app, service)).await;
+}
+
+// ---------------------------------------------------------------------------
+// Startup
 
 /// reqwest is built with `rustls-no-provider` (shared with the updater plugin):
 /// every Client, even a plain-HTTP one, panics unless a provider is installed.
@@ -366,46 +552,98 @@ fn ensure_tls_provider() {
     });
 }
 
-async fn run(app: &AppHandle) -> Result<(), String> {
+/// How to tell whether a service is up.
+enum Probe {
+    Http { client: reqwest::Client, url: String },
+    Socket(PathBuf),
+}
+
+impl Probe {
+    fn new(app: &AppHandle, service: Service, manifest: &ReleaseManifest) -> Result<Self, String> {
+        Ok(match service {
+            Service::Server => Probe::Http {
+                client: reqwest::Client::builder()
+                    .no_proxy()
+                    .timeout(Duration::from_secs(1))
+                    .build()
+                    .map_err(|e| e.to_string())?,
+                url: format!("http://127.0.0.1:{}/api/v1/health", manifest.port),
+            },
+            Service::Daemon => Probe::Socket(daemon_socket_path(app)?),
+        })
+    }
+
+    async fn is_up(&self) -> bool {
+        match self {
+            Probe::Http { client, url } => matches!(client.get(url).send().await, Ok(r) if r.status().is_success()),
+            Probe::Socket(path) => {
+                let path = path.clone();
+                tauri::async_runtime::spawn_blocking(move || ping_socket(&path))
+                    .await
+                    .unwrap_or(false)
+            }
+        }
+    }
+}
+
+/// Sends the daemon's `ping` over its Unix socket (newline-delimited JSON).
+#[cfg(unix)]
+fn ping_socket(path: &Path) -> bool {
+    use std::io::{BufRead, BufReader};
+    use std::os::unix::net::UnixStream;
+    let Ok(mut stream) = UnixStream::connect(path) else { return false };
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(1)));
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(1)));
+    if stream.write_all(b"{\"method\":\"ping\"}\n").is_err() {
+        return false;
+    }
+    let mut line = String::new();
+    if BufReader::new(&stream).read_line(&mut line).is_err() {
+        return false;
+    }
+    serde_json::from_str::<serde_json::Value>(&line).is_ok_and(|v| v["ok"] == true)
+}
+
+#[cfg(not(unix))]
+fn ping_socket(_path: &Path) -> bool {
+    false
+}
+
+async fn run(app: &AppHandle, service: Service) -> Result<(), String> {
     ensure_tls_provider();
     let manifest = ReleaseManifest::load()?;
-    let health_url = format!("http://127.0.0.1:{}/api/v1/health", manifest.port);
-    let health_client = reqwest::Client::builder()
-        .no_proxy()
-        .timeout(Duration::from_secs(1))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let probe = Probe::new(app, service, &manifest)?;
+    let name = service.name();
 
-    set_status(app, ServerStatus::Checking);
-    stop_orphaned_servers(app).await;
-    if is_healthy(&health_client, &health_url).await {
-        println!("A server is already running on port {}; using it.", manifest.port);
-        set_status(app, ServerStatus::Ready { external: true });
+    set_status(app, service, ServiceStatus::Checking);
+    stop_orphans(app, service, &manifest).await;
+    if probe.is_up().await {
+        println!("A {name} is already running; using it.");
+        set_status(app, service, ServiceStatus::Ready { external: true });
         return Ok(());
     }
 
     let bin = match std::env::var_os(BIN_OVERRIDE_ENV) {
         Some(path) => PathBuf::from(path),
-        None => ensure_installed(app, &manifest).await?,
+        None => ensure_installed(app, service, &manifest).await?,
     };
 
-    set_status(app, ServerStatus::Starting);
-    let (exited, log_path) = spawn(app, &bin, &manifest.args)?;
+    set_status(app, service, ServiceStatus::Starting);
+    let (exited, log_path) = spawn(app, service, &bin, &service.args(&manifest))?;
 
     let deadline = Instant::now() + STARTUP_TIMEOUT;
     loop {
         if exited.load(Ordering::SeqCst) {
-            return Err(format!("server exited during startup; see {}", log_path.display()));
+            return Err(format!("{name} exited during startup; see {}", log_path.display()));
         }
-        if is_healthy(&health_client, &health_url).await {
-            set_status(app, ServerStatus::Ready { external: false });
+        if probe.is_up().await {
+            set_status(app, service, ServiceStatus::Ready { external: false });
             return Ok(());
         }
         if Instant::now() > deadline {
-            let stop_app = app.clone();
-            let _ = tauri::async_runtime::spawn_blocking(move || stop_server(&stop_app)).await;
+            stop_blocking(app.clone(), service).await;
             return Err(format!(
-                "server not healthy after {}s; see {}",
+                "{name} not ready after {}s; see {}",
                 STARTUP_TIMEOUT.as_secs(),
                 log_path.display()
             ));
@@ -414,18 +652,17 @@ async fn run(app: &AppHandle) -> Result<(), String> {
     }
 }
 
-async fn is_healthy(client: &reqwest::Client, url: &str) -> bool {
-    matches!(client.get(url).send().await, Ok(r) if r.status().is_success())
-}
-
-/// Returns the server binary of the pinned release, installing it first if needed.
-async fn ensure_installed(app: &AppHandle, manifest: &ReleaseManifest) -> Result<PathBuf, String> {
+/// Returns the geenii binary of the pinned release, installing it first if needed.
+/// Progress is reported as `service`'s status.
+async fn ensure_installed(app: &AppHandle, service: Service, manifest: &ReleaseManifest) -> Result<PathBuf, String> {
     let root = app
         .path()
         .app_cache_dir()
         .map_err(|e| e.to_string())?
         .join("server");
     let bin = root.join(&manifest.version).join(&manifest.binary);
+    // The other service may be installing right now; wait for it, then re-check.
+    let _install = services(app).install.lock().await;
     if bin.is_file() {
         return Ok(bin);
     }
@@ -435,9 +672,9 @@ async fn ensure_installed(app: &AppHandle, manifest: &ReleaseManifest) -> Result
     std::fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
 
     let archive = root.join(format!("{}.tar.gz.download", manifest.version));
-    download(app, &manifest.archive_url(target), &archive, &expected).await?;
+    download(app, service, &manifest.archive_url(target), &archive, &expected).await?;
 
-    set_status(app, ServerStatus::Installing);
+    set_status(app, service, ServiceStatus::Installing);
     let (r, v, a) = (root.clone(), manifest.version.clone(), archive.clone());
     tauri::async_runtime::spawn_blocking(move || install_archive(&a, &r, &v))
         .await
@@ -471,7 +708,7 @@ fn target_tag() -> Result<&'static str, String> {
 }
 
 /// Downloads `url` to `dest`, failing (and removing `dest`) unless its SHA-256 is `expected`.
-async fn download(app: &AppHandle, url: &str, dest: &Path, expected: &str) -> Result<(), String> {
+async fn download(app: &AppHandle, service: Service, url: &str, dest: &Path, expected: &str) -> Result<(), String> {
     println!("Downloading server from {url}");
     let client = reqwest::Client::builder()
         .user_agent(concat!("geenii-desktop/", env!("CARGO_PKG_VERSION")))
@@ -493,7 +730,7 @@ async fn download(app: &AppHandle, url: &str, dest: &Path, expected: &str) -> Re
     let mut hasher = Sha256::new();
     let mut downloaded = 0u64;
     let mut last_report = 0u64;
-    set_status(app, ServerStatus::Downloading { downloaded, total });
+    set_status(app, service, ServiceStatus::Downloading { downloaded, total });
 
     let result: Result<(), String> = async {
         while let Some(chunk) = response
@@ -506,7 +743,7 @@ async fn download(app: &AppHandle, url: &str, dest: &Path, expected: &str) -> Re
             downloaded += chunk.len() as u64;
             if downloaded - last_report >= 512 * 1024 {
                 last_report = downloaded;
-                set_status(app, ServerStatus::Downloading { downloaded, total });
+                set_status(app, service, ServiceStatus::Downloading { downloaded, total });
             }
         }
         file.flush().await.map_err(|e| e.to_string())?;
@@ -569,10 +806,11 @@ fn prune_other_versions(root: &Path, keep: &str) {
     }
 }
 
-/// Spawns the server and forwards its output to the log file.
+/// Spawns a service and forwards its output to its log file.
 /// Returns a flag set when the process terminates, and the log path.
-fn spawn(app: &AppHandle, bin: &Path, args: &[String]) -> Result<(Arc<AtomicBool>, PathBuf), String> {
-    let log_path = log_path(app)?;
+fn spawn(app: &AppHandle, service: Service, bin: &Path, args: &[String]) -> Result<(Arc<AtomicBool>, PathBuf), String> {
+    let name = service.name();
+    let log_path = log_path(app, service)?;
     if let Some(log_dir) = log_path.parent() {
         std::fs::create_dir_all(log_dir).map_err(|e| format!("create log directory: {e}"))?;
     }
@@ -584,20 +822,35 @@ fn spawn(app: &AppHandle, bin: &Path, args: &[String]) -> Result<(Arc<AtomicBool
     println!("Starting {} {} (log: {})", bin.display(), args.join(" "), log_path.display());
 
     let mut command = app.shell().command(bin.to_string_lossy().to_string()).args(args);
-    // Run in the user's home directory (the server's GEENII_WORKING_DIR defaults to its cwd).
+    // Run in the user's home directory (GEENII_WORKING_DIR defaults to the cwd).
     // PyInstaller locates its bundled files relative to the executable, not the cwd.
     match app.path().home_dir() {
         Ok(home) => command = command.current_dir(home),
-        Err(e) => eprintln!("no home directory ({e}); starting server in the current directory"),
+        Err(e) => eprintln!("no home directory ({e}); starting {name} in the current directory"),
+    }
+    // `geenii` in commands the services run (e.g. scheduler tasks) is this binary:
+    // apps started from the GUI do not have it on their PATH.
+    if let Some(dir) = bin.parent() {
+        let inherited = std::env::var_os("PATH").unwrap_or_default();
+        let paths = std::iter::once(dir.to_path_buf()).chain(std::env::split_paths(&inherited));
+        match std::env::join_paths(paths) {
+            Ok(path) => command = command.env("PATH", path.to_string_lossy().to_string()),
+            Err(e) => eprintln!("cannot add {} to PATH: {e}", dir.display()),
+        }
+    }
+    // The server finds the daemon on the socket the app checks.
+    match daemon_socket_path(app) {
+        Ok(socket) => command = command.env("GEENII_SOCKET", socket.to_string_lossy().to_string()),
+        Err(e) => eprintln!("no daemon socket path ({e})"),
     }
     let (mut rx, child) = command
         .spawn()
         .map_err(|e| format!("failed to start {}: {e}", bin.display()))?;
     let pid = child.pid();
-    println!("Server started (pid {pid})");
+    println!("{name} started (pid {pid})");
     let exited = Arc::new(AtomicBool::new(false));
     let exited_flag = exited.clone();
-    *app.state::<ServerProcess>().child.lock().unwrap() = Some(ManagedChild {
+    *state(app, service).child.lock().unwrap() = Some(ManagedChild {
         child,
         exited: exited.clone(),
     });
@@ -617,19 +870,18 @@ fn spawn(app: &AppHandle, bin: &Path, args: &[String]) -> Result<(Arc<AtomicBool
                     let _ = write!(log, "{text}");
                 }
                 CommandEvent::Error(err) => {
-                    eprintln!("server error: {err}");
-                    let _ = writeln!(log, "SERVER ERROR: {err}");
+                    eprintln!("{name} error: {err}");
+                    let _ = writeln!(log, "{} ERROR: {err}", name.to_uppercase());
                 }
                 CommandEvent::Terminated(p) => {
-                    let msg = format!("server terminated: code={:?} signal={:?}", p.code, p.signal);
+                    let msg = format!("{name} terminated: code={:?} signal={:?}", p.code, p.signal);
                     eprintln!("{msg}");
                     let _ = writeln!(log, "{msg}");
                     exited_flag.store(true, Ordering::SeqCst);
                     // Still registered => not stopped by us: report the crash.
                     // (Compare pids: after a restart the slot holds the new process.)
-                    let state = app.state::<ServerProcess>();
                     let crashed = {
-                        let mut slot = state.child.lock().unwrap();
+                        let mut slot = state(&app, service).child.lock().unwrap();
                         if slot.as_ref().is_some_and(|m| m.child.pid() == pid) {
                             slot.take();
                             true
@@ -638,7 +890,7 @@ fn spawn(app: &AppHandle, bin: &Path, args: &[String]) -> Result<(Arc<AtomicBool
                         }
                     };
                     if crashed {
-                        set_status(&app, ServerStatus::Failed { error: msg });
+                        set_status(&app, service, ServiceStatus::Failed { error: msg });
                     }
                 }
                 _ => {}
@@ -689,15 +941,15 @@ mod tests {
     /// The JSON shapes the frontend relies on (src/components/tauri/desktop-runtime.ts).
     #[test]
     fn status_serializes_as_frontend_expects() {
-        let json = |s: ServerStatus| serde_json::to_value(s).unwrap();
-        assert_eq!(json(ServerStatus::Idle), serde_json::json!({"state": "idle"}));
+        let json = |s: ServiceStatus| serde_json::to_value(s).unwrap();
+        assert_eq!(json(ServiceStatus::Idle), serde_json::json!({"state": "idle"}));
         assert_eq!(
-            json(ServerStatus::Downloading { downloaded: 5, total: None }),
+            json(ServiceStatus::Downloading { downloaded: 5, total: None }),
             serde_json::json!({"state": "downloading", "downloaded": 5, "total": null})
         );
-        assert_eq!(json(ServerStatus::Ready { external: true }), serde_json::json!({"state": "ready", "external": true}));
+        assert_eq!(json(ServiceStatus::Ready { external: true }), serde_json::json!({"state": "ready", "external": true}));
         assert_eq!(
-            json(ServerStatus::Failed { error: "x".into() }),
+            json(ServiceStatus::Failed { error: "x".into() }),
             serde_json::json!({"state": "failed", "error": "x"})
         );
         let info = serde_json::to_value(DesktopInfo {
@@ -710,18 +962,23 @@ mod tests {
             server_url: "http://localhost:1".into(),
             server_bin_override: None,
             server_log: None,
+            daemon_socket: None,
+            daemon_log: None,
         })
         .unwrap();
         let mut keys: Vec<_> = info.as_object().unwrap().keys().cloned().collect();
         keys.sort();
         assert_eq!(
             keys,
-            ["appName", "appVersion", "arch", "os", "serverBinOverride", "serverLog", "serverUrl", "serverVersion", "tauriVersion"]
+            [
+                "appName", "appVersion", "arch", "daemonLog", "daemonSocket", "os", "serverBinOverride", "serverLog",
+                "serverUrl", "serverVersion", "tauriVersion"
+            ]
         );
     }
 
     #[test]
-    fn find_orphans_matches_only_our_parentless_servers() {
+    fn find_orphans_matches_only_our_parentless_services() {
         let app = "/Apps/geenii.app/Contents/MacOS/geenii-desktop";
         let prefixes = vec![
             "/Cache/io.geenii.desktop/server/".to_string(),
@@ -736,10 +993,53 @@ mod tests {
           203     1 /dev/dist/geenii-other server start
           204     1 /usr/bin/python3 /Cache/io.geenii.desktop/server/v1/x.py
           205     1 /Cache/other.app/server/v1/geenii/geenii server start
+          300     1 /Cache/io.geenii.desktop/server/v1/geenii/geenii daemon start
+          301   100 /Cache/io.geenii.desktop/server/v1/geenii/geenii daemon start
         ";
         // 200: orphaned (parent launchd); 202: parent gone. 201: live app instance.
-        // 203/204/205: not our binaries.
-        assert_eq!(find_orphans(ps, &prefixes, app), vec![200, 202]);
+        // 203/204/205: not our binaries. 300/301: daemons, not servers.
+        assert_eq!(find_orphans(ps, &prefixes, "server start", app), vec![200, 202]);
+        // 300: orphaned daemon; 301: the live app's daemon.
+        assert_eq!(find_orphans(ps, &prefixes, "daemon start", app), vec![300]);
+    }
+
+    #[test]
+    fn status_summary_is_short() {
+        assert_eq!(ServiceStatus::Ready { external: false }.summary(), "running");
+        assert_eq!(ServiceStatus::Downloading { downloaded: 21, total: Some(50) }.summary(), "downloading 42%");
+        assert_eq!(ServiceStatus::Downloading { downloaded: 5, total: Some(0) }.summary(), "downloading…");
+        assert_eq!(ServiceStatus::Failed { error: "long error".into() }.summary(), "failed");
+    }
+
+    #[test]
+    fn manifest_defaults_daemon_args() {
+        assert_eq!(ReleaseManifest::load().unwrap().daemon_args, ["daemon", "start"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn ping_socket_expects_ok_reply() {
+        use std::io::{BufRead, BufReader};
+        use std::os::unix::net::UnixListener;
+        // Unix socket paths are limited to ~104 bytes; macOS's temp dir is long.
+        let path = PathBuf::from(format!("/tmp/geenii-ping-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        assert!(!ping_socket(&path), "no socket");
+
+        let listener = UnixListener::bind(&path).unwrap();
+        let server = std::thread::spawn(move || {
+            for reply in [&b"{\"ok\":true,\"result\":\"pong\"}\n"[..], b"{\"ok\":false,\"error\":\"x\"}\n"] {
+                let (mut conn, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&conn).read_line(&mut line).unwrap();
+                assert_eq!(line, "{\"method\":\"ping\"}\n");
+                conn.write_all(reply).unwrap();
+            }
+        });
+        assert!(ping_socket(&path));
+        assert!(!ping_socket(&path));
+        server.join().unwrap();
+        std::fs::remove_file(&path).unwrap();
     }
 
     #[test]

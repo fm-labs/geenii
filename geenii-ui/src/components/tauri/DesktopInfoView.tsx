@@ -1,13 +1,17 @@
 import React from 'react'
 import { cn } from 'cn'
 import { useOptionalDesktop } from './DesktopStartupGate.tsx'
-import { describeServerStatus } from './desktop-runtime.ts'
-import ServerLogView from './ServerLogView.tsx'
+import { describeServiceStatus, ServiceStatus } from './desktop-runtime.ts'
+import ServiceLogView from './ServiceLogView.tsx'
+import ServiceControls from './ServiceControls.tsx'
 
-const Section = ({ title, children }: React.PropsWithChildren<{ title: string }>) => (
-  <section className="min-w-0">
-    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
-    <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">{children}</dl>
+const Section = ({ title, actions, children }: React.PropsWithChildren<{ title: string; actions?: React.ReactNode }>) => (
+  <section className="min-w-0 space-y-3">
+    <div>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+      <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">{children}</dl>
+    </div>
+    {actions}
   </section>
 )
 
@@ -19,40 +23,46 @@ const Row = ({ label, value, mono }: { label: string; value: React.ReactNode; mo
     </>
   )
 
-/** Desktop shell, managed server and backend details; live, from the desktop context. */
+const StatusValue = ({ status, service }: { status: ServiceStatus | null; service: 'server' | 'daemon' }) => {
+  const { label, dot } = describeServiceStatus(status, service)
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={cn('size-2 shrink-0 rounded-full', dot)} />
+      {label}
+    </span>
+  )
+}
+
+/** Desktop shell, managed services and backend details; live, from the desktop context. */
 const DesktopInfoView = () => {
   const desktop = useOptionalDesktop()
   if (!desktop) return null
 
   const info = desktop.tauri.info
-  const status = desktop.server.status
   const backend = desktop.backend.info
-  const { label, dot } = describeServerStatus(status)
   const providers = backend?.providers ?? []
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <Section title="Desktop app">
           <Row label="App" value={info && `${info.appName} ${info.appVersion}`} />
           <Row label="Tauri" value={info?.tauriVersion} />
           <Row label="Platform" value={info && `${info.os} / ${info.arch}`} />
         </Section>
 
-        <Section title="Server">
-          <Row
-            label="Status"
-            value={
-              <span className="inline-flex items-center gap-1.5">
-                <span className={cn('size-2 shrink-0 rounded-full', dot)} />
-                {label}
-              </span>
-            }
-          />
+        <Section title="Server" actions={<ServiceControls service="server" status={desktop.server.status} />}>
+          <Row label="Status" value={<StatusValue status={desktop.server.status} service="server" />} />
           <Row label="Release" value={info?.serverVersion} />
           <Row label="URL" value={info?.serverUrl} mono />
           <Row label="Binary" value={info?.serverBinOverride} mono />
           <Row label="Log" value={info?.serverLog} mono />
+        </Section>
+
+        <Section title="Daemon" actions={<ServiceControls service="daemon" status={desktop.daemon.status} />}>
+          <Row label="Status" value={<StatusValue status={desktop.daemon.status} service="daemon" />} />
+          <Row label="Socket" value={info?.daemonSocket} mono />
+          <Row label="Log" value={info?.daemonLog} mono />
         </Section>
 
         <Section title="Backend">
@@ -74,7 +84,7 @@ const DesktopInfoView = () => {
           )}
         </Section>
       </div>
-      <ServerLogView />
+      <ServiceLogView />
     </div>
   )
 }

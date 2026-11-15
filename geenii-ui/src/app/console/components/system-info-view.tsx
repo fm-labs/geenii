@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton.tsx'
 import JsonView from '@/components/json-view.tsx'
 import { useApi } from '@/context/api-context.tsx'
 import { cn } from 'cn'
+import { ModelProviderIcon } from '@/app/agents/model-provider.tsx'
 
 /** Response of GET /info, see `get_app_info()` in geenii/g.py */
 type SystemInfo = {
@@ -321,6 +322,7 @@ const SystemInfoView = () => {
                   <Badge key={p.name} variant={p.configured ? 'secondary' : 'outline'}
                          className={cn('gap-1.5 py-1', !p.configured && 'text-muted-foreground')}>
                     <span className={cn('size-1.5 rounded-full', p.configured ? 'bg-emerald-500' : 'bg-muted-foreground/40')} />
+                    <ModelProviderIcon model={p.name} size={16} className={cn(!p.configured && 'opacity-50')} />
                     {p.name}
                   </Badge>
                 ))}

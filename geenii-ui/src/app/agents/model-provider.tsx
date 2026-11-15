@@ -1,23 +1,41 @@
 import React from 'react'
-import {
-  ApertureIcon, AsteriskIcon, BotIcon, FlaskConicalIcon, LucideIcon, ServerIcon, WandSparklesIcon,
-} from 'lucide-react'
+import { BotIcon, FlaskConicalIcon, WandSparklesIcon } from 'lucide-react'
 import { cn } from 'cn'
+import anthropicSvg from '@/assets/brands/anthropic.svg'
+import openaiSvg from '@/assets/brands/openai.svg'
+import ollamaSvg from '@/assets/brands/ollama.svg'
+
+type ProviderIconProps = { size?: number, strokeWidth?: number, className?: string }
+
+/** Renders a monochrome brand SVG in the current text color (via CSS mask) */
+const brandIcon = (src: string): React.FC<ProviderIconProps> => ({ size = 24, className }) => (
+  <span
+    aria-hidden
+    className={cn('inline-block shrink-0 bg-current', className)}
+    style={{
+      width: size, height: size,
+      maskImage: `url("${src}")`, WebkitMaskImage: `url("${src}")`,
+      maskSize: 'contain', WebkitMaskSize: 'contain',
+      maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
+      maskPosition: 'center', WebkitMaskPosition: 'center',
+    }}
+  />
+)
 
 export type ModelProviderInfo = {
   /** provider id as used in the model prefix, e.g. "ollama" */
   id: string
   label: string
-  /** Placeholder glyph until real brand marks are added */
-  icon: LucideIcon
+  /** Brand mark (or a lucide glyph for providers without one) */
+  icon: React.ComponentType<ProviderIconProps>
   /** Brand-ish accent used for the badge background */
   color: string
 }
 
 const PROVIDERS: Record<string, ModelProviderInfo> = {
-  anthropic: { id: 'anthropic', label: 'Anthropic', icon: AsteriskIcon, color: '#d97757' },
-  openai: { id: 'openai', label: 'OpenAI', icon: ApertureIcon, color: '#10a37f' },
-  ollama: { id: 'ollama', label: 'Ollama', icon: ServerIcon, color: '#404040' },
+  anthropic: { id: 'anthropic', label: 'Anthropic', icon: brandIcon(anthropicSvg), color: '#d97757' },
+  openai: { id: 'openai', label: 'OpenAI', icon: brandIcon(openaiSvg), color: '#10a37f' },
+  ollama: { id: 'ollama', label: 'Ollama', icon: brandIcon(ollamaSvg), color: '#404040' },
   geenii: { id: 'geenii', label: 'Geenii', icon: WandSparklesIcon, color: '#7c3aed' },
   fake: { id: 'fake', label: 'Fake', icon: FlaskConicalIcon, color: '#64748b' },
 }

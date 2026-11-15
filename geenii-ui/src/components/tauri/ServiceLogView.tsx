@@ -1,13 +1,16 @@
 import React from 'react'
-import { getServerLog } from './desktop-runtime.ts'
+import { cn } from 'cn'
+import { getServiceLog, SERVICE_LABELS, ServiceName } from './desktop-runtime.ts'
 
 const POLL_MS = 2000
 const LINES = 300
 // eslint-disable-next-line no-control-regex
 const ANSI = /\x1b\[[0-9;?]*[A-Za-z]/g
+const SERVICES: ServiceName[] = ['server', 'daemon']
 
-/** Live tail of the server log, polled while mounted. Sticks to the bottom unless scrolled up. */
-const ServerLogView = () => {
+/** Live tail of a service log, polled while mounted. Sticks to the bottom unless scrolled up. */
+const ServiceLogView = () => {
+  const [service, setService] = React.useState<ServiceName>('server')
   const [log, setLog] = React.useState<string | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const ref = React.useRef<HTMLPreElement>(null)
@@ -16,9 +19,12 @@ const ServerLogView = () => {
   React.useEffect(() => {
     let cancelled = false
     let timer: ReturnType<typeof setTimeout>
+    setLog(null)
+    setError(null)
+    stickToBottom.current = true
     const poll = async () => {
       try {
-        const text = await getServerLog(LINES)
+        const text = await getServiceLog(service, LINES)
         if (!cancelled) {
           setLog(text.replace(ANSI, ''))
           setError(null)
@@ -33,7 +39,7 @@ const ServerLogView = () => {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [])
+  }, [service])
 
   React.useLayoutEffect(() => {
     const el = ref.current
@@ -47,9 +53,28 @@ const ServerLogView = () => {
 
   return (
     <section className="min-w-0">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Server log <span className="font-normal normal-case tracking-normal">(last {LINES} lines)</span>
-      </h3>
+      <div className="mb-2 flex items-center gap-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Logs <span className="font-normal normal-case tracking-normal">(last {LINES} lines)</span>
+        </h3>
+        <div className="inline-flex rounded-md border bg-background p-0.5 text-xs" role="tablist">
+          {SERVICES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              role="tab"
+              aria-selected={s === service}
+              onClick={() => setService(s)}
+              className={cn(
+                'rounded px-2 py-0.5',
+                s === service ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {SERVICE_LABELS[s]}
+            </button>
+          ))}
+        </div>
+      </div>
       {error && <div className="mb-2 text-xs text-destructive">{error}</div>}
       <pre
         ref={ref}
@@ -62,4 +87,4 @@ const ServerLogView = () => {
   )
 }
 
-export default ServerLogView
+export default ServiceLogView

@@ -17,12 +17,12 @@ use uuid::Uuid;
 use tauri::http::{Response, StatusCode};
 use tauri::image::Image;
 use tauri::path::BaseDirectory;
-use tauri::{App, AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
-use tauri::menu::{Menu, MenuItem};
+use tauri::{App, AppHandle, Listener, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_shell::{process::CommandChild, ShellExt};
 
-use server::ServerProcess;
+use server::{Service, Services};
 
 
 pub struct ServerState {
@@ -340,7 +340,7 @@ pub fn run() {
         // .invoke_handler(tauri::generate_handler![
         //     execute_command,
         // ])
-        .manage(ServerProcess::default())
+        .manage(Services::default())
         .setup(|app| {
             // PATHS
             setup_path_checker(app)?;
@@ -354,7 +354,25 @@ pub fn run() {
             let quit_item =
                 MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
-            let menu = Menu::with_items(app, &[&show_item, &create_task_item, &quit_item])?;
+            // Live service status (disabled items, updated on every status change).
+            let server_status_item =
+                MenuItem::with_id(app, "status-server", server::status_text(app.handle(), Service::Server), false, None::<&str>)?;
+            let daemon_status_item =
+                MenuItem::with_id(app, "status-daemon", server::status_text(app.handle(), Service::Daemon), false, None::<&str>)?;
+            for (service, item) in [(Service::Server, server_status_item.clone()), (Service::Daemon, daemon_status_item.clone())] {
+                let handle = app.handle().clone();
+                app.listen(service.status_event(), move |_| {
+                    if let Err(e) = item.set_text(server::status_text(&handle, service)) {
+                        eprintln!("failed to update tray status: {e}");
+                    }
+                });
+            }
+            let separator = PredefinedMenuItem::separator(app)?;
+
+            let menu = Menu::with_items(
+                app,
+                &[&server_status_item, &daemon_status_item, &separator, &show_item, &create_task_item, &quit_item],
+            )?;
 
             let tray_icon = Image::from_bytes(include_bytes!("../icons/32x32.png")).expect("Failed to load tray icon");
             //let tray_icon = Image::from_path("icons/32x32.png").expect("Failed to load tray icon");
@@ -400,7 +418,7 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // SERVER (downloaded on first run, started in the background)
+            // SERVER + DAEMON (downloaded on first run, started in the background)
             server::autostart(app.handle());
 
             Ok(())
@@ -410,8 +428,8 @@ pub fn run() {
                 // Fires when the last window closes
                 let app = window.app_handle();
                 if app.webview_windows().is_empty() {
-                    eprintln!("Stopping server because last window was destroyed");
-                    server::stop_server(app);
+                    eprintln!("Stopping server and daemon because last window was destroyed");
+                    server::stop_all(app);
                 }
             }
         })
@@ -427,6 +445,11 @@ pub fn run() {
             server::server_stop,
             server::server_restart,
             server::server_log,
+            server::daemon_status,
+            server::daemon_start,
+            server::daemon_stop,
+            server::daemon_restart,
+            server::daemon_log,
             server::desktop_info
         ])
         .register_uri_scheme_protocol("geenii", |ctx, request| {
@@ -497,7 +520,7 @@ pub fn run() {
         .run(|app, event| {
             // Covers tray "Quit" and other exits that don't destroy the windows first.
             if let RunEvent::Exit = event {
-                server::stop_server(app);
+                server::stop_all(app);
             }
         });
 

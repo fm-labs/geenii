@@ -1,7 +1,7 @@
 import React from 'react'
 import { AppContext } from '../../context/app-context.tsx'
 import TauriUpdaterPanelItem from '@/components/tauri/TauriUpdaterPanelItem.tsx'
-import TauriServerPanelItem from '@/components/tauri/TauriServerPanelItem.tsx'
+import TauriServicesPanelItem from '@/components/tauri/TauriServicesPanelItem.tsx'
 import TauriSettingsPanelItem from '@/components/tauri/TauriSettingsPanelItem.tsx'
 import { TauriPanelProvider, useTauriPanel } from '@/components/tauri/TauriPanelContext.tsx'
 
@@ -16,7 +16,7 @@ const TauriPanel = () => {
     <TauriPanelProvider>
       <div className={'TauriPanel fixed right-0 bottom-0 p-2 pe-3'} style={{zIndex: 10000 }}>
         <div className={'flex items-center gap-1 justify-end text-sm'}>
-          <TauriServerPanelItem />
+          <TauriServicesPanelItem />
           <TauriUpdaterPanelItem />
           {/*<TauriSettingsPanelItem />*/}
         </div>

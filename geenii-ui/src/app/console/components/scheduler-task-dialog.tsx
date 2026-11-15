@@ -331,6 +331,7 @@ const SchedulerTaskDialog = ({ open, onOpenChange, task, onSaved }: {
               {form.targetKind === 'cmd' ? (
                 <>
                   <Input value={form.cmd} onChange={(e) => set('cmd', e.target.value)} className="font-mono"
+                         autoCorrect="off" autoCapitalize="off" spellCheck={false}
                          placeholder={'$GEENII_BIN agent --name mac-bot "Remind me to drink water"'} />
                   <div className="text-xs text-muted-foreground">
                     Run directly, not through a shell. Quote arguments with spaces; <code>$VAR</code> is filled in from the daemon&apos;s environment.
