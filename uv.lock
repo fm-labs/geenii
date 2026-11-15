@@ -558,7 +558,7 @@ server = [
 
 [[package]]
 name = "geenii"
-version = "0.4.0.dev6"
+version = "0.4.0.dev7"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -593,16 +593,16 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", specifier = ">=1.15.0" },
+    { name = "anthropic", specifier = ">=2.7.0" },
     { name = "click", specifier = ">=8.3.1" },
     { name = "croniter", specifier = ">=6.0.0" },
     { name = "cryptography", specifier = ">=49.0.0" },
-    { name = "fastapi", specifier = ">=0.146.0" },
+    { name = "fastapi", specifier = ">=0.162.0" },
     { name = "fastmcp", specifier = ">=4.1.0" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "mcp", specifier = ">=2.3.0" },
-    { name = "ollama", specifier = ">=0.5.1" },
-    { name = "openai", specifier = ">=3.35.0" },
+    { name = "ollama", specifier = ">=0.6.3" },
+    { name = "openai", specifier = ">=3.50.0" },
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pymongo", specifier = ">=4.17.0" },
