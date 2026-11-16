@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import json
 import logging
 import os
@@ -9,6 +9,7 @@ from typing import ClassVar
 from openai import OpenAI
 
 from geenii import config
+from geenii.ai import _ai_log
 from geenii.chat_models import ImageContent, JsonContent, TextContent, ToolCallContent
 from geenii.config import GEENII_CACHE_DIR
 from geenii.datamodels import (
@@ -109,7 +110,7 @@ class OpenAIProvider(
 
         def datetime_from_timestamp(ts):
             """Convert a Unix timestamp to a human-readable datetime isoformat."""
-            return datetime.datetime.fromtimestamp(ts).isoformat()
+            return datetime.fromtimestamp(ts).isoformat()
 
         try:
             openai_models = self.client.models.list()
@@ -341,12 +342,29 @@ class OpenAIProvider(
             int(max_tokens),
             len(input_messages),
         )
+
+        _ai_log(
+            "provider.completion",
+            {
+                "timestamp": str(datetime.now()),
+                "context_id": request.context_id,
+                "model": model,
+                "messages": input_messages,
+                "tools": tool_defs_openai,
+                "options": {
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "top_p": top_p,
+                },
+            },
+        )
+        
         time_start = time.time()
         model_result = self.client.responses.create(
             model=model,
             instructions=instructions,
             input=input_messages,
-            tools=tool_defs_openai or [],
+            tools=tool_defs_openai,
             stream=False,
             text={
                 "format": output_format,

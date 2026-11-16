@@ -2,10 +2,12 @@ import json
 import logging
 import time
 import uuid
+from datetime import datetime
 
 import ollama
 
 from geenii import config
+from geenii.ai import _ai_log
 from geenii.chat_models import (
     ContentPart,
     JsonContent,
@@ -52,7 +54,7 @@ def _usage_from_result(model_result) -> Usage:
 
 
 class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvider):
-    DEFAULT_MODEL = "qwen:3b"
+    DEFAULT_MODEL = "gemma4:latest"
     DEFAULT_TEMPERATURE = 0.1
     DEFAULT_MAX_TOKENS = 8192  # 4096
     DEFAULT_TOP_K = None  # 20
@@ -243,6 +245,7 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             logger.debug(input_messages)
             output_format = request.output_format or None
             output_schema = request.output_schema or None
+            format = output_schema or output_format
 
             model_params = request.model_parameters or {}
             temperature = model_params.get("temperature", request.temperature) or self.DEFAULT_TEMPERATURE
@@ -263,12 +266,22 @@ class OllamaAIProvider(AIProvider, AICompletionProvider, AIChatCompletionProvide
             logger.info(
                 f"OLLAMA: Generating chat completion model={model} ctx={max_tokens} temperature={temperature} output={output_format} and {len(input_messages)} input messages"
             )
+
+            _ai_log("provider.completion", {
+                "timestamp": str(datetime.now()),
+                "context_id": request.context_id,
+                "model": model,
+                "messages": input_messages,
+                "tools": ollama_tools,
+                "options": chat_options,
+            })
+
             model_result = self.ollama.chat(
                 model=model,
                 messages=input_messages,
                 tools=ollama_tools,
                 options=chat_options,
-                format=output_schema or output_format,
+                format=format,
                 # Not supported yet
                 stream=False,
                 # think=None,
@@ -519,7 +532,7 @@ def model_messages_to_ollama_format(messages: list[ModelMessage]) -> list[dict]:
                 elif isinstance(content_item, ToolCallContent):
                     # print(f"Adding message with role {role} and tool call content: {content_item.name} with arguments {content_item.arguments}")
                     _message = {
-                        "role": "tool",
+                        "role": "assistant",
                         "tool_calls": [
                             {
                                 "function": {
@@ -528,7 +541,8 @@ def model_messages_to_ollama_format(messages: list[ModelMessage]) -> list[dict]:
                                 },
                             }
                         ],
-                        "content": f"Tool call: {content_item.name} with arguments {content_item.arguments}",
+                        #"content": f"Tool call: {content_item.name} with arguments {content_item.arguments}",
+                        "content": "",
                     }
                 elif isinstance(content_item, ToolCallResultContent):
                     # print(f"Adding message with role {role} and tool call result content: {content_item.result}")
