@@ -84,6 +84,8 @@ if __name__ == "__main__":
             {"escape": "true"},
         ),
         ("VERSION", "", write_version_to_file, None),
+        ("geenii-ui/package.json", "version", bump_version_json, None),
+        ("geenii-ui/src-tauri/tauri.conf.json", "version", bump_version_json, None)
     ]
     for file_path, key, bump_func, extra in files:
         bump_func(file_path, key, new_version, extra)
