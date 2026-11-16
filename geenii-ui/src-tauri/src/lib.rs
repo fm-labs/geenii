@@ -362,9 +362,16 @@ pub fn run() {
             for (service, item) in [(Service::Server, server_status_item.clone()), (Service::Daemon, daemon_status_item.clone())] {
                 let handle = app.handle().clone();
                 app.listen(service.status_event(), move |_| {
-                    if let Err(e) = item.set_text(server::status_text(&handle, service)) {
-                        eprintln!("failed to update tray status: {e}");
-                    }
+                    // Don't call set_text here directly: off the main thread it blocks until the
+                    // main thread runs it, which deadlocks when the main thread itself is waiting
+                    // on the emitter (e.g. stop_all in RunEvent::Exit). Queue it instead.
+                    let item = item.clone();
+                    let text = server::status_text(&handle, service);
+                    let _ = handle.run_on_main_thread(move || {
+                        if let Err(e) = item.set_text(text) {
+                            eprintln!("failed to update tray status: {e}");
+                        }
+                    });
                 });
             }
             let separator = PredefinedMenuItem::separator(app)?;
