@@ -1,10 +1,10 @@
 [project]
 name = "geenii"
-version = "0.4.0.dev8"
+version = "0.4.0.dev9"
 description = "A versatile AI agent toolkit"
 requires-python = ">=3.14,<4.0"
 authors = [
-    { name = "fm-labs", email = "code@fmlabs.dev" },
+    { name = "fm-labs", email = "geenii@fmlabs.dev" },
 ]
 readme = "README.python.md"
 classifiers = [
