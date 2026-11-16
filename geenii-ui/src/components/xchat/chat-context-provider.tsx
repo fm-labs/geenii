@@ -53,6 +53,13 @@ const ChatProvider = (props: ChatProviderProps) => {
   // stop a running turn when the chat goes away
   React.useEffect(() => () => session.cancel(), [session])
 
+  // a reload or closed tab unmounts nothing, so the server would keep the turn (and the chat busy)
+  React.useEffect(() => {
+    const onPageHide = () => session.cancel()
+    window.addEventListener('pagehide', onPageHide)
+    return () => window.removeEventListener('pagehide', onPageHide)
+  }, [session])
+
   const emptyRenderers = React.useMemo(() => ({}), [])
 
   return (

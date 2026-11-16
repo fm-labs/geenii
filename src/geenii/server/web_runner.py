@@ -63,16 +63,21 @@ class WebAgentRunner:
         """Start a turn and return its event stream (ends after a `done` or `error` event)."""
         if not self._turn.acquire(blocking=False):
             raise AgentBusyError(f"Conversation {self.agent.context_id} is busy")
-        self._cancelled.clear()
-        self.hitl.reset()
+        try:
+            self._cancelled.clear()
+            self.hitl.reset()
 
-        events: queue.Queue = queue.Queue()
-        threading.Thread(
-            target=self._run_turn,
-            args=(content, events),
-            daemon=True,
-            name=f"agent-turn-{self.agent.context_id}",
-        ).start()
+            events: queue.Queue = queue.Queue()
+            threading.Thread(
+                target=self._run_turn,
+                args=(content, events),
+                daemon=True,
+                name=f"agent-turn-{self.agent.context_id}",
+            ).start()
+        except BaseException:
+            # the turn thread never started, so it cannot release the lock
+            self._turn.release()
+            raise
         return self._read(events)
 
     @staticmethod
@@ -81,9 +86,10 @@ class WebAgentRunner:
             yield event
 
     def _run_turn(self, content: str | list[ContentPart], events: queue.Queue) -> None:
-        messages = self.agent.process(content)
+        messages = None
         final: ChatStreamEvent = ChatDoneEvent()
         try:
+            messages = self.agent.process(content)
             events.put(ChatStatusEvent(status="thinking"))
             for message in messages:
                 if self._cancelled.is_set():
@@ -103,12 +109,22 @@ class WebAgentRunner:
             logger.exception(f"Agent run failed for context {self.agent.context_id}", exc_info=e)
             final = ChatErrorEvent(error=str(e))
         finally:
-            messages.close()
-            # a cancelled or failed turn may leave tasks behind; they must not run with the next message
-            self.agent.clear_tasks()
-            self._turn.release()
-            events.put(final)
-            events.put(_END)
+            try:
+                close = getattr(messages, "close", None)
+                if close is not None:
+                    close()
+            except Exception as e:
+                logger.exception(f"Closing the agent run failed for context {self.agent.context_id}", exc_info=e)
+            try:
+                # a cancelled or failed turn may leave tasks behind; they must not run with the next message
+                self.agent.clear_tasks()
+            except Exception as e:
+                logger.exception(f"Clearing tasks failed for context {self.agent.context_id}", exc_info=e)
+            finally:
+                # always free the conversation and end the stream, whatever the cleanup did
+                self._turn.release()
+                events.put(final)
+                events.put(_END)
 
     def respond(self, interaction_id: str, choice: str) -> bool:
         """Answer a pending approval request. Returns False if it is not pending."""

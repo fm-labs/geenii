@@ -90,8 +90,8 @@ export const createAgentBackend = (options: AgentBackendOptions): ChatBackend =>
     return res
   }
 
-  const json = async <T>(method: string, path: string, body?: unknown): Promise<T> =>
-    (await request(method, path, body)).json()
+  const json = async <T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> =>
+    (await request(method, path, body, signal)).json()
 
   // a chat keeps the agent it was created with, which may differ from `agent` (the list shows all chats)
   const chatAgents = new Map<string, string>()
@@ -114,21 +114,24 @@ export const createAgentBackend = (options: AgentBackendOptions): ChatBackend =>
   async function* send(req: ChatSendRequest, signal: AbortSignal): AsyncIterable<ChatEvent> {
     let contextId = req.contextId
     if (!contextId) {
-      const info = await json<ChatSessionInfo>('POST', '', { agent })
+      const info = await json<ChatSessionInfo>('POST', '', { agent }, signal)
       contextId = info.id
       yield { type: 'context', contextId }
     }
+    signal.throwIfAborted()
 
-    const res = await request('POST', `/${contextId}/messages`, { content: req.content }, signal)
-    if (!res.body) throw new Error('Empty response from chat API')
-
-    // closing the stream alone does not stop an agent that waits for a tool approval
+    // closing the stream alone does not stop an agent that waits for a tool approval, so the server is told.
+    // Registered before the request: the turn starts on the server before its response arrives here.
+    // keepalive lets the cancel outlive a page that is being unloaded.
     const id = contextId
     const onAbort = () => {
-      fetch(`${base}/${id}/cancel`, { method: 'POST', headers: options.headers }).catch(() => undefined)
+      fetch(`${base}/${id}/cancel`, { method: 'POST', headers: options.headers, keepalive: true }).catch(() => undefined)
     }
     signal.addEventListener('abort', onAbort, { once: true })
     try {
+      const res = await request('POST', `/${id}/messages`, { content: req.content }, signal)
+      if (!res.body) throw new Error('Empty response from chat API')
+
       for await (const raw of readNdjson(res.body)) {
         const event = toChatEvent(raw)
         if (!event) continue

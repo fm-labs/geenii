@@ -167,7 +167,7 @@ def test_post_message_streams_turn_and_stores_history(client, provider):
     assert events[-1] == {"type": "done"}
     assert _texts(events) == ["Hello there."]
     message = next(e["message"] for e in events if e["type"] == "message")
-    assert message["sender_id"] == "default"
+    assert message["sender_id"] == "default#fake:test"
     assert message["context_id"] == chat
     assert message["id"] == message["message"]["id"]
 
@@ -227,6 +227,50 @@ def test_busy_chat_returns_409(client, store):
     response = client.post(f"/api/v1/chats/{chat}/messages", json={"prompt": "hi"})
 
     assert response.status_code == 409
+
+
+def test_failing_cleanup_still_releases_turn_and_ends_stream(client, store, provider, monkeypatch):
+    """Regression: an exception in the turn's cleanup skipped the lock release and the end of the stream,
+    so the chat stayed busy (409) and the stream reader blocked forever."""
+    chat = _create(client)
+    runner = store.runner(chat)
+
+    def broken_clear_tasks():
+        raise RuntimeError("cleanup failed")
+
+    monkeypatch.setattr(runner.agent, "clear_tasks", broken_clear_tasks)
+    provider.enqueue("hello")
+    events = list(runner.start("hi"))  # would block forever without the end marker
+
+    assert events[-1].type == "done"
+    assert not runner.busy
+
+
+def test_failing_process_call_still_releases_turn(client, store, monkeypatch):
+    chat = _create(client)
+    runner = store.runner(chat)
+
+    def broken_process(content):
+        raise RuntimeError("process failed")
+
+    monkeypatch.setattr(runner.agent, "process", broken_process)
+    events = list(runner.start("hi"))
+
+    assert events[-1].type == "error" and "process failed" in events[-1].error
+    assert not runner.busy
+
+
+def test_failing_turn_start_releases_turn(client, store, monkeypatch):
+    chat = _create(client)
+    runner = store.runner(chat)
+
+    def broken_reset():
+        raise RuntimeError("reset failed")
+
+    monkeypatch.setattr(runner.hitl, "reset", broken_reset)
+    with pytest.raises(RuntimeError):
+        runner.start("hi")
+    assert not runner.busy
 
 
 def test_agent_failure_streams_error_and_releases_turn(client, monkeypatch, provider):
