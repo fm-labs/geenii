@@ -18,7 +18,7 @@ class AgentSpec(pydantic.BaseModel):
 
     file_path: str | None = None  # path to the spec file, used for loading additional instructions
     name: str
-    model: str
+    model: str | None = None
     system: str | None = None
     label: str | None = None
     description: str | None = None
