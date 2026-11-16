@@ -28,8 +28,10 @@ def default_socket_path() -> str:
 
 
 class DaemonClient:
-    def __init__(self, socket_path: str | None = None) -> None:
+    def __init__(self, socket_path: str | None = None, actor: str | None = None) -> None:
         self._socket_path = socket_path or default_socket_path()
+        # Who is calling, recorded with control actions in the process event log
+        self.actor = actor or os.environ.get("GEENII_ACTOR") or "cli"
 
     @property
     def socket_path(self) -> str:
@@ -40,7 +42,9 @@ class DaemonClient:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             sock.connect(self._socket_path)
-            payload = json.dumps({"method": method, "params": params or {}}, separators=(",", ":")) + "\n"
+            params = {**(params or {})}
+            params.setdefault("actor", self.actor)
+            payload = json.dumps({"method": method, "params": params}, separators=(",", ":")) + "\n"
             sock.sendall(payload.encode())
 
             # read until newline

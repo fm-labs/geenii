@@ -2,7 +2,7 @@
 HTTP routes for viewing and editing the scheduler config.
 
 Works on the scheduler config file: the one the running daemon was started with,
-or the default .geenii/scheduler.json. Reads add the live state of each task
+or the default ~/.geenii/scheduler.json. Reads add the live state of each task
 (next/last run, running) when the daemon is running; writes update the file and
 make a daemon that uses it reload, like `geenii scheduler add/remove`.
 """
@@ -17,6 +17,7 @@ import threading
 import pydantic
 from fastapi import APIRouter, Depends, HTTPException
 
+from geenii import proc_events
 from geenii.daemon.client import DaemonClient
 from geenii.scheduler import SchedulerConfig, parse_interval
 from geenii.server.daemon_routes import dep_daemon_client
@@ -237,6 +238,7 @@ def create_task(
             raise HTTPException(409, f"Task '{entry['name']}' already exists")
         data["tasks"].append(entry)
         _write(path, data)
+    proc_events.record("scheduler", "task.add", actor="api", name=entry["name"], cmd=entry.get("cmd"), path=path)
     return {"task": entry, "path": path, "reload": _reload(client, live)}
 
 
@@ -262,6 +264,16 @@ def update_task(
         extra = {k: v for k, v in data["tasks"][i].items() if k not in _TASK_FIELDS}
         data["tasks"][i] = {**new_entry, **extra}
         _write(path, data)
+    proc_events.record(
+        "scheduler",
+        "task.update",
+        actor="api",
+        name=new_entry["name"],
+        renamed_from=name if new_entry["name"] != name else None,
+        cmd=new_entry.get("cmd"),
+        enabled=new_entry.get("enabled", True),
+        path=path,
+    )
     return {"task": data["tasks"][i], "path": path, "reload": _reload(client, live)}
 
 
@@ -282,6 +294,7 @@ def delete_task(
             raise HTTPException(404, f"Task '{name}' not found in {path}")
         del data["tasks"][i]
         _write(path, data)
+    proc_events.record("scheduler", "task.delete", actor="api", name=name, path=path)
     return {"path": path, "reload": _reload(client, live)}
 
 

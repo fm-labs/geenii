@@ -2,7 +2,7 @@
 HTTP routes for viewing and editing the supervisor's services and controlling them.
 
 Works on the services config file: the one the running daemon was started with,
-or the default .geenii/services.json. Reads add the live state of each service
+or the default ~/.geenii/services.json. Reads add the live state of each service
 (running, pid, uptime, ...) when the daemon is running; writes update the file and
 make a daemon that uses it reload, like `geenii supervisor add/remove`.
 Start/stop/restart/logs act on the running daemon only.
@@ -18,9 +18,10 @@ import threading
 import pydantic
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from geenii import proc_events
 from geenii.daemon.client import DaemonClient
 from geenii.server.daemon_routes import dep_daemon_client
-from geenii.supervisor import ServiceConfig
+from geenii.supervisor import MAX_FAILURES, ServiceConfig
 
 router = APIRouter(prefix="/supervisor", tags=["supervisor"])
 
@@ -53,6 +54,9 @@ class ServiceInput(pydantic.BaseModel):
     env: dict[str, str] | None = None
     cwd: str | None = None
     capture_output: bool = True
+    max_failures: int = pydantic.Field(
+        MAX_FAILURES, ge=0, description="Give up after this many failures in a row; 0: never"
+    )
     enabled: bool = True
 
     def to_entry(self) -> dict:
@@ -66,6 +70,8 @@ class ServiceInput(pydantic.BaseModel):
             entry["cwd"] = self.cwd.strip()
         if not self.capture_output:
             entry["capture_output"] = False
+        if self.max_failures != MAX_FAILURES:
+            entry["max_failures"] = self.max_failures
         if not self.enabled:
             entry["enabled"] = False
         return entry
@@ -87,6 +93,9 @@ def _live_state(status: dict, name: str) -> dict | None:
     watcher = status["watchers"].get(name)
     if running and running.get("returncode") is None:
         state = "running"
+    elif desired.get("gave_up"):
+        # Stopped restarting after max_failures failures in a row
+        state = "failed"
     elif watcher and not watcher["done"]:
         # Waiting out the restart delay, or (re)spawning
         state = "restarting"
@@ -101,6 +110,9 @@ def _live_state(status: dict, name: str) -> dict | None:
         "backoff_s": running["backoff_s"] if running else None,
         "last_exit": running["last_exit"] if running else None,
         "restart": desired["restart"],
+        "failures": desired.get("failures", 0),
+        "max_failures": desired.get("max_failures"),
+        "gave_up": desired.get("gave_up"),
     }
 
 
@@ -265,6 +277,7 @@ def create_service(
             raise HTTPException(409, f"Service '{entry['name']}' already exists")
         data["services"].append(entry)
         _write(path, data)
+    proc_events.record("supervisor", "service.add", actor="api", name=entry["name"], cmd=entry.get("cmd"), path=path)
     return {"service": entry, "path": path, "reload": _reload(client, live)}
 
 
@@ -290,6 +303,16 @@ def update_service(
         extra = {k: v for k, v in data["services"][i].items() if k not in _SERVICE_FIELDS}
         data["services"][i] = {**new_entry, **extra}
         _write(path, data)
+    proc_events.record(
+        "supervisor",
+        "service.update",
+        actor="api",
+        name=new_entry["name"],
+        renamed_from=name if new_entry["name"] != name else None,
+        cmd=new_entry.get("cmd"),
+        enabled=new_entry.get("enabled", True),
+        path=path,
+    )
     return {"service": data["services"][i], "path": path, "reload": _reload(client, live)}
 
 
@@ -310,6 +333,7 @@ def delete_service(
             raise HTTPException(404, f"Service '{name}' not found in {path}")
         del data["services"][i]
         _write(path, data)
+    proc_events.record("supervisor", "service.delete", actor="api", name=name, path=path)
     return {"path": path, "reload": _reload(client, live)}
 
 

@@ -211,3 +211,29 @@ def test_control_errors(api, error, status):
     fake = FakeDaemonClient(EMPTY_STATUS)
     fake.error = error
     assert make(fake).post("/api/v1/supervisor/services/web/start").status_code == status
+
+
+def test_failed_state_and_max_failures(api, tmp_path):
+    make, _ = api
+    path = str(tmp_path / "daemon-services.json")
+    _write(path, [{"name": "web", "cmd": ["x"], "max_failures": 5}])
+    status = {
+        "desired": {
+            "web": {**_desired(["x"]), "max_failures": 5, "failures": 5, "gave_up": {"failures": 5, "at": 1.0}}
+        },
+        "running": {},
+        "watchers": {"web": {"done": True, "cancelled": False, "task_name": "watch:web"}},
+    }
+    (web,) = make(FakeDaemonClient(status, config=path)).get("/api/v1/supervisor/config").json()["services"]
+    assert web["live"]["state"] == "failed"
+    assert web["live"]["failures"] == 5 and web["max_failures"] == 5
+
+    client = make()
+    client.post("/api/v1/supervisor/services", json={"name": "a", "cmd": ["x"], "max_failures": 0})
+    client.post("/api/v1/supervisor/services", json={"name": "b", "cmd": ["x"], "max_failures": 1000})
+    _, default_path = api
+    assert _read(default_path) == [{"name": "a", "cmd": ["x"], "max_failures": 0}, {"name": "b", "cmd": ["x"]}]
+    assert (
+        client.post("/api/v1/supervisor/services", json={"name": "c", "cmd": ["x"], "max_failures": -1}).status_code
+        == 422
+    )

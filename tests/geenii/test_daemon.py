@@ -509,3 +509,30 @@ def test_scheduler_routes_edit_and_run_in_live_daemon(short_dir):
             assert http.post("/api/v1/scheduler/tasks/missing/run").status_code == 404
         finally:
             app.dependency_overrides.pop(daemon_routes.dep_daemon_client, None)
+
+
+def test_default_configs_are_in_the_user_home():
+    from geenii import config
+    from geenii.daemon import server as daemon_server
+
+    home = os.path.join(config.GEENII_USER_HOME, ".geenii")
+    assert daemon_server.DEFAULT_SCHEDULER_CONFIG == os.path.join(home, "scheduler.json")
+    assert daemon_server.DEFAULT_SERVICES_CONFIG == os.path.join(home, "services.json")
+
+
+def test_warns_about_a_config_left_in_the_working_dir(tmp_path, monkeypatch, caplog):
+    from geenii.daemon import server as daemon_server
+
+    project = tmp_path / "project"
+    (project / ".geenii").mkdir(parents=True)
+    (project / ".geenii" / "services.json").write_text('{"services": []}')
+    default = str(tmp_path / "home" / ".geenii" / "services.json")
+    monkeypatch.setattr(daemon_server, "GEENII_WORKING_DIR", str(project))
+
+    with caplog.at_level("WARNING", logger=daemon_server.logger.name):
+        daemon_server._warn_if_project_config(default, default)
+        assert "Ignoring" in caplog.text and str(project) in caplog.text
+        caplog.clear()
+        # An explicitly given config is not second-guessed
+        daemon_server._warn_if_project_config(str(tmp_path / "other.json"), default)
+        assert caplog.text == ""

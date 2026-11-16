@@ -123,7 +123,7 @@ class ExecutePmCommandProcessor(FlowProcessor):
 
     def process(self, input_data: Any, ctx: FlowContext) -> Generator[Any, None, ExecutePmCommandOutput]:
         c: ExecutePmCommandConfig = self.config
-        client = ProcessManagerClient(c.socket)
+        client = ProcessManagerClient(c.socket, actor="flow")
         info = client.start(c.command, env=c.env, cwd=c.cwd, pid=c.pid)
         process_id = info["pid"]
         yield StepEvent(

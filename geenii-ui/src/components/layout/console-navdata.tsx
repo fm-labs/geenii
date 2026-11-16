@@ -70,6 +70,10 @@ export const consoleNavData = {
           url: '#/console/system/stats',
         },
         {
+          title: 'Process stats',
+          url: '#/console/system/process-stats',
+        },
+        {
           title: 'Scheduler',
           url: '#/console/system/scheduler',
         },

@@ -37,7 +37,7 @@ event loop. They are reached through **one Unix socket**.
         │
   ProcessHost (daemon/host.py): owns the components, registers their RPC methods
         ├── ProcessManager   pm.*
-        ├── Scheduler        scheduler.*   (tasks from $GEENII_WORKING_DIR/.geenii/scheduler.json)
+        ├── Scheduler        scheduler.*   (tasks from ~/.geenii/scheduler.json)
         └── Supervisor       supervisor.*
 ```
 
@@ -99,7 +99,7 @@ connection may send several requests.
 | `scheduler.run` | `name` | `"started"`. Starts a run now via `Scheduler.run_now()`, without waiting for it. Fails for unknown tasks, or if the task is still running and doesn't allow overlap |
 | `scheduler.reload` | none | `{"added": [...], "removed": [...], "updated": [...]}`. Re-reads the daemon's scheduler config via `Scheduler.reload_config()`. Fails if the daemon was started without a config file |
 | `supervisor.status` | none | `Supervisor.status()` |
-| `supervisor.ensure` | `name`, `cmd` (list of strings), `restart?`, `env?`, `cwd?`, `capture_output?` | `"ok"` |
+| `supervisor.ensure` | `name`, `cmd` (list of strings), `restart?`, `env?`, `cwd?`, `capture_output?`, `max_failures?` | `"ok"` |
 | `supervisor.stop` | `name`, `disable_restart?` (default `true`) | `"ok"` |
 | `supervisor.restart` | `name` | `"ok"` |
 | `supervisor.logs` | `name`, `tail?` (default 100) | list of log lines |
@@ -171,7 +171,7 @@ event loop. They are designed to be called from concurrent FastAPI handlers.
 
 | Type | Purpose |
 |---|---|
-| `ProcConfig` | The declared (desired) state: `name`, `cmd: list[str]`, `restart=True`, `env` (extra variables, merged into `os.environ`), `cwd`, `capture_output=True` |
+| `ProcConfig` | The declared (desired) state: `name`, `cmd: list[str]`, `restart=True`, `env` (extra variables, merged into `os.environ`), `cwd`, `capture_output=True`, `max_failures=1000` |
 | `UpdateProcRequest` | Pydantic model for partial updates: `restart`, `env`, `cwd` |
 | `ProcRuntime` | The live state: the `asyncio.subprocess.Process`, `started_at`, `last_exit`, and the stdout/stderr pipe tasks |
 | `RunResult` | Result of a one-shot `run()`: `returncode`, `stdout`/`stderr` as lists of lines, `duration_s` |
@@ -190,7 +190,8 @@ Tuning constants at module level:
 | Constant | Default | Meaning |
 |---|---|---|
 | `BACKOFF_INITIAL` | `0.5` | Restart delay after a clean exit or the first crash |
-| `BACKOFF_MAX` | `30.0` | Upper bound for the doubling restart delay |
+| `BACKOFF_MAX` | `3600.0` | Upper bound for the doubling restart delay |
+| `MAX_FAILURES` | `1000` | Default `max_failures`: failures in a row before the supervisor gives up (`0`: never) |
 | `BACKOFF_RESET_AFTER` | `60.0` | A process that stayed up this many seconds before crashing starts again from `BACKOFF_INITIAL` |
 | `RUN_LOG_HISTORY` | `50` | Number of finished `run()` log buffers kept |
 | `SUBSCRIBER_QUEUE_SIZE` | `1000` | Maximum events queued for each log subscriber |
@@ -222,7 +223,18 @@ ensure(name, cfg)
   backoff resets to `BACKOFF_INITIAL`.
 - **Non-zero exit:** the process waits the current backoff, and the stored
   backoff doubles, up to `BACKOFF_MAX`. A process that keeps crashing
-  therefore waits 0.5s, 1s, 2s, … and then 30s between attempts.
+  therefore waits 0.5s, 1s, 2s, … and then 1h between attempts (reached
+  after 13 crashes).
+
+Crashes and spawn errors in a row are counted in `_failures`. The count resets
+whenever the backoff does (clean exit, or uptime ≥ `BACKOFF_RESET_AFTER`). When
+it reaches the process's `max_failures`, the watcher stops: the process stays
+desired, `status()["desired"][name]["gave_up"]` is set to `{failures, at}`, a
+`gave_up` event is recorded, and the HTTP API shows the state as `failed`.
+`restart_process()` (and `supervisor.start`) resets the count and tries again,
+and so does `ensure()` for a process that was given up on. With the default of
+1000 and a 1h delay cap, a process that never comes up is given up on after
+about 41 days.
 
 Every process is started in its **own process group**
 (`start_new_session=True`), the same way the Scheduler and the Process Manager
@@ -259,7 +271,7 @@ services that the daemon starts at startup.
 
 | Item | Purpose |
 |---|---|
-| `ServiceConfig` | Pydantic schema for one entry: `name`, `cmd`, `restart`, `env`, `cwd`, `capture_output`, `enabled` |
+| `ServiceConfig` | Pydantic schema for one entry: `name`, `cmd`, `restart`, `env`, `cwd`, `capture_output`, `max_failures`, `enabled` |
 | `read_services(path)` | Parses the file into `ProcConfig`s. Expands `$VAR` in `cmd`/`cwd` and `~` in `cwd`. Invalid entries, disabled services and duplicate names are logged and skipped. A missing file or bad JSON raises |
 | `await apply_services(configs)` | Makes the file-declared services match `configs` and returns `{"started", "stopped", "restarted"}` |
 
@@ -303,7 +315,7 @@ written to the Python logger at `INFO` level as `[name][tag] msg`.
 
 `geenii/scheduler.py` runs tasks on a cron schedule (`cron:EXPR`) or once at a
 set time (`at:ISO_DATETIME`). Task definitions come from a JSON file (by
-default `$GEENII_WORKING_DIR/.geenii/scheduler.json`) or are added programmatically. Config
+default `~/.geenii/scheduler.json`) or are added programmatically. Config
 format and usage are covered in the [user guide](../user-guide/scheduler.md);
 this section covers the internals.
 
@@ -554,6 +566,53 @@ file exists and that `ping` succeeds. The client has no socket timeout.
   `kill`, `list` and `cleanup`, plus `serve`, an alias for
   `geenii daemon start`. The socket path can be overridden with `--socket`,
   `GEENII_SOCKET` or `GEENII_PM_SOCKET`.
+
+---
+
+## Process event log (`geenii/proc_events.py`)
+
+All three components record what they run, and the control actions taken on
+them, in one append-only log:
+`$GEENII_CACHE_DIR/logs/proc-events-YYYY-MM.log`, one JSON object per line,
+one file per UTC month. It works like the AI usage log.
+
+Every line has the same envelope: `ts`, `component` (`pm`, `scheduler`,
+`supervisor`), `event`, and where it applies `name` (task or service),
+`run_id`, `system_pid`, `trigger`, `actor`, `cmd`, `state`, `exit_code`,
+`duration_ms` and `error`.
+
+| Kind | Events | Recorded by |
+|------|--------|-------------|
+| Run events | `start`, `exit`, `spawn_error` | process manager (all pm processes, including scheduled `cmd` tasks, which carry `component: scheduler`), scheduler (callable tasks), supervisor |
+| | `timeout`, `skipped` | scheduler |
+| | `restart_scheduled` (with `backoff_s`), `gave_up` | supervisor |
+| Control actions | `service.*`, `task.*`, `config.reload`, `pm.kill`, `pm.cleanup`, `pm.gc` | daemon RPC handlers (`daemon/host.py`), config-file routes, CLI `add`/`remove` |
+
+- **Triggers:** `schedule` or `manual` for scheduled tasks; `start` or
+  `restart` for services; `manual` for processes started through `pm.start`.
+- **Actors:** `DaemonClient(actor=...)` sends an `actor` param with every call.
+  The default is `$GEENII_ACTOR` or `cli`. The HTTP API uses `api`, the
+  process-manager agent `agent` and flows `flow`. Actions arriving without an
+  actor are recorded as `unknown`.
+- **Secrets:** environment variable values are never written. In `cmd`,
+  secret-looking values are masked (`TOKEN=***`, `--api-key ***`,
+  `Bearer ***`), and long arguments and argument lists are shortened.
+- **Writing never raises**, so a full disk can't break a run.
+- **Retention:** the daemon deletes monthly files older than
+  `GEENII_PROC_EVENTS_KEEP_MONTHS` (default 12; 0 keeps everything) when it
+  starts.
+
+Stats (`geenii/proc_stats.py`) are counted per local day and per
+(component, name). Each monthly file is aggregated once and cached like the AI
+usage stats (`usage_stats.UsageStatsCache`).
+
+| Endpoint | Returns |
+|----------|---------|
+| `GET /api/v1/stats/processes?days=30` | totals, daily series, runs per hour, breakdowns by component and by task/service |
+| `GET /api/v1/stats/processes/events?limit=&component=&name=&event=&audit=` | newest events first; `event` takes a prefix such as `service.`, `audit=true` returns only control actions |
+| `GET /api/v1/stats/processes/events.csv?days=30` | all events of the range as CSV; fields without their own column are in `details` (JSON) |
+
+The console shows these under **System → Process stats**.
 
 ---
 

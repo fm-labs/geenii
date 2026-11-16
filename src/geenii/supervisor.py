@@ -36,11 +36,13 @@ from typing import Any, Literal
 import pydantic
 
 from geenii import proc as proc_util
+from geenii import proc_events
 
 logger = logging.getLogger(__name__)
 
 BACKOFF_INITIAL = 0.5  # restart delay after a clean exit / first crash
-BACKOFF_MAX = 30.0  # upper bound for the exponential restart delay
+BACKOFF_MAX = 3600.0  # upper bound for the exponential restart delay
+MAX_FAILURES = 1000  # default: give up after this many failures in a row (0: never give up)
 BACKOFF_RESET_AFTER = 60.0  # a process that ran this long counts as healthy again
 RUN_LOG_HISTORY = 50  # number of finished one-shot run() log buffers to keep
 SUBSCRIBER_QUEUE_SIZE = 1000  # per-subscriber queue bound; oldest events are dropped
@@ -62,6 +64,8 @@ class ProcConfig:
     env: dict[str, str] | None = None  # extra vars; merged into os.environ at spawn time
     cwd: str | None = None
     capture_output: bool = True
+    # Stop restarting after this many failures in a row (crashes or spawn errors); 0: never give up
+    max_failures: int = MAX_FAILURES
 
 
 class ServiceConfig(pydantic.BaseModel):
@@ -75,6 +79,7 @@ class ServiceConfig(pydantic.BaseModel):
     env: dict[str, str] | None = None
     cwd: str | None = None
     capture_output: bool = True
+    max_failures: int = pydantic.Field(MAX_FAILURES, ge=0)
     enabled: bool = True
 
 
@@ -116,6 +121,7 @@ def read_services(config_path: str | Path) -> list[ProcConfig]:
                 env=conf.env,
                 cwd=os.path.expanduser(os.path.expandvars(conf.cwd)) if conf.cwd else None,
                 capture_output=conf.capture_output,
+                max_failures=conf.max_failures,
             )
         )
     return services
@@ -234,6 +240,10 @@ class Supervisor:
         # Restart delay per process. Kept outside ProcRuntime because the
         # runtime entry is dropped on every exit.
         self._backoff: dict[str, float] = {}
+        # Failures in a row per process (crashes and spawn errors), reset once it ran healthy
+        self._failures: dict[str, int] = {}
+        # Processes the supervisor gave up on after max_failures: name -> {"failures", "at"}
+        self._gave_up: dict[str, dict[str, Any]] = {}
         # Names of finished one-shot run() jobs, oldest first; evicted ones lose their LogBus
         self._run_history: deque[str] = deque()
         # Services declared in the config file, as last applied (copies; see apply_services)
@@ -339,6 +349,9 @@ class Supervisor:
         async with self._lock:
             self._configs[name] = cfg
             self._logs.setdefault(name, LogBus())
+            if name in self._gave_up:
+                # A new definition gets a fresh set of attempts
+                self._reset_failures(name)
             self._ensure_watcher_locked(name)
 
     async def stop_process(self, name: str, *, disable_restart: bool = True) -> None:
@@ -346,6 +359,7 @@ class Supervisor:
             if disable_restart:
                 self._configs.pop(name, None)
                 self._backoff.pop(name, None)
+                self._reset_failures(name)
             await self._cancel_watcher_locked(name)
             await self._terminate_locked(name)
 
@@ -358,6 +372,7 @@ class Supervisor:
             await self._cancel_watcher_locked(name)
             await self._terminate_locked(name)
             self._backoff[name] = BACKOFF_INITIAL
+            self._reset_failures(name)
             self._ensure_watcher_locked(name)
 
     async def apply_services(self, services: list[ProcConfig]) -> dict[str, list[str]]:
@@ -420,6 +435,10 @@ class Supervisor:
                 "cwd": cfg.cwd,
                 "capture_output": cfg.capture_output,
                 "env_keys": sorted(cfg.env) if cfg.env else [],
+                "max_failures": cfg.max_failures,
+                "failures": self._failures.get(name, 0),
+                # Set when the supervisor stopped restarting it: {"failures", "at"}
+                "gave_up": self._gave_up.get(name),
             }
         for name, rt in self._runtime.items():
             out["running"][name] = {
@@ -502,10 +521,27 @@ class Supervisor:
         """
         if rc == 0 or uptime >= BACKOFF_RESET_AFTER:
             self._backoff[name] = BACKOFF_INITIAL
+            self._failures.pop(name, None)
+        if rc != 0:
+            self._failures[name] = self._failures.get(name, 0) + 1
         delay = self._backoff.get(name, BACKOFF_INITIAL)
         if rc != 0:
             self._backoff[name] = min(delay * 2, BACKOFF_MAX)
         return delay
+
+    def _reset_failures(self, name: str) -> None:
+        self._failures.pop(name, None)
+        self._gave_up.pop(name, None)
+
+    def _give_up(self, name: str, cfg: ProcConfig) -> bool:
+        """True (and the process marked as given up) once it failed max_failures times in a row."""
+        failures = self._failures.get(name, 0)
+        if not cfg.max_failures or failures < cfg.max_failures:
+            return False
+        self._gave_up[name] = {"failures": failures, "at": time.time()}
+        self._log(name, f"gave up after {failures} failures in a row; start or restart it to try again")
+        proc_events.record("supervisor", "gave_up", name=name, failures=failures, max_failures=cfg.max_failures)
+        return True
 
     def _retire_run_log(self, job: str) -> None:
         """Keep the LogBus of a finished run() job, evicting the oldest beyond RUN_LOG_HISTORY."""
@@ -525,6 +561,7 @@ class Supervisor:
         Desired-state loop.  Runs outside any lock; acquires it only when
         mutating shared dicts (config read is effectively immutable once set).
         """
+        trigger = "start"
         while not self._stop_event.is_set():
             # Read config without lock — single-threaded asyncio means this
             # is consistent as long as we don't yield between check and use
@@ -534,8 +571,11 @@ class Supervisor:
                 return
 
             rt = self._runtime.get(name)
-            if rt is not None and rt.proc.returncode is None:
-                # Process is running; wait for it to exit.
+            if rt is not None:
+                # Spawned and its exit not handled yet. Checking returncode here instead
+                # would miss a fast exit: asyncio may set it before wait() is awaited,
+                # and the process would be respawned without backoff. wait() returns
+                # at once for a process that already exited.
                 try:
                     rc = await rt.proc.wait()
                 except asyncio.CancelledError:
@@ -544,6 +584,7 @@ class Supervisor:
 
                 rt.last_exit = {"returncode": rc, "exited_at": time.time()}
                 self._log(name, f"exited rc={rc}")
+                self._record_exit(name, rt, "completed" if rc == 0 else "failed")
 
                 # Re-read config after await — it may have changed
                 cfg = self._configs.get(name)
@@ -553,25 +594,40 @@ class Supervisor:
 
                 delay = self._next_delay(name, rc, time.time() - rt.started_at)
                 self._runtime.pop(name, None)
+                if self._give_up(name, cfg):
+                    return
                 self._log(name, f"restarting in {delay:.1f}s")
+                proc_events.record("supervisor", "restart_scheduled", name=name, exit_code=rc, backoff_s=delay)
+                trigger = "restart"
                 await asyncio.sleep(delay)
 
             else:
                 # Not running yet (or runtime cleared) — spawn it.
                 try:
-                    await self._spawn(name, cfg)
+                    await self._spawn(name, cfg, trigger)
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
                     # Escalate the same backoff as crashes to avoid tight loops
                     delay = self._next_delay(name, None, 0.0)
-                    self._log(
-                        name,
-                        f"spawn error: {type(exc).__name__}: {exc}. retrying in {delay:.1f}s",
+                    giving_up = bool(cfg.max_failures) and self._failures.get(name, 0) >= cfg.max_failures
+                    retry = "" if giving_up else f". retrying in {delay:.1f}s"
+                    self._log(name, f"spawn error: {type(exc).__name__}: {exc}{retry}")
+                    proc_events.record(
+                        "supervisor",
+                        "spawn_error",
+                        name=name,
+                        trigger=trigger,
+                        cmd=cfg.cmd,
+                        error=f"{type(exc).__name__}: {exc}",
+                        backoff_s=None if giving_up else delay,
                     )
+                    if self._give_up(name, cfg):
+                        return
+                    trigger = "restart"
                     await asyncio.sleep(delay)
 
-    async def _spawn(self, name: str, cfg: ProcConfig) -> None:
+    async def _spawn(self, name: str, cfg: ProcConfig, trigger: str = "start") -> None:
         self._log(name, f"starting: {' '.join(cfg.cmd)}")
 
         # cfg.env is merged over os.environ (not a replacement)
@@ -587,6 +643,18 @@ class Supervisor:
                 rt.err_task = asyncio.create_task(self._pipe(name, proc.stderr, "stderr"), name=f"pipe:{name}:err")
 
         self._log(name, f"started pid={proc.pid}")
+        proc_events.record("supervisor", "start", name=name, system_pid=proc.pid, trigger=trigger, cmd=cfg.cmd)
+
+    def _record_exit(self, name: str, rt: ProcRuntime, state: str) -> None:
+        proc_events.record(
+            "supervisor",
+            "exit",
+            name=name,
+            system_pid=rt.proc.pid,
+            state=state,
+            exit_code=rt.proc.returncode,
+            duration_ms=round((time.time() - rt.started_at) * 1000),
+        )
 
     async def _pipe(self, name: str, stream: asyncio.StreamReader, tag: Tag) -> None:
         try:
@@ -628,6 +696,7 @@ class Supervisor:
 
         await proc_util.terminate(proc, grace=TERMINATE_GRACE_S)
         self._log(name, f"terminated rc={proc.returncode}")
+        self._record_exit(name, rt, "killed")
         self._runtime.pop(name, None)
 
 

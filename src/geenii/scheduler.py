@@ -37,6 +37,7 @@ import logging
 import os
 import re
 import sys
+import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -47,6 +48,7 @@ from typing import Any
 import pydantic
 from croniter import croniter
 
+from geenii import proc_events
 from geenii.pm.process_manager import ProcessManager, ProcessState
 from geenii.tool.common import expand_vars
 
@@ -136,26 +138,62 @@ class ScheduledTask:
         base = after or datetime.now(UTC)
         return croniter(value, base).get_next(datetime).replace(tzinfo=UTC)
 
-    async def run(self, pm: ProcessManager | None = None) -> None:
+    async def run(self, pm: ProcessManager | None = None, trigger: str = "schedule") -> None:
         """Run the task: cmd as a process of pm, or the Python callable (run_fn).
 
         Failures and timeouts are logged, not raised. Cancellation propagates.
         Raises ValueError if a cmd task is run without a ProcessManager.
+        `trigger` ("schedule" or "manual") is recorded in the process event log.
         """
         if self.cmd and pm is None:
             raise ValueError(f"Task '{self.name}' runs a command and needs a ProcessManager")
         logger.info("Running task '%s'", self.name)
+        # A cmd run is recorded by the process manager; a callable run here
+        fn_run_id = None if self.cmd else self._new_run_id()
+        fn_started = time.monotonic()
+        if fn_run_id:
+            proc_events.record(
+                "scheduler", "start", name=self.name, run_id=fn_run_id, trigger=trigger, cmd=self.module or None
+            )
+
+        def fn_exit(state: str, error: str | None = None) -> None:
+            if fn_run_id:
+                proc_events.record(
+                    "scheduler",
+                    "exit",
+                    name=self.name,
+                    run_id=fn_run_id,
+                    trigger=trigger,
+                    state=state,
+                    duration_ms=round((time.monotonic() - fn_started) * 1000),
+                    error=error,
+                )
+
         try:
-            await asyncio.wait_for(self._execute(pm), timeout=self.timeout)
+            await asyncio.wait_for(self._execute(pm, trigger), timeout=self.timeout)
             logger.info("Task '%s' completed successfully", self.name)
+            fn_exit("completed")
         except TimeoutError:
             logger.error("Task '%s' timed out after %ss", self.name, self.timeout)
-        except Exception:
+            proc_events.record(
+                "scheduler",
+                "timeout",
+                name=self.name,
+                run_id=fn_run_id or self.last_run_id,
+                trigger=trigger,
+                timeout=self.timeout,
+            )
+            fn_exit("killed", f"timed out after {self.timeout}s")
+        except asyncio.CancelledError:
+            fn_exit("killed", "cancelled")
+            raise
+        except Exception as exc:
             logger.exception("Task '%s' failed", self.name)
+            fn_exit("failed", f"{type(exc).__name__}: {exc}")
 
-    async def _execute(self, pm: ProcessManager | None) -> None:
+    async def _execute(self, pm: ProcessManager | None, trigger: str = "schedule") -> None:
         if self.cmd:
-            await self._run_cmd(pm)
+            await self._run_cmd(pm, trigger)
         elif self.run_fn is not None:
             args = (self.params or [], self.env) if self._pass_args else ()
             if inspect.iscoroutinefunction(self.run_fn):
@@ -167,13 +205,14 @@ class ScheduledTask:
         else:
             raise RuntimeError("Task has no cmd or run_fn")
 
-    async def _run_cmd(self, pm: ProcessManager) -> None:
+    async def _run_cmd(self, pm: ProcessManager, trigger: str = "schedule") -> None:
         expanded = [os.path.expandvars(arg) for arg in self.cmd]
         info = await pm.start(
             expanded,
             env=self.env,
             cwd=str(self.working_dir) if self.working_dir else None,
             pid=self._new_run_id(),
+            origin={"component": "scheduler", "name": self.name, "trigger": trigger},
         )
         self.last_run_id = info.pid
         logger.info("Task '%s' started as process %s: %s", self.name, info.pid, expanded)
@@ -480,7 +519,7 @@ class Scheduler:
             if not task.allow_overlap and self._is_running(task.name):
                 raise RuntimeError(f"Task '{task_name}' is already running")
             logger.info("Task '%s' started manually", task.name)
-            self._launch(task)
+            self._launch(task, trigger="manual")
             self._last_run[task.name] = datetime.now(UTC)
 
     async def remove_task(self, task_name: str) -> None:
@@ -493,8 +532,8 @@ class Scheduler:
 
     # -- main loop ------------------------------------------------------------
 
-    def _launch(self, task: ScheduledTask) -> None:
-        _t = asyncio.create_task(task.run(self.pm), name=f"task:{task.name}")
+    def _launch(self, task: ScheduledTask, trigger: str = "schedule") -> None:
+        _t = asyncio.create_task(task.run(self.pm, trigger), name=f"task:{task.name}")
         self._running_tasks.add(_t)
         self._active[task.name] = _t
 
@@ -527,6 +566,13 @@ class Scheduler:
                             logger.warning(
                                 "Task '%s' is due but its previous run is still in progress — skipping",
                                 task.name,
+                            )
+                            proc_events.record(
+                                "scheduler",
+                                "skipped",
+                                name=task.name,
+                                trigger="schedule",
+                                error="previous run still in progress",
                             )
                         else:
                             logger.info(

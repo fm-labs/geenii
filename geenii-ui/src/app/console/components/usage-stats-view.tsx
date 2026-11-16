@@ -43,22 +43,22 @@ type UsageStats = {
   by_task: UsageRow[]
 }
 
-const RANGES = [
+export const RANGES = [
   { label: '7 days', days: 7 },
   { label: '30 days', days: 30 },
   { label: '90 days', days: 90 },
   { label: 'All time', days: 0 },
 ] as const
 
-const COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)']
-const color = (i: number) => COLORS[i % COLORS.length]
+export const COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)']
+export const color = (i: number) => COLORS[i % COLORS.length]
 const OTHER_COLOR = 'var(--muted-foreground)'
 
 const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
-const full = new Intl.NumberFormat()
-const fmt = (n: number) => compact.format(n)
-const fmtDuration = (ms: number | null) => ms === null ? '—' : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`
-const fmtDay = (iso: string, long = false) =>
+export const full = new Intl.NumberFormat()
+export const fmt = (n: number) => compact.format(n)
+export const fmtDuration = (ms: number | null) => ms === null ? '—' : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`
+export const fmtDay = (iso: string, long = false) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, long ? { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' })
 
 /** The top `n` rows plus one "other" row summing the rest */
@@ -74,7 +74,7 @@ const topRows = (rows: UsageRow[], n: number): UsageRow[] => {
   return [...rows.slice(0, n), other]
 }
 
-const ChartTooltip = ({ active, payload, label, labelFormatter }: {
+export const ChartTooltip = ({ active, payload, label, labelFormatter }: {
   active?: boolean
   payload?: { name: string, value: number, color?: string, payload?: any }[]
   label?: string | number
@@ -95,14 +95,14 @@ const ChartTooltip = ({ active, payload, label, labelFormatter }: {
   )
 }
 
-const axisProps = {
+export const axisProps = {
   stroke: 'var(--muted-foreground)',
   fontSize: 11,
   tickLine: false,
   axisLine: false,
 } as const
 
-const Kpi = ({ icon: Icon, label, value, hint }: { icon: React.ElementType, label: string, value: React.ReactNode, hint?: React.ReactNode }) => (
+export const Kpi = ({ icon: Icon, label, value, hint }: { icon: React.ElementType, label: string, value: React.ReactNode, hint?: React.ReactNode }) => (
   <Card className="gap-1 py-4">
     <CardHeader className="px-4">
       <CardDescription className="flex items-center gap-1.5"><Icon size={14} /> {label}</CardDescription>
@@ -114,7 +114,7 @@ const Kpi = ({ icon: Icon, label, value, hint }: { icon: React.ElementType, labe
   </Card>
 )
 
-const ChartCard = ({ title, description, actions, className, children }: {
+export const ChartCard = ({ title, description, actions, className, children }: {
   title: string
   description?: string
   actions?: React.ReactNode
@@ -135,7 +135,7 @@ const ChartCard = ({ title, description, actions, className, children }: {
   </Card>
 )
 
-const Segmented = <T extends string | number>({ options, value, onChange }: {
+export const Segmented = <T extends string | number>({ options, value, onChange }: {
   options: readonly { label: string, value: NoInfer<T> }[]
   value: T
   onChange: (value: NoInfer<T>) => void

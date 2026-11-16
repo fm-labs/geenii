@@ -14,14 +14,16 @@ for clients of the former standalone process manager service.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from geenii import proc_events
 from geenii.pm.process_manager import ProcessManager
 from geenii.scheduler import Scheduler
-from geenii.supervisor import ProcConfig, Supervisor, read_services
+from geenii.supervisor import MAX_FAILURES, ProcConfig, Supervisor, read_services
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,11 @@ RpcMethod = Callable[[dict], Awaitable[Any]]
 
 # Unprefixed aliases kept for the former `geenii pm serve` protocol
 _PM_ALIASES = ("start", "status", "output", "kill", "list", "cleanup")
+
+
+def _audit(component: proc_events.Component, event: str, params: dict, **fields: Any) -> None:
+    """Record a control action in the process event log, with the caller's actor."""
+    proc_events.record(component, event, actor=params.get("actor") or "unknown", **fields)
 
 
 class ProcessHost:
@@ -80,6 +87,7 @@ class ProcessHost:
 
     async def start(self) -> None:
         self.pm.recover()
+        await asyncio.to_thread(proc_events.prune)
         if self.services_config and os.path.isfile(self.services_config):
             try:
                 await self.supervisor.apply_services(read_services(self.services_config))
@@ -126,6 +134,7 @@ class ProcessHost:
             env=params.get("env"),
             cwd=params.get("cwd") or None,
             pid=params.get("pid") or None,
+            origin={"trigger": "manual", "actor": params.get("actor")},
         )
         return info.to_dict()
 
@@ -146,7 +155,10 @@ class ProcessHost:
         return (await self.pm.wait(params["process_id"], timeout=params.get("timeout"))).to_dict()
 
     async def _pm_kill(self, params: dict) -> dict:
-        return (await self.pm.kill(params["process_id"], force=params.get("force", False))).to_dict()
+        force = params.get("force", False)
+        info = await self.pm.kill(params["process_id"], force=force)
+        _audit("pm", "pm.kill", params, run_id=info.pid, system_pid=info.system_pid, force=force or None)
+        return info.to_dict()
 
     async def _pm_list(self, params: dict) -> list[dict]:
         procs = await self.pm.list(include_finished=params.get("include_finished", False))
@@ -154,14 +166,18 @@ class ProcessHost:
 
     async def _pm_cleanup(self, params: dict) -> str:
         await self.pm.cleanup(params["process_id"])
+        _audit("pm", "pm.cleanup", params, run_id=params["process_id"])
         return "ok"
 
     async def _pm_gc(self, params: dict) -> list[str]:
-        return await self.pm.gc(
+        removed = await self.pm.gc(
             params.get("max_age"),
             states=params.get("states"),
             dry_run=params.get("dry_run", False),
         )
+        if removed and not params.get("dry_run"):
+            _audit("pm", "pm.gc", params, removed=len(removed), max_age=params.get("max_age"))
+        return removed
 
     # -- scheduler.* ------------------------------------------------------------
 
@@ -170,12 +186,15 @@ class ProcessHost:
 
     async def _scheduler_run(self, params: dict) -> str:
         await self.scheduler.run_now(params["name"])
+        _audit("scheduler", "task.run_now", params, name=params["name"])
         return "started"
 
     async def _scheduler_reload(self, params: dict) -> dict:
         if not self.scheduler_config:
             raise RuntimeError("The daemon was started without a scheduler config file")
-        return await self.scheduler.reload_config(self.scheduler_config)
+        changes = await self.scheduler.reload_config(self.scheduler_config)
+        _audit("scheduler", "config.reload", params, changes=changes)
+        return changes
 
     # -- supervisor.* -----------------------------------------------------------
 
@@ -196,8 +215,10 @@ class ProcessHost:
                 env=params.get("env"),
                 cwd=params.get("cwd"),
                 capture_output=params.get("capture_output", True),
+                max_failures=int(params.get("max_failures", MAX_FAILURES)),
             ),
         )
+        _audit("supervisor", "service.ensure", params, name=name, cmd=cmd)
         return "ok"
 
     async def _supervisor_start(self, params: dict) -> str:
@@ -205,6 +226,7 @@ class ProcessHost:
         name = params["name"]
         if name in self.supervisor.status()["desired"]:
             await self.supervisor.restart_process(name)
+            _audit("supervisor", "service.start", params, name=name)
             return "ok"
         services = {}
         if self.services_config and os.path.isfile(self.services_config):
@@ -212,14 +234,18 @@ class ProcessHost:
         if name not in services:
             raise KeyError(f"'{name}' is not supervised and not an enabled service of the services config")
         await self.supervisor.ensure(name, services[name])
+        _audit("supervisor", "service.start", params, name=name)
         return "ok"
 
     async def _supervisor_stop(self, params: dict) -> str:
-        await self.supervisor.stop_process(params["name"], disable_restart=params.get("disable_restart", True))
+        disable_restart = params.get("disable_restart", True)
+        await self.supervisor.stop_process(params["name"], disable_restart=disable_restart)
+        _audit("supervisor", "service.stop", params, name=params["name"], keep=not disable_restart)
         return "ok"
 
     async def _supervisor_restart(self, params: dict) -> str:
         await self.supervisor.restart_process(params["name"])
+        _audit("supervisor", "service.restart", params, name=params["name"])
         return "ok"
 
     async def _supervisor_reload(self, params: dict) -> dict:
@@ -227,7 +253,9 @@ class ProcessHost:
             raise RuntimeError("The daemon was started without a services config file")
         if not os.path.isfile(self.services_config):
             raise FileNotFoundError(f"Services config {self.services_config} does not exist")
-        return await self.supervisor.apply_services(read_services(self.services_config))
+        changes = await self.supervisor.apply_services(read_services(self.services_config))
+        _audit("supervisor", "config.reload", params, changes=changes)
+        return changes
 
     async def _supervisor_logs(self, params: dict) -> list[str]:
         return self.supervisor.logs(params["name"], tail=params.get("tail", 100))

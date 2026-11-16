@@ -18,6 +18,7 @@ import os
 import tempfile
 import threading
 from collections import Counter
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -111,11 +112,27 @@ def aggregate_log_file(path: str) -> dict[str, DayAggregate]:
 
 
 class UsageStatsCache:
-    """Per-file day aggregates, invalidated by a change of the file's size or mtime."""
+    """Per-file day aggregates, invalidated by a change of the file's size or mtime.
 
-    def __init__(self, log_dir: str | None = None, cache_dir: str | None = None):
+    Defaults to the AI usage logs; `pattern`, `aggregate` and `version` let other
+    monthly JSON-lines logs (e.g. the process event log) reuse it. An aggregate maps
+    a day to {"rows": {row key: Counter}, "hours": [24 counts]}.
+    """
+
+    def __init__(
+        self,
+        log_dir: str | None = None,
+        cache_dir: str | None = None,
+        *,
+        pattern: str = "ai-usage-*.log",
+        aggregate: Callable[[str], dict[str, DayAggregate]] | None = None,
+        version: int = CACHE_VERSION,
+    ):
         self._log_dir = log_dir
         self._cache_dir = cache_dir
+        self._pattern = pattern
+        self._aggregate = aggregate
+        self._version = version
         self._files: dict[str, tuple[tuple[int, int], dict[str, DayAggregate]]] = {}
         self._lock = threading.Lock()
 
@@ -136,7 +153,7 @@ class UsageStatsCache:
                 data = json.load(f)
         except OSError, ValueError:
             return None
-        if data.get("version") != CACHE_VERSION or tuple(data.get("signature") or ()) != signature:
+        if data.get("version") != self._version or tuple(data.get("signature") or ()) != signature:
             return None
         return {
             day: {
@@ -155,7 +172,7 @@ class UsageStatsCache:
             with os.fdopen(fd, "w") as f:
                 json.dump(
                     {
-                        "version": CACHE_VERSION,
+                        "version": self._version,
                         "signature": list(signature),
                         "days": days,
                     },
@@ -173,7 +190,7 @@ class UsageStatsCache:
             return cached[1]
         days = None if refresh else self._read_cache_file(path, signature)
         if days is None:
-            days = aggregate_log_file(path)
+            days = (self._aggregate or aggregate_log_file)(path)
             self._write_cache_file(path, signature, days)
         self._files[path] = (signature, days)
         return days
@@ -182,7 +199,7 @@ class UsageStatsCache:
         """Aggregates of all days in all usage log files. A day can span two files (around a month boundary)."""
         merged: dict[str, DayAggregate] = {}
         with self._lock:
-            paths = sorted(glob.glob(os.path.join(self.log_dir, "ai-usage-*.log")))
+            paths = sorted(glob.glob(os.path.join(self.log_dir, self._pattern)))
             for path in set(self._files) - set(paths):
                 del self._files[path]
             for path in paths:

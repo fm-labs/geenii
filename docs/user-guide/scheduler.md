@@ -7,10 +7,10 @@ the supervisor.
 
 ## Running
 
-Start the daemon. By default it loads `.geenii/scheduler.json`:
+Start the daemon. By default it loads `~/.geenii/scheduler.json` from your home directory:
 
 ```bash
-geenii daemon start                                   # uses $GEENII_WORKING_DIR/.geenii/scheduler.json
+geenii daemon start                                   # uses ~/.geenii/scheduler.json
 geenii daemon start --scheduler-config /path/to/scheduler.json
 
 # older forms, now aliases for the above

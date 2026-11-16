@@ -5,9 +5,11 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from geenii import proc_events
 from geenii.cli.daemon_cli import live_daemon
 from geenii.daemon.client import SOCKET_ENV_VARS, DaemonClient
 from geenii.daemon.server import DEFAULT_SERVICES_CONFIG
+from geenii.supervisor import MAX_FAILURES
 
 console = Console()
 
@@ -111,7 +113,11 @@ def status(ctx, as_json):
             name,
             "file" if cfg.get("source") == "config" else "ad hoc",
             " ".join(cfg["cmd"]),
-            "[bold green]running[/bold green]" if rt else "[yellow]stopped[/yellow]",
+            "[bold green]running[/bold green]"
+            if rt
+            else f"[red]failed ({cfg['gave_up']['failures']}x)[/red]"
+            if cfg.get("gave_up")
+            else "[yellow]stopped[/yellow]",
             str(rt["pid"]) if rt else "-",
             f"{rt['uptime_s']:.0f}s" if rt else "-",
             "yes" if cfg["restart"] else "no",
@@ -135,8 +141,15 @@ def status(ctx, as_json):
     help="Environment variable in KEY=VALUE format (repeatable).",
 )
 @click.option("--cwd", "-d", default=None, help="Working directory.")
+@click.option(
+    "--max-failures",
+    type=click.IntRange(min=0),
+    default=MAX_FAILURES,
+    show_default=True,
+    help="Stop restarting after this many failures in a row (0: never give up).",
+)
 @click.pass_context
-def start(ctx, name, cmd, no_restart, env, cwd):
+def start(ctx, name, cmd, no_restart, env, cwd, max_failures):
     """Start NAME running CMD and keep it running (ad hoc, until the daemon stops).
 
     CMD is executed directly, without a shell; use `sh -c '...'` for shell
@@ -157,6 +170,7 @@ def start(ctx, name, cmd, no_restart, env, cwd):
             "restart": not no_restart,
             "env": env_dict or None,
             "cwd": cwd,
+            "max_failures": max_failures,
         },
     )
     click.echo(f"Supervising '{name}'.")
@@ -236,6 +250,13 @@ def list_services(config):
     help="Environment variable in KEY=VALUE format (repeatable).",
 )
 @click.option("--cwd", "-d", default=None, help="Working directory.")
+@click.option(
+    "--max-failures",
+    type=click.IntRange(min=0),
+    default=MAX_FAILURES,
+    show_default=True,
+    help="Stop restarting after this many failures in a row (0: never give up).",
+)
 @click.option("--disabled", is_flag=True, help="Add the service in disabled state.")
 @click.option(
     "--config",
@@ -245,7 +266,7 @@ def list_services(config):
     help=CONFIG_OPTION_HELP,
 )
 @click.pass_context
-def add_service(ctx, name, cmd, no_restart, env, cwd, disabled, config):
+def add_service(ctx, name, cmd, no_restart, env, cwd, max_failures, disabled, config):
     """Declare service NAME running CMD in the config file.
 
     The daemon starts it whenever it starts; a running daemon that uses this
@@ -268,11 +289,14 @@ def add_service(ctx, name, cmd, no_restart, env, cwd, disabled, config):
         entry["env"] = env_dict
     if cwd:
         entry["cwd"] = cwd
+    if max_failures != MAX_FAILURES:
+        entry["max_failures"] = max_failures
     if disabled:
         entry["enabled"] = False
     data.setdefault("services", []).append(entry)
     _write_file(config, data)
 
+    proc_events.record("supervisor", "service.add", actor="cli", name=name, cmd=list(cmd), path=os.path.abspath(config))
     click.echo(f"Added service '{name}' to {config}")
     _reload_if_live(ctx, config)
 
@@ -301,6 +325,7 @@ def remove_service(ctx, name, config):
     data["services"] = remaining
     _write_file(config, data)
 
+    proc_events.record("supervisor", "service.delete", actor="cli", name=name, path=os.path.abspath(config))
     click.echo(f"Removed service '{name}' from {config}")
     _reload_if_live(ctx, config)
 

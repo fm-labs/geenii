@@ -3,7 +3,9 @@
 Keep long-running processes up. The supervisor runs inside the
 [geenii daemon](daemon.md), so start that first (`geenii daemon start`). It
 restarts a process when it exits, waiting longer after each crash in a row
-(0.5s, 1s, 2s, … up to 30s).
+(0.5s, 1s, 2s, … up to 1h). After 1000 failures in a row (`max_failures`) it
+gives up and shows the process as `failed`; `restart` (or Start in the
+console) tries again.
 
 There are two kinds of supervised processes:
 
@@ -17,7 +19,7 @@ file services come back.
 
 ## services.json
 
-By default the file is `$GEENII_WORKING_DIR/.geenii/services.json`; `geenii daemon start
+By default the file is `~/.geenii/services.json`; `geenii daemon start
 --services-config PATH` chooses another one. `$VAR` in `cmd` and `cwd` is
 filled in from the daemon's environment, and `~` in `cwd` is expanded.
 
@@ -44,6 +46,7 @@ filled in from the daemon's environment, and `~` in `cwd` is expanded.
 | `env` | Extra environment variables |
 | `cwd` | Working directory |
 | `capture_output` | Keep stdout/stderr in the supervisor log (default `true`) |
+| `max_failures` | Stop restarting after this many failures in a row: crashes or spawn errors (default `1000`; `0` never gives up) |
 | `enabled` | `false` skips the service (default `true`) |
 
 Invalid entries and duplicate names are logged and skipped. An unreadable file
@@ -92,6 +95,7 @@ configuration is replaced and takes effect at the next restart.
 | `--no-restart` | | Run once; don't restart the process when it exits |
 | `--env` | `-e` | Environment variable in `KEY=VALUE` format (repeatable) |
 | `--cwd` | `-d` | Working directory |
+| `--max-failures` | | Stop restarting after this many failures in a row (default 1000; 0: never) |
 
 ### stop
 
@@ -139,7 +143,7 @@ geenii supervisor add <NAME> [OPTIONS] -- <CMD>...
 
 Declare a service in the file. If a daemon is running with this file, it
 starts the service right away. Options: `--no-restart`, `--env`/`-e`
-(repeatable), `--cwd`/`-d`, `--disabled`, `--config`/`-c`. Fails if `NAME` is
+(repeatable), `--cwd`/`-d`, `--max-failures`, `--disabled`, `--config`/`-c`. Fails if `NAME` is
 already in the file.
 
 ### remove

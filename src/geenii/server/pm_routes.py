@@ -37,7 +37,7 @@ class StartProcessRequest(pydantic.BaseModel):
 
 
 def dep_pm_client() -> ProcessManagerClient:
-    return ProcessManagerClient()
+    return ProcessManagerClient(actor="api")
 
 
 def _call(fn, *args, **kwargs):

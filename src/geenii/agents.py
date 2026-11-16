@@ -164,7 +164,7 @@ class ProcessManagerAgent(Agent):
 
     def __init__(self, name: str, pm: ProcessManagerClient = None, **kwargs):
         super().__init__(name, **kwargs)
-        self._pm = pm or ProcessManagerClient()
+        self._pm = pm or ProcessManagerClient(actor="agent")
 
     def _initialize(self):
         """Initialize the agent by loading built-in tools, MCP server tools, and any tools from loaded skills."""

@@ -122,7 +122,7 @@ geenii skills install "my_skill" "file:///path/to/skills/my_skill"
 
 ### `geenii scheduler` — Manage the scheduler
 
-Schedule agents to run on a cron-based schedule. Tasks are defined in `.geenii/scheduler.json`
+Schedule agents to run on a cron-based schedule. Tasks are defined in `~/.geenii/scheduler.json`
 and run inside the geenii daemon.
 
 ```bash
@@ -135,7 +135,7 @@ geenii daemon stop
 ### `geenii supervisor` — Keep processes running
 
 Supervised processes run inside the daemon and are restarted when they exit.
-Services added with `add` are saved in `.geenii/services.json` and start with the daemon.
+Services added with `add` are saved in `~/.geenii/services.json` and start with the daemon.
 
 ```bash
 geenii supervisor add web -- python -m http.server 8000     # persistent

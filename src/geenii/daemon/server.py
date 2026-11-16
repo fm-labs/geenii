@@ -25,15 +25,26 @@ import time
 from typing import Any
 
 from geenii import proc as proc_util
-from geenii.config import GEENII_WORKING_DIR
+from geenii.config import GEENII_USER_HOME, GEENII_WORKING_DIR
 from geenii.daemon.client import default_socket_path
 from geenii.daemon.host import ProcessHost
 from geenii.scheduler import Scheduler
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SCHEDULER_CONFIG = os.path.join(GEENII_WORKING_DIR, ".geenii", "scheduler.json")
-DEFAULT_SERVICES_CONFIG = os.path.join(GEENII_WORKING_DIR, ".geenii", "services.json")
+# The daemon is one per user (one socket), so its configs live in the user's ~/.geenii,
+# not in the directory it happens to be started from
+DEFAULT_SCHEDULER_CONFIG = os.path.join(GEENII_USER_HOME, ".geenii", "scheduler.json")
+DEFAULT_SERVICES_CONFIG = os.path.join(GEENII_USER_HOME, ".geenii", "services.json")
+
+
+def _warn_if_project_config(path: str | None, default: str) -> None:
+    """Point out a config in the working directory's .geenii, which is no longer read (it used to be the default)."""
+    if path != default:
+        return
+    legacy = os.path.join(GEENII_WORKING_DIR, ".geenii", os.path.basename(default))
+    if os.path.abspath(legacy) != os.path.abspath(default) and os.path.isfile(legacy):
+        logger.warning("Ignoring %s: the daemon reads %s; move the file there to use it", legacy, default)
 
 
 class DaemonAlreadyRunning(RuntimeError):
@@ -181,6 +192,8 @@ def build_host(
     services_config: str | None = DEFAULT_SERVICES_CONFIG,
 ) -> ProcessHost:
     """Create a ProcessHost for the given config files (each is optional and may not exist yet)."""
+    _warn_if_project_config(scheduler_config, DEFAULT_SCHEDULER_CONFIG)
+    _warn_if_project_config(services_config, DEFAULT_SERVICES_CONFIG)
     scheduler = Scheduler()
     if scheduler_config and os.path.isfile(scheduler_config):
         scheduler.load_config(scheduler_config)

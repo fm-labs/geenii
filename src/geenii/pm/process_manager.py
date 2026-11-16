@@ -45,6 +45,7 @@ from enum import Enum
 from typing import Any
 
 from geenii import proc as proc_util
+from geenii import proc_events
 from geenii.config import GEENII_CACHE_DIR, PM_GC_MAX_AGE
 
 logger = logging.getLogger(__name__)
@@ -148,6 +149,19 @@ class _RunningProcess:
     proc: asyncio.subprocess.Process
     waiter: asyncio.Task | None = None
     kill_requested: bool = False
+    # Who started it, for the process event log: component, name, trigger, actor
+    origin: dict[str, Any] | None = None
+
+
+def _origin_fields(origin: dict[str, Any] | None) -> dict[str, Any]:
+    """Event log fields of an origin dict; the component defaults to pm."""
+    origin = origin or {}
+    return {
+        "component": origin.get("component") or "pm",
+        "name": origin.get("name"),
+        "trigger": origin.get("trigger"),
+        "actor": origin.get("actor"),
+    }
 
 
 class ProcessManager:
@@ -223,6 +237,7 @@ class ProcessManager:
         env: dict[str, str] | None = None,
         cwd: str | None = None,
         pid: str | None = None,
+        origin: dict[str, Any] | None = None,
     ) -> ProcessInfo:
         """
         Start a background process.
@@ -233,6 +248,8 @@ class ProcessManager:
         :param cwd: Working directory for the process.
         :param pid: Explicit process ID. Auto-generated if omitted. Must be
                     unused and match [A-Za-z0-9][A-Za-z0-9_-]{0,63}.
+        :param origin: Who starts it, for the process event log: `component`
+                       (default "pm"), `name`, `trigger`, `actor`.
         :return: ProcessInfo with the assigned pid and initial state.
         """
         if isinstance(cmd, str):
@@ -259,8 +276,16 @@ class ProcessManager:
                 # The child gets its own descriptors; ours can be closed right after spawning
                 with open(stdout_path, "ab") as out, open(stderr_path, "ab") as err:
                     p = await proc_util.spawn(argv, env=env, cwd=cwd, stdout=out, stderr=err)
-            except BaseException:
+            except BaseException as exc:
                 shutil.rmtree(proc_dir, ignore_errors=True)
+                if isinstance(exc, Exception):
+                    proc_events.record(
+                        **_origin_fields(origin),
+                        event="spawn_error",
+                        run_id=pid,
+                        cmd=cmd,
+                        error=f"{type(exc).__name__}: {exc}",
+                    )
                 raise
 
             info = ProcessInfo(
@@ -275,12 +300,13 @@ class ProcessManager:
                 stdout_path=stdout_path,
                 stderr_path=stderr_path,
             )
-            rp = _RunningProcess(info=info, proc=p)
+            rp = _RunningProcess(info=info, proc=p, origin=origin)
             self._procs[pid] = rp
             self._write_meta(info)
             rp.waiter = asyncio.create_task(self._wait(rp), name=f"pm-wait:{pid}")
 
         logger.info(f"Started process {pid} (system pid {p.pid}, shell={shell}): {cmd}")
+        proc_events.record(**_origin_fields(origin), event="start", run_id=pid, system_pid=p.pid, cmd=cmd)
         return info
 
     async def status(self, pid: str) -> ProcessInfo:
@@ -470,6 +496,15 @@ class ProcessManager:
             logger.error(f"Could not persist final state of process {info.pid}: {exc}")
         finally:
             self._procs.pop(info.pid, None)
+        proc_events.record(
+            **_origin_fields(rp.origin),
+            event="exit",
+            run_id=info.pid,
+            system_pid=info.system_pid,
+            state=info.state.value,
+            exit_code=rc,
+            duration_ms=round((info.finished_at - info.started_at) * 1000),
+        )
         logger.info(f"Process {info.pid} finished: state={info.state.value} exit_code={info.exit_code}")
 
     @staticmethod

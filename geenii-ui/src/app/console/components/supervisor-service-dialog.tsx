@@ -17,8 +17,12 @@ export type SupervisorServiceInput = {
   env?: Record<string, string> | null
   cwd?: string | null
   capture_output?: boolean
+  max_failures?: number
   enabled?: boolean
 }
+
+/** Default of `max_failures`, see MAX_FAILURES in geenii/supervisor.py */
+export const DEFAULT_MAX_FAILURES = 1000
 
 /** Response of the write endpoints: whether a running daemon re-applied the file */
 export type SupervisorWriteResult = {
@@ -34,6 +38,7 @@ type FormState = {
   env: string // KEY=VALUE per line
   cwd: string
   captureOutput: boolean
+  maxFailures: string
 }
 
 const toForm = (s?: SupervisorServiceInput | null): FormState => ({
@@ -44,6 +49,7 @@ const toForm = (s?: SupervisorServiceInput | null): FormState => ({
   env: Object.entries(s?.env ?? {}).map(([k, v]) => `${k}=${v}`).join('\n'),
   cwd: s?.cwd ?? '',
   captureOutput: s?.capture_output ?? true,
+  maxFailures: String(s?.max_failures ?? DEFAULT_MAX_FAILURES),
 })
 
 /** Build the request body; throws Error with a message for the user on invalid input. */
@@ -57,9 +63,12 @@ const toInput = (f: FormState): SupervisorServiceInput => {
     if (i <= 0) throw new Error(`Invalid environment line "${line}", expected KEY=VALUE`)
     env[line.slice(0, i).trim()] = line.slice(i + 1)
   }
+  const maxFailures = f.maxFailures.trim() === '' ? DEFAULT_MAX_FAILURES : Number(f.maxFailures)
+  if (!Number.isInteger(maxFailures) || maxFailures < 0) throw new Error('Max failures must be a whole number ≥ 0')
   return {
     name: f.name.trim(),
     cmd,
+    max_failures: maxFailures,
     enabled: f.enabled,
     restart: f.restart,
     env: Object.keys(env).length ? env : null,
@@ -174,7 +183,8 @@ const SupervisorServiceDialog = ({ open, onOpenChange, service, onSaved }: {
             <span className="text-xs text-muted-foreground">(off: run once per daemon start)</span>
           </label>
 
-          <details className="group rounded-md border px-3 py-2" open={!!(form.env || form.cwd || !form.captureOutput) || undefined}>
+          <details className="group rounded-md border px-3 py-2"
+                   open={!!(form.env || form.cwd || !form.captureOutput || form.maxFailures !== String(DEFAULT_MAX_FAILURES)) || undefined}>
             <summary className="cursor-pointer text-sm font-medium">Advanced</summary>
             <div className="mt-3 grid gap-4">
               <FormRow label="Environment" hint="One KEY=VALUE per line, added to the daemon's environment.">
@@ -184,6 +194,11 @@ const SupervisorServiceDialog = ({ open, onOpenChange, service, onSaved }: {
               <FormRow label="Working directory" htmlFor="service-cwd">
                 <Input id="service-cwd" value={form.cwd} onChange={(e) => set('cwd', e.target.value)}
                        placeholder="Default: the daemon's working directory" className="font-mono" />
+              </FormRow>
+              <FormRow label="Max failures in a row" htmlFor="service-max-failures"
+                       hint="Crashes and spawn errors in a row before the supervisor stops restarting it (the delay doubles up to 1 h). 0: never give up.">
+                <Input id="service-max-failures" type="number" min={0} step={1} value={form.maxFailures}
+                       onChange={(e) => set('maxFailures', e.target.value)} className="w-40" />
               </FormRow>
               <label className="flex items-center gap-2 text-sm">
                 <Switch checked={form.captureOutput} onCheckedChange={(v) => set('captureOutput', v)} />

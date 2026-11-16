@@ -10,7 +10,7 @@ geenii scheduler <command> [--config PATH]
 ```
 
 All subcommands accept `--config`/`-c` to specify the scheduler config JSON
-file (defaults to `.geenii/scheduler.json`).
+file (defaults to `~/.geenii/scheduler.json`).
 
 **Live and offline.** When a daemon is running with the **same** config file,
 `status`, `run`, `add`, `remove` and `reload` work against it. When there is

@@ -15,7 +15,7 @@ router = APIRouter(prefix="/daemon", tags=["daemon"])
 
 
 def dep_daemon_client() -> DaemonClient:
-    return DaemonClient()
+    return DaemonClient(actor="api")
 
 
 @router.get("/status")

@@ -1,6 +1,6 @@
 import pytest
 
-from geenii import ai, config, mcp_config
+from geenii import ai, config, mcp_config, proc_events
 from geenii.pm import process_manager as pm_mod
 
 
@@ -10,6 +10,14 @@ def isolated_ai_logs(tmp_path, monkeypatch):
     path = tmp_path / "ai-cache"
     monkeypatch.setattr(ai, "GEENII_CACHE_DIR", str(path))
     return path
+
+
+@pytest.fixture(autouse=True)
+def isolated_proc_events(tmp_path, monkeypatch):
+    """Keep the process event log of test runs out of the real cache dir. Returns the log dir."""
+    path = tmp_path / "proc-cache"
+    monkeypatch.setattr(proc_events, "GEENII_CACHE_DIR", str(path))
+    return path / "logs"
 
 
 @pytest.fixture(autouse=True)

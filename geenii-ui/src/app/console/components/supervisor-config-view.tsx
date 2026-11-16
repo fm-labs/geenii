@@ -25,13 +25,18 @@ const LOG_POLL_MS = 2000
 
 /** Supervisor state of a service, see `_live_state` in geenii/server/supervisor_routes.py */
 type LiveService = {
-  state: 'running' | 'restarting' | 'stopped'
+  state: 'running' | 'restarting' | 'stopped' | 'failed'
   source: 'config' | 'api'
   pid: number | null
   uptime_s: number | null
   backoff_s: number | null
   last_exit: { returncode: number, exited_at: number } | null
   restart: boolean
+  /** Failures in a row (crashes, spawn errors); reset once it ran healthy */
+  failures: number
+  max_failures: number | null
+  /** Set when the supervisor stopped restarting it after max_failures */
+  gave_up: { failures: number, at: number } | null
 }
 
 /** A service entry from the services config file, see `ServiceConfig` in geenii/supervisor.py */
@@ -42,6 +47,7 @@ type Service = {
   env?: Record<string, string> | null
   cwd?: string | null
   capture_output?: boolean
+  max_failures?: number
   enabled: boolean
   live: LiveService | null
   not_in_config?: boolean
@@ -79,6 +85,9 @@ const StateBadge = ({ service, daemonRunning }: { service: Service, daemonRunnin
   }
   if (live?.state === 'restarting') {
     return <Badge variant="outline" className="gap-1 text-amber-600"><LoaderIcon className="size-3 animate-spin" /> restarting</Badge>
+  }
+  if (live?.state === 'failed') {
+    return <Badge variant="destructive" title={`Gave up after ${live.gave_up?.failures} failures in a row`}>failed</Badge>
   }
   if (live?.state === 'stopped') return <Badge variant="outline">stopped</Badge>
   // Enabled in the file but not supervised: stopped for good, invalid entry, or not applied yet
@@ -159,7 +168,7 @@ const ServiceRow = ({ service, daemonRunning, onEdit, onDelete, onAction }: {
   // A supervised service can be stopped/restarted; any other enabled one (config or kept) can be started
   const notRunningReason = !daemonRunning ? 'The daemon is not running' : null
   const canStart = daemonRunning && service.enabled && live?.state !== 'running' && live?.state !== 'restarting'
-  const canStop = daemonRunning && !!live && live.state !== 'stopped'
+  const canStop = daemonRunning && !!live && live.state !== 'stopped' && live.state !== 'failed'
   const canRestart = daemonRunning && !!live
 
   return (
@@ -188,10 +197,23 @@ const ServiceRow = ({ service, daemonRunning, onEdit, onDelete, onAction }: {
           )}
           <Field label="Restart">{service.restart ? 'when it exits (with backoff)' : 'no, run once'}</Field>
           {service.capture_output === false && <Field label="Output">not captured</Field>}
+          <Field label="Failure limit">
+            {(service.max_failures ?? live?.max_failures ?? 1000) === 0
+              ? 'never give up'
+              : `give up after ${service.max_failures ?? live?.max_failures ?? 1000} failures in a row`}
+            {live && live.failures > 0 && <span className="text-amber-600"> · {live.failures} so far</span>}
+          </Field>
           {live && (
             <>
               {live.pid && <Field label="PID">{live.pid}</Field>}
               {live.state === 'running' && <Field label="Uptime">{fmtUptime(live.uptime_s)}</Field>}
+              {live.gave_up && (
+                <Field label="Gave up">
+                  <span className="text-destructive">
+                    after {live.gave_up.failures} failures, {new Date(live.gave_up.at * 1000).toLocaleString()}; start it to try again
+                  </span>
+                </Field>
+              )}
               {live.last_exit && (
                 <Field label="Last exit">
                   rc={live.last_exit.returncode} at {new Date(live.last_exit.exited_at * 1000).toLocaleString()}

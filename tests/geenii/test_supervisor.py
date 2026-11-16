@@ -327,3 +327,107 @@ def test_apply_services_adopts_an_ad_hoc_service_of_the_same_name(tmp_path):
         "config",
         ["sleep", "31"],
     )
+
+
+def test_fast_exit_is_handled_before_respawn():
+    """A process that exits before the watcher waits for it still gets its exit handled (and backoff)."""
+
+    async def main():
+        sup = Supervisor()
+        # Several services started back to back: the loop is busy while "fast" exits
+        await sup.ensure("fast", ProcConfig(name="fast", cmd=["true"]))
+        for i in range(5):
+            await sup.ensure(f"other{i}", ProcConfig(name=f"other{i}", cmd=["sleep", "30"]))
+        await asyncio.sleep(0.6)
+        await sup.stop()
+        return sup.logs("fast", 400)
+
+    lines = [line for line in asyncio.run(main()) if line.startswith("[supervisor] ")]
+    starts = [i for i, line in enumerate(lines) if line.startswith("[supervisor] started pid=")]
+    assert len(starts) >= 2
+    for a, b in zip(starts, starts[1:]):
+        assert any(line.startswith("[supervisor] exited rc=0") for line in lines[a:b]), lines[a:b]
+
+
+def test_defaults(monkeypatch):
+    monkeypatch.undo()  # the module's real values, not fast_backoff's
+    assert sup_mod.BACKOFF_MAX == 3600.0
+    assert sup_mod.MAX_FAILURES == 1000
+    assert ProcConfig(name="x", cmd=["x"]).max_failures == 1000
+
+
+def test_gives_up_after_max_failures_in_a_row_and_start_retries():
+    async def main():
+        sup = Supervisor()
+        await sup.ensure("crash", ProcConfig(name="crash", cmd=["sh", "-c", "exit 1"], max_failures=3))
+        await asyncio.sleep(1.0)
+        desired = sup.status()["desired"]["crash"]
+        starts = sum(1 for line in sup.logs("crash", 400) if "started pid=" in line)
+        watcher_done = sup._watchers["crash"].done()
+        # A manual restart resets the count and tries again
+        await sup.restart_process("crash")
+        after_restart = sup.status()["desired"]["crash"]
+        await sup.stop()
+        return desired, starts, watcher_done, after_restart
+
+    desired, starts, watcher_done, after_restart = asyncio.run(main())
+    assert starts == 3
+    assert watcher_done
+    assert desired["failures"] == 3 and desired["gave_up"]["failures"] == 3
+    assert after_restart["gave_up"] is None and after_restart["failures"] == 0
+
+
+def test_spawn_errors_count_towards_the_limit():
+    async def main():
+        sup = Supervisor()
+        await sup.ensure("bad", ProcConfig(name="bad", cmd=["/nonexistent/binary"], max_failures=2))
+        await asyncio.sleep(0.5)
+        await sup.stop()
+        return sup.status()["desired"]["bad"], sup.logs("bad", 50)
+
+    desired, logs = asyncio.run(main())
+    assert desired["gave_up"]["failures"] == 2
+    assert sum("spawn error" in line for line in logs) == 2
+    assert "retrying" not in [line for line in logs if "spawn error" in line][-1]
+
+
+def test_healthy_run_resets_the_failure_count(monkeypatch):
+    # Every run counts as long-lived, so failures never add up
+    monkeypatch.setattr(sup_mod, "BACKOFF_RESET_AFTER", 0.0)
+
+    async def main():
+        sup = Supervisor()
+        await sup.ensure("flaky", ProcConfig(name="flaky", cmd=["sh", "-c", "exit 1"], max_failures=2))
+        await asyncio.sleep(0.6)
+        status = sup.status()["desired"]["flaky"]
+        await sup.stop()
+        return status
+
+    status = asyncio.run(main())
+    assert status["gave_up"] is None
+    assert status["failures"] == 1
+
+
+def test_zero_max_failures_never_gives_up():
+    async def main():
+        sup = Supervisor()
+        await sup.ensure("crash", ProcConfig(name="crash", cmd=["sh", "-c", "exit 1"], max_failures=0))
+        await asyncio.sleep(0.8)
+        status = sup.status()["desired"]["crash"]
+        await sup.stop()
+        return status
+
+    status = asyncio.run(main())
+    assert status["gave_up"] is None and status["failures"] >= 3
+
+
+def test_read_services_max_failures(tmp_path):
+    path = tmp_path / "services.json"
+    path.write_text(
+        '{"services": [{"name": "a", "cmd": ["x"], "max_failures": 7}, {"name": "b", "cmd": ["x"]}, '
+        '{"name": "c", "cmd": ["x"], "max_failures": -1}]}'
+    )
+    services = {s.name: s for s in read_services(path)}
+    assert services["a"].max_failures == 7
+    assert services["b"].max_failures == 1000
+    assert "c" not in services  # invalid entry is skipped

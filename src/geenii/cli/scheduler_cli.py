@@ -6,6 +6,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from geenii import proc_events
 from geenii.cli.daemon_cli import live_daemon
 from geenii.daemon.client import DaemonClient
 from geenii.daemon.server import DEFAULT_SCHEDULER_CONFIG
@@ -261,6 +262,7 @@ def add_task(name, cmd, interval, env, disabled, timeout, allow_overlap, config)
     with open(config, "w") as f:
         json.dump(data, f, indent=2)
 
+    proc_events.record("scheduler", "task.add", actor="cli", name=name, cmd=list(cmd), path=os.path.abspath(config))
     click.echo(f"Added task '{name}' to {config}")
     _reload_if_live(config)
 
@@ -297,6 +299,7 @@ def remove_task(name, config):
     with open(config, "w") as f:
         json.dump(data, f, indent=2)
 
+    proc_events.record("scheduler", "task.delete", actor="cli", name=name, path=os.path.abspath(config))
     click.echo(f"Removed task '{name}' from {config}")
     _reload_if_live(config)
 

@@ -64,12 +64,12 @@ def daemon():
     "--scheduler-config",
     "-c",
     default=None,
-    help="Scheduler config JSON. Default: $GEENII_WORKING_DIR/.geenii/scheduler.json (if it exists).",
+    help="Scheduler config JSON. Default: ~/.geenii/scheduler.json (if it exists).",
 )
 @click.option(
     "--services-config",
     default=None,
-    help="Supervised services JSON. Default: $GEENII_WORKING_DIR/.geenii/services.json (if it exists).",
+    help="Supervised services JSON. Default: ~/.geenii/services.json (if it exists).",
 )
 def start(socket, scheduler_config, services_config):
     """Run the daemon in the foreground until SIGINT/SIGTERM."""

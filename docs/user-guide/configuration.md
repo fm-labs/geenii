@@ -36,8 +36,8 @@ Configuration lives in two `.geenii/` directories, resolved at import time by
 ├── .env                # environment variables (API keys etc.), auto-loaded
 ├── geenii.json         # user settings
 ├── mcp.json            # MCP server definitions
-├── scheduler.json      # scheduled tasks (read by the geenii daemon)
-├── services.json       # supervised services (read by the geenii daemon)
+├── scheduler.json      # scheduled tasks (~/.geenii only; read by the geenii daemon)
+├── services.json       # supervised services (~/.geenii only; read by the geenii daemon)
 ├── agents/             # one <name>.md per agent (see agents.md)
 │   └── my-agent.md
 ├── skills/             # one directory per skill (see skills.md)
@@ -180,12 +180,16 @@ servers defined in the project's `.geenii/mcp.json` can't be changed there.
 
 ## `scheduler.json` — scheduled tasks
 
-Read by the geenii daemon at startup (`geenii daemon start`). See
+Only read from `~/.geenii/scheduler.json` in your home directory, not from the
+project directory: there is one daemon per user, whatever directory it was
+started from. A `scheduler.json` in a project's `.geenii` is ignored (the
+daemon logs a warning). Read by the geenii daemon at startup (`geenii daemon start`). See
 [scheduler.md](scheduler.md) for the format and semantics.
 
 ## `services.json` — supervised services
 
-Long-running processes that the geenii daemon starts at startup and restarts
+Only read from `~/.geenii/services.json` in your home directory, like
+`scheduler.json`. Long-running processes that the geenii daemon starts at startup and restarts
 when they exit. Manage the file with `geenii supervisor add/remove/list`; after
 editing it by hand, run `geenii supervisor reload`. See the
 [supervisor CLI reference](../cli-reference/supervisor.md#servicesjson) for
