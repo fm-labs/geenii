@@ -33,7 +33,7 @@ build:
 
 .PHONY: run-devserver
 run-devserver:
-		exec uvicorn --app-dir ./src geenii.server.server:app --port 33311 --reload
+		exec uvicorn --app-dir ./src geenii.server.server:app --port 33311 --reload --log-level debug
 
 
 .PHONY: image

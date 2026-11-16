@@ -7,6 +7,7 @@ data/
 build/
 dist/
 /lib/
+/plugins/
 .env
 .env.local
 .env.*
