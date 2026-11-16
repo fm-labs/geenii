@@ -54,7 +54,7 @@ class WebAgentRunner:
         return ChatMessage(
             id=message.id,
             timestamp=message.timestamp,
-            sender_id="user" if message.role == "user" else self.agent.name,
+            sender_id="user" if message.role == "user" else f"{self.agent.name}#{self.agent.model}",
             context_id=self.agent.context_id,
             message=message,
         )
