@@ -73,7 +73,7 @@ const ChatMessage = ({ message }: ChatMessageRendererProps) => {
   }
 
   return (
-    <div className={cn('group flex flex-col gap-1', isUser ? 'items-end' : 'items-start')} data-role={role}>
+    <div className={cn('group flex flex-col gap-1', isUser ? 'items-end' : 'items-start')} data-role={role} data-xchat-item={'message'}>
       <div className={'flex items-baseline gap-2 px-1 text-xs text-muted-foreground'}>
         {!isUser && <span className={'font-medium'}>{message.sender_id}</span>}
         <span className={'opacity-0 transition-opacity group-hover:opacity-100'}>{formatTime(message.timestamp)}</span>

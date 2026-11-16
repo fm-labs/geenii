@@ -4,6 +4,7 @@ import { useChat } from '@/components/xchat/chat-context.tsx'
 import { ChatMessageRendererType } from '@/components/xchat/chat.types.ts'
 import { buildToolCallIndex, ToolCallIndexContext } from '@/components/xchat/chat-tool-calls.ts'
 import ChatMessage from '@/components/xchat/chat-message.tsx'
+import ChatLinkGuard from '@/components/xchat/chat-link-guard.tsx'
 
 type ChatMessagesProps = {
   /** Replaces the message component; content parts are still customizable via the provider's renderers */
@@ -58,12 +59,14 @@ const ChatMessages = (props: ChatMessagesProps) => {
 
   return (
     <ToolCallIndexContext.Provider value={toolCalls}>
-      <div className={cn('flex flex-col gap-4', className)} role={'log'} aria-live={'polite'}>
-        {messages.map((message, idx) => (
-          <MessageRenderer key={message.id} message={message} isLast={idx === messages.length - 1} />
-        ))}
-        <div ref={endRef} />
-      </div>
+      <ChatLinkGuard>
+        <div className={cn('flex flex-col gap-4', className)} role={'log'} aria-live={'polite'}>
+          {messages.map((message, idx) => (
+            <MessageRenderer key={message.id} message={message} isLast={idx === messages.length - 1} />
+          ))}
+          <div ref={endRef} />
+        </div>
+      </ChatLinkGuard>
     </ToolCallIndexContext.Provider>
   )
 }
