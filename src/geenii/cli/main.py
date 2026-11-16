@@ -22,7 +22,6 @@ from geenii.cli.tools_cli import tools as tools_cli
 from geenii.config import APP_VERSION, GEENII_CACHE_DIR
 from geenii.logs import init_logging
 
-init_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -62,8 +61,13 @@ class FallbackGroup(click.Group):
     default=None,
     help="Set the logging level.",
 )
-def geecli(no_cache, log_level):
+@click.pass_context
+def geecli(ctx, no_cache, log_level):
     """Geenii CLI - A versatile command-line interface for AI agents, tools, and skills."""
+    # One log file per command (geenii-agent.log, geenii-scheduler.log, ...);
+    # GEENII_LOG_NAME overrides it, e.g. per scheduled task via the task's env.
+    subcommand = ctx.invoked_subcommand
+    init_logging(f"geenii-{subcommand}" if subcommand else None, force=True)
     if no_cache:
         config.GEENII_CACHE_DISABLED = True
     if log_level:

@@ -211,7 +211,7 @@ def run_daemon(
 def main(argv: list[str] | None = None) -> None:
     from geenii.logs import init_logging
 
-    init_logging()
+    init_logging("geenii-daemon")
 
     parser = argparse.ArgumentParser(prog="geenii-daemon", description="Run the geenii daemon.")
     parser.add_argument("--socket", default=None, help="Unix socket path")

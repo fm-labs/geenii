@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from logging.handlers import RotatingFileHandler
 
 from rich.logging import RichHandler
@@ -13,9 +14,27 @@ LOG_FORMAT3 = "%(asctime)s - %(levelname)s - %(message)s"
 formatter = logging.Formatter(LOG_FORMAT1)
 
 
-def init_logging():
-    if os.getenv("GEENII_LOGGING", "rich") == "rich":
+DEFAULT_LOG_NAME = "geenii"
+
+
+def resolve_log_name(log_name: str | None = None) -> str:
+    """Name of the rotating log file (without .log): GEENII_LOG_NAME wins over log_name."""
+    name = os.getenv("GEENII_LOG_NAME") or log_name or DEFAULT_LOG_NAME
+    # The name becomes a file name in the logs dir; keep it to a plain basename
+    return re.sub(r"[^A-Za-z0-9_.-]", "-", name).lstrip(".") or DEFAULT_LOG_NAME
+
+
+def init_logging(log_name: str | None = None, force: bool = False):
+    """Configure root logging (GEENII_LOGGING=rich|plain, default plain).
+
+    :param log_name: Rotating log file name for plain logging (``<cache>/logs/<name>.log``).
+                     The GEENII_LOG_NAME environment variable overrides it.
+    :param force: Replace existing root handlers. Without it, this is a no-op when
+                  logging was already configured (logging.basicConfig semantics).
+    """
+    if os.getenv("GEENII_LOGGING", "plain") == "rich":
         logging.basicConfig(
+            force=force,
             level="INFO",
             # format="%(message)s",
             format="%(name)s: %(message)s",
@@ -31,11 +50,12 @@ def init_logging():
         )
     else:
         logging.basicConfig(
+            force=force,
             level=logging.INFO,
             format=LOG_FORMAT1,
             handlers=[
                 get_console_log_handler(),
-                get_rotating_file_log_handler("geenii"),
+                get_rotating_file_log_handler(resolve_log_name(log_name)),
             ],
         )
     # logging.getLogger("httpx").setLevel(logging.WARNING)

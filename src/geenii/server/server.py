@@ -7,31 +7,20 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from rich.logging import RichHandler
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from geenii.config import APP_VERSION, WWW_DIR
 from geenii.datamodels import Problem
 from geenii.g import init_global_agent_registry, init_global_skill_registry
+from geenii.logs import init_logging
 from geenii.server.router import app_router
 from geenii.tool.registry import ToolRegistry
 from geenii.tools import init_builtin_tools, init_mcp_server_tools
 
-# logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-logging.basicConfig(
-    level="INFO",
-    format="%(message)s",
-    handlers=[
-        RichHandler(
-            show_time=True,  # show timestamps
-            omit_repeated_times=False,  # show timestamp every line
-            show_level=True,
-            show_path=True,  # hide file path
-            rich_tracebacks=False,  # beautiful exception tracebacks
-        )
-    ],
-)
+# Same setup as the CLI (honours GEENII_LOGGING / GEENII_LOG_NAME). A no-op when the CLI
+# already configured logging; needed when uvicorn imports this module in a fresh process (--reload).
+init_logging("geenii-server")
 
 # dotenv.load_dotenv(GEENII_DIR + "/.env", override=True, verbose=True)
 
