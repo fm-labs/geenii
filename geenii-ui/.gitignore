@@ -6,6 +6,7 @@ src-tauri/gen/schemas/
 src-tauri/binaries/
 src-tauri/target/
 public/assets/
+public/apps/
 
 # Logs
 logs

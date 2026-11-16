@@ -3,4 +3,6 @@ bak/
 docs/
 node_modules/
 src-tauri/
+public/apps/
+public/assets/
 *.local
