@@ -39,3 +39,18 @@ type McpServerConfig = {
     legacy?: boolean;
     [key: string]: any;
 }
+
+/** Tool discovery state of a server: not requested yet, waiting for a worker, connecting, done, or failed */
+type McpServerLoadState = 'pending' | 'queued' | 'loading' | 'ready' | 'failed'
+
+/** One entry of GET /mcp/status */
+type McpServerLoadStatus = {
+    name: string;
+    state: McpServerLoadState;
+    tool_count: number;
+    error?: string | null;
+    attempts: number;
+    /** unix timestamps in seconds */
+    started_at?: number | null;
+    finished_at?: number | null;
+}

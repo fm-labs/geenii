@@ -6,6 +6,7 @@ import logging
 import os
 import pickle
 import sqlite3
+import threading
 import time
 from collections.abc import Callable
 from functools import wraps
@@ -24,6 +25,10 @@ class CacheStore(abc.ABC):
 
     @abc.abstractmethod
     def read_cache(self, key: str) -> Any:
+        pass
+
+    @abc.abstractmethod
+    def delete_cache(self, key: str) -> None:
         pass
 
 
@@ -57,6 +62,9 @@ class SqliteCacheStore(CacheStore):
             check_same_thread=False,
             isolation_level=None,  # autocommit mode (we use explicit BEGIN for writes)
         )
+        # the connection is shared across threads: concurrent BEGINs on one connection fail with
+        # "cannot start a transaction within a transaction", so its use is serialized
+        self._lock = threading.RLock()
 
         # Row format + minor ergonomics
         self.conn.row_factory = sqlite3.Row
@@ -90,7 +98,8 @@ class SqliteCacheStore(CacheStore):
     def _with_retry(self, fn, *, retries: int = 3, base_sleep: float = 0.02):
         for i in range(retries + 1):
             try:
-                return fn()
+                with self._lock:
+                    return fn()
             except sqlite3.OperationalError as e:
                 msg = str(e).lower()
                 if "locked" in msg or "busy" in msg:
@@ -148,6 +157,9 @@ class SqliteCacheStore(CacheStore):
 
         self._with_retry(op)
 
+    def delete_cache(self, key: str) -> None:
+        self._with_retry(lambda: self.conn.execute("DELETE FROM cache WHERE key = ?", (key,)))
+
     def purge_expired(self) -> int:
         now = time.time()
 
@@ -167,7 +179,8 @@ class SqliteCacheStore(CacheStore):
         return self._with_retry(op)
 
     def close(self) -> None:
-        self.conn.close()
+        with self._lock:
+            self.conn.close()
 
 
 class FileCacheStore(CacheStore):
@@ -216,6 +229,9 @@ class FileCacheStore(CacheStore):
         # atomic-ish replace
         os.replace(tmp_path, path)
 
+    def delete_cache(self, key: str) -> None:
+        self._path_for_key(key).unlink(missing_ok=True)
+
 
 class InMemoryCacheStore(CacheStore):
     def __init__(self):
@@ -234,6 +250,9 @@ class InMemoryCacheStore(CacheStore):
     def write_cache(self, key: str, value: Any, ttl: float | None = None) -> None:
         expiry = None if ttl is None else (time.time() + float(ttl))
         self.store[key] = (expiry, value)
+
+    def delete_cache(self, key: str) -> None:
+        self.store.pop(key, None)
 
 
 def default_cache_key(func, args, kwargs):
@@ -330,6 +349,10 @@ def cached(ttl=None, cachekey=None, cache_if: Callable[[Any], bool] | None = Non
                 return cachekey
             return default_cache_key(func, args, kwargs)
 
+        def invalidate(*args, **kwargs) -> None:
+            """Drop the cached result for these arguments."""
+            cache_store().delete_cache(make_key(args, kwargs))
+
         if is_async:
 
             @wraps(func)
@@ -338,6 +361,7 @@ def cached(ttl=None, cachekey=None, cache_if: Callable[[Any], bool] | None = Non
                 return await acache_fn(lambda: func(*args, **kwargs), key, ttl, cache_if)
 
             async_wrapper.__wrapped__ = func
+            async_wrapper.invalidate = invalidate
             return async_wrapper
 
         @wraps(func)
@@ -346,6 +370,7 @@ def cached(ttl=None, cachekey=None, cache_if: Callable[[Any], bool] | None = Non
             return cache_fn(lambda: func(*args, **kwargs), key, ttl, cache_if)
 
         sync_wrapper.__wrapped__ = func
+        sync_wrapper.invalidate = invalidate
         return sync_wrapper
 
     return decorator

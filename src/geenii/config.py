@@ -46,6 +46,14 @@ FERNET_SECRET_KEY = _envvar("FERNET_SECRET_KEY", "")
 
 MCP_CONFIG_FILE = "mcp.json"
 MCP_INIT_TIMEOUT = float(_envvar("GEENII_MCP_INIT_TIMEOUT", "30"))
+# The API server discovers the tools of all configured MCP servers in the background at startup
+MCP_AUTOLOAD = _envvar("GEENII_MCP_AUTOLOAD", "true").lower() == "true"
+# Number of MCP servers whose tools are discovered at the same time
+MCP_LOAD_CONCURRENCY = int(_envvar("GEENII_MCP_LOAD_CONCURRENCY", "4"))
+# How long an agent waits for an MCP server that is still loading, before it starts without that server's tools
+MCP_AGENT_WAIT_TIMEOUT = float(_envvar("GEENII_MCP_AGENT_WAIT_TIMEOUT", "90"))
+# Seconds before a server whose discovery failed is tried again on the next request for its tools
+MCP_RETRY_COOLDOWN = float(_envvar("GEENII_MCP_RETRY_COOLDOWN", "60"))
 
 # Completion models
 # DEFAULT_COMPLETION_MODEL= "openai:gpt-4o-mini"

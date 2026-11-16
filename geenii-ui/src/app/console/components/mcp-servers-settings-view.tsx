@@ -6,6 +6,7 @@ import { McpServerProvider } from '@/app/mcp-servers/components/mcp-server-provi
 import McpServerViewHead, { mcpServerTarget } from '@/app/mcp-servers/components/mcp-server-view-head.tsx'
 import McpServerActions from '@/app/mcp-servers/components/mcp-server-actions.tsx'
 import McpServerConfigEditor from '@/app/mcp-servers/components/mcp-server-config-editor.tsx'
+import McpServerStatusBadge from '@/app/mcp-servers/components/mcp-server-status-badge.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Card, CardContent } from '@/components/ui/card.tsx'
@@ -15,7 +16,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { cn } from 'cn'
 
 const McpServersAdminView = () => {
-  const { servers, loading, error, refresh, getServerConfig, createServer, updateServer, deleteServer } = useMcpServers()
+  const { servers, loading, error, refresh, getServerConfig, createServer, updateServer, deleteServer, statuses, reloadServer } = useMcpServers()
   const [filter, setFilter] = React.useState<string>('')
   const [selectedServerName, setSelectedServerName] = React.useState<string | null>(null)
 
@@ -46,6 +47,15 @@ const McpServersAdminView = () => {
       setSelectedServerName(name)
     }
     setEditing(undefined)
+  }
+
+  const reloadTools = async (name: string) => {
+    setActionError(null)
+    try {
+      await reloadServer(name)
+    } catch (e: any) {
+      setActionError(`Failed to reload ${name}: ${e?.message || e}`)
+    }
   }
 
   const removeServer = async (name: string) => {
@@ -105,6 +115,7 @@ const McpServersAdminView = () => {
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <span className="truncate">{server.name}</span>
                   {server.type && <Badge variant="outline">{server.type}</Badge>}
+                  <McpServerStatusBadge status={statuses[server.name]} />
                 </div>
                 <p className="truncate font-mono text-xs text-muted-foreground" title={mcpServerTarget(server)}>
                   {mcpServerTarget(server)}
@@ -119,7 +130,9 @@ const McpServersAdminView = () => {
             {/* keyed by name, so tools are fetched once per selected server */}
             <McpServerProvider key={selectedServer.name} serverName={selectedServer.name} server={selectedServer}>
               <Card className="gap-4">
-                <McpServerViewHead onClose={() => setSelectedServerName(null)} onEdit={() => editServer(selectedServer.name)}
+                <McpServerViewHead status={statuses[selectedServer.name]}
+                                   onReload={statuses[selectedServer.name] ? () => reloadTools(selectedServer.name) : undefined}
+                                   onClose={() => setSelectedServerName(null)} onEdit={() => editServer(selectedServer.name)}
                                    onDelete={() => removeServer(selectedServer.name)} />
                 <CardContent className="flex flex-col gap-6">
                   <McpServer />

@@ -45,7 +45,7 @@ The `lifespan` in `server.py` builds the shared state once per process:
 | `app.state` | Built by | Contents |
 |---|---|---|
 | `agent_registry` | `init_global_agent_registry(projects=True)` | All agent specs from `$GEENII_WORKING_DIR/.geenii/agents/`, `~/.geenii/agents/` and `/var/geenii/agents/` (`config.agent_paths()`), plus `<project>/.geenii/agents/` of every project in the user settings (`config.project_paths()`) |
-| `tool_registry` | `init_builtin_tools()`, `init_mcp_server_tools()` | Built-in tools plus the tools of **all** servers in `mcp.json` (discovered in a worker thread, so startup waits for the slowest server). Agents still load their own MCP tools when they start |
+| `tool_registry` | `init_builtin_tools()`, `McpToolLoader.attach()` | Built-in tools plus the tools of **all** servers in `mcp.json`. MCP servers are discovered in the background, so startup doesn't wait for them; their tools are added as each one becomes ready (see [mcp.md](mcp.md#background-loading)). Agents load their own MCP tools when they start, from the same loader |
 | `chat_sessions` | `dep_chat_sessions` (lazily, on first `/chats` request) | `ChatSessionStore` over `GEENII_CHAT_SESSIONS_DIR` |
 
 Route modules read this state through small `Depends()` helpers
@@ -73,6 +73,9 @@ All paths are relative to `/api/v1`.
 | `PUT /mcp/servers/{name}` | Body: the full entry; `********` keeps a stored value. Writes `~/.geenii/mcp.json`. 400, 404, 409 if only in the project file |
 | `DELETE /mcp/servers/{name}` | Removes the server from `~/.geenii/mcp.json`. 204, 404, 409 if only in the project file |
 | `POST /mcp/servers/{name}/tool/call` | Body `{tool_name, arguments}`. Raw MCP `CallToolResult`. 404 unknown server, 502 on failure |
+| `GET /mcp/status` | Tool discovery status of every configured server (`pending`, `queued`, `loading`, `ready`, `failed`), with tool count and last error |
+| `GET /mcp/servers/{name}/status` | The same for one server. 404 unknown |
+| `POST /mcp/servers/{name}/reload` | Discovers the server's tools again in the background, bypassing the cache. 202 with its status, 404 unknown |
 | `GET /skills/` | The skills in the registry, sorted by name: `name`, `path`, `source` (the skill path it was loaded from), `description`, `triggers`, `allowed_tools`, `metadata`, `scripts`, `used_by` (agents listing it). Skills whose SKILL.md can't be parsed are skipped at startup |
 | `GET /skills/{name}` | The entry plus `instructions` (the markdown body of SKILL.md). 404 for unknown skills |
 | `GET /projects/` | `ProjectInfo[]`: the projects from the user settings' `projects` key (`config.get_projects()`): `path` (resolved), `trusted` (`"trusted": true`), `exists` (the directory exists) |

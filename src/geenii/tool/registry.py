@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import threading
 from collections.abc import Callable
 from typing import Any
 
@@ -15,20 +16,25 @@ logger = logging.getLogger(__name__)
 
 
 class ToolRegistry:
-    """Central registry for discovering and invoking tools by name."""
+    """Central registry for discovering and invoking tools by name.
+
+    Thread-safe: MCP server tools are added from background threads while the registry is in use.
+    """
 
     def __init__(self) -> None:
         self._tools: dict[str, Tool] = {}
+        self._lock = threading.RLock()
 
     # -- registration -------------------------------------------------------
 
     def register(self, tool: Tool) -> None:
-        """Register a tool instance. Raises ValueError on duplicate names."""
-        if tool.name in self._tools:
-            # raise ValueError(f"Tool {tool.name!r} is already registered")
-            logger.warning(f"Tool {tool.name!r} already registered")
-            return
-        self._tools[tool.name] = tool
+        """Register a tool instance. A tool whose name is already registered is skipped."""
+        with self._lock:
+            if tool.name in self._tools:
+                # raise ValueError(f"Tool {tool.name!r} is already registered")
+                logger.warning(f"Tool {tool.name!r} already registered")
+                return
+            self._tools[tool.name] = tool
         logger.info("Registered tool %r (%s)", tool.name, tool.__class__.__name__)
 
     def register_function(
@@ -76,6 +82,18 @@ class ToolRegistry:
             registered.append(tool)
         return registered
 
+    def unregister_mcp_tools(self, mcp_server_id: str) -> list[str]:
+        """Remove all tools of an MCP server. Returns the removed tool names."""
+        with self._lock:
+            names = [
+                name
+                for name, tool in self._tools.items()
+                if isinstance(tool, McpTool) and tool.mcp_server_id == mcp_server_id
+            ]
+            for name in names:
+                del self._tools[name]
+        return names
+
     def tool(
         self,
         name: str | None = None,
@@ -112,7 +130,8 @@ class ToolRegistry:
     def unregister(self, name: str) -> Tool:
         """Remove and return a tool. Raises KeyError if missing."""
         try:
-            return self._tools.pop(name)
+            with self._lock:
+                return self._tools.pop(name)
         except KeyError:
             raise KeyError(f"Tool {name!r} is not registered") from None
 
@@ -121,15 +140,17 @@ class ToolRegistry:
 
     def list_tool_names(self) -> set[str]:
         """Return the names of all registered tools (insertion order)."""
-        return set(self._tools.keys())
+        with self._lock:
+            return set(self._tools.keys())
 
     def list_tools(self) -> list[Tool]:
         """Return all registered tools (insertion order)."""
-        return list(self._tools.values())
+        with self._lock:
+            return list(self._tools.values())
 
     def list_definitions(self) -> list[dict]:
         """Return OpenAI-compatible tool definitions for all tools."""
-        return [t.to_definition() for t in self._tools.values()]
+        return [t.to_definition() for t in self.list_tools()]
 
     def get_tool_description(self, name: str) -> str:
         """Return a tool description by name."""
@@ -152,7 +173,7 @@ class ToolRegistry:
         return self.has(name)
 
     def __repr__(self) -> str:
-        names = ", ".join(self._tools)
+        names = ", ".join(self.list_tool_names())
         return f"<ToolRegistry tools=[{names}]>"
 
 

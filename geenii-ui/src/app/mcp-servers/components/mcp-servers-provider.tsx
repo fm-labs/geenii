@@ -13,7 +13,14 @@ type McpServersContextType = {
     createServer: (name: string, config: McpServerConfig) => Promise<void>;
     updateServer: (name: string, config: McpServerConfig) => Promise<void>;
     deleteServer: (name: string) => Promise<void>;
+    /** Tool discovery status by server name. Empty when the API server doesn't report it */
+    statuses: Record<string, McpServerLoadStatus>;
+    /** Discover a server's tools again in the background, bypassing the server's cache */
+    reloadServer: (name: string) => Promise<void>;
 }
+
+// while a server is queued or loading, its status is polled at this interval
+const STATUS_POLL_INTERVAL_MS = 2000
 
 const McpServersContext = React.createContext<McpServersContextType | null>(null)
 
@@ -23,6 +30,18 @@ export const McpServersProvider = ({ children }: PropsWithChildren) => {
     const [servers, setServers] = React.useState<McpServer[]>([]);
     const [loading, setLoading] = React.useState<boolean>(true);
     const [error, setError] = React.useState<string | null>(null);
+    const [statuses, setStatuses] = React.useState<Record<string, McpServerLoadStatus>>({});
+
+    const refreshStatus = useCallback(async () => {
+        try {
+            const data: McpServerLoadStatus[] = await fetchJson('/api/v1/mcp/status')
+            setStatuses(Object.fromEntries(data.map((s) => [s.name, s])))
+        } catch (error) {
+            // an older API server has no status route: show no status rather than an error
+            console.debug("Error fetching MCP server status:", error)
+            setStatuses({})
+        }
+    }, [fetchJson])
 
     const refresh = useCallback(async (reload: boolean = false) => {
         setLoading(true)
@@ -37,11 +56,19 @@ export const McpServersProvider = ({ children }: PropsWithChildren) => {
         } finally {
             setLoading(false)
         }
-    }, [fetchJson])
+        await refreshStatus()
+    }, [fetchJson, refreshStatus])
 
     React.useEffect(() => {
         refresh()
     }, [refresh])
+
+    const discovering = Object.values(statuses).some((s) => s.state === 'queued' || s.state === 'loading')
+    React.useEffect(() => {
+        if (!discovering) return
+        const timer = window.setInterval(refreshStatus, STATUS_POLL_INTERVAL_MS)
+        return () => window.clearInterval(timer)
+    }, [discovering, refreshStatus])
 
     const serverUrl = (name: string) => `/api/v1/mcp/servers/${encodeURIComponent(name)}`
 
@@ -76,9 +103,14 @@ export const McpServersProvider = ({ children }: PropsWithChildren) => {
         await refresh()
     }, [fetch, refresh])
 
+    const reloadServer = useCallback(async (name: string) => {
+        const status: McpServerLoadStatus = await fetchJson(`${serverUrl(name)}/reload`, { method: 'POST' })
+        setStatuses((prev) => ({ ...prev, [name]: status }))
+    }, [fetchJson])
+
     const value = React.useMemo(
-        () => ({ servers, loading, error, refresh, getServerConfig, createServer, updateServer, deleteServer }),
-        [servers, loading, error, refresh, getServerConfig, createServer, updateServer, deleteServer])
+        () => ({ servers, loading, error, refresh, getServerConfig, createServer, updateServer, deleteServer, statuses, reloadServer }),
+        [servers, loading, error, refresh, getServerConfig, createServer, updateServer, deleteServer, statuses, reloadServer])
 
     return (<McpServersContext.Provider value={value}>{children}</McpServersContext.Provider>)
 }

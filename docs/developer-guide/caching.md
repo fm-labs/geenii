@@ -42,7 +42,7 @@ returned but not stored, so the next call runs the function again.
 | Function | TTL | Called by |
 |---|---|---|
 | `geenii.ai.enumerate_models()` | 1 h | `GET /ai/models` (`server/ai_routes.py`), `geenii models` CLI, the agents' models info command |
-| `geenii.tools.read_mcp_server_tools(server_name, server_conf)` | 1 h, non-empty results only (`cache_if=bool`) | `init_mcp_server_tools()`: server startup, `geenii tools`, `geenii ai`, agents with `mcp_servers` |
+| `geenii.tools.read_mcp_server_tools(server_name, server_conf)` | 1 h, non-empty results only (`cache_if=bool`) | `McpToolLoader` (via `init_mcp_server_tools()`): server startup, `geenii tools`, `geenii ai`, agents with `mcp_servers`. `reload` drops the entry with `read_mcp_server_tools.invalidate(name)` |
 
 `enumerate_providers()` has a commented-out `@cached` and is **not** cached.
 

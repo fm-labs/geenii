@@ -22,6 +22,7 @@ from geenii.config import (
     GEENII_CACHE_DIR,
     GEENII_USER_HOME,
     GEENII_WORKING_DIR,
+    MCP_AGENT_WAIT_TIMEOUT,
     agent_paths,
     flow_dirs,
     project_paths,
@@ -138,8 +139,8 @@ def init_agent(
                 break
 
     if agent_conf.mcp_servers is not None and len(agent_conf.mcp_servers) > 0:
-        mcp_servers = agent_conf.mcp_servers
-        init_mcp_server_tools(tool_registry, set(mcp_servers))
+        # waits for servers that are still loading in the background, up to the timeout
+        init_mcp_server_tools(tool_registry, set(agent_conf.mcp_servers), timeout=MCP_AGENT_WAIT_TIMEOUT)
 
     skill_registry = SkillRegistry()
     if agent_conf.skills is not None:

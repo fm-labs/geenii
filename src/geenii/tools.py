@@ -59,57 +59,41 @@ def init_builtin_tools(registry: ToolRegistry):
     init_core_tools(registry)
 
 
-# empty results are not cached: [] is also what a failed listing returns, and it would hide the server's tools for the full ttl
+# empty results are not cached: a server that is still starting up may list no tools yet
 @cached(ttl=3600, cache_if=bool)
 def read_mcp_server_tools(server_name) -> list[dict]:
+    """List the tools of an MCP server. Raises if the server is not configured or can't be reached."""
     # short-lived client for discovery only; tool calls use the cached client from get_mcp_client_for_server
     server_conf = get_mcp_config_for_server(server_name, compile=True)
     if server_conf is None:
-        logger.warning(f"No MCP servers configured for server '{server_name}'")
-        return []
+        raise ValueError(f"MCP server '{server_name}' is not configured")
     mcp_client = McpClient(server_name, server_conf)
     try:
         try:
-            tools = mcp_client.list_tools()
+            return mcp_client.list_tools()
         except Exception as e:
             # try again after a short delay in case the server is still starting up
             logger.warning(f"Error listing tools from MCP server {server_name}: {e}. Retrying in 1 seconds...")
-            try:
-                time.sleep(1)
-                tools = mcp_client.list_tools()
-            except Exception as e:
-                logger.error(
-                    f"Error listing tools from MCP server {server_name} on second attempt: {e}. Skipping this server."
-                )
-                return []
-            # logger.error(f"Error listing tools from MCP server {server_name}: {e}.")
-            # return []
-        return tools
-    except Exception as e:
-        logger.error(f"Error retrieving tools from MCP server {server_name}: {e}")
-        return []
+            time.sleep(1)
+            return mcp_client.list_tools()
     finally:
         mcp_client.close()
 
 
-def init_mcp_server_tools(registry: ToolRegistry, server_names: set[str] | None = None):
-    mcp_config = get_mcp_config()
-    if not mcp_config or "mcpServers" not in mcp_config:
-        logger.warning("No MCP servers configured")
-        return
+def init_mcp_server_tools(
+    registry: ToolRegistry,
+    server_names: set[str] | None = None,
+    timeout: float | None = None,
+):
+    """Register the tools of the given MCP servers (default: all configured), waiting for their discovery.
 
-    for server_name in mcp_config["mcpServers"]:
-        if server_names is not None and server_name not in server_names:
-            continue
+    Discovery runs in parallel and is shared with any other caller loading the same servers. A server that
+    fails, or is not loaded within `timeout` seconds, is skipped.
+    """
+    # imported here: the loader imports this module
+    from geenii.mcp_loader import get_mcp_loader
 
-        try:
-            mcp_tools = read_mcp_server_tools(server_name)
-            if len(mcp_tools) > 0:
-                # map the MCP tool definitions to the internal tool representation and register them in the registry
-                registry.register_mcp_tools(mcp_server_id=server_name, tool_definitions=mcp_tools)
-        except Exception as e:
-            logger.error(f"Error connecting to MCP server {server_name}: {e}")
-            continue
+    get_mcp_loader().register_into(registry, server_names, timeout=timeout)
 
 
 def invoke_tool(

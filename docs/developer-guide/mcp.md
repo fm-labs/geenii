@@ -21,6 +21,7 @@ Geenii does not host an MCP server itself, and does not use MCP prompts yet.
 | `geenii/tool/mcp_tool.py` | `McpTool`: a `Tool` that forwards `invoke()` to an MCP server |
 | `geenii/tool/registry.py` | `ToolRegistry.register_mcp_tools()` turns a `tools/list` result into `McpTool`s |
 | `geenii/tools.py` | `read_mcp_server_tools()` (discovery, cached) and `init_mcp_server_tools()` |
+| `geenii/mcp_loader.py` | `McpToolLoader`: discovers servers' tools in the background, once per server, and tracks their load status |
 | `geenii/cli/mcp_cli.py` | The `geenii mcp` command group |
 | `geenii/server/mcp_routes.py` | The `/mcp` HTTP routes |
 | `geenii-ui/src/app/mcp-servers/` | React providers and components for the MCP view |
@@ -105,6 +106,10 @@ use connects with the new config. Entries are written as sent, with any
 | Environment variable | Default | Effect |
 |---|---|---|
 | `GEENII_MCP_INIT_TIMEOUT` | `30` | Seconds fastmcp waits for a server's `initialize` handshake |
+| `GEENII_MCP_AUTOLOAD` | `true` | The HTTP server starts discovering all servers' tools in the background at startup. With `false`, a server is only loaded when an agent needs it or it is reloaded |
+| `GEENII_MCP_LOAD_CONCURRENCY` | `4` | Number of servers discovered at the same time |
+| `GEENII_MCP_AGENT_WAIT_TIMEOUT` | `90` | Seconds an agent waits, in total, for its servers that are still loading. A server not ready by then is skipped, and the agent starts without its tools |
+| `GEENII_MCP_RETRY_COOLDOWN` | `60` | Seconds before a server whose discovery failed is tried again, the next time its tools are requested |
 
 ## Clients and connections
 
@@ -138,26 +143,56 @@ the first tool call starts it a second time, on its own long-lived connection.
 
 ## MCP tools
 
-`init_mcp_server_tools(registry, server_names=None)` does the following for
-each configured server (or only for those in `server_names`):
+Discovery:
 
-1. `read_mcp_server_tools()` fetches `tools/list` through a short-lived client.
-   The result is cached for one hour with `@cached(ttl=3600, cache_if=bool)`,
-   keyed by server name and config. Empty results are not cached, so an
-   unreachable server is tried again next time. There's no retry: a failed
-   listing logs an error and skips the server.
+1. `read_mcp_server_tools()` fetches `tools/list` through a short-lived client,
+   and tries once more after a second if that fails. It raises if the server
+   isn't configured or can't be reached. The result is cached for one hour with
+   `@cached(ttl=3600, cache_if=bool)`, keyed by server name. Empty results and
+   failures are not cached.
 2. `registry.register_mcp_tools()` registers one `McpTool` per tool, named
    `mcp__<server>__<tool>`. It uses the tool's `description` and `input_schema`.
 
-Callers:
+### Background loading
 
-- **Agents:** `init_agent()` passes the agent spec's `mcp_servers`, so an agent
-  only gets tools from the servers it lists, and none without `mcp_servers`.
-- **HTTP server:** at startup, the app's `tool_registry` loads tools from
-  **all** configured servers. It does this in a worker thread, because
-  discovery blocks. Startup takes as long as the slowest server takes to
-  respond, up to the init timeout.
-- **CLI:** `geenii tools` and `geenii ai`.
+Starting a server can take minutes, for example when `docker run` has to pull
+its image first. So discovery goes through one process-wide `McpToolLoader`
+(`get_mcp_loader()` in `geenii/mcp_loader.py`):
+
+- **One discovery per server:** `ensure(name)` returns the server's
+  discovery as a `Future`, and starts it on the loader's thread pool
+  (`GEENII_MCP_LOAD_CONCURRENCY` workers) if it isn't running or done yet.
+  Everyone who needs the server waits on the same future, so a server that is
+  still starting is never started a second time.
+- **Status:** each server is `pending` (not requested yet), `queued`
+  (waiting for a free worker), `loading`, `ready` or `failed`, with
+  its tool count, last error, attempts and timestamps (`status()`).
+- **Retries:** a failed server is tried again on the next `ensure()`, once
+  `GEENII_MCP_RETRY_COOLDOWN` seconds have passed.
+- **Attached registries:** `attach(registry)` keeps a registry up to date.
+  Each server's tools are added as soon as it is ready, and replaced or
+  removed when it is reloaded, fails or is forgotten.
+- **Reload:** `reload(name)` drops the cached tool list and discovers the
+  server again. A discovery that is overtaken by a reload is ignored when it
+  finishes. `forget(name)` drops a server and its tools.
+- **Waiting:** `register_into(registry, names, timeout)` waits for the given
+  servers, up to `timeout` seconds in total, and registers the tools of those
+  that are ready. Servers that failed or are still loading are skipped with a
+  log message.
+
+`init_mcp_server_tools(registry, server_names=None, timeout=None)` is
+`register_into()` on the shared loader. Callers:
+
+- **HTTP server:** at startup the app's `tool_registry` gets the built-in tools
+  only, is attached to the loader, and the loader starts discovering **all**
+  configured servers (unless `GEENII_MCP_AUTOLOAD=false`). Startup doesn't
+  wait: MCP tools show up in `/api/v1/tools/` as servers become ready.
+  Shutdown cancels queued discoveries; running ones finish in their threads.
+- **Agents:** `init_agent()` passes the agent spec's `mcp_servers` with
+  `GEENII_MCP_AGENT_WAIT_TIMEOUT`, so an agent only gets tools from the servers
+  it lists, and none without `mcp_servers`. A server already loaded by the
+  startup preload is used as is; one still loading is waited for.
+- **CLI:** `geenii tools` and `geenii ai` wait for all servers, with no timeout.
 
 `McpTool.invoke()` calls the tool through the cached client and maps the
 `CallToolResult` to a `ToolCallResult`:
@@ -204,7 +239,10 @@ calls don't stall the event loop.
 | `GET /mcp/servers/{name}` | — | Summary merged with `McpClient.info()`: `server_capabilities`, `tools`, `resources`. Connects to the server (starts it, for stdio) |
 | `GET /mcp/servers/{name}/config` | — | The full `mcp.json` entry (merged config), with `env` and `headers` values masked. Doesn't connect |
 | `PUT /mcp/servers/{name}` | The full entry (`{…}`) | The updated summary. Replaces the entry in the root `mcp.json` |
-| `DELETE /mcp/servers/{name}` | — | `204`. Removes the entry from the root `mcp.json` |
+| `DELETE /mcp/servers/{name}` | — | `204`. Removes the entry from the root `mcp.json` and the server's tools from the app's `tool_registry` |
+| `GET /mcp/status` | — | Load status of every configured server: `name`, `state` (`pending`, `queued`, `loading`, `ready`, `failed`), `tool_count`, `error`, `attempts`, `started_at`, `finished_at` |
+| `GET /mcp/servers/{name}/status` | — | The same for one server |
+| `POST /mcp/servers/{name}/reload` | — | `202` with the server's status. Discovers its tools again in the background, bypassing the cache |
 | `POST /mcp/servers/{name}/tool/call` | `{"tool_name": str, "arguments": {}}` (`MCPToolCallRequest`) | The raw MCP `CallToolResult` as JSON (`content`, `structured_content`, `is_error`, …) |
 
 Errors use the standard Problem body (see [server.md](server.md#errors)):
@@ -257,8 +295,9 @@ Route: `#/console/configure/mcp-servers` (`console/configure-page.tsx` →
 ```
 McpServersSettingsView
 └── McpServersProvider              GET /mcp/servers           servers, loading, error, refresh(reload),
-    │                                                          getServerConfig, createServer,
-    │                                                          updateServer, deleteServer
+    │                               GET /mcp/status            getServerConfig, createServer,
+    │                                                          updateServer, deleteServer,
+    │                                                          statuses, reloadServer
     └── McpServersAdminView         filter, server list, selection, add / edit / delete
         ├── McpServerConfigEditor   in a Sheet                 form ↔ JSON editor for one mcp.json entry
         └── McpServerProvider       keyed by server name       tools, resources, loading, loaded, error,
@@ -283,6 +322,14 @@ McpServersSettingsView
   no field for are passed through unchanged. JSON mode edits the same entry as
   text. Validation mirrors the server's (name pattern, command or URL
   required, unique names).
+- **Load status:** each list row and the details header show the server's
+  tool discovery status as a `McpServerStatusBadge`: not loaded, queued,
+  loading, `N tools` or failed (hover for details). A failed server's error is
+  shown under its command. `refresh()` also fetches `GET /mcp/status`, and the
+  provider polls it every 2 s while any server is queued or loading, and not
+  otherwise. Reload in the details header calls
+  `POST /mcp/servers/{name}/reload`. An API server without the status route
+  shows no status.
 - **Details card:** keyed by server name, so a server's tools are fetched once
   each time it's selected. The tools Refresh button fetches again, but gets
   the same result back (see [Known issues](#known-issues)).
@@ -301,6 +348,7 @@ uv run pytest tests/geenii/test_mcp_config.py tests/geenii/test_mcp_routes.py
 | File | Covers |
 |---|---|
 | `tests/geenii/test_mcp_config.py` | `${VAR}` expansion (which fields, unknown names, non-string values), merging the root and project files, compiled configs being copies, and the root-file write helpers (create, keep other keys, reload, drop cached clients, delete) |
+| `tests/geenii/test_mcp_loader.py` | `McpToolLoader` with a fake discovery: one discovery per server, attached registries, retries and the cooldown, timeouts, reload and forget, the server's tool registry not waiting at startup, the status and reload routes, and concurrent SQLite cache writes |
 | `tests/geenii/test_mcp_routes.py` | The `/mcp/servers` CRUD routes: masking, create validation and name clashes, keeping masked values on update, `404` / `409` for unknown and project-only servers, delete |
 
 Both use the `mcp_dirs` fixture in `tests/geenii/conftest.py`. It points the
@@ -320,9 +368,13 @@ test connects to an MCP server.
 - **Project file overrides API edits:** a server defined in both files is
   read from the project `mcp.json`. Its update succeeds against the root file,
   but has no effect until the project entry is removed.
-- **Registered tools aren't updated:** adding, changing or deleting a server
-  doesn't touch the tools already registered in the server's `tool_registry`
-  or in running agents. New servers' tools show up after a restart.
+- **Running agents aren't updated:** adding, changing or deleting a server
+  through the API updates the server's `tool_registry`, but not the tools of
+  agents that are already running. A hand edit of `mcp.json` updates neither;
+  use `POST /mcp/servers/{name}/reload`.
+- **Shutdown can wait for discovery:** cancelling a running discovery isn't
+  possible, so a server that is still starting (for example pulling its image)
+  can delay process exit until it finishes or times out.
 - **Tool lists never refresh:** `McpClient` never invalidates its list cache,
   so a server's new or changed tools don't show up until the process restarts.
   Discovery has its own one-hour cache on top of that.

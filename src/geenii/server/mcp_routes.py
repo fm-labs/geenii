@@ -14,6 +14,7 @@ from geenii.mcp_config import (
     read_root_mcp_config,
     save_mcp_server_config,
 )
+from geenii.mcp_loader import get_mcp_loader
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,12 @@ def _get_server_config(server_name: str) -> dict:
 @router.get("/servers")
 def list_servers(reload: bool = False) -> list[dict]:
     servers = get_mcp_config(reload=reload).get("mcpServers", {})
-    return [_server_summary(name, cfg) for name, cfg in servers.items()]
+    _items = []
+    for name, cfg in servers.items():
+        _items.append(_server_summary(name, cfg))
+        if reload:
+            get_mcp_loader().reload(name)
+    return _items
 
 
 @router.post("/servers", status_code=201)
@@ -126,6 +132,7 @@ def create_server(request: McpServerCreateRequest) -> dict:
     cfg = _unmask_config(request.config, None)
     _validate_server_config(cfg)
     save_mcp_server_config(request.name, cfg)
+    get_mcp_loader().ensure(request.name)
     return _server_summary(request.name, cfg)
 
 
@@ -141,6 +148,7 @@ def update_server(server_name: str, config: dict) -> dict:
     cfg = _unmask_config(config, stored)
     _validate_server_config(cfg)
     save_mcp_server_config(server_name, cfg)
+    get_mcp_loader().reload(server_name)
     return _server_summary(server_name, cfg)
 
 
@@ -148,7 +156,28 @@ def update_server(server_name: str, config: dict) -> dict:
 def delete_server(server_name: str) -> Response:
     _get_root_server_config(server_name)
     delete_mcp_server_config(server_name)
+    get_mcp_loader().forget(server_name)
     return Response(status_code=204)
+
+
+@router.get("/status")
+def list_server_status() -> list[dict]:
+    """Tool discovery status of all configured servers: pending, loading, ready or failed."""
+    return get_mcp_loader().status()
+
+
+@router.get("/servers/{server_name}/status")
+def get_server_status(server_name: str) -> dict:
+    _get_server_config(server_name)
+    return get_mcp_loader().status(server_name)[0]
+
+
+@router.post("/servers/{server_name}/reload", status_code=202)
+def reload_server(server_name: str) -> dict:
+    """Discover the server's tools again in the background, bypassing the cache."""
+    _get_server_config(server_name)
+    get_mcp_loader().reload(server_name)
+    return get_mcp_loader().status(server_name)[0]
 
 
 @router.get("/servers/{server_name}")

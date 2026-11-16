@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -10,13 +9,14 @@ from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from geenii.config import APP_VERSION, WWW_DIR
+from geenii.config import APP_VERSION, MCP_AUTOLOAD, WWW_DIR
 from geenii.datamodels import Problem
 from geenii.g import init_global_agent_registry, init_global_skill_registry
 from geenii.logs import init_logging
 from geenii.server.router import app_router
 from geenii.tool.registry import ToolRegistry
-from geenii.tools import init_builtin_tools, init_mcp_server_tools
+from geenii.mcp_loader import get_mcp_loader, shutdown_mcp_loader
+from geenii.tools import init_builtin_tools
 
 # Same setup as the CLI (honours GEENII_LOGGING / GEENII_LOG_NAME). A no-op when the CLI
 # already configured logging; needed when uvicorn imports this module in a fresh process (--reload).
@@ -72,8 +72,12 @@ async def initialize_tool_registry():
     print("Initializing tool registry...")
     registry = ToolRegistry()
     init_builtin_tools(registry)
-    # MCP discovery is blocking (spawns/connects to servers), so keep it off the event loop
-    await asyncio.to_thread(init_mcp_server_tools, registry)
+    # MCP servers can take long to start (e.g. pulling docker images), so their tools are discovered
+    # in the background and added to the registry as each server becomes ready
+    loader = get_mcp_loader()
+    loader.attach(registry)
+    if MCP_AUTOLOAD:
+        loader.start()
     return registry
 
 
@@ -113,6 +117,8 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        # cancels queued MCP discoveries; running ones finish in their threads
+        shutdown_mcp_loader()
         # await app.state.chat_server.stop()
         # await app.state.scheduler.stop()
         # await app.state.supervisor.stop()
