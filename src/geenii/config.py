@@ -37,7 +37,7 @@ PM_GC_MAX_AGE = float(_envvar("GEENII_PM_GC_MAX_AGE", str(7 * 24 * 3600)))
 # Static web GUI served by the API server (defaults to the repo's www/ folder)
 WWW_DIR = _envvar(
     "GEENII_WWW_DIR",
-    os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, "www"),
+    None, #os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, "www"),
 )
 
 GEENII_MEMORY_ENGINE = "file"
@@ -57,18 +57,17 @@ MCP_RETRY_COOLDOWN = float(_envvar("GEENII_MCP_RETRY_COOLDOWN", "60"))
 
 # Completion models
 # DEFAULT_COMPLETION_MODEL= "openai:gpt-4o-mini"
-DEFAULT_COMPLETION_MODEL = "ollama:qwen3:8b"
+DEFAULT_COMPLETION_MODEL = _envvar("GEENII_DEFAULT_COMPLETION_MODEL", "ollama:gemma4:latest")
 
 # Image generation
 # DEFAULT_IMAGE_GENERATION_MODEL="stable-diffusion:stable-diffusion:latest" # need GPU
-DEFAULT_IMAGE_GENERATION_MODEL = "openai:dall-e-2"
-
+DEFAULT_IMAGE_GENERATION_MODEL = _envvar("GEENII_DEFAULT_IMAGE_GENERATION_MODEL", "openai:dall-e-2")
 # Audio generation / Text-to-Speech
-DEFAULT_AUDIO_GENERATION_MODEL = "hf:llama-2:latest"
+DEFAULT_AUDIO_GENERATION_MODEL = _envvar("GEENII_DEFAULT_IMAGE_GENERATION_MODEL", "hf:llama-2:latest")
 # Audio transcription / Speech-to-Text
 # DEFAULT_AUDIO_TRANSCRIPTION_MODEL="whisper:whisper-1:latest"
-DEFAULT_AUDIO_TRANSCRIPTION_MODEL = "openai:whisper-1"
-DEFAULT_AUDIO_TRANSLATION_MODEL = "whisper:whisper-1:latest"
+DEFAULT_AUDIO_TRANSCRIPTION_MODEL = _envvar("GEENII_DEFAULT_AUDIO_TRANSCRIPTION_MODEL", "openai:whisper-1")
+DEFAULT_AUDIO_TRANSLATION_MODEL = _envvar("GEENII_DEFAULT_AUDIO_TRANSLATION_MODEL", "whisper:whisper-1:latest")
 
 # Vendor specific
 WHISPERCPP_IMAGE = "whispercpp:latest"
@@ -114,7 +113,7 @@ REDIS_URI = _envvar("REDIS_URI", "")
 #     return GEENII_DATA_DIR
 
 
-def read_user_settings():
+def read_user_settings() -> dict:
     user_settings_path = os.path.join(GEENII_USER_HOME, ".geenii", "settings.json")
     default_settings = {
         "theme": "system",  # options: "light", "dark", "system"
@@ -123,6 +122,7 @@ def read_user_settings():
         "environment": {},
         "skill_dirs": [],
         "projects": {},  # "/path/to/project/dir": {"trusted": true}
+        "plugin_dirs": [], # ["/path/to/plugin/module/",]
     }
     if os.path.exists(user_settings_path):
         try:
@@ -256,3 +256,4 @@ def apps_dirs() -> list[str]:
 def project_skills_dir() -> str:
     """Where `geenii skills install` puts skills"""
     return os.path.join(GEENII_WORKING_DIR, ".geenii", "skills")
+
