@@ -353,20 +353,23 @@ class LLMTask(BaseAgentTask):
                     call_id=tool_call.call_id,
                 )
                 tool_result = None
-                for msg in tool_task.execute():
-                    if isinstance(msg, ModelMessage) and isinstance(msg.content[0], ToolCallResultContent):
-                        tool_result = msg.content[0].result
-                        # add the tool result to the message history so that it can be used as context for the next response generation
-                        # self.agent.add_to_history(msg)
-                        yield msg
-                    else:
-                        # if the tool task yields any other messages (e.g. user interaction requests), we yield them immediately
-                        # todo: add to message history as well?
-                        if isinstance(msg, ModelMessage):
-                            # approval requests only go out if the human answers through this stream
-                            if not isinstance(msg.content[0], UserInteractionContent) or self.agent.hitl.interactive:
-                                yield msg
-
+                try:
+                    for msg in tool_task.execute():
+                        if isinstance(msg, ModelMessage) and isinstance(msg.content[0], ToolCallResultContent):
+                            tool_result = msg.content[0].result
+                            # add the tool result to the message history so that it can be used as context for the next response generation
+                            # self.agent.add_to_history(msg)
+                            yield msg
+                        else:
+                            # if the tool task yields any other messages (e.g. user interaction requests), we yield them immediately
+                            # todo: add to message history as well?
+                            if isinstance(msg, ModelMessage):
+                                # approval requests only go out if the human answers through this stream
+                                if not isinstance(msg.content[0], UserInteractionContent) or self.agent.hitl.interactive:
+                                    yield msg
+                except Exception as e:
+                    logger.error("Exception while processing tool call.", exc_info=True)
+                    pass
                 tools_called += 1
                 if tool_result is None:
                     logger.error(
