@@ -180,7 +180,7 @@ const toInput = (f: FormState): SchedulerTaskInput => {
 }
 
 /** Message of a failed request; FastAPI validation errors (422) have a list as detail */
-const requestError = (err: any): string => {
+export const requestError = (err: any): string => {
   const detail = err?.response?.data?.detail
   if (Array.isArray(detail)) return detail.map((d) => `${(d.loc ?? []).slice(1).join('.')}: ${d.msg}`).join('; ')
   return err?.message || 'Unknown error'
@@ -203,7 +203,7 @@ const Segmented = <T extends string>({ value, options, onChange }: {
   </div>
 )
 
-const FormRow = ({ label, htmlFor, hint, children }: {
+export const FormRow = ({ label, htmlFor, hint, children }: {
   label: string
   htmlFor?: string
   hint?: React.ReactNode

@@ -144,6 +144,43 @@ def test_one_socket_serves_all_three_components(short_dir):
             client.call("supervisor.ensure", {"name": "bad", "cmd": "not a list"})
 
 
+def test_supervisor_start_resumes_kept_and_config_services(short_dir):
+    services = os.path.join(short_dir, "services.json")
+    with open(services, "w") as f:
+        json.dump(
+            {"services": [{"name": "svc", "cmd": ["sleep", "30"]}, {"name": "off", "cmd": ["true"], "enabled": False}]},
+            f,
+        )
+    host = ProcessHost(
+        pm=ProcessManager(os.path.join(short_dir, "procs")),
+        scheduler=Scheduler(),
+        supervisor=Supervisor(),
+        services_config=services,
+    )
+    with RunningDaemon(DaemonServer(host, os.path.join(short_dir, "d.sock"))) as client:
+        running = lambda: client.call("supervisor.status")["running"].get("svc", {}).get("pid")  # noqa: E731
+        first_pid = _wait_until(running)
+
+        # Stopped with keep: still desired, started again in place
+        client.call("supervisor.stop", {"name": "svc", "disable_restart": False})
+        assert "svc" in client.call("supervisor.status")["desired"]
+        assert "svc" not in client.call("supervisor.status")["running"]
+        assert client.call("supervisor.start", {"name": "svc"}) == "ok"
+        _wait_until(lambda: running() not in (None, first_pid))
+
+        # Stopped for good: started again from the services file
+        client.call("supervisor.stop", {"name": "svc"})
+        assert client.call("supervisor.status")["desired"] == {}
+        client.call("supervisor.start", {"name": "svc"})
+        _wait_until(running)
+        assert client.call("supervisor.status")["desired"]["svc"]["source"] == "config"
+
+        # Disabled and unknown services cannot be started
+        for name in ("off", "missing"):
+            with pytest.raises(RuntimeError, match="KeyError"):
+                client.call("supervisor.start", {"name": name})
+
+
 def test_shutdown_stops_every_component_and_removes_the_socket(short_dir):
     server = DaemonServer(_make_host(short_dir), os.path.join(short_dir, "d.sock"))
     daemon = RunningDaemon(server)

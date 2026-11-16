@@ -74,6 +74,10 @@ export const consoleNavData = {
           url: '#/console/system/scheduler',
         },
         {
+          title: 'Services',
+          url: '#/console/system/services',
+        },
+        {
           title: 'Processes',
           url: '#/console/system/processes',
         },

@@ -5,8 +5,8 @@ loop and exposes their operations as namespaced RPC methods.
 Method names:
     pm.start, pm.status, pm.output, pm.wait, pm.kill, pm.list, pm.cleanup, pm.gc
     scheduler.status, scheduler.run, scheduler.reload
-    supervisor.status, supervisor.ensure, supervisor.stop, supervisor.restart, supervisor.logs,
-    supervisor.reload
+    supervisor.status, supervisor.ensure, supervisor.start, supervisor.stop, supervisor.restart,
+    supervisor.logs, supervisor.reload
 
 The pm.* methods are also registered without the prefix (start, status, ...)
 for clients of the former standalone process manager service.
@@ -65,6 +65,7 @@ class ProcessHost:
             "scheduler.reload": self._scheduler_reload,
             "supervisor.status": self._supervisor_status,
             "supervisor.ensure": self._supervisor_ensure,
+            "supervisor.start": self._supervisor_start,
             "supervisor.stop": self._supervisor_stop,
             "supervisor.restart": self._supervisor_restart,
             "supervisor.logs": self._supervisor_logs,
@@ -197,6 +198,20 @@ class ProcessHost:
                 capture_output=params.get("capture_output", True),
             ),
         )
+        return "ok"
+
+    async def _supervisor_start(self, params: dict) -> str:
+        """Start NAME again: a supervised (e.g. stopped with keep) process, or an enabled service of the services file."""
+        name = params["name"]
+        if name in self.supervisor.status()["desired"]:
+            await self.supervisor.restart_process(name)
+            return "ok"
+        services = {}
+        if self.services_config and os.path.isfile(self.services_config):
+            services = {c.name: c for c in read_services(self.services_config)}
+        if name not in services:
+            raise KeyError(f"'{name}' is not supervised and not an enabled service of the services config")
+        await self.supervisor.ensure(name, services[name])
         return "ok"
 
     async def _supervisor_stop(self, params: dict) -> str:

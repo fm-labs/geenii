@@ -7,6 +7,7 @@ import SettingsView from '@/app/console/settings-view.tsx'
 import UsageStatsView from '@/app/console/components/usage-stats-view.tsx'
 import SchedulerConfigView from '@/app/console/components/scheduler-config-view.tsx'
 import ProcessManagerView from '@/app/console/components/process-manager-view.tsx'
+import SupervisorConfigView from '@/app/console/components/supervisor-config-view.tsx'
 
 const SystemPage = () => {
   const { params } = useRoute()
@@ -22,6 +23,8 @@ const SystemPage = () => {
         return <UsageStatsView />
       case 'scheduler':
         return <SchedulerConfigView />
+      case 'services':
+        return <SupervisorConfigView />
       case 'processes':
         return <ProcessManagerView />
       default:
