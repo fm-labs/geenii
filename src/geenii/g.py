@@ -9,6 +9,7 @@ from geenii.agent.registry import AgentRegistry, AgentSpec, logger
 from geenii.flows import FlowRegistry
 from geenii.hitl import HumanInTheLoopController
 from geenii.memory import ChatMemory
+from geenii.plugins import plugin_agents, plugin_tools
 from geenii.tool.registry import ToolRegistry
 from geenii.tools import _redact_env_vars, init_builtin_tools, init_mcp_server_tools
 
@@ -53,31 +54,35 @@ def init_global_agent_registry(registry: AgentRegistry | None = None, projects: 
         {
             "default": AgentSpec(
                 name="default",
-                model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
+                model=DEFAULT_COMPLETION_MODEL,
+                class_name="geenii.agents.RoutingAgent",
                 scope="global",
             )
         }
     )
     # routing
-    registry._agent_configs.update(
-        {
-            "routing": AgentSpec(
-                name="routing",
-                class_name="geenii.agents.RoutingAgent",
-                model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
-                scope="global",
-            )
-        }
-    )
+    # registry._agent_configs.update(
+    #     {
+    #         "routing": AgentSpec(
+    #             name="routing",
+    #             class_name="geenii.agents.RoutingAgent",
+    #             model=DEFAULT_COMPLETION_MODEL,
+    #             scope="global",
+    #         )
+    #     }
+    # )
     # chatgpt
     registry._agent_configs.update({"chatgpt": AgentSpec(name="chatgpt", model="openai:gpt-4o-mini", scope="global")})
-    # anthropic
-    registry._agent_configs.update(
-        {"claude": AgentSpec(name="claude", model="anthropic:claude-opus-4-6", scope="global")}
-    )
+    # claude
+    registry._agent_configs.update({"claude": AgentSpec(name="claude", model="anthropic:claude-opus-4-6", scope="global")})
+    # deepseek
+    #registry._agent_configs.update({"deepseek": AgentSpec(name="deepseek", model="ollama:deepseek:v1", scope="global")})
 
     for agent_dir, scope in set(agent_paths()):
         registry.load_from_directory(agent_dir, scope=scope)
+
+    # agents added by plugins; agent md files with the same name take precedence
+    registry._agent_configs.update(plugin_agents())
 
     # also load from all registered projects
     if projects:
@@ -101,10 +106,15 @@ def init_agent_by_name(name: str, context_id: str | None = None, cwd: str | None
     try:
         md_file_path, scope = locate_agent_md_file(name)
         if md_file_path is None:
+            plugin_spec = plugin_agents().get(name)
+            if plugin_spec is not None:
+                if cwd is not None:
+                    plugin_spec.working_dir = cwd
+                return init_agent(plugin_spec, context_id=context_id)
             if name == "default":
                 return init_default_agent(context_id=context_id)
-            elif name == "auto":
-                return init_routing_agent(context_id=context_id)
+            #elif name == "auto":
+            #    return init_routing_agent(context_id=context_id)
             else:
                 raise ValueError(f"Agent '{name}' not found.")
 
@@ -120,7 +130,7 @@ def init_agent_by_name(name: str, context_id: str | None = None, cwd: str | None
 
 
 def init_agent(
-    agent_conf: AgentSpec,
+    agent_spec: AgentSpec,
     context_id: str | None = None,
     *,
     memory: ChatMemory | None = None,
@@ -129,34 +139,39 @@ def init_agent(
     """Create a new agent instance from its spec. `memory` and `hitl` override the agent's defaults."""
     # todo check model provider configuration
     # todo check model availability
-    logger.info(f"Loading agent '{agent_conf.name}' with class '{agent_conf.class_name}'.")
+    logger.info(f"Loading agent '{agent_spec.name}' with class '{agent_spec.class_name}'.")
 
     tool_registry = ToolRegistry()
-    if agent_conf.tools is not None:
-        for tool in agent_conf.tools:
+    if agent_spec.tools is not None:
+        for tool in agent_spec.tools:
             if tool in ("read", "write", "bash"):
                 init_builtin_tools(tool_registry)
                 break
+        # tools added by plugins
+        _plugin_tools = plugin_tools()
+        for tool in agent_spec.tools:
+            if _plugin_tools.has(tool) and not tool_registry.has(tool):
+                tool_registry.register(_plugin_tools.get(tool))
 
-    if agent_conf.mcp_servers is not None and len(agent_conf.mcp_servers) > 0:
+    if agent_spec.mcp_servers is not None and len(agent_spec.mcp_servers) > 0:
         # waits for servers that are still loading in the background, up to the timeout
-        init_mcp_server_tools(tool_registry, set(agent_conf.mcp_servers), timeout=MCP_AGENT_WAIT_TIMEOUT)
+        init_mcp_server_tools(tool_registry, set(agent_spec.mcp_servers), timeout=MCP_AGENT_WAIT_TIMEOUT)
 
     skill_registry = SkillRegistry()
-    if agent_conf.skills is not None:
-        for skill in agent_conf.skills:
-            logger.info(f"Adding skill '{skill}' to agent '{agent_conf.name}'.")
+    if agent_spec.skills is not None:
+        for skill in agent_spec.skills:
+            logger.info(f"Adding skill '{skill}' to agent '{agent_spec.name}'.")
             skill_registry.load(skill)
 
     agent_class_name = "geenii.agents.Agent"
-    if agent_conf.class_name is not None:
-        agent_class_name = agent_conf.class_name
+    if agent_spec.class_name is not None:
+        agent_class_name = agent_spec.class_name
 
-    cwd = agent_conf.working_dir
+    cwd = agent_spec.working_dir
 
     env_store = AgentEnvStore()
-    env = env_store.resolve(agent_conf.name)
-    secret_keys = set(env_store.secret_keys(agent_conf.name))
+    env = env_store.resolve(agent_spec.name)
+    secret_keys = set(env_store.secret_keys(agent_spec.name))
 
     # instance from class path string
     try:
@@ -165,15 +180,15 @@ def init_agent(
         agent_class = getattr(module, class_name)
 
         logger.info(
-            f"Loading agent '{agent_conf.name}' with class '{agent_conf.class_name}' and Context '{context_id}'."
+            f"Loading agent '{agent_spec.name}' with class '{agent_spec.class_name}' and Context '{context_id}'."
         )
         agent = agent_class(
-            name=agent_conf.name,
-            description=agent_conf.description,
-            model=agent_conf.model,
-            system_prompt=agent_conf.full_instructions,
-            allowed_tools=set(agent_conf.tools),
-            mcp_servers=agent_conf.mcp_servers,
+            name=agent_spec.name,
+            description=agent_spec.description,
+            model=agent_spec.model,
+            system_prompt=agent_spec.full_instructions,
+            allowed_tools=set(agent_spec.tools),
+            mcp_servers=agent_spec.mcp_servers,
             tool_registry=tool_registry,
             skill_registry=skill_registry,
             context_id=context_id,
@@ -193,28 +208,29 @@ def init_default_agent(context_id: str | None = None) -> BaseAgent:
     try:
         agent_conf = AgentSpec(
             name="default",
-            class_name="geenii.agents.Agent",
-            model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
-            system=DEFAULT_AGENT_SYSTEM_PROMPT,
-            scope="global",
-        )
-        return init_agent(agent_conf, context_id=context_id)
-    except Exception:
-        raise
-
-
-def init_routing_agent(context_id: str | None = None) -> BaseAgent:
-    try:
-        agent_conf = AgentSpec(
-            name="routing",
+            #class_name="geenii.agents.Agent",
             class_name="geenii.agents.RoutingAgent",
-            model=DEFAULT_COMPLETION_MODEL or "ollama:qwen3:8b",
+            model=DEFAULT_COMPLETION_MODEL,
             system=DEFAULT_AGENT_SYSTEM_PROMPT,
             scope="global",
         )
         return init_agent(agent_conf, context_id=context_id)
     except Exception:
         raise
+
+
+# def init_routing_agent(context_id: str | None = None) -> BaseAgent:
+#     try:
+#         agent_conf = AgentSpec(
+#             name="routing",
+#             class_name="geenii.agents.RoutingAgent",
+#             model=DEFAULT_COMPLETION_MODEL,
+#             system=DEFAULT_AGENT_SYSTEM_PROMPT,
+#             scope="global",
+#         )
+#         return init_agent(agent_conf, context_id=context_id)
+#     except Exception:
+#         raise
 
 
 def init_global_skill_registry() -> SkillRegistry:

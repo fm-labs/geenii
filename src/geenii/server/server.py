@@ -13,6 +13,7 @@ from geenii.config import APP_VERSION, MCP_AUTOLOAD, WWW_DIR
 from geenii.datamodels import Problem
 from geenii.g import init_global_agent_registry, init_global_skill_registry
 from geenii.logs import init_logging
+from geenii.plugins import load_plugins, plugin_tools
 from geenii.server.router import app_router
 from geenii.tool.registry import ToolRegistry
 from geenii.mcp_loader import get_mcp_loader, shutdown_mcp_loader
@@ -63,6 +64,14 @@ init_logging("geenii-server")
 #     return scheduler
 
 
+async def initialize_plugins():
+    print("Initializing plugins...")
+    plugins = load_plugins()
+    for p in plugins.values():
+        print(f"  plugin '{p.name}' ({p.path}): {'FAILED: ' + p.error if p.error else 'ok'}")
+    return plugins
+
+
 async def initialize_agent_registry():
     print("Initializing agent registry...")
     return init_global_agent_registry(projects=True)
@@ -72,6 +81,8 @@ async def initialize_tool_registry():
     print("Initializing tool registry...")
     registry = ToolRegistry()
     init_builtin_tools(registry)
+    for tool in plugin_tools().list_tools():
+        registry.register(tool)
     # MCP servers can take long to start (e.g. pulling docker images), so their tools are discovered
     # in the background and added to the registry as each server becomes ready
     loader = get_mcp_loader()
@@ -97,6 +108,8 @@ async def initialize_skill_registry():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Plugins (before the registries, which include plugin agents and tools)
+    app.state.plugins = await initialize_plugins()
     # Agent Registry
     app.state.agent_registry = await initialize_agent_registry()
     # Tool Registry
@@ -155,7 +168,7 @@ async def unhandled_exception_middleware(request: Request, call_next):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -203,7 +216,7 @@ async def http_exception_handler(_: Request, exc: HTTPException):
 app.include_router(app_router, prefix="")
 
 # Web GUI; mounted last so the API routes take precedence
-if os.path.isdir(WWW_DIR):
+if WWW_DIR is not None and os.path.isdir(WWW_DIR):
     app.mount("/", StaticFiles(directory=WWW_DIR, html=True), name="www")
 else:
     logging.warning(f"Web GUI directory not found, not serving it: {WWW_DIR}")
