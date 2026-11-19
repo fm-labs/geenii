@@ -381,7 +381,7 @@ fn stop_pid(name: &str, pid: u32) {
 }
 
 /// The daemon's socket, resolved like geenii.daemon.client.default_socket_path
-/// (`$GEENII_SOCKET`, `$GEENII_PM_SOCKET`, else `$GEENII_CACHE_DIR/geenii.sock`).
+/// (`$GEENII_SOCKET`, `$GEENII_PM_SOCKET`, else `$GEENII_CACHE_DIR/geeniid.sock`).
 /// The app passes it to both services as `GEENII_SOCKET`.
 fn daemon_socket_path(app: &AppHandle) -> Result<PathBuf, String> {
     let env = |name: &str| std::env::var_os(name).filter(|v| !v.is_empty());
@@ -392,7 +392,7 @@ fn daemon_socket_path(app: &AppHandle) -> Result<PathBuf, String> {
         Some(dir) => PathBuf::from(dir),
         None => app.path().home_dir().map_err(|e| e.to_string())?.join(".cache").join("geenii"),
     };
-    Ok(cache.join("geenii.sock"))
+    Ok(cache.join("geeniid.sock"))
 }
 
 // ---------------------------------------------------------------------------
