@@ -47,3 +47,11 @@ export const mcpServerOfTool = (tool: string) => {
 }
 
 export const agentUrl = (name: string) => `#/agents/${encodeURIComponent(name)}`
+
+export const AGENTS_CONFIG_PATH = '/console/configure/agents'
+
+/** Route of an agent's configuration in the console; `edit` opens its editor */
+export const agentConfigPath = (name: string, edit = false) =>
+  `${AGENTS_CONFIG_PATH}/${encodeURIComponent(name)}${edit ? '/edit':''}`
+
+export const agentConfigUrl = (name: string, edit = false) => `#${agentConfigPath(name, edit)}`

@@ -7,7 +7,7 @@ import { cn } from 'cn'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Skeleton } from '@/components/ui/skeleton.tsx'
-import { agentUrl, AgentType, shortToolName } from '@/app/agents/agent-types.ts'
+import { agentConfigUrl, agentUrl, AgentType, shortToolName } from '@/app/agents/agent-types.ts'
 import { ModelProviderIcon } from '@/app/agents/model-provider.tsx'
 import {
   AgentIcon, AgentsEmpty, AgentsError, agentTitle, LauncherAgentsTabProps, visibleAgents,
@@ -94,7 +94,7 @@ const AgentDetails = ({ agent, isStarred, onToggleStar }: {
           <a href={agentUrl(agent.name)}>Launch</a>
         </Button>
         <Button asChild size="sm" variant="outline" title="Configure">
-          <a href="#/console/configure/agents"><SettingsIcon /></a>
+          <a href={agentConfigUrl(agent.name)}><SettingsIcon /></a>
         </Button>
       </div>
     </div>

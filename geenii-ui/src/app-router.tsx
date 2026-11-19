@@ -111,6 +111,15 @@ const AppRouter = () => {
         element: <ConfigurePage />,
       },
       {
+        // deep link to one item of a section, e.g. an agent's configuration
+        path: '/console/configure/:section/:item',
+        element: <ConfigurePage />,
+      },
+      {
+        path: '/console/configure/:section/:item/:action',
+        element: <ConfigurePage />,
+      },
+      {
         path: '/console/system/:section',
         element: <SystemPage />,
       },

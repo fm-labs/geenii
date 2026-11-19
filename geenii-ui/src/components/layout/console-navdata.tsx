@@ -47,7 +47,7 @@ export const consoleNavData = {
       ],
     },
     {
-      title: 'Install from Catalog',
+      title: 'Install',
       url: '#',
       items: [
         // {

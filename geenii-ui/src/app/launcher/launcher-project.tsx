@@ -1,9 +1,9 @@
-import { BrainIcon, FolderIcon, PlugIcon, SparklesIcon, StarIcon, WrenchIcon } from 'lucide-react'
+import { BrainIcon, FolderIcon, PlugIcon, SettingsIcon, SparklesIcon, StarIcon, WrenchIcon } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card.tsx'
 import { cn } from 'cn'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Skeleton } from '@/components/ui/skeleton.tsx'
-import { agentUrl, AgentType, shortToolName } from '@/app/agents/agent-types.ts'
+import { agentConfigUrl, agentUrl, AgentType, shortToolName } from '@/app/agents/agent-types.ts'
 import {
   AgentIcon, AgentsEmpty, AgentsError, agentTitle, LauncherAgentsTabProps, visibleAgents,
 } from '@/app/launcher/launcher-agents-shared.tsx'
@@ -33,14 +33,24 @@ const ProjectAgentCard = ({ agent, isStarred, onToggleStar }: {
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <CardTitle className="truncate leading-tight">{agentTitle(agent)}</CardTitle>
-              <button
-                type="button"
-                onClick={onToggleStar}
-                className="relative z-10 -mt-1 -mr-1 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                title={isStarred ? 'Remove bookmark':'Bookmark'}
-              >
-                <StarIcon size={16} className={cn(isStarred && 'fill-amber-400 text-amber-400')} />
-              </button>
+              <div className="relative z-10 -mt-1 -mr-1 flex shrink-0 items-center">
+                <a
+                  href={agentConfigUrl(agent.name)}
+                  className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="Configure"
+                  aria-label={`Configure ${agentTitle(agent)}`}
+                >
+                  <SettingsIcon size={16} />
+                </a>
+                <button
+                  type="button"
+                  onClick={onToggleStar}
+                  className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title={isStarred ? 'Remove bookmark':'Bookmark'}
+                >
+                  <StarIcon size={16} className={cn(isStarred && 'fill-amber-400 text-amber-400')} />
+                </button>
+              </div>
             </div>
             {agent.label && <p className="truncate font-mono text-xs text-muted-foreground">{agent.name}</p>}
             {agent.model && (

@@ -4,8 +4,10 @@ import {
   ScrollTextIcon, SearchIcon, SparklesIcon, TerminalIcon, WrenchIcon, XIcon,
 } from 'lucide-react'
 import {
-  AgentCommandType, AgentDetailType, AgentType, agentUrl, mcpServerOfTool, shortToolName,
+  AGENTS_CONFIG_PATH, AgentCommandType, agentConfigPath, AgentDetailType, AgentType, agentUrl, mcpServerOfTool,
+  shortToolName,
 } from '@/app/agents/agent-types.ts'
+import { useNavigate, useRoute } from '@/app-router.tsx'
 import AgentConfigEditor, { AgentConfigSubmit } from '@/app/agents/components/agent-config-editor.tsx'
 import JsonView from '@/components/json-view.tsx'
 import { OutputDataMarkdown } from '@/components/output-data-markdown.tsx'
@@ -279,16 +281,27 @@ export const capText = (text?: string | null, max = LIST_DESCRIPTION_MAX_CHARS) 
 
 const AgentsAdminView = () => {
   const { fetchJson } = useApi()
+  const { params } = useRoute()
+  const navigate = useNavigate()
   const [agents, setAgents] = React.useState<AgentType[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [filter, setFilter] = React.useState('')
-  const [selectedName, setSelectedName] = React.useState<string | null>(null)
-  const [editorMode, setEditorMode] = React.useState<'create' | 'edit' | null>(null)
+  const [creating, setCreating] = React.useState(false)
+
+  // the selected agent and its edit mode live in the route, so they can be deep-linked
+  const selectedName = params?.item ? decodeURIComponent(params.item) : null
+  const editorMode: 'create' | 'edit' | null = creating ? 'create'
+    : selectedName && params?.action === 'edit' ? 'edit' : null
 
   const select = (name: string | null) => {
-    setSelectedName(name)
-    setEditorMode(null)
+    setCreating(false)
+    navigate(name ? agentConfigPath(name) : AGENTS_CONFIG_PATH)
+  }
+  const edit = (name: string) => navigate(agentConfigPath(name, true))
+  const startCreate = () => {
+    if (selectedName) navigate(AGENTS_CONFIG_PATH)
+    setCreating(true)
   }
 
   // POST writes a new spec file, PUT replaces the agent's file; errors are shown in the editor
@@ -343,7 +356,7 @@ const AgentsAdminView = () => {
           <Button size="sm" variant="ghost" onClick={fetchAgents} disabled={loading}>
             <RefreshCwIcon className={loading ? 'animate-spin' : ''} /> Refresh
           </Button>
-          <Button size="sm" onClick={() => { setSelectedName(null); setEditorMode('create') }} disabled={editorMode === 'create'}>
+          <Button size="sm" onClick={startCreate} disabled={editorMode === 'create'}>
             <PlusIcon /> New agent
           </Button>
         </div>
@@ -352,6 +365,12 @@ const AgentsAdminView = () => {
       {error && (
         <div className="rounded-lg border border-destructive/50 p-4 text-sm text-destructive">
           Failed to load agents: {error}
+        </div>
+      )}
+
+      {!loading && !error && selectedName && !selected && !creating && (
+        <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+          Agent <span className="font-mono">{selectedName}</span> not found.
         </div>
       )}
 
@@ -391,18 +410,18 @@ const AgentsAdminView = () => {
         </div>
 
         {editorMode === 'create' && (
-          <AgentConfigEditor existingNames={agents.map((a) => a.name)} onSubmit={saveAgent} onCancel={() => setEditorMode(null)} />
+          <AgentConfigEditor existingNames={agents.map((a) => a.name)} onSubmit={saveAgent} onCancel={() => setCreating(false)} />
         )}
         {editorMode === 'edit' && selected && (
           // in edit mode the editor takes the place of the details card
           <AgentConfigEditor key={selected.name} agentName={selected.name} existingNames={agents.map((a) => a.name)}
-                             onSubmit={saveAgent} onCancel={() => setEditorMode(null)} />
+                             onSubmit={saveAgent} onCancel={() => select(selected.name)} />
         )}
         {!editorMode && selected && (
           <div className="lg:sticky lg:top-20 lg:self-start">
             {/* keyed by name, so details are fetched once per selected agent */}
             <AgentConfigDetails key={selected.name} agent={selected} onClose={() => select(null)}
-                                onEdit={() => setEditorMode('edit')} />
+                                onEdit={() => edit(selected.name)} />
           </div>
         )}
       </div>
