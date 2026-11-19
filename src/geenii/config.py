@@ -13,7 +13,7 @@ import dotenv
 from geenii.utils.os_util import get_user_home_dir
 
 
-def _envvar(var: str, default: str | None = None) -> str | None:
+def _envvar(var: str, default: str | None = None) -> str: # | None:
     return os.environ.get(var, default)
 
 
@@ -26,11 +26,14 @@ GEENII_CHAT_SESSIONS_DIR = Path(GEENII_USER_HOME) / ".geenii" / "chats"
 
 # Load environment variables from the project and user .env files, if they exist.
 # Without override the first source to set a variable wins: shell > project .env > user .env
+dotenv.load_dotenv(os.path.join(GEENII_WORKING_DIR, ".geenii", ".env.local"), override=False, verbose=True)
 dotenv.load_dotenv(os.path.join(GEENII_WORKING_DIR, ".geenii", ".env"), override=False, verbose=True)
 dotenv.load_dotenv(os.path.join(GEENII_USER_HOME, ".geenii", ".env"), override=False, verbose=True)
 
 GEENII_CACHE_DIR = _envvar("GEENII_CACHE_DIR", os.path.join(GEENII_USER_HOME, ".cache", "geenii"))
 GEENII_CACHE_DISABLED = _envvar("GEENII_CACHE_DISABLED", "false").lower() == "true"
+
+GEENII_APPS_INSTALL_DIR = _envvar("GEENII_APPS_INSTALL_DIR", os.path.join(GEENII_USER_HOME, ".geenii", "apps"))
 
 # Default minimum age (seconds since a process finished) before the process manager's gc removes it
 PM_GC_MAX_AGE = float(_envvar("GEENII_PM_GC_MAX_AGE", str(7 * 24 * 3600)))
@@ -242,8 +245,8 @@ def agent_paths() -> list[tuple[str, str]]:
         (os.path.join(GEENII_WORKING_DIR, ".geenii", "agents"), "project"),
         (os.path.join(GEENII_USER_HOME, ".geenii", "agents"), "user"),
         ("/var/geenii/agents", "global"),
+        ("/etc/geenii/agents", "global"),
     ]
-
 
 def get_root_mcp_config_path() -> Path:
     """The user-level mcp.json; the base config that the working dir mcp.json overrides."""
@@ -285,10 +288,19 @@ def flow_dirs() -> list[str]:
 
 
 def apps_dirs() -> list[str]:
-    return [
+    _apps_paths = [
         os.path.join(GEENII_USER_HOME, ".geenii", "apps"),
         os.path.join(GEENII_WORKING_DIR, ".geenii", "apps"),
+        GEENII_APPS_INSTALL_DIR
     ]
+
+    _settings = read_user_settings()
+    for apps_dir in _settings.get("apps_dirs", []):
+        if os.path.isdir(apps_dir):
+            _apps_paths.append(apps_dir)
+        else:
+            print(f"Warning: apps directory '{apps_dir}' does not exist or is not a directory.")
+    return _apps_paths
 
 
 def project_skills_dir() -> str:

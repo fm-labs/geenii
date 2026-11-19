@@ -7,4 +7,4 @@ class User:
 
 
 def dep_current_user() -> User | None:
-    return User(username="test_user")
+    return User(username="user@localhost")
