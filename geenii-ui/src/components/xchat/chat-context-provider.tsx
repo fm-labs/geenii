@@ -35,7 +35,7 @@ const ChatProvider = (props: ChatProviderProps) => {
 
   const [session] = React.useState(() => new ChatSession({
     backend,
-    contextId,
+    //contextId, // do not pass contextId here. use session.load(contextId) to fetch message history
     model,
     initialMessages: props.initialMessages,
     userId: props.userId,

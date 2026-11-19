@@ -11,7 +11,6 @@ const AgentPage = () => {
   const { params } = useRoute()
   const name = decodeURIComponent(params?.name || '')
   const contextId = decodeURIComponent(params?.contextId || '')
-
   const notify = useNotification()
   const { apiBaseUrl } = useApi()
 
