@@ -28,7 +28,7 @@ def recorded_run(monkeypatch):
 
     def fake_run(command, **kwargs):
         calls.append({"command": command, **kwargs})
-        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        return subprocess.CompletedProcess(command, 0, stdout=b"", stderr=b"")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     return calls
@@ -66,6 +66,12 @@ def test_non_zero_exit_is_an_error(bash):
     result = bash.invoke(ctx=CTX, args={"command": "echo partial; echo boom >&2; exit 3"})
     assert result.is_error is True
     assert result.text == "stdout:\npartial\nstderr:\nboom\nEXITED WITH NON-ZERO EXIT CODE: 3"
+
+
+def test_non_utf8_output_does_not_crash(bash):
+    result = bash.invoke(ctx=CTX, args={"command": "printf '\\377\\376'; echo ok >&2"})
+    assert result.is_error is False
+    assert result.text == "stdout:\nstdout decoding error\nstderr:\nok"
 
 
 def test_error_result_has_no_structured_content_even_for_json(bash):

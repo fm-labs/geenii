@@ -44,8 +44,9 @@ def spawn_toolcall_proc(command: str, cwd: str, env: dict[str, str] | None = Non
         cwd=cwd,
         check=False,
     )
-    logger.info(f"toolcall [{_tmpid}] stdout: {p.stdout.decode('utf-8').strip()}")
-    logger.info(f"toolcall [{_tmpid}] stderr: {p.stderr.decode('utf-8').strip()}")
+    # errors="replace": non-UTF-8 output must not crash logging; to_toolcall_result reports it
+    logger.info(f"toolcall [{_tmpid}] stdout: {p.stdout.decode('utf-8', errors='replace').strip()}")
+    logger.info(f"toolcall [{_tmpid}] stderr: {p.stderr.decode('utf-8', errors='replace').strip()}")
     logger.info(f"toolcall [{_tmpid}] rc: {p.returncode}")
 
     return p.returncode, p.stdout, p.stderr
