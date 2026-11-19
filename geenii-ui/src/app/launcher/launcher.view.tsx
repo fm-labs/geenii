@@ -3,6 +3,7 @@ import { Popover as PopoverPrimitive } from 'radix-ui'
 import {
   BrainIcon, FolderIcon, InfoIcon, PlugIcon, SearchIcon, SettingsIcon, SparklesIcon, StarIcon, WrenchIcon,
 } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card.tsx'
 import { cn } from 'cn'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
@@ -60,7 +61,7 @@ const agentInitials = (agent: AgentType) => {
   return initials.toUpperCase()
 }
 
-const AgentIcon = ({ agent }: { agent: AgentType }) => {
+const AgentIcon = ({ agent, size = 'lg' }: { agent: AgentType, size?: 'sm' | 'lg' }) => {
   const hue = agentHue(agent.name)
   return (
     <div
@@ -68,7 +69,9 @@ const AgentIcon = ({ agent }: { agent: AgentType }) => {
         'relative flex items-center justify-center font-semibold text-white select-none',
         'shadow-[0_1px_2px_rgba(0,0,0,0.15),0_4px_12px_rgba(0,0,0,0.08)]',
         'transition-transform duration-200 ease-out group-active:scale-95',
-        'size-20 rounded-[22px] text-2xl group-hover:scale-[1.06]',
+        size === 'lg'
+          ? 'size-20 rounded-[22px] text-2xl group-hover:scale-[1.06]'
+          : 'size-11 shrink-0 rounded-[13px] text-base',
       )}
       style={{
         background: `linear-gradient(145deg, hsl(${hue} 75% 62%), hsl(${(hue + 35) % 360} 70% 45%))`,
@@ -77,7 +80,7 @@ const AgentIcon = ({ agent }: { agent: AgentType }) => {
       {agentInitials(agent)}
       <ModelProviderIcon
         model={agent.model}
-        size={26}
+        size={size === 'lg' ? 26 : 18}
         className="absolute -right-1 -bottom-1 ring-2 ring-background shadow-sm"
       />
     </div>
@@ -111,7 +114,7 @@ const AgentDetails = ({ agent, isStarred, onToggleStar }: {
               type="button"
               onClick={onToggleStar}
               className="-mr-1 -mt-1 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              title={isStarred ? 'Unstar' : 'Star'}
+              title={isStarred ? 'Remove bookmark' : 'Bookmark'}
             >
               <StarIcon size={16} className={cn(isStarred && 'fill-amber-400 text-amber-400')} />
             </button>
@@ -239,7 +242,7 @@ const AgentTile = ({ agent, isStarred, onToggleStar }: {
             <InfoIcon size={14} />
           </button>
           {isStarred && (
-            <StarIcon size={12} className="absolute top-1 left-2 fill-amber-400 text-amber-400" aria-label="Starred" />
+            <StarIcon size={12} className="absolute top-1 left-2 fill-amber-400 text-amber-400" aria-label="Bookmarked" />
           )}
         </div>
       </PopoverPrimitive.Anchor>
@@ -264,6 +267,98 @@ const AgentTile = ({ agent, isStarred, onToggleStar }: {
   )
 }
 
+const MAX_CARD_TOOLS = 5
+
+/** Project agents: a full card with all info inline instead of an icon tile + popover */
+const ProjectAgentCard = ({ agent, isStarred, onToggleStar }: {
+  agent: AgentType
+  isStarred: boolean
+  onToggleStar: () => void
+}) => {
+  const tools = agent.tools || []
+  const skills = agent.skills || []
+  const mcpServers = agent.mcp_servers || []
+  const hiddenTools = tools.slice(MAX_CARD_TOOLS)
+
+  return (
+    <Card className="relative h-full gap-4 transition hover:border-foreground/20 hover:shadow-md has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring">
+      {/* stretched link: the whole card launches the agent, the bookmark button sits above it */}
+      <a href={agentUrl(agent.name)} className="absolute inset-0 z-0 rounded-xl outline-none" aria-label={`Launch ${agentTitle(agent)}`} />
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <AgentIcon agent={agent} size="sm" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <CardTitle className="truncate leading-tight">{agentTitle(agent)}</CardTitle>
+              <button
+                type="button"
+                onClick={onToggleStar}
+                className="relative z-10 -mt-1 -mr-1 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                title={isStarred ? 'Remove bookmark' : 'Bookmark'}
+              >
+                <StarIcon size={16} className={cn(isStarred && 'fill-amber-400 text-amber-400')} />
+              </button>
+            </div>
+            {agent.label && <p className="truncate font-mono text-xs text-muted-foreground">{agent.name}</p>}
+            {agent.model && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground" title="Model">
+                <BrainIcon size={12} /> <span className="truncate font-mono">{agent.model}</span>
+              </p>
+            )}
+          </div>
+        </div>
+        <CardDescription className="line-clamp-3" title={agent.description?.trim()}>
+          {agent.description?.trim() || <span className="italic">No description</span>}
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="flex flex-col gap-2 text-sm">
+        {mcpServers.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            <PlugIcon size={14} className="mr-1 text-muted-foreground" aria-label="MCP servers" />
+            {mcpServers.map((s) => <Badge key={s} variant="secondary">{s}</Badge>)}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-1">
+          <WrenchIcon size={14} className="mr-1 text-muted-foreground" aria-label="Tools" />
+          {tools.length === 0 && <span className="text-xs text-muted-foreground">No tools</span>}
+          {tools.slice(0, MAX_CARD_TOOLS).map((t) => <Badge key={t} variant="outline" title={t}>{shortToolName(t)}</Badge>)}
+          {hiddenTools.length > 0 && (
+            <Badge variant="outline" title={hiddenTools.join('\n')}>+{hiddenTools.length} more</Badge>
+          )}
+        </div>
+        {skills.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            <SparklesIcon size={14} className="mr-1 text-muted-foreground" aria-label="Skills" />
+            {skills.map((s) => <Badge key={s}>{s}</Badge>)}
+          </div>
+        )}
+      </CardContent>
+
+      <CardFooter className="mt-auto border-t pt-4! text-xs text-muted-foreground">
+        <FolderIcon size={12} className="mr-1 shrink-0" aria-label="Working directory" />
+        {agent.working_dir
+          ? <span className="truncate font-mono" title={`Working directory: ${agent.working_dir}`}>{agent.working_dir}</span>
+          : <span className="italic">No directory access</span>}
+      </CardFooter>
+    </Card>
+  )
+}
+
+const CardSkeleton = () => (
+  <Card className="gap-4 px-6">
+    <div className="flex items-center gap-3">
+      <Skeleton className="size-11 rounded-[13px]" />
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-3 w-24" />
+      </div>
+    </div>
+    <Skeleton className="h-12 w-full" />
+    <Skeleton className="h-5 w-2/3" />
+  </Card>
+)
+
 const TileSkeleton = () => (
   <div className="flex w-28 flex-col items-center gap-2 p-2">
     <Skeleton className="size-20 rounded-[22px]" />
@@ -271,13 +366,14 @@ const TileSkeleton = () => (
   </div>
 )
 
-/** Grid sections, broadest scope first; agents without a scope go last */
-const SCOPE_GROUPS: { scope: AgentType['scope'], label: string }[] = [
-  { scope: 'global', label: 'Global' },
-  { scope: 'user', label: 'User' },
-  { scope: 'project', label: 'Project' },
-  { scope: undefined, label: 'Other' },
+type LauncherTab = 'agents' | 'project'
+
+const TABS: { id: LauncherTab, label: string }[] = [
+  { id: 'agents', label: 'Agents' },
+  { id: 'project', label: 'Project' },
 ]
+
+const tabOf = (agent: AgentType): LauncherTab => (agent.scope === 'project' ? 'project' : 'agents')
 
 const matchesQuery = (agent: AgentType, query: string) => {
   const q = query.trim().toLowerCase()
@@ -305,7 +401,18 @@ const LauncherView = () => {
       .finally(() => setLoading(false))
   }, [fetchJson])
 
-  const filtered = agents.filter((a) => matchesQuery(a, query))
+  const [tab, setTab] = React.useState<LauncherTab>('agents')
+
+  const tabCounts = React.useMemo(() => {
+    const counts: Record<LauncherTab, number> = { agents: 0, project: 0 }
+    agents.forEach((a) => { counts[tabOf(a)]++ })
+    return counts
+  }, [agents])
+
+  // bookmarked agents first, then alphabetical (agents are already sorted by title)
+  const filtered = agents
+    .filter((a) => tabOf(a) === tab && matchesQuery(a, query))
+    .sort((a, b) => Number(starred.includes(b.name)) - Number(starred.includes(a.name)))
 
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && filtered.length > 0) {
@@ -316,14 +423,47 @@ const LauncherView = () => {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-10 pt-6 pb-10">
+    <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-8 pt-6 pb-10">
+      <div
+        role="tablist"
+        aria-label="Agent scope"
+        className="inline-flex items-center gap-1 rounded-full border bg-muted/50 p-1"
+      >
+        {TABS.map(({ id, label }) => {
+          const active = tab === id
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(id)}
+              className={cn(
+                'flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium outline-none transition',
+                'focus-visible:ring-2 focus-visible:ring-ring',
+                active
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {label}
+              {!loading && (
+                <span className={cn('text-xs tabular-nums', active ? 'text-muted-foreground' : 'text-muted-foreground/70')}>
+                  {tabCounts[id]}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
       <div className="relative w-full max-w-sm">
         <SearchIcon size={16} className="absolute top-1/2 left-3.5 -translate-y-1/2 text-muted-foreground" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onSearchKeyDown}
-          placeholder="Search agents"
+          placeholder={tab === 'project' ? 'Search project agents' : 'Search agents'}
           autoFocus
           className="h-10 w-full rounded-full border bg-muted/50 pr-4 pl-10 text-sm outline-none transition focus:bg-background focus:ring-[3px] focus:ring-ring/40"
         />
@@ -335,40 +475,47 @@ const LauncherView = () => {
         </div>
       )}
 
-
-      {loading && (
+      {loading && (tab === 'project' ? (
+        <section className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
+          {[0, 1].map((i) => <CardSkeleton key={i} />)}
+        </section>
+      ) : (
         <section className="flex w-full flex-wrap justify-center gap-x-4 gap-y-6">
           {[0, 1, 2, 3, 4, 5].map((i) => <TileSkeleton key={i} />)}
         </section>
+      ))}
+
+      {!loading && filtered.length > 0 && tab === 'agents' && (
+        <section role="tabpanel" className="flex w-full flex-wrap justify-center gap-x-4 gap-y-6">
+          {filtered.map((agent) => (
+            <AgentTile
+              key={agent.name}
+              agent={agent}
+              isStarred={starred.includes(agent.name)}
+              onToggleStar={() => toggleStar(agent.name)}
+            />
+          ))}
+        </section>
       )}
 
-      {SCOPE_GROUPS.map(({ scope, label }) => {
-        const groupAgents = filtered.filter((a) => (a.scope || undefined) === scope)
-        if (groupAgents.length === 0) return null
-        return (
-          <section key={label} className="flex w-full flex-col gap-4">
-            <h2 className="flex items-center gap-3 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-              {label}
-              <span className="font-normal normal-case tracking-normal">{groupAgents.length}</span>
-              <span className="h-px flex-1 bg-border" aria-hidden />
-            </h2>
-            <div className="flex flex-wrap gap-x-4 gap-y-6">
-              {groupAgents.map((agent) => (
-                <AgentTile
-                  key={agent.name}
-                  agent={agent}
-                  isStarred={starred.includes(agent.name)}
-                  onToggleStar={() => toggleStar(agent.name)}
-                />
-              ))}
-            </div>
-          </section>
-        )
-      })}
+      {!loading && filtered.length > 0 && tab === 'project' && (
+        <section role="tabpanel" className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
+          {filtered.map((agent) => (
+            <ProjectAgentCard
+              key={agent.name}
+              agent={agent}
+              isStarred={starred.includes(agent.name)}
+              onToggleStar={() => toggleStar(agent.name)}
+            />
+          ))}
+        </section>
+      )}
 
       {!loading && !error && filtered.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          {query ? `No agents match “${query}”` : 'No agents configured yet.'}
+          {query
+            ? `No agents match “${query}”`
+            : tab === 'project' ? 'No project agents found.' : 'No agents configured yet.'}
         </p>
       )}
     </div>
