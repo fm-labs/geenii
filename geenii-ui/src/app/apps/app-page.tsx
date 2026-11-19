@@ -46,6 +46,7 @@ const AppFrame = ({ app, url }: { app: GeeAppInfo, url: string }) => {
         sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads allow-popups"
         allow="microphone"
         referrerPolicy="no-referrer"
+        style={{height: "70vh"}}
       />
     </div>
   )
