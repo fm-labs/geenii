@@ -17,6 +17,7 @@ import time
 
 import pydantic
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi.responses import FileResponse, Response
 
 from geenii.apps import AppRegistry
 from geenii.config import apps_dirs
@@ -106,6 +107,40 @@ def add_app(
     Returns the app info."""
     return _daemon_call(client, "apps.add", {"path": body.path}, dirs)
 
+APP_ICON_FILE = "icon.svg"
+
+# Generic app icon (a rounded square with a 2x2 grid), used when an app has no icon.svg
+DEFAULT_APP_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" \
+stroke="#64748b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="2.5" y="2.5" width="19" height="19" rx="4.5" fill="#f1f5f9"/>
+<rect x="6.5" y="6.5" width="4.5" height="4.5" rx="1"/>
+<rect x="13" y="6.5" width="4.5" height="4.5" rx="1"/>
+<rect x="6.5" y="13" width="4.5" height="4.5" rx="1"/>
+<rect x="13" y="13" width="4.5" height="4.5" rx="1"/>
+</svg>
+"""
+
+
+@router.get("/{name}/icon", response_class=Response)
+def get_app_icon(
+    name: str,
+    client: DaemonClient = Depends(dep_daemon_client),
+    dirs: list[str] = Depends(dep_apps_dirs),
+) -> Response:
+    """The app's icon as SVG: the `icon.svg` in its directory, or a default icon. 404 if the app doesn't exist."""
+    info = get_app(name, client, dirs)
+    headers = {
+        "Cache-Control": "no-cache",
+        # Don't run scripts embedded in an app's SVG when it is opened directly
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        "X-Content-Type-Options": "nosniff",
+    }
+    app_dir = os.path.realpath(info["path"])
+    icon_path = os.path.realpath(os.path.join(app_dir, APP_ICON_FILE))
+    # Only a regular file inside the app directory (no symlink out of it)
+    if os.path.dirname(icon_path) == app_dir and os.path.isfile(icon_path):
+        return FileResponse(icon_path, media_type="image/svg+xml", headers=headers)
+    return Response(DEFAULT_APP_ICON_SVG, media_type="image/svg+xml", headers=headers)
 
 @router.get("/{name}")
 def get_app(

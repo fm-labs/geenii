@@ -2,6 +2,7 @@ import React from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { useApi } from '@/context/api-context.tsx'
 import { AppContext } from '@/context/app-context.tsx'
+import { joinUrl } from '@/lib/utils.ts'
 
 /** Refresh interval of app lists and pages while the daemon is running */
 export const APPS_POLL_MS = 5000
@@ -47,6 +48,12 @@ export type AppsListResponse = {
 }
 
 export const appPath = (name: string) => `/api/v1/apps/${encodeURIComponent(name)}`
+
+/** URL of the app's icon (its icon.svg, or a default one), for an <img> */
+export const useAppIconUrl = (name: string): string => {
+  const { apiBaseUrl } = useApi()
+  return joinUrl(apiBaseUrl, `${appPath(name)}/icon`)
+}
 
 /** Message of a failed request (the server's Problem detail) */
 export const requestError = (err: any): string => err?.response?.data?.detail || err?.message || 'Unknown error'

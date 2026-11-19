@@ -1,6 +1,5 @@
 import React from 'react'
 import MainLayout from '@/components/layout/main-layout.tsx'
-import MainContent from '@/components/layout/main-content.tsx'
 import LauncherView from '@/app/launcher/launcher.view.tsx'
 import { useRoute } from '@/app-router.tsx'
 
@@ -10,9 +9,9 @@ const LauncherPage = () => {
 
   return (
     <MainLayout>
-      <MainContent>
+      <main className={"absolute top-12 left-0 w-full h-[calc(100vh-4rem)]"}>
         <LauncherView tabId={tabId} />
-      </MainContent>
+      </main>
     </MainLayout>
   )
 }

@@ -72,7 +72,7 @@ const AgentIcon = ({ agent, size = 'lg' }: { agent: AgentType, size?: 'sm' | 'lg
         'shadow-[0_1px_2px_rgba(0,0,0,0.15),0_4px_12px_rgba(0,0,0,0.08)]',
         'transition-transform duration-200 ease-out group-active:scale-95',
         size==='lg'
-          ? 'size-20 rounded-[22px] text-2xl group-hover:scale-[1.06]'
+          ? 'size-24 rounded-[26px] text-3xl group-hover:scale-[1.06]'
           :'size-11 shrink-0 rounded-[13px] text-base',
       )}
       style={{
@@ -216,7 +216,7 @@ const AgentTile = ({ agent, isStarred, onToggleStar }: {
     <PopoverPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <PopoverPrimitive.Anchor asChild>
         <div
-          className="group relative flex w-28 flex-col items-center"
+          className="group relative flex w-36 flex-col items-center"
           onMouseEnter={onHoverStart}
           onMouseLeave={onHoverEnd}
         >
@@ -226,7 +226,7 @@ const AgentTile = ({ agent, isStarred, onToggleStar }: {
             title={agentTitle(agent)}
           >
             <AgentIcon agent={agent} />
-            <span className="max-w-full truncate text-center text-sm">
+            <span className="line-clamp-2 max-w-full text-center text-sm leading-tight break-words">
               {agentTitle(agent)}
             </span>
           </a>
@@ -367,8 +367,8 @@ const CardSkeleton = () => (
 )
 
 const TileSkeleton = () => (
-  <div className="flex w-28 flex-col items-center gap-2 p-2">
-    <Skeleton className="size-20 rounded-[22px]" />
+  <div className="flex w-36 flex-col items-center gap-2 p-2">
+    <Skeleton className="size-24 rounded-[26px]" />
     <Skeleton className="h-3 w-14" />
   </div>
 )
@@ -377,8 +377,8 @@ type LauncherTab = 'agents' | 'project' | 'apps'
 
 const TABS: { id: LauncherTab, label: string }[] = [
   { id: 'agents', label: 'Agents' },
-  { id: 'project', label: 'Project' },
   { id: 'apps', label: 'Apps' },
+  { id: 'project', label: 'Project' },
 ]
 
 const tabOf = (agent: AgentType): Exclude<LauncherTab, 'apps'> => (agent.scope==='project' ? 'project':'agents')
@@ -455,7 +455,7 @@ const LauncherView = ({ tabId }: { tabId?: string }) => {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-8 pt-6 pb-10">
+    <div className="mx-auto flex w-full max-w-[70vw] flex-col items-center gap-8 pt-6 pb-10">
       <div
         role="tablist"
         aria-label="Agent scope"

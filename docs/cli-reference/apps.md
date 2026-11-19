@@ -161,7 +161,7 @@ reloads its apps afterwards.
 | Option | Short | Description |
 |---|---|---|
 | `--type` | `-t` | App type: `statichtml`, `python`, `node`, or `binary` (auto-detected if omitted) |
-| `--title` | | Human-readable title |
+| `--title` | | Human-readable title (default: from the name, `my-app` → `My App`) |
 | `--description` | | Short description |
 | `--autostart` | | Write `"autostart": true` as the manifest default |
 | `--dir` | | Additional apps directory to search |

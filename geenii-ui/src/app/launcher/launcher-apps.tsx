@@ -3,22 +3,8 @@ import { LoaderIcon, PlayIcon, SettingsIcon, SquareIcon } from 'lucide-react'
 import { cn } from 'cn'
 import { Skeleton } from '@/components/ui/skeleton.tsx'
 import { useNavigate } from '@/app-router.tsx'
-import { AppAction, GeeAppInfo, isActive, requestError, useAppAction } from '@/app/apps/apps-api.ts'
+import { AppAction, GeeAppInfo, isActive, requestError, useAppAction, useAppIconUrl } from '@/app/apps/apps-api.ts'
 import { AppStatusDot, DaemonNotRunning, Notice } from '@/app/apps/apps-components.tsx'
-
-/** Deterministic hue per app, so each icon keeps its color across reloads */
-const appHue = (name: string) => {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = (hash * 31 + name.charCodeAt(i)) | 0
-  }
-  return Math.abs(hash) % 360
-}
-
-const appInitials = (app: GeeAppInfo) => {
-  const words = app.title.split(/[\s_\-.]+/).filter(Boolean)
-  return (words.length > 1 ? words[0][0] + words[1][0] : app.title.slice(0, 2)).toUpperCase()
-}
 
 export const matchesAppQuery = (app: GeeAppInfo, query: string) => {
   const q = query.trim().toLowerCase()
@@ -29,21 +15,17 @@ export const matchesAppQuery = (app: GeeAppInfo, query: string) => {
 export const appPageUrl = (app: GeeAppInfo) => `/apps/${encodeURIComponent(app.name)}`
 
 const AppIcon = ({ app }: { app: GeeAppInfo }) => {
-  const hue = appHue(app.name)
+  const iconUrl = useAppIconUrl(app.name)
   return (
     <div
       className={cn(
-        'relative flex size-20 items-center justify-center rounded-[22px] text-2xl font-semibold text-white select-none',
+        'relative flex size-24 items-center justify-center rounded-[26px] border bg-card p-4 select-none',
         'shadow-[0_1px_2px_rgba(0,0,0,0.15),0_4px_12px_rgba(0,0,0,0.08)]',
         'transition-transform duration-200 ease-out group-hover:scale-[1.06] group-active:scale-95',
         !app.enabled && 'opacity-40 grayscale',
       )}
-      style={{ background: `linear-gradient(145deg, hsl(${hue} 70% 58%), hsl(${(hue + 50) % 360} 65% 42%))` }}
     >
-      {appInitials(app)}
-      <span className="absolute -bottom-1 rounded-md bg-background/90 px-1 font-mono text-[10px] font-medium text-muted-foreground shadow-sm">
-        {app.type}
-      </span>
+      <img src={iconUrl} alt="" className="size-full object-contain" draggable={false} />
       <AppStatusDot app={app} className="absolute -top-0.5 -right-0.5 size-3.5 ring-2 ring-background" />
     </div>
   )
@@ -81,7 +63,7 @@ const AppTile = ({ app, daemonRunning, busy, onAction }: {
       : active ? 'open' : 'start and open'
 
   return (
-    <div className="group relative flex w-28 flex-col items-center">
+    <div className="group relative flex w-36 flex-col items-center">
       <a
         href={`#${appPageUrl(app)}`}
         onClick={open}
@@ -89,7 +71,7 @@ const AppTile = ({ app, daemonRunning, busy, onAction }: {
         title={`${app.title}${app.description ? ` — ${app.description}` : ''} (${hint})`}
       >
         <AppIcon app={app} />
-        <span className={cn('max-w-full truncate text-center text-sm', !app.enabled && 'text-muted-foreground')}>
+        <span className={cn('line-clamp-2 max-w-full text-center text-sm leading-tight break-words', !app.enabled && 'text-muted-foreground')}>
           {app.title}
         </span>
       </a>
@@ -115,8 +97,8 @@ const AppTile = ({ app, daemonRunning, busy, onAction }: {
 }
 
 const TileSkeleton = () => (
-  <div className="flex w-28 flex-col items-center gap-2 p-2">
-    <Skeleton className="size-20 rounded-[22px]" />
+  <div className="flex w-36 flex-col items-center gap-2 p-2">
+    <Skeleton className="size-24 rounded-[26px]" />
     <Skeleton className="h-3 w-14" />
   </div>
 )

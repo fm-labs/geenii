@@ -1,14 +1,12 @@
 import React from 'react'
-import { ArrowLeftIcon, ChevronRightIcon, ExternalLinkIcon, RefreshCwIcon } from 'lucide-react'
+import { ArrowLeftIcon, ExternalLinkIcon, InfoIcon, RefreshCwIcon, ScrollTextIcon, SettingsIcon } from 'lucide-react'
 import MainLayout from '@/components/layout/main-layout.tsx'
 import MainContent from '@/components/layout/main-content.tsx'
-import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible.tsx'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Skeleton } from '@/components/ui/skeleton.tsx'
 import { useNavigate, useRoute } from '@/app-router.tsx'
-import { cn } from 'cn'
-import { GeeAppInfo, useApp, useAppUrl, useOpenExternal } from '@/app/apps/apps-api.ts'
+import { GeeAppInfo, useApp, useAppIconUrl, useAppUrl, useOpenExternal } from '@/app/apps/apps-api.ts'
 import {
   AppControls, AppLog, AppStatusBadge, DaemonNotRunning, fmtUptime, Notice,
 } from '@/app/apps/apps-components.tsx'
@@ -68,6 +66,8 @@ const AppPlaceholder = ({ app }: { app: GeeAppInfo }) => {
 
 const AppDetails = ({ app }: { app: GeeAppInfo }) => (
   <dl>
+    <Field label="Name">{app.name}</Field>
+    {app.description && <Field label="Description"><span className="font-sans text-sm">{app.description}</span></Field>}
     <Field label="Type">{app.type}</Field>
     <Field label="Version">{app.version}</Field>
     <Field label="Path">{app.path}</Field>
@@ -93,8 +93,10 @@ const AppPage = () => {
   const name = route?.params?.appId ? decodeURIComponent(route.params.appId) : null
   const { data: app, error, loading, reload } = useApp(name)
   const url = useAppUrl(app)
+  const iconUrl = useAppIconUrl(name ?? '')
   const [notice, setNotice] = React.useState<{ text: string, warn?: boolean } | null>(null)
   const [logOpen, setLogOpen] = React.useState(false)
+  const [detailsOpen, setDetailsOpen] = React.useState(false)
 
   const onDone = (text: string, warn?: boolean) => {
     setNotice({ text, warn })
@@ -128,20 +130,24 @@ const AppPage = () => {
 
           {app && (
             <>
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight">
-                    <span className="truncate">{app.title}</span>
-                    <AppStatusBadge app={app} />
-                  </h1>
-                  <div className="flex flex-wrap items-center gap-2 pt-1 text-sm text-muted-foreground">
-                    <Badge variant="outline" className="font-mono">{app.type}</Badge>
-                    {app.title !== app.name && <span className="font-mono text-xs">{app.name}</span>}
-                    {app.autostart && <Badge variant="secondary" title="Started when the daemon starts">autostart</Badge>}
-                    {app.description && <span>{app.description}</span>}
-                  </div>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <h1 className="flex min-w-0 items-center gap-3 text-2xl font-bold tracking-tight">
+                  <img src={iconUrl} alt="" className="size-8 shrink-0" draggable={false} />
+                  <span className="truncate">{app.title}</span>
+                  <AppStatusBadge app={app} />
+                </h1>
+                <div className="flex items-center gap-2">
+                  <Button size="icon-sm" variant="ghost" title="Details" onClick={() => setDetailsOpen(true)}>
+                    <InfoIcon />
+                  </Button>
+                  <Button size="icon-sm" variant="ghost" title="Log" onClick={() => setLogOpen(true)}>
+                    <ScrollTextIcon />
+                  </Button>
+                  <Button size="icon-sm" variant="ghost" title="App settings" onClick={() => navigate('/console/configure/apps')}>
+                    <SettingsIcon />
+                  </Button>
+                  <AppControls app={app} onDone={onDone} />
                 </div>
-                <AppControls app={app} onDone={onDone} />
               </div>
 
               <Notice notice={notice} onDismiss={() => setNotice(null)} />
@@ -149,31 +155,25 @@ const AppPage = () => {
 
               {app.status === 'running' && url ? <AppFrame app={app} url={url} /> : <AppPlaceholder app={app} />}
 
-              <Collapsible open={logOpen} onOpenChange={setLogOpen} className="rounded-lg border">
-                <CollapsibleTrigger asChild>
-                  <button className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
-                    <ChevronRightIcon className={cn('size-4 text-muted-foreground transition-transform', logOpen && 'rotate-90')} />
-                    Log
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="px-3 pb-3">
+              <Dialog open={logOpen} onOpenChange={setLogOpen}>
+                <DialogContent className="sm:max-w-4xl">
+                  <DialogHeader>
+                    <DialogTitle>Log · {app.title}</DialogTitle>
+                  </DialogHeader>
                   {logOpen && (app.status !== null
-                    ? <AppLog name={app.name} />
+                    ? <AppLog name={app.name} className="max-h-[70vh]" />
                     : <div className="text-xs text-muted-foreground">The log is kept by the daemon.</div>)}
-                </CollapsibleContent>
-              </Collapsible>
+                </DialogContent>
+              </Dialog>
 
-              <Collapsible className="rounded-lg border">
-                <CollapsibleTrigger asChild>
-                  <button className="group flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
-                    <ChevronRightIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-                    Details
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="px-3 pb-3">
+              <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+                <DialogContent className="sm:max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle>{app.title}</DialogTitle>
+                  </DialogHeader>
                   <AppDetails app={app} />
-                </CollapsibleContent>
-              </Collapsible>
+                </DialogContent>
+              </Dialog>
             </>
           )}
         </div>
