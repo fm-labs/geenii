@@ -34,9 +34,10 @@ export function ConsoleSidebar({ ...props }: React.ComponentProps<typeof Sidebar
             <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {item.items.map((item) => (
+                {item.items.map((item: any) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild /*isActive={item.isActive}*/>
+                      {/*item?.icon && <item.icon />*/}
                       <a href={item.url}>{item.title}</a>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

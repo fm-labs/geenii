@@ -54,22 +54,22 @@ const data = {
     // },
     {
       title: 'New Chat',
-      url: '#/agents/routing',
+      url: '#/agents/default',
       icon: PlusSquareIcon,
       isActive: false,
     },
-    {
-      title: 'Agents',
-      url: '#/agents',
-      icon: BotIcon,
-      isActive: false,
-    },
-    {
-      title: 'Console',
-      url: '#/console',
-      icon: WrenchIcon,
-      isActive: false,
-    },
+    // {
+    //   title: 'Agents',
+    //   url: '#/agents',
+    //   icon: BotIcon,
+    //   isActive: false,
+    // },
+    // {
+    //   title: 'Console',
+    //   url: '#/console',
+    //   icon: WrenchIcon,
+    //   isActive: false,
+    // },
   ],
   mails: []
 }

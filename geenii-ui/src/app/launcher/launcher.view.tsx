@@ -390,7 +390,11 @@ const matchesQuery = (agent: AgentType, query: string) => {
     .some((v) => v?.toLowerCase().includes(q))
 }
 
-const LauncherView = ({ tabId }: { tabId?: string }) => {
+const LauncherView = () => {
+
+  const searchParams = new URLSearchParams(window.location.search)
+  const tabParam = searchParams.get('tab')
+
   const { fetchJson } = useApi()
   const { starred, toggleStar } = useStarredAgents()
 
@@ -409,11 +413,11 @@ const LauncherView = ({ tabId }: { tabId?: string }) => {
       .finally(() => setLoading(false))
   }, [fetchJson])
 
-  const [tab, setTab] = React.useState<LauncherTab>(tabId as LauncherTab || 'agents')
+  const [tab, setTab] = React.useState<LauncherTab>('agents')
   React.useEffect(() => {
-    console.log('tabid changed', tabId)
-    setTab(tabId as LauncherTab)
-  }, [tabId])
+     console.log("TAB", window.location.search, tabParam)
+     setTab(tabParam as LauncherTab)
+  }, [tabParam])
 
   // polled only while the apps tab is shown; disabled apps aren't launchable, so they're left out
   const appsState = useApps(tab==='apps')

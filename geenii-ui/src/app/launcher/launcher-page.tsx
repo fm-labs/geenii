@@ -1,18 +1,21 @@
 import React from 'react'
-import MainLayout from '@/components/layout/main-layout.tsx'
 import LauncherView from '@/app/launcher/launcher.view.tsx'
-import { useRoute } from '@/app-router.tsx'
+import LauncherLayout from '@/app/launcher/launcher-layout.tsx'
+import LauncherHeader from '@/app/launcher/launcher-header.tsx'
 
 const LauncherPage = () => {
-  const { params } = useRoute()
-  const tabId = params?.tabId || 'agents'
+
+  const searchParams = new URLSearchParams(window.location.search)
+  const tabParam = searchParams.get('tab')
+  console.log(window.location)
 
   return (
-    <MainLayout>
+    <LauncherLayout>
+      <LauncherHeader />
       <main className={"absolute top-12 left-0 w-full h-[calc(100vh-4rem)]"}>
-        <LauncherView tabId={tabId} />
+        <LauncherView />
       </main>
-    </MainLayout>
+    </LauncherLayout>
   )
 }
 

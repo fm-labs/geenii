@@ -1,4 +1,6 @@
 // This is sample data.
+import { BotIcon } from 'lucide-react'
+
 export const consoleNavData = {
   navMain: [
     {
@@ -8,6 +10,7 @@ export const consoleNavData = {
         {
           title: 'Agents',
           url: '#/console/configure/agents',
+          icon: BotIcon
         },
         {
           title: 'Skills',

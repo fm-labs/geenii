@@ -11,7 +11,7 @@ export const xchatNavData = {
         },
         {
           title: 'New Chat',
-          url: '#/agents/routing',
+          url: '#/agents/default',
         },
         {
           title: 'Agents',
@@ -20,6 +20,7 @@ export const xchatNavData = {
         {
           title: 'Console',
           url: '#/console',
+          icon: "wrench"
         },
       ],
     },
