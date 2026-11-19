@@ -13,6 +13,7 @@ daemon.
 from __future__ import annotations
 
 import os
+import time
 
 import pydantic
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -29,6 +30,26 @@ class StartAppInput(pydantic.BaseModel):
     model_config = {"extra": "forbid"}
 
     port: int | None = pydantic.Field(None, ge=1, le=65535, description="Port to serve on; auto-allocated if omitted")
+
+
+class AutostartInput(pydantic.BaseModel):
+    model_config = {"extra": "forbid"}
+
+    autostart: pydantic.StrictBool
+
+
+class AddAppInput(pydantic.BaseModel):
+    model_config = {"extra": "forbid"}
+
+    path: str = pydantic.Field(
+        ..., min_length=1, description="Absolute path of the app directory; it needs a manifest.json"
+    )
+
+
+class EnabledInput(pydantic.BaseModel):
+    model_config = {"extra": "forbid"}
+
+    enabled: pydantic.StrictBool
 
 
 def dep_apps_dirs() -> list[str]:
@@ -74,6 +95,18 @@ def reload_apps(
     return _daemon_call(client, "apps.reload", {}, dirs)
 
 
+@router.post("/add")
+def add_app(
+    body: AddAppInput,
+    client: DaemonClient = Depends(dep_daemon_client),
+    dirs: list[str] = Depends(dep_apps_dirs),
+) -> dict:
+    """Add an app directory with a valid manifest by its path, disabled (saved in the user settings).
+    400 if the directory or its manifest is missing or invalid, 409 if the app or its name already exists.
+    Returns the app info."""
+    return _daemon_call(client, "apps.add", {"path": body.path}, dirs)
+
+
 @router.get("/{name}")
 def get_app(
     name: str,
@@ -98,7 +131,9 @@ def start_app(
 ) -> dict:
     """Start the app as a daemon service. 409 if it is already started."""
     port = body.port if body else None
-    return _daemon_call(client, "apps.start", {"name": name, "port": port}, dirs)
+    res = _daemon_call(client, "apps.start", {"name": name, "port": port}, dirs)
+    time.sleep(1)  # give the app a sec to start
+    return res
 
 
 @router.post("/{name}/stop")
@@ -132,3 +167,26 @@ def app_logs(
 ) -> dict:
     """Recent output of the app, as `[tag] line` strings (empty if it never ran)."""
     return {"name": name, "lines": _daemon_call(client, "apps.logs", {"name": name, "tail": tail}, dirs)}
+
+
+@router.put("/{name}/autostart")
+def set_app_autostart(
+    name: str,
+    body: AutostartInput,
+    client: DaemonClient = Depends(dep_daemon_client),
+    dirs: list[str] = Depends(dep_apps_dirs),
+) -> dict:
+    """Set the app's autostart in the user settings; applies at the next daemon start. Returns the app info."""
+    return _daemon_call(client, "apps.set_autostart", {"name": name, "autostart": body.autostart}, dirs)
+
+
+@router.put("/{name}/enabled")
+def set_app_enabled(
+    name: str,
+    body: EnabledInput,
+    client: DaemonClient = Depends(dep_daemon_client),
+    dirs: list[str] = Depends(dep_apps_dirs),
+) -> dict:
+    """Enable or disable the app in the user settings. A disabled app can't be started and isn't
+    autostarted; disabling a running app stops it. Returns the app info."""
+    return _daemon_call(client, "apps.set_enabled", {"name": name, "enabled": body.enabled}, dirs)

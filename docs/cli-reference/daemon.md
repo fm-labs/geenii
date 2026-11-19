@@ -13,7 +13,7 @@ geenii daemon <command> [--socket PATH]
 
 All subcommands accept `--socket`/`-s`. If it isn't given, the path comes from
 `GEENII_SOCKET`, then from `GEENII_PM_SOCKET` (kept for compatibility), and
-otherwise defaults to `$GEENII_CACHE_DIR/geenii.sock`. `geenii pm` uses the
+otherwise defaults to `$GEENII_CACHE_DIR/geeniid.sock`. `geenii pm` uses the
 same socket.
 
 ## Commands

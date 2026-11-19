@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton.tsx'
 import { useApi } from '@/context/api-context.tsx'
 import { agentUrl, AgentType, shortToolName } from '@/app/agents/agent-types.ts'
 import { ModelProviderIcon } from '@/app/agents/model-provider.tsx'
+import { useApps } from '@/app/apps/apps-api.ts'
+import LauncherApps, { appPageUrl, matchesAppQuery } from '@/app/launcher/launcher-apps.tsx'
 
 /** Agents starred until the user decides otherwise */
 const DEFAULT_STARRED = ['default']
@@ -366,14 +368,15 @@ const TileSkeleton = () => (
   </div>
 )
 
-type LauncherTab = 'agents' | 'project'
+type LauncherTab = 'agents' | 'project' | 'apps'
 
 const TABS: { id: LauncherTab, label: string }[] = [
   { id: 'agents', label: 'Agents' },
   { id: 'project', label: 'Project' },
+  { id: 'apps', label: 'Apps' },
 ]
 
-const tabOf = (agent: AgentType): LauncherTab => (agent.scope === 'project' ? 'project' : 'agents')
+const tabOf = (agent: AgentType): Exclude<LauncherTab, 'apps'> => (agent.scope === 'project' ? 'project' : 'agents')
 
 const matchesQuery = (agent: AgentType, query: string) => {
   const q = query.trim().toLowerCase()
@@ -382,7 +385,7 @@ const matchesQuery = (agent: AgentType, query: string) => {
     .some((v) => v?.toLowerCase().includes(q))
 }
 
-const LauncherView = () => {
+const LauncherView = ({ tabId }: { tabId?: string }) => {
   const { fetchJson } = useApi()
   const { starred, toggleStar } = useStarredAgents()
 
@@ -401,13 +404,28 @@ const LauncherView = () => {
       .finally(() => setLoading(false))
   }, [fetchJson])
 
-  const [tab, setTab] = React.useState<LauncherTab>('agents')
+  const [tab, setTab] = React.useState<LauncherTab>(tabId as LauncherTab || 'agents')
+
+  // polled only while the apps tab is shown; disabled apps aren't launchable, so they're left out
+  const appsState = useApps(tab === 'apps')
+  const apps = React.useMemo(
+    () => appsState.data
+      ? appsState.data.apps.filter((a) => a.enabled).sort((a, b) => a.title.localeCompare(b.title))
+      : null,
+    [appsState.data],
+  )
+
+  // the list was loaded once on mount: refresh it when switching to the apps tab
+  const reloadApps = appsState.reload
+  React.useEffect(() => {
+    if (tab === 'apps') reloadApps(true)
+  }, [tab, reloadApps])
 
   const tabCounts = React.useMemo(() => {
-    const counts: Record<LauncherTab, number> = { agents: 0, project: 0 }
+    const counts: Record<LauncherTab, number> = { agents: 0, project: 0, apps: apps?.length ?? 0 }
     agents.forEach((a) => { counts[tabOf(a)]++ })
     return counts
-  }, [agents])
+  }, [agents, apps])
 
   // bookmarked agents first, then alphabetical (agents are already sorted by title)
   const filtered = agents
@@ -415,7 +433,10 @@ const LauncherView = () => {
     .sort((a, b) => Number(starred.includes(b.name)) - Number(starred.includes(a.name)))
 
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && filtered.length > 0) {
+    if (e.key === 'Enter' && tab === 'apps') {
+      const first = apps?.find((a) => matchesAppQuery(a, query))
+      if (first) window.location.hash = appPageUrl(first)
+    } else if (e.key === 'Enter' && filtered.length > 0) {
       window.location.hash = agentUrl(filtered[0].name).slice(1)
     } else if (e.key === 'Escape') {
       setQuery('')
@@ -447,7 +468,7 @@ const LauncherView = () => {
               )}
             >
               {label}
-              {!loading && (
+              {(id === 'apps' ? apps !== null : !loading) && (
                 <span className={cn('text-xs tabular-nums', active ? 'text-muted-foreground' : 'text-muted-foreground/70')}>
                   {tabCounts[id]}
                 </span>
@@ -463,12 +484,24 @@ const LauncherView = () => {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onSearchKeyDown}
-          placeholder={tab === 'project' ? 'Search project agents' : 'Search agents'}
+          placeholder={tab === 'apps' ? 'Search apps' : tab === 'project' ? 'Search project agents' : 'Search agents'}
           autoFocus
           className="h-10 w-full rounded-full border bg-muted/50 pr-4 pl-10 text-sm outline-none transition focus:bg-background focus:ring-[3px] focus:ring-ring/40"
         />
       </div>
 
+      {tab === 'apps' && (
+        <LauncherApps
+          apps={apps}
+          daemonRunning={!!appsState.data?.daemon.running}
+          loading={appsState.loading}
+          error={appsState.error}
+          query={query}
+          reload={appsState.reload}
+        />
+      )}
+
+      {tab !== 'apps' && <>
       {error && (
         <div className="rounded-lg border border-destructive/50 p-4 text-sm text-destructive">
           Failed to load agents: {error}
@@ -518,6 +551,7 @@ const LauncherView = () => {
             : tab === 'project' ? 'No project agents found.' : 'No agents configured yet.'}
         </p>
       )}
+      </>}
     </div>
   )
 }

@@ -94,9 +94,9 @@ def test_endpoint_urls():
     assert Endpoint(host="127.0.0.1", port=8080).url == "http://127.0.0.1:8080"
     assert Endpoint(host="0.0.0.0", port=8080).url == "http://127.0.0.1:8080"
     assert Endpoint(host="::1", port=8080).url == "http://[::1]:8080"
-    uds = Endpoint(uds="/run/geenii.sock")
+    uds = Endpoint(uds="/run/geeniid.sock")
     assert uds.url == "http://localhost"
-    assert str(uds) == "unix:/run/geenii.sock"
+    assert str(uds) == "unix:/run/geeniid.sock"
     assert Endpoint.from_state({"uds": "/x.sock", "host": None, "port": None}) == Endpoint(uds="/x.sock")
 
 

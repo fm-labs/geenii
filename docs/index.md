@@ -28,7 +28,7 @@ How to set up, configure, and use Geenii.
 - **[Installation](user-guide/installation.md)** — prerequisites, provider
   setup, and verification.
 - **[Configuration](user-guide/configuration.md)** — the `.geenii/` directory,
-  environment variables, `geenii.json`, `mcp.json`, logs, and caches.
+  environment variables, `settings.json`, `mcp.json`, logs, and caches.
 - **[Agents](user-guide/agents.md)** — defining agents in markdown, AgentSpec
   fields, running and listing agents.
 - **[Scheduler](user-guide/scheduler.md)** — running agents on a cron schedule.

@@ -59,7 +59,8 @@ manifest are skipped (the latter with an error in the daemon log).
   "main": "index.html",
   "port": 9100,
   "env": {},
-  "sandbox": false
+  "sandbox": false,
+  "autostart": false
 }
 ```
 
@@ -77,6 +78,7 @@ Only `name` is required. All other fields have sensible defaults:
 | `port`        | `null`      | Preferred port (auto-allocated if omitted)           |
 | `env`         | `{}`        | Environment variables passed to the process          |
 | `sandbox`     | `false`     | Run inside Docker sandbox (not yet wired)            |
+| `autostart`   | `false`     | Default for starting the app when the daemon starts or discovers it, once the app is enabled; the user's [app settings](#app-settings) override it |
 
 Extra fields are allowed — the manifest uses `extra = "allow"` so
 app-specific metadata won't break validation.
@@ -137,6 +139,8 @@ manifests to disk.
   `None` if missing
 - `infer_manifest(app_dir, name)` — auto-detect type from directory contents
 - `write_manifest(app_dir, manifest)` — write `manifest.json` to disk
+- `read_app_settings()` / `save_app_settings(app_path, **fields)` — the
+  user's app settings (see [App settings](#app-settings))
 
 ### `src/geenii/daemon/host.py`
 
@@ -226,9 +230,79 @@ Apps run as supervisor services:
   `starting` while the supervisor is about to (re)spawn it, else `stopped`
 - stopping the daemon stops all apps with the other supervised processes
 
-Apps are not started automatically when the daemon starts. An app removed
-from disk while running keeps running; stop it with
+An app removed from disk while running keeps running; stop it with
 `geenii supervisor stop app-<name>`.
+
+### App settings
+
+The user's per-app settings live in the user settings file
+(`~/.geenii/settings.json`, `config.user_settings_path()`), under `apps`,
+keyed by the app's resolved directory (app names can repeat across
+projects). Nothing is written into app directories.
+
+```json
+{
+  "apps": {
+    "/home/me/.geenii/apps/my-app": {"enabled": true, "autostart": true}
+  }
+}
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Apps are disabled until the user enables (installs) them. A disabled app can't be started (`apps.start`/`apps.restart` fail) and isn't autostarted, even with `autostart` in its manifest. Disabling a started app stops it |
+| `autostart` | the manifest's `autostart` | See [Autostart](#autostart) |
+| `added` | `false` | The app was [added by its path](#adding-an-app-by-path); the registry loads it from this entry |
+
+`AppSettings` validates an entry; unknown keys are kept. `AppRegistry.reload()`
+reads the settings, so the daemon reads them at start and on every rescan;
+there is no file watcher. `apps.set_enabled` and `apps.set_autostart`
+(`PUT /apps/{name}/enabled`, `PUT /apps/{name}/autostart`, `geenii apps
+enable|disable|autostart`, and the switches in the UI console's
+`#/console/configure/apps`) write the file with `save_app_settings()` and
+update the daemon's copy of the app. Disabling a started app also stops it;
+otherwise they don't start or stop the app: autostart applies at the next
+daemon start.
+
+### Adding an app by path
+
+An app directory outside the app directories can be added by its absolute
+path: `apps.add` (`POST /apps/add`, the **Add App** dialog in the UI
+console). The directory must exist and have a valid `manifest.json`; the
+app is named after the manifest's `name` (scanned apps are named after
+their directory). `AppRegistry.add_app()` refuses a directory that is
+already known or a name that is taken, then saves
+`{"added": true, "enabled": false}` in the app settings, so the app starts
+out disabled, under Available.
+
+`AppRegistry.reload()` loads every `added` entry the directory scan didn't
+find. Entries whose directory or manifest is gone, or whose name is taken
+by a scanned app, are logged and skipped.
+
+`save_app_settings()` goes through `config.update_user_settings()`, which
+keeps the file's other keys, refuses to overwrite a malformed file, and
+writes atomically.
+
+### Autostart
+
+Apps that are enabled and have autostart (the user's app settings, else the
+manifest's `autostart`) are started by the daemon:
+
+- when it starts, for the apps it knows then (`~/.geenii/apps`)
+- when a rescan discovers them: a new app directory sent as `dirs` (e.g. a
+  project's `.geenii/apps`, the first time a client sends it) or a new app
+  found by `apps.reload`
+
+Apps are disabled by default, so a newly found app is only autostarted if
+it was already enabled in the user settings. Enabling an app doesn't start
+it; its autostart applies from the next daemon start.
+
+An autostart app that is already started, or that was stopped and is still
+on disk, is not started again by a rescan; it starts again with the next
+daemon start. An app that fails to start is logged and skipped.
+
+Each autostart is recorded in the process event log (`app.autostart`, actor
+`daemon`).
 
 For the method list and params, see the
 [wire protocol](processes.md#wire-protocol).
@@ -245,15 +319,58 @@ knows the server's project apps. Responses use the app info dict of the
 |---|---|
 | `GET /apps/` | `{"apps": [...], "daemon": {"running": bool}}`. Without a daemon, the apps on disk with `status: null` |
 | `GET /apps/{name}` | App info (`status: null` without a daemon). 404 unknown |
-| `POST /apps/{name}/start` | Optional body `{"port": int}`. App info. 409 already started |
+| `POST /apps/{name}/start` | Optional body `{"port": int}`. App info. 409 already started or disabled |
 | `POST /apps/{name}/stop` | App info. 409 not started |
 | `POST /apps/{name}/restart` | Optional body `{"port": int}`; keeps the port if omitted. App info |
 | `GET /apps/{name}/logs?tail=200` | `{"name", "lines"}`; `lines` is empty if the app never ran |
-| `POST /apps/reload` | `{"added", "removed", "dirs"}` |
+| `POST /apps/reload` | `{"added", "removed", "autostarted", "dirs"}` |
+| `PUT /apps/{name}/autostart` | Body `{"autostart": bool}`. Saves the app's autostart in the user settings; applies at the next daemon start. App info |
+| `POST /apps/add` | Body `{"path": str}`, an absolute app directory with a `manifest.json`. Adds it disabled. App info. 400 missing directory or manifest, invalid manifest or relative path; 409 already added or name taken |
+| `PUT /apps/{name}/enabled` | Body `{"enabled": bool}`. Enables or disables the app in the user settings; disabling a running app stops it. App info |
 
 Every route except the two reads returns 409 when the daemon isn't running,
 and 503 when it can't be reached. Unknown apps are 404, and invalid params
 are 400 or 422.
+
+## UI
+
+`geenii-ui/src/app/apps/` uses the HTTP API:
+
+- `apps-api.ts` — types, the `useApps(poll = true)` / `useApp(name)` hooks
+  (polled every 5 s while the daemon runs; `useApps(false)` loads once),
+  `useAppAction()`, `useSetAppSetting()`, and `useAppUrl()`: a running app is
+  reached at `http://<API server host>:<port>/`
+- `apps-components.tsx` — status badge, start/stop/restart controls, log
+  viewer (polled every 2 s while open)
+- `#/` launcher, **Apps** tab (`launcher/launcher-apps.tsx`) — icon tiles
+  of the enabled apps with a status dot, filtered by the launcher search.
+  Clicking a tile opens `#/apps/<name>`, starting the app first if it is
+  stopped; a hover button starts or stops it in place. The list is polled only
+  while the tab is shown. A **Manage your apps** link leads to the console
+  app settings
+- `#/apps` (`apps-page.tsx`, `apps-view.tsx`) — app cards with status and
+  controls (not linked in the navigation)
+- `#/apps/<name>` (`app-page.tsx`) — the running app in an iframe, plus its
+  log and details
+- `#/console/configure/apps` (`console/components/apps-settings.tsx`) — tabs
+  **Installed** (enabled apps) and **Available** (disabled apps, with an
+  **Install** button = enable). Each card shows the status dot and badge,
+  the title (click opens `#/apps/<name>`) and the description; its settings
+  button opens a dialog with the app's info (name, type, version, path,
+  service, port, process, last exit), Start/Stop/Restart, the Autostart
+  switch and **Install**/**Uninstall** (uninstall = disable and stop; files
+  are never added or removed). A third tab, **Marketplace**
+  (`apps/marketplace-view.tsx`: app bundles from a catalog, a dummy view with
+  sample data in `apps/marketplace-catalog.json`; its Install button only
+  says installing isn't available yet; shown only with
+  `VITE_FEATURE_APPS_MARKETPLACE=true`); **Refresh**, **Rescan**
+  (`POST /apps/reload`) and **Add App**, a dialog with a form to add an app
+  directory by its path (`POST /apps/add`; the new app shows under
+  Available) and a note on copying apps into the app directories
+
+The desktop app's CSP allows frames from `http://localhost:*` and
+`http://127.0.0.1:*` for this. `tauri-app-viewer.tsx` (static files through
+the `geenii://` scheme) is no longer used by the app page.
 
 ## Current status
 
@@ -266,16 +383,15 @@ are 400 or 422.
 | Process lifecycle  | Done             | Supervisor services `app-<name>`: restart, logs, status |
 | Sandbox mode       | Flag only        | `sandbox: true` in manifest, not wired to `sandbox.py` |
 | HTTP routes        | Done             | `/api/v1/apps`, see [HTTP API](#http-api)         |
+| UI                 | Done             | Launcher Apps tab, `#/apps/<name>`, console app settings, see [UI](#ui) |
+| Autostart          | Done             | Manifest `autostart`, see [Autostart](#autostart) |
 | Agent integration  | Not started      | Agents can't discover or interact with apps yet   |
 | App generation     | Specs only       | Prompt specs in `data/appbuilder/`, no pipeline   |
 
 ## Future work
 
-- **Autostart** — a manifest flag to start apps when the daemon starts
 - **Sandbox integration** — when `sandbox: true`, use `PythonSandbox` /
   `NodeJsSandbox` from `sandbox.py` instead of bare subprocess
-- **UI** — add the `/apps` routes to the UI router, show status and
-  start/stop buttons, and serve running apps from their port
 - **Agent integration** — let agents discover, start, and generate apps
 - **App generation pipeline** — execute `data/appbuilder/` specs via LLM,
   parse output, write files, create manifest

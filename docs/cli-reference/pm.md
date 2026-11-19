@@ -13,7 +13,7 @@ geenii pm [--socket PATH] <command>
 
 | Option | Short | Env Var | Description |
 |---|---|---|---|
-| `--socket` | `-s` | `GEENII_SOCKET`, then `GEENII_PM_SOCKET` | Path to the daemon's Unix socket (default `$GEENII_CACHE_DIR/geenii.sock`) |
+| `--socket` | `-s` | `GEENII_SOCKET`, then `GEENII_PM_SOCKET` | Path to the daemon's Unix socket (default `$GEENII_CACHE_DIR/geeniid.sock`) |
 
 ## Commands
 

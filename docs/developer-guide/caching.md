@@ -193,7 +193,7 @@ stored state rather than caches:
 | `processes/<pid>/` | process manager output (cleaned by its gc) |
 | `sandboxes/<id>/Dockerfile` | generated sandbox images |
 | `tts/` | HF text-to-speech output |
-| `geenii.sock` | daemon socket (default path) |
+| `geeniid.sock` | daemon socket (default path) |
 
 Deleting the whole directory loses agent memory and logs, not just caches. To
 reset only the caches, delete `cache.sqlite*`.

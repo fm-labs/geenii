@@ -8,7 +8,7 @@ from geenii.server.server import app
 
 
 class FakeDaemonClient:
-    socket_path = "/tmp/fake-geenii.sock"
+    socket_path = "/tmp/fake-geeniid.sock"
 
     def __init__(self, status=None, config=None):
         self._status = status

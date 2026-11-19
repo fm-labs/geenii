@@ -12,7 +12,9 @@ geenii apps [--socket PATH] <command> [OPTIONS]
 
 Apps run inside the [geenii daemon](daemon.md) as supervisor services named
 `app-<name>`, so they keep running after the CLI exits and stop when the
-daemon stops. Start the daemon first:
+daemon stops. Apps are disabled until you enable them (see `enable` below);
+enabled apps with autostart (see `autostart` below) start with the daemon.
+Start the daemon first:
 
 ```bash
 geenii daemon start
@@ -119,8 +121,31 @@ Show the app's recent output, as kept by the supervisor (lines prefixed with
 geenii apps reload [--dir DIR]
 ```
 
-Rescan all app directories, picking up new, removed and changed apps.
-Running apps keep running; use `restart` to apply manifest changes to them.
+Rescan all app directories, picking up new, removed and changed apps, and
+start new enabled apps that have `autostart` set. Running apps keep running; use
+`restart` to apply manifest changes to them.
+
+### enable / disable
+
+```
+geenii apps enable <NAME> [--dir DIR]
+geenii apps disable <NAME> [--dir DIR]
+```
+
+Enable or disable an app. Apps are disabled by default: enable an app before
+starting it. Disabling a running app stops it; a disabled app can't be
+started and isn't autostarted. Saved in the user
+settings (`~/.geenii/settings.json`, `apps`), not in the app directory.
+
+### autostart
+
+```
+geenii apps autostart <NAME> on|off [--dir DIR]
+```
+
+Turn starting the app with the daemon on or off. Saved in the user settings
+and applied at the next daemon start; it overrides the manifest's
+`autostart`. Only enabled apps are autostarted.
 
 ### init
 
@@ -138,6 +163,7 @@ reloads its apps afterwards.
 | `--type` | `-t` | App type: `statichtml`, `python`, `node`, or `binary` (auto-detected if omitted) |
 | `--title` | | Human-readable title |
 | `--description` | | Short description |
+| `--autostart` | | Write `"autostart": true` as the manifest default |
 | `--dir` | | Additional apps directory to search |
 
 ### init-all

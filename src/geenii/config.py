@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
+import threading
+from collections.abc import Callable
 from os.path import realpath
 from pathlib import Path
 
@@ -37,7 +40,7 @@ PM_GC_MAX_AGE = float(_envvar("GEENII_PM_GC_MAX_AGE", str(7 * 24 * 3600)))
 # Static web GUI served by the API server (defaults to the repo's www/ folder)
 WWW_DIR = _envvar(
     "GEENII_WWW_DIR",
-    None, #os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, "www"),
+    None,  # os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, "www"),
 )
 
 GEENII_MEMORY_ENGINE = "file"
@@ -114,7 +117,7 @@ REDIS_URI = _envvar("REDIS_URI", "")
 
 
 def read_user_settings() -> dict:
-    user_settings_path = os.path.join(GEENII_USER_HOME, ".geenii", "settings.json")
+    settings_path = user_settings_path()
     default_settings = {
         "theme": "system",  # options: "light", "dark", "system"
         "notifications": True,
@@ -122,11 +125,11 @@ def read_user_settings() -> dict:
         "environment": {},
         "skill_dirs": [],
         "projects": {},  # "/path/to/project/dir": {"trusted": true}
-        "plugin_dirs": [], # ["/path/to/plugin/module/",]
+        "plugin_dirs": [],  # ["/path/to/plugin/module/",]
     }
-    if os.path.exists(user_settings_path):
+    if os.path.exists(settings_path):
         try:
-            with open(user_settings_path, "r") as f:
+            with open(settings_path, "r") as f:
                 settings = json.load(f)
                 return settings
         except Exception as e:
@@ -138,12 +141,47 @@ def read_user_settings() -> dict:
 
 def write_user_settings(settings: dict):
     print(f"Saving settings: {settings}")
-    user_settings_path = os.path.join(GEENII_USER_HOME, ".geenii", "settings.json")
     try:
-        with open(user_settings_path, "w") as f:
+        with open(user_settings_path(), "w") as f:
             json.dump(settings, f, indent=4)
     except Exception as e:
         print(f"Error writing user settings: {e}")
+
+
+def user_settings_path() -> str:
+    return os.path.join(GEENII_USER_HOME, ".geenii", "settings.json")
+
+
+# Serializes read-modify-write of the user settings within this process
+_settings_lock = threading.Lock()
+
+
+def update_user_settings(update: Callable[[dict], None]) -> dict:
+    """Apply UPDATE to the user settings file and write it back; returns the new settings.
+
+    Unlike write_user_settings(), this raises on errors instead of losing them: a
+    malformed file is not overwritten (ValueError), and write errors propagate. A
+    missing file starts out empty, so defaults aren't written into it. Written atomically.
+    """
+    path = user_settings_path()
+    with _settings_lock:
+        settings: dict = {}
+        if os.path.isfile(path):
+            with open(path) as f:
+                settings = json.load(f)
+            if not isinstance(settings, dict):
+                raise ValueError(f"{path} is not a JSON object")
+        update(settings)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        fd, tmp = tempfile.mkstemp(prefix=".settings-", suffix=".json", dir=os.path.dirname(path))
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(settings, f, indent=4)
+            os.replace(tmp, path)
+        except BaseException:
+            os.unlink(tmp)
+            raise
+    return settings
 
 
 def _normalize_dir(path: str) -> str:
@@ -256,4 +294,3 @@ def apps_dirs() -> list[str]:
 def project_skills_dir() -> str:
     """Where `geenii skills install` puts skills"""
     return os.path.join(GEENII_WORKING_DIR, ".geenii", "skills")
-

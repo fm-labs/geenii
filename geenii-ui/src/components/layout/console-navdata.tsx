@@ -25,6 +25,10 @@ export const consoleNavData = {
           title: 'Models',
           url: '#/console/configure/models',
         },
+        {
+          title: 'Apps',
+          url: '#/console/configure/apps',
+        },
         // {
         //   title: 'Environments',
         //   url: '#/console/configure/environments',

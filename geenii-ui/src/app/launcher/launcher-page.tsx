@@ -3,11 +3,11 @@ import MainLayout from '@/components/layout/main-layout.tsx'
 import MainContent from '@/components/layout/main-content.tsx'
 import LauncherView from '@/app/launcher/launcher.view.tsx'
 
-const LauncherPage = () => {
+const LauncherPage = ({ tabId }: { tabId?: string }) => {
   return (
     <MainLayout>
       <MainContent>
-        <LauncherView />
+        <LauncherView tabId={tabId} />
       </MainContent>
     </MainLayout>
   )

@@ -7,11 +7,17 @@ Method names:
     scheduler.status, scheduler.run, scheduler.reload
     supervisor.status, supervisor.ensure, supervisor.start, supervisor.stop, supervisor.restart,
     supervisor.logs, supervisor.reload
-    apps.list, apps.info, apps.start, apps.stop, apps.restart, apps.logs, apps.reload
+    apps.list, apps.info, apps.start, apps.stop, apps.restart, apps.logs, apps.reload,
+    apps.set_autostart, apps.set_enabled, apps.add
 
 Apps run as supervisor services named `app-<name>`. Every apps.* method takes
 an optional `dirs` list of absolute app directories; new ones are added to the
 registry (and scanned) before the call, so a CLI can bring its project's apps.
+Apps with autostart (the user's app settings, else the manifest) are started
+at start() and when a rescan discovers them; disabled apps can't be started.
+apps.set_autostart and apps.set_enabled write the user settings file;
+disabling a started app also stops it. apps.add adds an app directory with a
+valid manifest by its path, disabled (saved in the user settings).
 
 The pm.* methods are also registered without the prefix (start, status, ...)
 for clients of the former standalone process manager service.
@@ -22,11 +28,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
 from geenii import proc_events
-from geenii.apps import AppRegistry, AppStatus, GeeApp
+from geenii.apps import AppRegistry, AppStatus, GeeApp, save_app_settings
 from geenii.pm.process_manager import ProcessManager
 from geenii.scheduler import Scheduler
 from geenii.supervisor import MAX_FAILURES, ProcConfig, Supervisor, read_services
@@ -93,6 +100,9 @@ class ProcessHost:
             "apps.restart": self._apps_restart,
             "apps.logs": self._apps_logs,
             "apps.reload": self._apps_reload,
+            "apps.set_autostart": self._apps_set_autostart,
+            "apps.set_enabled": self._apps_set_enabled,
+            "apps.add": self._apps_add,
         }
         for name in _PM_ALIASES:
             self._methods[name] = self._methods[f"pm.{name}"]
@@ -111,6 +121,7 @@ class ProcessHost:
             except Exception:
                 # A broken services file must not keep the daemon from starting
                 logger.exception("Could not apply services config %s", self.services_config)
+        await self._apps_autostart(self.apps.names())
         await self.scheduler.start()
         logger.info(
             "Process host started (%d scheduled task(s), %d service(s), %d app(s))",
@@ -291,7 +302,30 @@ class ProcessHost:
         if not isinstance(dirs, list) or not all(isinstance(d, str) and os.path.isabs(d) for d in dirs):
             raise ValueError("'dirs' must be a list of absolute paths")
         if any([self.apps.add_dir(d) for d in dirs]):
-            await asyncio.to_thread(self.apps.reload)
+            changes = await asyncio.to_thread(self.apps.reload)
+            await self._apps_autostart(changes["added"])
+
+    async def _apps_autostart(self, names: list[str]) -> list[str]:
+        """Start the apps among NAMES that have autostart and aren't started yet; returns the started ones.
+
+        Errors are logged: one broken app must not keep the daemon or the others from starting.
+        """
+        started = []
+        desired = self.supervisor.status()["desired"]
+        for name in names:
+            app = self.apps.get(name)
+            if app is None or not app.enabled or not app.autostart or app.service_name in desired:
+                continue
+            try:
+                await self._apps_ensure(app, {})
+            except Exception:
+                logger.exception("Could not autostart app '%s'", name)
+                continue
+            proc_events.record("supervisor", "app.autostart", actor="daemon", name=name, port=app.port)
+            started.append(name)
+        if started:
+            logger.info("Autostarted app(s): %s", ", ".join(started))
+        return started
 
     async def _apps_get(self, params: dict) -> GeeApp:
         await self._apps_sync_dirs(params)
@@ -333,12 +367,20 @@ class ProcessHost:
     async def _apps_info(self, params: dict) -> dict:
         return self._app_info(await self._apps_get(params))
 
+    @staticmethod
+    def _apps_require_enabled(app: GeeApp) -> None:
+        if not app.enabled:
+            raise RuntimeError(f"App '{app.name}' is disabled; enable it to start it")
+
     async def _apps_start(self, params: dict) -> dict:
         app = await self._apps_get(params)
+        self._apps_require_enabled(app)
         if app.service_name in self.supervisor.status()["desired"]:
             raise RuntimeError(f"App '{app.name}' is already started; use apps.restart to restart it")
         await self._apps_ensure(app, params)
         _audit("supervisor", "app.start", params, name=app.name, port=app.port)
+        # deliberately sleep for a sec to wait for the app to start
+        time.sleep(1)
         return self._app_info(app)
 
     async def _apps_stop(self, params: dict) -> dict:
@@ -352,6 +394,7 @@ class ProcessHost:
     async def _apps_restart(self, params: dict) -> dict:
         """Restart with a fresh service config, so manifest changes take effect (starts a stopped app)"""
         app = await self._apps_get(params)
+        self._apps_require_enabled(app)
         await self._apps_ensure(app, params)
         await self.supervisor.restart_process(app.service_name)
         _audit("supervisor", "app.restart", params, name=app.name, port=app.port)
@@ -367,4 +410,43 @@ class ProcessHost:
     async def _apps_reload(self, params: dict) -> dict:
         await self._apps_sync_dirs(params)
         changes = await asyncio.to_thread(self.apps.reload)
-        return {**changes, "dirs": self.apps.dirs}
+        autostarted = await self._apps_autostart(changes["added"])
+        return {**changes, "autostarted": autostarted, "dirs": self.apps.dirs}
+
+    async def _apps_set_setting(self, params: dict, field: str) -> dict:
+        """Set a boolean FIELD of the app's user settings (in the user settings file).
+
+        Autostart applies at the next daemon start; the app isn't started or stopped.
+        """
+        app = await self._apps_get(params)
+        value = params.get(field)
+        if not isinstance(value, bool):
+            raise ValueError(f"'{field}' must be true or false")
+        app.settings = await asyncio.to_thread(save_app_settings, app.path, **{field: value})
+        _audit("supervisor", f"app.set_{field}", params, name=app.name, **{field: value})
+        return self._app_info(app)
+
+    async def _apps_set_autostart(self, params: dict) -> dict:
+        return await self._apps_set_setting(params, "autostart")
+
+    async def _apps_add(self, params: dict) -> dict:
+        """Add the app directory `path` (it needs a valid manifest), disabled"""
+        await self._apps_sync_dirs(params)
+        path = params.get("path")
+        if not isinstance(path, str) or not path.strip():
+            raise ValueError("'path' must be a directory path")
+        if not os.path.isabs(os.path.expanduser(path.strip())):
+            raise ValueError(f"'path' must be absolute: {path}")
+        app = await asyncio.to_thread(self.apps.add_app, path.strip())
+        _audit("supervisor", "app.add", params, name=app.name, path=app.path)
+        return self._app_info(app)
+
+    async def _apps_set_enabled(self, params: dict) -> dict:
+        """Enable or disable the app; disabling also stops it if it is started"""
+        info = await self._apps_set_setting(params, "enabled")
+        app = self.apps.require(params["name"])
+        if not app.enabled and app.service_name in self.supervisor.status()["desired"]:
+            await self.supervisor.stop_process(app.service_name, disable_restart=True)
+            _audit("supervisor", "app.stop", params, name=app.name, reason="disabled")
+            info = self._app_info(app)
+        return info

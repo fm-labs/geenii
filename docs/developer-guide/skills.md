@@ -70,7 +70,7 @@ needed, so edits take effect without restarting.
 
 1. `$GEENII_WORKING_DIR/.geenii/skills` (project)
 2. `~/.geenii/skills` (user)
-3. Every directory listed in `skill_dirs` in `geenii.json`
+3. Every directory listed in `skill_dirs` in `~/.geenii/settings.json`
 
 A skill is any subdirectory containing a `SKILL.md`. Names must be unique;
 registering a duplicate name raises an error.

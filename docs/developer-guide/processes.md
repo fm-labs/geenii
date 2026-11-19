@@ -31,7 +31,7 @@ event loop. They are reached through **one Unix socket**.
  agents (ProcessManagerClient) · geenii pm / daemon CLI · other DaemonClient users
         │  DaemonClient (sync, one connection per call)
         ▼
-  Unix socket  $GEENII_CACHE_DIR/geenii.sock   (newline-delimited JSON-RPC)
+  Unix socket  $GEENII_CACHE_DIR/geeniid.sock   (newline-delimited JSON-RPC)
         │
   DaemonServer (daemon/server.py): socket, dispatch, lifecycle
         │
@@ -44,7 +44,7 @@ event loop. They are reached through **one Unix socket**.
 
 | Module | Contents |
 |---|---|
-| `daemon/client.py` | `DaemonClient` with `call(method, params)`, `is_available()`, `info()` and `shutdown()`. Also `default_socket_path()`: `GEENII_SOCKET`, then `GEENII_PM_SOCKET`, then `$GEENII_CACHE_DIR/geenii.sock`. It imports nothing heavy, so agents can use it cheaply. |
+| `daemon/client.py` | `DaemonClient` with `call(method, params)`, `is_available()`, `info()` and `shutdown()`. Also `default_socket_path()`: `GEENII_SOCKET`, then `GEENII_PM_SOCKET`, then `$GEENII_CACHE_DIR/geeniid.sock`. It imports nothing heavy, so agents can use it cheaply. |
 | `daemon/host.py` | `ProcessHost(pm=, scheduler=, supervisor=, scheduler_config=, services_config=, apps=)`. `apps` is an `AppRegistry` (see [Apps](apps.md#the-daemon)); `start()` scans its directories. `scheduler_config` and `services_config` are the files that `scheduler.reload` and `supervisor.reload` re-read. `start()` runs `pm.recover()`, applies the services file (if one exists; errors are logged, not fatal), then starts the scheduler loop. `stop()` stops, in order: the scheduler (its running tasks are cancelled and their processes killed), then the supervised processes, then `pm.shutdown()`. `methods` maps RPC names to coroutines. |
 | `daemon/server.py` | `DaemonServer(host, socket_path)`, `build_host(scheduler_config, services_config)` (its app registry starts with `~/.geenii/apps`), `run_daemon()` and `main()`, which is the `geenii-daemon` entry point. |
 
@@ -112,13 +112,16 @@ connection may send several requests.
 | `apps.stop` | `name`, `dirs?` | app info dict. Stops the service and removes it from the supervisor. Fails if it isn't started |
 | `apps.restart` | `name`, `port?`, `dirs?` | app info dict. Redefines the service from the current manifest and restarts it (starts a stopped app) |
 | `apps.logs` | `name`, `tail?` (default 100), `dirs?` | list of log lines (empty if the app never ran) |
-| `apps.reload` | `dirs?` | `{"added": [...], "removed": [...], "dirs": [...]}`. Rescans all app directories |
+| `apps.reload` | `dirs?` | `{"added": [...], "removed": [...], "autostarted": [...], "dirs": [...]}`. Rescans all app directories and starts added apps with `autostart` |
+| `apps.set_autostart` | `name`, `autostart` (bool), `dirs?` | app info dict. Saves the app's autostart in the user settings file; applies at the next daemon start |
+| `apps.add` | `path` (absolute), `dirs?` | app info dict. Adds the app directory `path`, which needs a valid `manifest.json`, disabled; saved in the user settings file. `ValueError` for a missing directory or manifest, `RuntimeError` if the app is already added or its name is taken |
+| `apps.set_enabled` | `name`, `enabled` (bool), `dirs?` | app info dict. Enables or disables the app in the user settings file; `apps.start`/`apps.restart` fail for a disabled app. Disabling a started app stops it |
 
 `dirs` is a list of absolute app directories. New ones are added to the
-daemon's app registry (and scanned) before the call; the CLI sends its
+daemon's app registry (and scanned, starting its `autostart` apps) before the call; the CLI sends its
 project's `.geenii/apps` and `--dir` this way. An app info dict holds the
 manifest fields `name`, `type`, `title`, `description`, `version`, plus
-`port`, `path`, `trusted`, `sandbox`, `service` and the runtime fields
+`port`, `path`, `trusted`, `sandbox`, `enabled`, `autostart`, `added`, `service` and the runtime fields
 `status` (`running`, `starting`, `error`, `stopped`), `pid`, `uptime_s`,
 `failures`, `last_exit`.
 

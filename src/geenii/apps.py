@@ -6,6 +6,7 @@ from enum import Enum
 
 import pydantic
 
+from geenii import config
 from geenii.supervisor import ServiceConfig
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,62 @@ class GeeAppManifest(pydantic.BaseModel):
     port: int | None = None
     env: dict[str, str] = pydantic.Field(default_factory=dict)
     sandbox: bool = False
+    # Default for starting the app when the daemon starts or discovers it; the user's
+    # app settings (AppSettings.autostart) override it
+    autostart: bool = False
+
+
+class AppSettings(pydantic.BaseModel):
+    """The user's settings for one app, stored in the user settings file (`apps`, keyed by app directory)"""
+
+    model_config = {"extra": "allow"}
+
+    # A disabled app can't be started and isn't autostarted
+    enabled: bool = False
+    # None: the manifest's `autostart`
+    autostart: bool | None = None
+    # Added by its path (AppRegistry.add_app) rather than found in an app directory:
+    # the registry loads it from this settings entry
+    added: bool = False
+
+
+def app_settings_key(app_path: str) -> str:
+    """Key of an app in the `apps` settings: its resolved directory (names can repeat across projects)"""
+    return os.path.realpath(app_path)
+
+
+def read_app_settings() -> dict[str, AppSettings]:
+    """The `apps` section of the user settings; invalid entries are logged and skipped"""
+    raw = config.read_user_settings().get("apps") or {}
+    if not isinstance(raw, dict):
+        logger.error("Ignoring the 'apps' user settings: expected an object keyed by app directory")
+        return {}
+    result = {}
+    for path, entry in raw.items():
+        try:
+            result[app_settings_key(path)] = AppSettings.model_validate(entry or {})
+        except pydantic.ValidationError as e:
+            logger.error(f"Ignoring invalid app settings for {path}: {e}")
+    return result
+
+
+def save_app_settings(app_path: str, **fields) -> AppSettings:
+    """Set FIELDS of an app's entry in the user settings file; returns the entry"""
+    key = app_settings_key(app_path)
+    result: dict = {}
+
+    def update(settings: dict) -> None:
+        apps = settings.get("apps")
+        if not isinstance(apps, dict):
+            apps = settings["apps"] = {}
+        entry = apps.get(key) if isinstance(apps.get(key), dict) else {}
+        entry.update(fields)
+        # Validate before writing, so a bad value never reaches the file
+        result["settings"] = AppSettings.model_validate(entry)
+        apps[key] = entry
+
+    config.update_user_settings(update)
+    return result["settings"]
 
 
 class GeeApp(pydantic.BaseModel):
@@ -80,8 +137,20 @@ class GeeApp(pydantic.BaseModel):
     path: str
     manifest: GeeAppManifest
     trusted: bool = False
+    settings: AppSettings = pydantic.Field(default_factory=AppSettings)
 
     _assigned_port: int | None = pydantic.PrivateAttr(default=None)
+
+    @property
+    def enabled(self) -> bool:
+        return self.settings.enabled
+
+    @property
+    def autostart(self) -> bool:
+        """The user's setting, else the manifest default"""
+        if self.settings.autostart is not None:
+            return self.settings.autostart
+        return self.manifest.autostart
 
     @property
     def port(self) -> int | None:
@@ -99,6 +168,9 @@ class GeeApp(pydantic.BaseModel):
             "path": self.path,
             "trusted": self.trusted,
             "sandbox": self.manifest.sandbox,
+            "enabled": self.enabled,
+            "autostart": self.autostart,
+            "added": self.settings.added,
             "service": self.service_name,
         }
 
@@ -193,6 +265,22 @@ def infer_manifest(app_dir: str, name: str) -> GeeAppManifest:
     return GeeAppManifest(name=name, type=AppType.STATICHTML)
 
 
+def load_app(app_dir: str, trusted: bool = False) -> GeeApp:
+    """The app in APP_DIR, which must have a valid manifest; named after the manifest's `name`.
+
+    Raises ValueError if the directory doesn't exist or has no (valid) manifest.
+    """
+    if not os.path.isdir(app_dir):
+        raise ValueError(f"Directory not found: {app_dir}")
+    try:
+        manifest = read_manifest(app_dir)
+    except (OSError, ValueError) as e:
+        raise ValueError(f"Invalid {MANIFEST_FILENAME} in {app_dir}: {e}") from e
+    if manifest is None:
+        raise ValueError(f"No {MANIFEST_FILENAME} in {app_dir}")
+    return GeeApp(name=manifest.name, path=app_dir, manifest=manifest, trusted=trusted)
+
+
 def write_manifest(app_dir: str, manifest: GeeAppManifest) -> str:
     manifest_path = os.path.join(app_dir, MANIFEST_FILENAME)
     with open(manifest_path, "w") as f:
@@ -222,14 +310,17 @@ class AppRegistry:
         return True
 
     def reload(self) -> dict[str, list[str]]:
-        """Rescan all directories. Ports assigned to apps that still exist are kept."""
+        """Rescan all directories and re-read the app settings. Ports of apps that still exist are kept."""
         # Scan into a fresh registry and swap at the end, so readers never see a half-loaded one
         fresh = AppRegistry()
         for d in self._dirs:
             if os.path.isdir(d):
                 fresh.load_from_directory(d)
+        settings = read_app_settings()
+        fresh._load_added_apps(settings)
         old = self._apps
         for name, app in fresh._apps.items():
+            app.settings = settings.get(app_settings_key(app.path), AppSettings())
             if name in old:
                 app._assigned_port = old[name]._assigned_port
         self._apps = fresh._apps
@@ -237,6 +328,43 @@ class AppRegistry:
             "added": sorted(set(self._apps) - set(old)),
             "removed": sorted(set(old) - set(self._apps)),
         }
+
+    def _load_added_apps(self, settings: dict[str, AppSettings]) -> None:
+        """Load the apps added by path (`added` in their settings) that the directory scan didn't find"""
+        known = {app_settings_key(a.path) for a in self._apps.values()}
+        for path, entry in settings.items():
+            if not entry.added or path in known:
+                continue
+            try:
+                app = load_app(path)
+            except ValueError as e:
+                logger.warning(f"Skipping added app: {e}")
+                continue
+            if app.name in self._apps:
+                logger.warning(
+                    f"Skipping added app '{app.name}' in {path}: the name is taken by {self._apps[app.name].path}"
+                )
+                continue
+            self.register(app)
+
+    def add_app(self, app_dir: str) -> GeeApp:
+        """Add the app in APP_DIR (a directory with a valid manifest) by its path, disabled.
+
+        Saved in the user settings (`added`, `enabled: false`), so reload() keeps it.
+        Raises ValueError for a missing directory or manifest, RuntimeError if the app is already
+        known or its name is taken.
+        """
+        app_dir = os.path.abspath(os.path.expanduser(app_dir))
+        app = load_app(app_dir)
+        key = app_settings_key(app_dir)
+        for other in self._apps.values():
+            if app_settings_key(other.path) == key:
+                raise RuntimeError(f"App '{other.name}' in {app_dir} is already added")
+        if app.name in self._apps:
+            raise RuntimeError(f"An app named '{app.name}' already exists in {self._apps[app.name].path}")
+        app.settings = save_app_settings(app_dir, added=True, enabled=False)
+        self.register(app)
+        return app
 
     def register(self, app: GeeApp):
         self._apps[app.name] = app

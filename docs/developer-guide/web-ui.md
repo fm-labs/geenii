@@ -124,7 +124,10 @@ nav.
 ## Agent launcher (`#/`)
 
 `app/launcher/launcher.view.tsx` is the start page: an app-launcher grid of
-agents from `GET /agents/`, sorted by label.
+agents from `GET /agents/`, sorted by label. Tabs switch between **Agents**,
+**Project** (project-scoped agents as cards) and **Apps**
+(`launcher/launcher-apps.tsx`: the enabled GeeApps as tiles, see
+[apps.md](apps.md#ui)).
 
 - A search field filters by name, label, description and model; Enter opens
   the first match, Esc clears. While searching, all matches show in one grid.
@@ -144,7 +147,7 @@ agents from `GET /agents/`, sorted by label.
 
 | Route | View | Endpoints |
 |---|---|---|
-| `#/` | `launcher/launcher.view.tsx` — agent launcher (see above) | `GET /agents/` |
+| `#/` | `launcher/launcher.view.tsx` — agent and app launcher (see above) | `GET /agents/`, `/apps/`, `POST /apps/{name}/start\|stop` |
 | `#/agents` | `agents/agents.view.tsx` — card grid of agents; each card links to the agent page and shows the scope badge and the working directory ("No directory access" without one). Scope tabs (All, Global, User, Project, with counts) and, when projects are configured, a project select (the innermost project containing the agent's `working_dir`) filter the grid. A failing projects request only hides the project filter | `GET /agents/`, `/projects/` |
 | `#/agents/:name`, `#/agents/:name/:contextId` | `agents/agent.view.tsx` + `agent-chat.tsx` — an xchat bound to this agent (`contextId` opens that chat session) (no session list, "New chat" starts over), with the agent's short info (model, description, tool/MCP/skill counts) in the chat card header and a Details dialog for parameters, tool and skill descriptions and instructions | `GET /agents/{name}`, `/agents/{name}/commands`, `/tools/`, `/chats/*` |
 | `#/console/playground/tools` | `tools/tools.view.tsx` — tools as badges grouped by type; clicking one opens a pane with the parameter table, an rjsf form built from `parameters`, and Execute | `GET /tools/`, `POST /tools/{name}/execute` |
@@ -161,7 +164,7 @@ agents from `GET /agents/`, sorted by label.
 | Route | Page | Sections |
 |---|---|---|
 | `#/console/playground/{completions,tools,xchat}` | completion chat, tools view, xchat demo | — |
-| `#/console/configure/:section` | `console/configure-page.tsx` (formerly `managed-page.tsx`, `#/console/managed/…`) | `agents`, `skills`, `mcp-servers` (installed servers), `models`; `tools` is in the nav but not rendered yet |
+| `#/console/configure/:section` | `console/configure-page.tsx` (formerly `managed-page.tsx`, `#/console/managed/…`) | `agents`, `skills`, `mcp-servers` (installed servers), `models`, `apps` (installed/available apps, marketplace mock-up, rescan, add-app help); `tools` is in the nav but not rendered yet |
 | `#/console/catalog/:section` | `catalog/catalog-page.tsx` | `mcp` (Docker MCP Catalog, `DockerMcpCatalogView`), `models` |
 | `#/console/system/:section` | `console/system-page.tsx` | `info`, `stats` (usage stats), `settings` |
 
@@ -184,7 +187,7 @@ The components for the previous catalog format
 (`DockerMcpCatalogV3`, `DockerMcpCatalogV3Provider`,
 `DockerMcpCatalogV3ConfigBuilder`) and are deprecated.
 
-Other pages (`#/mcp`, `#/flows`, parts of `#/settings`, apps) call endpoints the server does not have yet; see
+Other pages (`#/mcp`, `#/flows`, parts of `#/settings`) call endpoints the server does not have yet; see
 `geenii-ui/SUMMARY.md`.
 
 ### xchat

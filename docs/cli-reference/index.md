@@ -39,6 +39,8 @@ geenii
 │   ├── restart NAME [-p PORT]    # restart, applying manifest changes
 │   ├── logs NAME [-n TAIL]       # recent app output
 │   ├── reload                    # rescan app directories
+│   ├── enable|disable NAME       # allow or block starting an app
+│   ├── autostart NAME on|off     # start with the daemon
 │   ├── init NAME [-t TYPE]       # generate manifest.json for one app
 │   └── init-all                  # batch-generate manifests
 ├── models

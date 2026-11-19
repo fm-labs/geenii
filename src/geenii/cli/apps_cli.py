@@ -189,10 +189,41 @@ def logs_app(ctx, name, tail, extra_dir):
 def reload_apps(ctx, extra_dir):
     """Rescan the app directories (picks up new, removed and changed apps)."""
     result = _call(ctx, "apps.reload", extra_dir=extra_dir)
-    for key in ("added", "removed"):
+    for key in ("added", "removed", "autostarted"):
         if result[key]:
             click.echo(f"  {key}: {', '.join(result[key])}")
     click_success(f"Reloaded apps from {len(result['dirs'])} director{'y' if len(result['dirs']) == 1 else 'ies'}.")
+
+
+@apps.command(name="enable")
+@click.argument("name")
+@dir_option
+@click.pass_context
+def enable_app(ctx, name, extra_dir):
+    """Enable an app (saved in the user settings)."""
+    _call(ctx, "apps.set_enabled", {"name": name, "enabled": True}, extra_dir)
+    click_success(f"Enabled '{name}'.")
+
+
+@apps.command(name="disable")
+@click.argument("name")
+@dir_option
+@click.pass_context
+def disable_app(ctx, name, extra_dir):
+    """Disable an app: stop it if running; it can't be started and isn't autostarted."""
+    _call(ctx, "apps.set_enabled", {"name": name, "enabled": False}, extra_dir)
+    click_success(f"Disabled '{name}'.")
+
+
+@apps.command(name="autostart")
+@click.argument("name")
+@click.argument("state", type=click.Choice(["on", "off"]))
+@dir_option
+@click.pass_context
+def autostart_app(ctx, name, state, extra_dir):
+    """Turn starting NAME with the daemon on or off (saved in the user settings; applies at the next daemon start)."""
+    _call(ctx, "apps.set_autostart", {"name": name, "autostart": state == "on"}, extra_dir)
+    click_success(f"Autostart of '{name}' is {state}; it applies at the next daemon start.")
 
 
 def _reload_if_live(ctx, extra_dir: str | None = None) -> None:
@@ -227,9 +258,10 @@ def _resolve_apps_dir(name: str, extra_dir: str | None = None) -> str | None:
 )
 @click.option("--title", default=None, help="Human-readable title.")
 @click.option("--description", default=None, help="Short description.")
+@click.option("--autostart", is_flag=True, default=False, help="Write `autostart: true` as the manifest default.")
 @dir_option
 @click.pass_context
-def init_app(ctx, name, app_type, title, description, extra_dir):
+def init_app(ctx, name, app_type, title, description, autostart, extra_dir):
     """Generate a manifest.json for an app directory."""
     apps_dir = _resolve_apps_dir(name, extra_dir)
     if apps_dir is None:
@@ -250,6 +282,8 @@ def init_app(ctx, name, app_type, title, description, extra_dir):
         manifest.title = title
     if description:
         manifest.description = description
+    if autostart:
+        manifest.autostart = True
 
     path = write_manifest(app_dir, manifest)
     click_success(f"Created {path}")

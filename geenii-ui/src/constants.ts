@@ -22,7 +22,6 @@ export const FEATURE_VOICE_TRANSCRIPTION_ENABLED = import.meta.env.VITE_FEATURE_
 export const FEATURE_AGENTS_ENABLED = import.meta.env.VITE_FEATURE_AGENTS_ENABLED === 'true' || false;
 export const FEATURE_MCP_ENABLED = import.meta.env.VITE_FEATURE_MCP_ENABLED === 'true' || false;
 export const FEATURE_TOOLS_ENABLED = import.meta.env.VITE_FEATURE_TOOLS_ENABLED === 'true' || false;
-export const FEATURE_APPS_ENABLED = import.meta.env.VITE_FEATURE_APPS_ENABLED === 'true' || false;
 export const FEATURE_FLOWS_ENABLED = import.meta.env.VITE_FEATURE_FLOWS_ENABLED === 'true' || false;
 export const FEATURE_CONSOLE_ENABLED = import.meta.env.VITE_FEATURE_CONSOLE_ENABLED === 'true' || false;
 export const FEATURE_MESSAGE_INBOX_ENABLED = import.meta.env.VITE_FEATURE_MESSAGE_INBOX_ENABLED === 'true' || false;
@@ -30,6 +29,10 @@ export const FEATURE_MESSAGE_INBOX_ENABLED = import.meta.env.VITE_FEATURE_MESSAG
 export const FEATURE_TAURI_ENABLED = import.meta.env.VITE_FEATURE_TAURI_ENABLED === 'true' || false;
 export const FEATURE_TAURI_XAPI_ENABLED = import.meta.env.VITE_FEATURE_TAURI_XAPI_ENABLED === 'true' || false;
 export const FEATURE_TAURI_TITLEBAR_ENABLED = import.meta.env.VITE_FEATURE_TAURI_TITLEBAR_ENABLED === 'true' || false;
+
+
+export const FEATURE_APPS_ENABLED = import.meta.env.VITE_FEATURE_APPS_ENABLED === 'true' || false;
+export const FEATURE_APPS_MARKETPLACE = import.meta.env.VITE_FEATURE_APPS_MARKETPLACE === 'true' || false;
 
 export const CHAT_TYPEWRITER_ENABLED = import.meta.env.VITE_CHAT_TYPEWRITER_ENABLED === 'true' || false;
 

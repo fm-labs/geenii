@@ -23,8 +23,8 @@
     "security": {
       "csp": {
         "default-src": "'self' geenii: http://geenii.localhost http://localhost:33311",
-        "frame-src": "'self' geenii: http://geenii.localhost http://localhost:33311",
-        "child-src": "'self' geenii: http://geenii.localhost http://localhost:33311",
+        "frame-src": "'self' geenii: http://geenii.localhost http://localhost:33311 http://localhost:* http://127.0.0.1:*",
+        "child-src": "'self' geenii: http://geenii.localhost http://localhost:33311 http://localhost:* http://127.0.0.1:*",
         "connect-src": "'self' ipc: https: wss: geenii: http://geenii.localhost http://localhost:33311",
         "media-src": "'self' asset: blob: data: geenii: http://geenii.localhost http://localhost:33311",
         "style-src": "'self' 'unsafe-inline' asset: geenii: http://geenii.localhost http://localhost:33311",

@@ -168,7 +168,7 @@ const McpServersAdminView = () => {
   )
 }
 
-export const McpServersSettingsView = () => {
+export const McpServersConsole = () => {
   return (
     <McpServersProvider>
       <McpServersAdminView />

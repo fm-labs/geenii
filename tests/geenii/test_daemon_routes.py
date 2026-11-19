@@ -7,7 +7,7 @@ from geenii.server.server import app
 
 class FakeDaemonClient:
     def __init__(self, available=True, info=None, info_error=None):
-        self.socket_path = "/tmp/fake-geenii.sock"
+        self.socket_path = "/tmp/fake-geeniid.sock"
         self._available = available
         self._info = info or {}
         self._info_error = info_error
@@ -35,7 +35,7 @@ def test_status_running(make_client):
     info = {"pid": 123, "uptime_s": 4.2, "pm": {"running": 1}}
     resp = make_client(FakeDaemonClient(info=info)).get("/api/v1/daemon/status")
     assert resp.status_code == 200
-    assert resp.json() == {"running": True, "socket": "/tmp/fake-geenii.sock", "info": info, "error": None}
+    assert resp.json() == {"running": True, "socket": "/tmp/fake-geeniid.sock", "info": info, "error": None}
 
 
 def test_status_not_running(make_client):

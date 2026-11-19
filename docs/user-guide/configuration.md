@@ -34,7 +34,7 @@ Configuration lives in two `.geenii/` directories, resolved at import time by
 ```
 .geenii/
 ├── .env                # environment variables (API keys etc.), auto-loaded
-├── geenii.json         # user settings
+├── settings.json       # user settings (~/.geenii only)
 ├── mcp.json            # MCP server definitions
 ├── scheduler.json      # scheduled tasks (~/.geenii only; read by the geenii daemon)
 ├── services.json       # supervised services (~/.geenii only; read by the geenii daemon)
@@ -89,9 +89,9 @@ env-configurable):
 Agents override the completion model per-agent via the `model` field in their
 definition file; the CLI can override it per-run with `--model`.
 
-## `geenii.json` — user settings
+## `settings.json` — user settings
 
-Read by `config.read_user_settings()`. Recognized keys and their defaults:
+`~/.geenii/settings.json`, read by `config.read_user_settings()`. Recognized keys and their defaults:
 
 ```json
 {
@@ -114,6 +114,11 @@ Read by `config.read_user_settings()`. Recognized keys and their defaults:
   `config.project_paths()` lists the configured project directories.
   `config.get_project_dir(path)` returns the project directory containing `path`
   (the innermost one for nested projects), or `None`.
+- **`apps`** — per-app settings written by the geenii daemon
+  (`geenii apps enable|disable|autostart`, the UI console), keyed by app
+  directory: `{"/path/to/app": {"enabled": true, "autostart": true}}`. Apps
+  without an entry are disabled. See
+  [apps.md](../developer-guide/apps.md#app-settings).
 - `theme`, `notifications`, `language`, `environment` are reserved for the
   UI/server. Example configs in the wild may contain additional keys
   (`providers`, `defaultProvider`, `skillRepositories`); these are currently

@@ -9,7 +9,8 @@ import time
 import pytest
 from click.testing import CliRunner
 
-from geenii.apps import AppRegistry, AppType, GeeAppManifest, infer_manifest, write_manifest
+from geenii import config
+from geenii.apps import AppRegistry, AppType, GeeAppManifest, infer_manifest, save_app_settings, write_manifest
 from geenii.cli import apps_cli
 from geenii.daemon.client import DaemonClient
 from geenii.daemon.host import ProcessHost
@@ -19,6 +20,19 @@ from geenii.scheduler import Scheduler
 from geenii.supervisor import Supervisor
 
 PY_APP = 'import os, time\nprint("listening on", os.environ["PORT"], flush=True)\ntime.sleep(30)\n'
+
+
+@pytest.fixture(autouse=True)
+def user_home(tmp_path, monkeypatch):
+    """Keep the user settings (app settings) out of the real ~/.geenii. Returns the settings file path."""
+    # a dot dir: tests that scan tmp_path for apps skip it
+    monkeypatch.setattr(config, "GEENII_USER_HOME", str(tmp_path / ".home"))
+    return config.user_settings_path()
+
+
+def _read_settings(path):
+    with open(path) as f:
+        return json.load(f)
 
 
 @pytest.fixture
@@ -71,12 +85,15 @@ class RunningDaemon:
             self._thread.join(15)
 
 
-def _make_app(apps_dir: str, name: str, files: dict[str, str]) -> str:
+def _make_app(apps_dir: str, name: str, files: dict[str, str], enabled: bool = True) -> str:
+    """An app directory with FILES; enabled in the user settings unless ENABLED is false (apps are disabled by default)"""
     app_dir = os.path.join(apps_dir, name)
     os.makedirs(app_dir)
     for fname, content in files.items():
         with open(os.path.join(app_dir, fname), "w") as f:
             f.write(content)
+    if enabled:
+        save_app_settings(app_dir, enabled=True)
     return app_dir
 
 
@@ -280,3 +297,208 @@ def test_apps_routes_with_daemon(short_dir, api):
         _make_app(apps_dir, "later", {"index.html": ""})
         resp = http.post("/api/v1/apps/reload")
         assert resp.status_code == 200 and resp.json()["added"] == ["later"]
+
+
+def test_autostart_apps(short_dir):
+    user_apps = os.path.join(short_dir, "user-apps")
+    project_apps = os.path.join(short_dir, "project-apps")
+    write_manifest(
+        _make_app(user_apps, "auto", {"main.py": PY_APP}), GeeAppManifest(name="auto", type="python", autostart=True)
+    )
+    _make_app(user_apps, "manual", {"main.py": PY_APP})
+    # A broken autostart app must not keep the others (or the daemon) from starting
+    write_manifest(_make_app(user_apps, "broken", {}), GeeAppManifest(name="broken", type="binary", autostart=True))
+    write_manifest(
+        _make_app(project_apps, "projauto", {"main.py": PY_APP}),
+        GeeAppManifest(name="projauto", type="python", autostart=True),
+    )
+    socket_path = os.path.join(short_dir, "d.sock")
+
+    with RunningDaemon(DaemonServer(_make_host(short_dir, [user_apps]), socket_path)) as client:
+        status = lambda name: client.call("apps.info", {"name": name})["status"]  # noqa: E731
+        _wait_until(lambda: status("auto") == "running")
+        assert client.call("apps.info", {"name": "auto"})["autostart"] is True
+        assert status("manual") == "stopped"
+        assert status("broken") == "stopped"
+
+        # Apps in a newly added directory are autostarted when it is first scanned
+        client.call("apps.list", {"dirs": [project_apps]})
+        _wait_until(lambda: status("projauto") == "running")
+
+        # A rescan doesn't restart an autostart app that was stopped on purpose
+        client.call("apps.stop", {"name": "auto"})
+        assert client.call("apps.reload")["autostarted"] == []
+        assert status("auto") == "stopped"
+
+        write_manifest(
+            _make_app(user_apps, "later", {"main.py": PY_APP}),
+            GeeAppManifest(name="later", type="python", autostart=True),
+        )
+        assert client.call("apps.reload")["autostarted"] == ["later"]
+
+
+def test_app_settings_are_saved_in_the_user_settings(tmp_path, user_home):
+    app_dir = _make_app(str(tmp_path / "apps"), "web", {"index.html": ""}, enabled=False)
+    os.makedirs(os.path.dirname(user_home))
+    with open(user_home, "w") as f:
+        json.dump({"theme": "dark", "apps": {"/other/app": {"enabled": False}}}, f)
+    manifest_before = os.listdir(app_dir)
+
+    # Apps are disabled until enabled in the settings
+    registry = AppRegistry([str(tmp_path / "apps")])
+    registry.reload()
+    assert registry.require("web").enabled is False
+
+    settings = save_app_settings(app_dir, autostart=True)
+    assert settings.enabled is False and settings.autostart is True
+    save_app_settings(app_dir, enabled=True)
+    save_app_settings(app_dir, enabled=False)
+    # Other settings stay; the app dir is untouched
+    assert _read_settings(user_home) == {
+        "theme": "dark",
+        "apps": {"/other/app": {"enabled": False}, os.path.realpath(app_dir): {"autostart": True, "enabled": False}},
+    }
+    assert os.listdir(app_dir) == manifest_before
+
+    registry = AppRegistry([str(tmp_path / "apps")])
+    registry.reload()
+    app = registry.require("web")
+    assert (app.enabled, app.autostart) == (False, True)
+    assert app.info()["enabled"] is False and app.info()["autostart"] is True
+
+
+def test_settings_autostart_overrides_the_manifest(tmp_path):
+    apps_dir = str(tmp_path / "apps")
+    app_dir = _make_app(apps_dir, "web", {"index.html": ""})
+    write_manifest(app_dir, GeeAppManifest(name="web", autostart=True))
+    registry = AppRegistry([apps_dir])
+    registry.reload()
+    assert registry.require("web").autostart is True
+    save_app_settings(app_dir, autostart=False)
+    registry.reload()
+    assert registry.require("web").autostart is False
+
+
+def test_malformed_settings_file_is_not_overwritten(tmp_path, user_home):
+    app_dir = _make_app(str(tmp_path / "apps"), "web", {"index.html": ""}, enabled=False)
+    os.makedirs(os.path.dirname(user_home))
+    with open(user_home, "w") as f:
+        f.write("{broken")
+    with pytest.raises(ValueError):
+        save_app_settings(app_dir, autostart=True)
+    with open(user_home) as f:
+        assert f.read() == "{broken"
+
+
+def test_app_settings_routes(short_dir, api, user_home):
+    apps_dir = os.path.join(short_dir, "apps")
+    app_dir = _make_app(apps_dir, "pyapp", {"main.py": PY_APP})
+    socket_path = os.path.join(short_dir, "d.sock")
+    http = api(socket_path, [apps_dir])
+
+    assert http.put("/api/v1/apps/pyapp/autostart", json={"autostart": True}).status_code == 409  # no daemon
+
+    with RunningDaemon(DaemonServer(_make_host(short_dir, []), socket_path)) as client:
+        resp = http.put("/api/v1/apps/pyapp/autostart", json={"autostart": True})
+        assert resp.status_code == 200 and resp.json()["autostart"] is True
+        # Setting the flag doesn't start the app, and doesn't write into the app dir
+        assert resp.json()["status"] == "stopped"
+        assert not os.path.exists(os.path.join(app_dir, "manifest.json"))
+        assert _read_settings(user_home)["apps"] == {os.path.realpath(app_dir): {"enabled": True, "autostart": True}}
+        # The registry re-reads the same value on rescans
+        client.call("apps.reload")
+        assert client.call("apps.info", {"name": "pyapp"})["autostart"] is True
+
+        # Disabling a running app stops it, and a disabled app can't be started
+        assert http.post("/api/v1/apps/pyapp/start").status_code == 200
+        _wait_until(lambda: client.call("apps.info", {"name": "pyapp"})["status"] == "running")
+        resp = http.put("/api/v1/apps/pyapp/enabled", json={"enabled": False})
+        assert resp.status_code == 200 and resp.json()["enabled"] is False
+        assert resp.json()["status"] == "stopped"
+        assert "app-pyapp" not in client.call("supervisor.status")["desired"]
+        resp = http.post("/api/v1/apps/pyapp/start")
+        assert resp.status_code == 409 and "disabled" in resp.json()["detail"]
+        assert http.post("/api/v1/apps/pyapp/restart").status_code == 409
+        assert http.put("/api/v1/apps/pyapp/enabled", json={"enabled": True}).json()["enabled"] is True
+        assert http.post("/api/v1/apps/pyapp/start").status_code == 200
+
+        assert http.put("/api/v1/apps/pyapp/autostart", json={"autostart": "yes"}).status_code == 422
+        assert http.put("/api/v1/apps/missing/enabled", json={"enabled": True}).status_code == 404
+
+
+def test_autostart_skips_disabled_apps_and_uses_settings(short_dir):
+    user_apps = os.path.join(short_dir, "user-apps")
+    by_settings = _make_app(user_apps, "bysettings", {"main.py": PY_APP})
+    # Never enabled: the manifest's autostart doesn't apply
+    disabled = _make_app(user_apps, "disabled", {"main.py": PY_APP}, enabled=False)
+    write_manifest(disabled, GeeAppManifest(name="disabled", type="python", autostart=True))
+    save_app_settings(by_settings, autostart=True)
+    socket_path = os.path.join(short_dir, "d.sock")
+
+    with RunningDaemon(DaemonServer(_make_host(short_dir, [user_apps]), socket_path)) as client:
+        _wait_until(lambda: client.call("apps.info", {"name": "bysettings"})["status"] == "running")
+        assert client.call("apps.info", {"name": "disabled"})["status"] == "stopped"
+
+
+def test_apps_cli_settings(short_dir, monkeypatch, user_home):
+    apps_dir = os.path.join(short_dir, "apps")
+    app_dir = _make_app(apps_dir, "pyapp", {"main.py": PY_APP})
+    socket_path = os.path.join(short_dir, "d.sock")
+    monkeypatch.setattr(apps_cli, "apps_dirs", lambda: [apps_dir])
+
+    def cli(*args):
+        result = CliRunner().invoke(apps_cli.apps, list(args), env={"COLUMNS": "250", "GEENII_SOCKET": socket_path})
+        return result.exit_code, result.output
+
+    with RunningDaemon(DaemonServer(_make_host(short_dir, []), socket_path)):
+        assert cli("autostart", "pyapp", "on")[0] == 0
+        assert cli("disable", "pyapp")[0] == 0
+        assert _read_settings(user_home)["apps"] == {os.path.realpath(app_dir): {"autostart": True, "enabled": False}}
+        code, out = cli("start", "pyapp")
+        assert code == 1 and "disabled" in out
+        assert cli("enable", "pyapp")[0] == 0
+
+
+def test_add_app_by_path(short_dir, api, user_home):
+    apps_dir = os.path.join(short_dir, "apps")
+    _make_app(apps_dir, "pyapp", {"main.py": PY_APP})
+    elsewhere = os.path.join(short_dir, "elsewhere")
+    ext_dir = _make_app(elsewhere, "ext-dir", {"main.py": PY_APP}, enabled=False)
+    write_manifest(ext_dir, GeeAppManifest(name="ext", type="python"))
+    no_manifest = _make_app(elsewhere, "plain", {"index.html": ""}, enabled=False)
+    broken = _make_app(elsewhere, "broken", {"manifest.json": "{not json"}, enabled=False)
+    clash = _make_app(elsewhere, "clash", {}, enabled=False)
+    write_manifest(clash, GeeAppManifest(name="pyapp"))
+    socket_path = os.path.join(short_dir, "d.sock")
+    http = api(socket_path, [apps_dir])
+
+    assert http.post("/api/v1/apps/add", json={"path": ext_dir}).status_code == 409  # no daemon
+
+    with RunningDaemon(DaemonServer(_make_host(short_dir, []), socket_path)) as client:
+        resp = http.post("/api/v1/apps/add", json={"path": ext_dir})
+        assert resp.status_code == 200, resp.text
+        info = resp.json()
+        # Named after the manifest, added disabled
+        assert (info["name"], info["enabled"], info["added"], info["status"]) == ("ext", False, True, "stopped")
+        assert _read_settings(user_home)["apps"][os.path.realpath(ext_dir)] == {"added": True, "enabled": False}
+
+        assert http.post("/api/v1/apps/add", json={"path": ext_dir}).status_code == 409  # already added
+        assert http.post("/api/v1/apps/add", json={"path": clash}).status_code == 409  # name taken
+        for bad in (os.path.join(elsewhere, "missing"), no_manifest, broken, "relative/dir"):
+            resp = http.post("/api/v1/apps/add", json={"path": bad})
+            assert resp.status_code == 400, (bad, resp.text)
+        assert http.post("/api/v1/apps/add", json={}).status_code == 422
+
+        # Rescans keep it, and it can be enabled and started like any app
+        assert client.call("apps.reload")["removed"] == []
+        assert http.put("/api/v1/apps/ext/enabled", json={"enabled": True}).status_code == 200
+        assert http.post("/api/v1/apps/ext/start").status_code == 200
+        _wait_until(lambda: client.call("apps.info", {"name": "ext"})["status"] == "running")
+
+    # A new registry loads it from the settings; a vanished directory is skipped
+    registry = AppRegistry([])
+    registry.reload()
+    assert registry.names() == ["ext"] and registry.require("ext").enabled is True
+    shutil.rmtree(ext_dir)
+    registry.reload()
+    assert registry.names() == []

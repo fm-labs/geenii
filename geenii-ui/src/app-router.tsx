@@ -13,6 +13,8 @@ import ConsolePage from '@/app/console/console-page.tsx'
 import ConfigurePage from '@/app/console/configure-page.tsx'
 import SystemPage from '@/app/console/system-page.tsx'
 import LauncherPage from '@/app/launcher/launcher-page.tsx'
+import AppsPage from '@/app/apps/apps-page.tsx'
+import AppPage from '@/app/apps/app-page.tsx'
 
 
 
@@ -72,7 +74,8 @@ const AppRouter = () => {
       },
       {
         path: '/agents',
-        element: <AgentsPage />,
+        //element: <AgentsPage />,
+        element: <LauncherPage tabId={"agents"} />,
       },
       {
         path: '/agents/:name',
@@ -81,6 +84,15 @@ const AppRouter = () => {
       {
         path: '/agents/:name/:contextId',
         element: <AgentPage />,
+      },
+      {
+        path: '/apps',
+        //element: <AppsPage />,
+        element: <LauncherPage tabId={"apps"} />,
+      },
+      {
+        path: '/apps/:appId',
+        element: <AppPage />,
       },
       {
         path: '/flows',
