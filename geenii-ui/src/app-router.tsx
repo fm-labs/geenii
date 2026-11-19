@@ -5,7 +5,6 @@ import { NotFoundError } from '@/features/errors/not-found-error.tsx'
 import FlowsPage from '@/app/flows/flows-page.tsx'
 import AudioPage from '@/app/aiassist/audio-page.tsx'
 import ToolsPage from '@/app/tools/tools.page.tsx'
-import AgentsPage from '@/app/agents/agents-page.tsx'
 import AgentPage from '@/app/agents/agent-page.tsx'
 import XchatDemoPage1 from '@/app/xchat/xchat-demo-page-1.tsx'
 import CatalogPage from '@/app/catalog/catalog-page.tsx'
@@ -13,7 +12,6 @@ import ConsolePage from '@/app/console/console-page.tsx'
 import ConfigurePage from '@/app/console/configure-page.tsx'
 import SystemPage from '@/app/console/system-page.tsx'
 import LauncherPage from '@/app/launcher/launcher-page.tsx'
-import AppsPage from '@/app/apps/apps-page.tsx'
 import AppPage from '@/app/apps/app-page.tsx'
 
 
@@ -74,8 +72,11 @@ const AppRouter = () => {
       },
       {
         path: '/agents',
-        element: <AgentsPage />,
-        //element: <LauncherPage />,
+        element: <LauncherPage />,
+      },
+      {
+        path: '/project',
+        element: <LauncherPage />,
       },
       {
         path: '/agents/:name',
@@ -87,8 +88,7 @@ const AppRouter = () => {
       },
       {
         path: '/apps',
-        element: <AppsPage />,
-        //element: <LauncherPage />,
+        element: <LauncherPage />,
       },
       {
         path: '/apps/:appId',
