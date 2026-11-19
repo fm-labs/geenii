@@ -35,6 +35,8 @@ Interactive API docs are at `http://localhost:33311/docs` (OpenAPI at
 | `chat_sessions.py` | `ChatSessionStore`: chat sessions on disk + per-session agent runners |
 | `web_runner.py` | `WebAgentRunner`: runs one agent turn in a thread and turns it into stream events |
 | `pm_routes.py` | `/pm` — proxy to the process manager daemon |
+| `daemon_helper.py` | Shared helpers for routes that use the geenii daemon (see [Daemon-backed routes](#daemon-backed-routes)) |
+| `apps_routes.py` | `/apps` — GeeApps, through the daemon's `apps.*` methods (see [apps.md](apps.md#http-api)) |
 | `security.py` | `dep_current_user` (stub, see [Security](#security)) |
 | `flow_routes.py` | Placeholder, not mounted |
 
@@ -92,6 +94,7 @@ All paths are relative to `/api/v1`.
 | `POST /chats/{id}/cancel` | Cancel the running turn |
 | `/chats/{id}/files…` | 501, not implemented |
 | `/pm/…` | Process manager: `ping`, `processes` (list/start/get/output/wait/kill/delete), `gc` — see [processes.md](processes.md) |
+| `/apps/…` | GeeApps: list, get, start, stop, restart, logs, reload — see [apps.md](apps.md#http-api) |
 
 `POST /tools/{name}/execute` runs the tool with an empty env and **no HITL
 approval** — it is an admin endpoint, so it can run arbitrary shell commands
@@ -120,6 +123,27 @@ to the outermost `ServerErrorMiddleware`, which sits outside
 hid the error from the UI. Middlewares run in reverse order of addition, so
 the catch-all middleware must stay **above** `app.add_middleware(CORSMiddleware, …)`
 in `server.py`.
+
+## Daemon-backed routes
+
+The `daemon`, `scheduler`, `supervisor`, `apps` and `pm` routes talk to the
+[geenii daemon](processes.md#the-geenii-daemon-geeniidaemon) through the
+helpers in `daemon_helper.py`:
+
+| Helper | Purpose |
+|---|---|
+| `dep_daemon_client()` | FastAPI dependency returning `DaemonClient(actor="api")`. Tests override it in `app.dependency_overrides` |
+| `daemon_call(client, method, params, not_found=None)` | Calls a daemon method. 409 when the daemon isn't running, otherwise errors as below |
+| `daemon_errors(not_found=None)` | Context manager with the same error mapping, for calls through other clients (`pm_routes` uses it with `ProcessManagerClient`) |
+| `daemon_state(client, component)` | `(status, config path, error)` of the `scheduler` or `supervisor`; the status is `None` without a daemon |
+| `config_path(client, component, default)` | `(path, live)`: the config file the daemon uses, else the default |
+| `reload_config(client, component, live)` | Makes a daemon that uses the file reload it; returns `{reloaded, changes, error}` |
+
+Daemon errors arrive as `"<ExceptionType>: <message>"` and are mapped to
+`KeyError` 404, `ValueError` 400, `TimeoutError` 408 and any other exception
+type 409, with the message as detail (`not_found` replaces it for a
+`KeyError`). Errors without an exception type, such as `Unknown method: …`,
+become 500, and connection errors 503.
 
 ## Agent chat
 
@@ -189,6 +213,7 @@ expose it on a network.
    I/O); FastAPI runs them in its threadpool. Use `async def` only for
    non-blocking code.
 4. Raise `HTTPException` for client errors and list them in `responses=`
-   with `{"model": Problem}`.
+   with `{"model": Problem}`. For calls to the geenii daemon, use the
+   helpers in `daemon_helper.py` (see [Daemon-backed routes](#daemon-backed-routes)).
 5. Include it in `router.py` with `prefix=API_ROUTE_PREFIX` and
    `dependencies=[Security(dep_current_user)]`.

@@ -1,12 +1,17 @@
 """
-ProcessHost: owns the Process Manager, Scheduler and Supervisor on one event
-loop and exposes their operations as namespaced RPC methods.
+ProcessHost: owns the Process Manager, Scheduler, Supervisor and App registry
+on one event loop and exposes their operations as namespaced RPC methods.
 
 Method names:
     pm.start, pm.status, pm.output, pm.wait, pm.kill, pm.list, pm.cleanup, pm.gc
     scheduler.status, scheduler.run, scheduler.reload
     supervisor.status, supervisor.ensure, supervisor.start, supervisor.stop, supervisor.restart,
     supervisor.logs, supervisor.reload
+    apps.list, apps.info, apps.start, apps.stop, apps.restart, apps.logs, apps.reload
+
+Apps run as supervisor services named `app-<name>`. Every apps.* method takes
+an optional `dirs` list of absolute app directories; new ones are added to the
+registry (and scanned) before the call, so a CLI can bring its project's apps.
 
 The pm.* methods are also registered without the prefix (start, status, ...)
 for clients of the former standalone process manager service.
@@ -21,6 +26,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from geenii import proc_events
+from geenii.apps import AppRegistry, AppStatus, GeeApp
 from geenii.pm.process_manager import ProcessManager
 from geenii.scheduler import Scheduler
 from geenii.supervisor import MAX_FAILURES, ProcConfig, Supervisor, read_services
@@ -48,6 +54,7 @@ class ProcessHost:
         supervisor: Supervisor | None = None,
         scheduler_config: str | None = None,
         services_config: str | None = None,
+        apps: AppRegistry | None = None,
     ) -> None:
         self.pm = pm or ProcessManager()
         self.scheduler = scheduler or Scheduler()
@@ -58,6 +65,8 @@ class ProcessHost:
         self.scheduler_config = os.path.abspath(scheduler_config) if scheduler_config else None
         # The services file applied at start() and by supervisor.reload
         self.services_config = os.path.abspath(services_config) if services_config else None
+        # Apps are scanned at start() and by apps.reload; they run as supervisor services
+        self.apps = apps or AppRegistry()
         self._methods: dict[str, RpcMethod] = {
             "pm.start": self._pm_start,
             "pm.status": self._pm_status,
@@ -77,6 +86,13 @@ class ProcessHost:
             "supervisor.restart": self._supervisor_restart,
             "supervisor.logs": self._supervisor_logs,
             "supervisor.reload": self._supervisor_reload,
+            "apps.list": self._apps_list,
+            "apps.info": self._apps_info,
+            "apps.start": self._apps_start,
+            "apps.stop": self._apps_stop,
+            "apps.restart": self._apps_restart,
+            "apps.logs": self._apps_logs,
+            "apps.reload": self._apps_reload,
         }
         for name in _PM_ALIASES:
             self._methods[name] = self._methods[f"pm.{name}"]
@@ -88,6 +104,7 @@ class ProcessHost:
     async def start(self) -> None:
         self.pm.recover()
         await asyncio.to_thread(proc_events.prune)
+        await asyncio.to_thread(self.apps.reload)
         if self.services_config and os.path.isfile(self.services_config):
             try:
                 await self.supervisor.apply_services(read_services(self.services_config))
@@ -96,13 +113,14 @@ class ProcessHost:
                 logger.exception("Could not apply services config %s", self.services_config)
         await self.scheduler.start()
         logger.info(
-            "Process host started (%d scheduled task(s), %d service(s))",
+            "Process host started (%d scheduled task(s), %d service(s), %d app(s))",
             len(self.scheduler.tasks),
             len(self.supervisor.status()["desired"]),
+            len(self.apps.list()),
         )
 
     async def stop(self) -> None:
-        """Stop scheduling first, then supervised processes, then on-demand processes."""
+        """Stop scheduling first, then supervised processes (including apps), then on-demand processes."""
         await self.scheduler.stop()
         await self.scheduler.wait_until_stopped()
         await self.supervisor.stop()
@@ -123,6 +141,11 @@ class ProcessHost:
                 "config": self.services_config,
                 "desired": len(sup["desired"]),
                 "running": len(sup["running"]),
+            },
+            "apps": {
+                "dirs": self.apps.dirs,
+                "count": len(self.apps.list()),
+                "running": sum(1 for a in self.apps.list() if a.service_name in sup["running"]),
             },
         }
 
@@ -259,3 +282,89 @@ class ProcessHost:
 
     async def _supervisor_logs(self, params: dict) -> list[str]:
         return self.supervisor.logs(params["name"], tail=params.get("tail", 100))
+
+    # -- apps.* -----------------------------------------------------------------
+
+    async def _apps_sync_dirs(self, params: dict) -> None:
+        """Add the caller's app directories (absolute paths) and rescan if any is new."""
+        dirs = params.get("dirs") or []
+        if not isinstance(dirs, list) or not all(isinstance(d, str) and os.path.isabs(d) for d in dirs):
+            raise ValueError("'dirs' must be a list of absolute paths")
+        if any([self.apps.add_dir(d) for d in dirs]):
+            await asyncio.to_thread(self.apps.reload)
+
+    async def _apps_get(self, params: dict) -> GeeApp:
+        await self._apps_sync_dirs(params)
+        return self.apps.require(params["name"])
+
+    def _app_info(self, app: GeeApp, sup: dict | None = None) -> dict:
+        """Static app info plus the runtime state of its supervisor service"""
+        sup = sup or self.supervisor.status()
+        desired = sup["desired"].get(app.service_name)
+        rt = sup["running"].get(app.service_name)
+        if rt:
+            status = AppStatus.RUNNING
+        elif desired and (desired.get("gave_up") or desired.get("failures")):
+            status = AppStatus.ERROR
+        elif desired:
+            status = AppStatus.STARTING
+        else:
+            status = AppStatus.STOPPED
+        return {
+            **app.info(),
+            "status": status.value,
+            "pid": rt["pid"] if rt else None,
+            "uptime_s": rt["uptime_s"] if rt else None,
+            "failures": desired.get("failures", 0) if desired else 0,
+            "last_exit": rt["last_exit"] if rt else None,
+        }
+
+    async def _apps_ensure(self, app: GeeApp, params: dict) -> None:
+        """(Re)define the app's supervisor service from its manifest"""
+        port = self.apps.assign_port(app.name, params.get("port"))
+        config = app.to_service_config(port=port)
+        await self.supervisor.ensure(config.name, config.to_proc_config())
+
+    async def _apps_list(self, params: dict) -> list[dict]:
+        await self._apps_sync_dirs(params)
+        sup = self.supervisor.status()
+        return [self._app_info(app, sup) for app in sorted(self.apps.list(), key=lambda a: a.name)]
+
+    async def _apps_info(self, params: dict) -> dict:
+        return self._app_info(await self._apps_get(params))
+
+    async def _apps_start(self, params: dict) -> dict:
+        app = await self._apps_get(params)
+        if app.service_name in self.supervisor.status()["desired"]:
+            raise RuntimeError(f"App '{app.name}' is already started; use apps.restart to restart it")
+        await self._apps_ensure(app, params)
+        _audit("supervisor", "app.start", params, name=app.name, port=app.port)
+        return self._app_info(app)
+
+    async def _apps_stop(self, params: dict) -> dict:
+        app = await self._apps_get(params)
+        if app.service_name not in self.supervisor.status()["desired"]:
+            raise RuntimeError(f"App '{app.name}' is not running")
+        await self.supervisor.stop_process(app.service_name, disable_restart=True)
+        _audit("supervisor", "app.stop", params, name=app.name)
+        return self._app_info(app)
+
+    async def _apps_restart(self, params: dict) -> dict:
+        """Restart with a fresh service config, so manifest changes take effect (starts a stopped app)"""
+        app = await self._apps_get(params)
+        await self._apps_ensure(app, params)
+        await self.supervisor.restart_process(app.service_name)
+        _audit("supervisor", "app.restart", params, name=app.name, port=app.port)
+        return self._app_info(app)
+
+    async def _apps_logs(self, params: dict) -> list[str]:
+        app = await self._apps_get(params)
+        try:
+            return self.supervisor.logs(app.service_name, tail=params.get("tail", 100))
+        except KeyError:
+            return []  # never started since the daemon started
+
+    async def _apps_reload(self, params: dict) -> dict:
+        await self._apps_sync_dirs(params)
+        changes = await asyncio.to_thread(self.apps.reload)
+        return {**changes, "dirs": self.apps.dirs}

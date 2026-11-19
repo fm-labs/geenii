@@ -3,7 +3,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from geenii.server import daemon_routes, supervisor_routes
+from geenii.server import daemon_helper, supervisor_routes
 from geenii.server.server import app
 
 
@@ -50,7 +50,7 @@ def api(tmp_path):
 
     def _api(fake=None):
         fake = fake or FakeDaemonClient()
-        app.dependency_overrides[daemon_routes.dep_daemon_client] = lambda: fake
+        app.dependency_overrides[daemon_helper.dep_daemon_client] = lambda: fake
         app.dependency_overrides[supervisor_routes.dep_services_config_path] = lambda: default_path
         return TestClient(app)
 
@@ -204,7 +204,13 @@ def test_control_without_daemon(api):
 
 @pytest.mark.parametrize(
     ("error", "status"),
-    [(RuntimeError("KeyError: 'web'"), 404), (RuntimeError("ValueError: bad"), 409), (OSError("gone"), 503)],
+    [
+        (RuntimeError("KeyError: 'web'"), 404),
+        (RuntimeError("ValueError: bad"), 400),
+        (RuntimeError("RuntimeError: busy"), 409),
+        (RuntimeError("Unknown method: x"), 500),
+        (OSError("gone"), 503),
+    ],
 )
 def test_control_errors(api, error, status):
     make, _ = api

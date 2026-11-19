@@ -11,7 +11,7 @@ Protocol: newline-delimited JSON over a Unix domain socket.
     Error:    {"ok": false, "error": "message"}\n
 
 Methods: ping, daemon.info, daemon.shutdown, plus everything ProcessHost
-registers (pm.*, scheduler.*, supervisor.*, and the unprefixed pm aliases).
+registers (pm.*, scheduler.*, supervisor.*, apps.*, and the unprefixed pm aliases).
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from typing import Any
 
 from geenii import proc as proc_util
 from geenii.config import GEENII_USER_HOME, GEENII_WORKING_DIR
+from geenii.apps import AppRegistry
 from geenii.daemon.client import default_socket_path
 from geenii.daemon.host import ProcessHost
 from geenii.scheduler import Scheduler
@@ -36,6 +37,8 @@ logger = logging.getLogger(__name__)
 # not in the directory it happens to be started from
 DEFAULT_SCHEDULER_CONFIG = os.path.join(GEENII_USER_HOME, ".geenii", "scheduler.json")
 DEFAULT_SERVICES_CONFIG = os.path.join(GEENII_USER_HOME, ".geenii", "services.json")
+# User apps; project apps are added by the clients that use them (the `dirs` param of apps.*)
+DEFAULT_APPS_DIR = os.path.join(GEENII_USER_HOME, ".geenii", "apps")
 
 
 def _warn_if_project_config(path: str | None, default: str) -> None:
@@ -208,6 +211,7 @@ def build_host(
         scheduler=scheduler,
         scheduler_config=scheduler_config,
         services_config=services_config,
+        apps=AppRegistry([DEFAULT_APPS_DIR]),
     )
 
 

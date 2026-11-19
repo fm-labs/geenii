@@ -82,6 +82,18 @@ class ServiceConfig(pydantic.BaseModel):
     max_failures: int = pydantic.Field(MAX_FAILURES, ge=0)
     enabled: bool = True
 
+    def to_proc_config(self) -> ProcConfig:
+        """The supervisor's runtime config for this service (cmd and cwd taken as they are)."""
+        return ProcConfig(
+            name=self.name,
+            cmd=list(self.cmd),
+            restart=self.restart,
+            env=dict(self.env) if self.env is not None else None,
+            cwd=self.cwd,
+            capture_output=self.capture_output,
+            max_failures=self.max_failures,
+        )
+
 
 def read_services(config_path: str | Path) -> list[ProcConfig]:
     """Parse the enabled services of a services config file.
@@ -114,14 +126,10 @@ def read_services(config_path: str | Path) -> list[ProcConfig]:
             continue
         names.add(conf.name)
         services.append(
-            ProcConfig(
-                name=conf.name,
+            replace(
+                conf.to_proc_config(),
                 cmd=[os.path.expandvars(arg) for arg in conf.cmd],
-                restart=conf.restart,
-                env=conf.env,
                 cwd=os.path.expanduser(os.path.expandvars(conf.cwd)) if conf.cwd else None,
-                capture_output=conf.capture_output,
-                max_failures=conf.max_failures,
             )
         )
     return services

@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from geenii import proc_events
 from geenii.daemon.client import DaemonClient
 from geenii.scheduler import SchedulerConfig, parse_interval
-from geenii.server.daemon_routes import dep_daemon_client
+from geenii.server.daemon_helper import config_path, daemon_errors, daemon_state, dep_daemon_client, reload_config
 
 router = APIRouter(prefix="/scheduler", tags=["scheduler"])
 
@@ -94,29 +94,6 @@ def _validate(task: TaskInput) -> None:
         raise HTTPException(400, f"Module path '{task.module}' must include at least one dot, e.g. pkg.function")
 
 
-def _daemon_state(client: DaemonClient) -> tuple[dict | None, str | None, str | None]:
-    """(scheduler status, config path the daemon uses, error) — status is None when the daemon is unreachable."""
-    if not client.is_available():
-        return None, None, None
-    try:
-        config = client.info()["scheduler"].get("config")
-        return client.call("scheduler.status"), config, None
-    except (RuntimeError, OSError, KeyError) as exc:
-        return None, None, str(exc)
-
-
-def _config_path(client: DaemonClient, default_path: str) -> tuple[str, bool]:
-    """(config path to edit, whether a running daemon schedules it)."""
-    if client.is_available():
-        try:
-            daemon_config = client.info()["scheduler"].get("config")
-        except RuntimeError, OSError, KeyError:
-            daemon_config = None
-        if daemon_config:
-            return daemon_config, True
-    return default_path, False
-
-
 def _read(path: str) -> dict:
     if not os.path.isfile(path):
         return {"tasks": []}
@@ -149,16 +126,6 @@ def _index(tasks: list, name: str) -> int | None:
     return next((i for i, t in enumerate(tasks) if isinstance(t, dict) and t.get("name") == name), None)
 
 
-def _reload(client: DaemonClient, live: bool) -> dict:
-    """Make the daemon re-read the file if it schedules it; the file change stands either way."""
-    if not live:
-        return {"reloaded": False, "changes": None, "error": None}
-    try:
-        return {"reloaded": True, "changes": client.call("scheduler.reload"), "error": None}
-    except (RuntimeError, OSError) as exc:
-        return {"reloaded": False, "changes": None, "error": str(exc)}
-
-
 @router.get("/config")
 def get_scheduler_config(
     client: DaemonClient = Depends(dep_daemon_client),
@@ -169,7 +136,7 @@ def get_scheduler_config(
     `tasks[].live` is null for tasks the running scheduler has not loaded (disabled,
     invalid, or the daemon is not running / uses another config file).
     """
-    status, daemon_config, daemon_error = _daemon_state(client)
+    status, daemon_config, daemon_error = daemon_state(client, "scheduler")
     path = daemon_config or default_path
 
     result: dict = {
@@ -230,7 +197,7 @@ def create_task(
 ) -> dict:
     """Add a task to the scheduler config."""
     _validate(task)
-    path, live = _config_path(client, default_path)
+    path, live = config_path(client, "scheduler", default_path)
     entry = task.to_entry()
     with _write_lock:
         data = _read(path)
@@ -239,7 +206,7 @@ def create_task(
         data["tasks"].append(entry)
         _write(path, data)
     proc_events.record("scheduler", "task.add", actor="api", name=entry["name"], cmd=entry.get("cmd"), path=path)
-    return {"task": entry, "path": path, "reload": _reload(client, live)}
+    return {"task": entry, "path": path, "reload": reload_config(client, "scheduler", live)}
 
 
 @router.put("/tasks/{name}")
@@ -251,7 +218,7 @@ def update_task(
 ) -> dict:
     """Replace a task in the scheduler config. `task.name` may differ from `name` to rename it."""
     _validate(task)
-    path, live = _config_path(client, default_path)
+    path, live = config_path(client, "scheduler", default_path)
     new_entry = task.to_entry()
     with _write_lock:
         data = _read(path)
@@ -274,7 +241,7 @@ def update_task(
         enabled=new_entry.get("enabled", True),
         path=path,
     )
-    return {"task": data["tasks"][i], "path": path, "reload": _reload(client, live)}
+    return {"task": data["tasks"][i], "path": path, "reload": reload_config(client, "scheduler", live)}
 
 
 @router.delete("/tasks/{name}")
@@ -284,7 +251,7 @@ def delete_task(
     default_path: str = Depends(dep_scheduler_config_path),
 ) -> dict:
     """Remove a task from the scheduler config. A run already in progress is allowed to finish."""
-    path, live = _config_path(client, default_path)
+    path, live = config_path(client, "scheduler", default_path)
     with _write_lock:
         if not os.path.isfile(path):
             raise HTTPException(404, f"Config file not found: {path}")
@@ -295,7 +262,7 @@ def delete_task(
         del data["tasks"][i]
         _write(path, data)
     proc_events.record("scheduler", "task.delete", actor="api", name=name, path=path)
-    return {"path": path, "reload": _reload(client, live)}
+    return {"path": path, "reload": reload_config(client, "scheduler", live)}
 
 
 @router.post("/tasks/{name}/run", status_code=202)
@@ -309,17 +276,9 @@ def run_task(
     Returns once the run has started; its state shows up in GET /scheduler/config
     (`live.running`, `live.last_run_id` for the process manager).
     """
-    path, live = _config_path(client, default_path)
+    path, live = config_path(client, "scheduler", default_path)
     if not live:
         raise HTTPException(409, "The geenii daemon is not running a scheduler (start it with `geenii daemon start`)")
-    try:
+    with daemon_errors(not_found=f"Task '{name}' is not loaded in the running scheduler (disabled or invalid?)"):
         client.call("scheduler.run", {"name": name})
-    except RuntimeError as exc:
-        # Daemon errors are "<ExceptionType>: <message>"
-        exc_type, _, detail = str(exc).partition(": ")
-        if exc_type == "KeyError":
-            raise HTTPException(404, f"Task '{name}' is not loaded in the running scheduler (disabled or invalid?)")
-        raise HTTPException(409, detail or str(exc))
-    except OSError as exc:
-        raise HTTPException(503, f"The geenii daemon is not reachable: {exc}")
     return {"name": name, "status": "started", "path": path}

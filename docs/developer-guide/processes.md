@@ -38,14 +38,15 @@ event loop. They are reached through **one Unix socket**.
   ProcessHost (daemon/host.py): owns the components, registers their RPC methods
         ├── ProcessManager   pm.*
         ├── Scheduler        scheduler.*   (tasks from ~/.geenii/scheduler.json)
-        └── Supervisor       supervisor.*
+        ├── Supervisor       supervisor.*
+        └── AppRegistry      apps.*        (apps run as supervisor services `app-<name>`)
 ```
 
 | Module | Contents |
 |---|---|
 | `daemon/client.py` | `DaemonClient` with `call(method, params)`, `is_available()`, `info()` and `shutdown()`. Also `default_socket_path()`: `GEENII_SOCKET`, then `GEENII_PM_SOCKET`, then `$GEENII_CACHE_DIR/geenii.sock`. It imports nothing heavy, so agents can use it cheaply. |
-| `daemon/host.py` | `ProcessHost(pm=, scheduler=, supervisor=, scheduler_config=, services_config=)`. `scheduler_config` and `services_config` are the files that `scheduler.reload` and `supervisor.reload` re-read. `start()` runs `pm.recover()`, applies the services file (if one exists; errors are logged, not fatal), then starts the scheduler loop. `stop()` stops, in order: the scheduler (its running tasks are cancelled and their processes killed), then the supervised processes, then `pm.shutdown()`. `methods` maps RPC names to coroutines. |
-| `daemon/server.py` | `DaemonServer(host, socket_path)`, `build_host(scheduler_config)`, `run_daemon()` and `main()`, which is the `geenii-daemon` entry point. |
+| `daemon/host.py` | `ProcessHost(pm=, scheduler=, supervisor=, scheduler_config=, services_config=, apps=)`. `apps` is an `AppRegistry` (see [Apps](apps.md#the-daemon)); `start()` scans its directories. `scheduler_config` and `services_config` are the files that `scheduler.reload` and `supervisor.reload` re-read. `start()` runs `pm.recover()`, applies the services file (if one exists; errors are logged, not fatal), then starts the scheduler loop. `stop()` stops, in order: the scheduler (its running tasks are cancelled and their processes killed), then the supervised processes, then `pm.shutdown()`. `methods` maps RPC names to coroutines. |
+| `daemon/server.py` | `DaemonServer(host, socket_path)`, `build_host(scheduler_config, services_config)` (its app registry starts with `~/.geenii/apps`), `run_daemon()` and `main()`, which is the `geenii-daemon` entry point. |
 
 **Starting.** Run `geenii daemon start [--socket] [--scheduler-config]`.
 The following are aliases for it:
@@ -71,6 +72,7 @@ connections, then calls `ProcessHost.stop()`, then removes the socket file.
 | `geenii pm` | every command except `serve` (an alias of `daemon start`) | Commands fail; `ping` exits with code 1 |
 | `geenii scheduler` | `status` (live table), `run` (starts in the daemon), `add`/`remove` (edit the file, then `scheduler.reload`), `reload` | Works on the config file: offline `status`, local `run`, and file edits only. The same fallback applies when the daemon uses a different config file |
 | `geenii supervisor` | `status`, `start`, `stop`, `restart`, `logs` | Commands exit with code 1 |
+| `geenii apps` | every command except `init`/`init-all` (they write manifests locally, then `apps.reload` if the daemon runs) | Commands exit with code 1 |
 
 ### Wire protocol
 
@@ -86,7 +88,7 @@ connection may send several requests.
 | Method | Params | Result |
 |---|---|---|
 | `ping` | none | `"pong"` |
-| `daemon.info` | none | `pid`, `socket`, `uptime_s`, plus a summary for `pm`, `scheduler` and `supervisor`, each of the last two with its `config` path |
+| `daemon.info` | none | `pid`, `socket`, `uptime_s`, plus a summary for `pm`, `scheduler`, `supervisor` (the last two with their `config` path) and `apps` (`dirs`, `count`, `running`) |
 | `daemon.shutdown` | none | `"shutting down"` (the daemon stops right after replying) |
 | `pm.start` | `command` (string, or list of strings), `env?`, `cwd?`, `pid?` | `ProcessInfo` dict |
 | `pm.status` | `process_id` | `ProcessInfo` dict |
@@ -104,6 +106,21 @@ connection may send several requests.
 | `supervisor.restart` | `name` | `"ok"` |
 | `supervisor.logs` | `name`, `tail?` (default 100) | list of log lines |
 | `supervisor.reload` | none | `{"started": [...], "stopped": [...], "restarted": [...]}`. Applies the daemon's services file via `Supervisor.apply_services()`. Fails if the daemon has no services config or the file is missing or invalid |
+| `apps.list` | `dirs?` | list of app info dicts (see below), sorted by name |
+| `apps.info` | `name`, `dirs?` | app info dict |
+| `apps.start` | `name`, `port?`, `dirs?` | app info dict. Starts the app as supervisor service `app-<name>`. Fails if it is already started |
+| `apps.stop` | `name`, `dirs?` | app info dict. Stops the service and removes it from the supervisor. Fails if it isn't started |
+| `apps.restart` | `name`, `port?`, `dirs?` | app info dict. Redefines the service from the current manifest and restarts it (starts a stopped app) |
+| `apps.logs` | `name`, `tail?` (default 100), `dirs?` | list of log lines (empty if the app never ran) |
+| `apps.reload` | `dirs?` | `{"added": [...], "removed": [...], "dirs": [...]}`. Rescans all app directories |
+
+`dirs` is a list of absolute app directories. New ones are added to the
+daemon's app registry (and scanned) before the call; the CLI sends its
+project's `.geenii/apps` and `--dir` this way. An app info dict holds the
+manifest fields `name`, `type`, `title`, `description`, `version`, plus
+`port`, `path`, `trusted`, `sandbox`, `service` and the runtime fields
+`status` (`running`, `starting`, `error`, `stopped`), `pid`, `uptime_s`,
+`failures`, `last_exit`.
 
 `start`, `status`, `output`, `kill`, `list` and `cleanup` without a prefix
 are aliases of the `pm.*` methods, left over from the former standalone

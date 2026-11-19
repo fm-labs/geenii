@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from fastapi.params import Security
 
 from geenii.server.agents_routes import router as agents_router
+from geenii.server.apps_routes import router as apps_router
 from geenii.server.ai_routes import router as ai_router
 from geenii.server.public_routes import router as public_router
 from geenii.server.chat_routes import router as chat_router
@@ -20,7 +21,6 @@ from geenii.server.tools_routes import router as tools_router
 # from geeniid.server.routes.route_skills import router as skills_router
 # from geeniid.server.routes.route_mcp_admin import router as mcp_router
 # from geeniid.server.routes.route_scheduler import router as scheduler_router
-# from geeniid.server.routes.route_apps import router as apps_router
 # from geeniid.chat.chat_server_routes import router as chat_router
 # from geenii.server.routes.route_ap import router as ap_router
 # from geenii.server.routes.route_pubsub import router as pubsub_router
@@ -34,6 +34,7 @@ app_router.include_router(public_router, prefix=API_ROUTE_PREFIX)
 app_router.include_router(daemon_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(scheduler_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(supervisor_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
+app_router.include_router(apps_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(pm_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(agents_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(tools_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
@@ -45,7 +46,6 @@ app_router.include_router(stats_router, prefix=API_ROUTE_PREFIX, dependencies=[S
 app_router.include_router(projects_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 # app_router.include_router(chat_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 # app_router.include_router(scheduler_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
-# app_router.include_router(apps_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 # app_router.include_router(settings_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 # app_router.include_router(ap_router)
 # app_router.include_router(pubsub_router)

@@ -10,12 +10,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from geenii.daemon.client import DaemonClient
+from geenii.server.daemon_helper import DAEMON_NOT_RUNNING, dep_daemon_client
 
 router = APIRouter(prefix="/daemon", tags=["daemon"])
-
-
-def dep_daemon_client() -> DaemonClient:
-    return DaemonClient(actor="api")
 
 
 @router.get("/status")
@@ -26,7 +23,7 @@ def daemon_status(client: DaemonClient = Depends(dep_daemon_client)) -> dict:
     """
     result = {"running": False, "socket": client.socket_path, "info": None, "error": None}
     if not client.is_available():
-        result["error"] = "The geenii daemon is not running (start it with `geenii daemon start`)"
+        result["error"] = DAEMON_NOT_RUNNING
         return result
     try:
         result["info"] = client.info()

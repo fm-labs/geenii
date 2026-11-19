@@ -5,82 +5,122 @@ List, inspect, start, stop, and initialize GeeApps (micro applications).
 ## Synopsis
 
 ```
-geenii apps <command> [OPTIONS]
+geenii apps [--socket PATH] <command> [OPTIONS]
 ```
+
+## The daemon
+
+Apps run inside the [geenii daemon](daemon.md) as supervisor services named
+`app-<name>`, so they keep running after the CLI exits and stop when the
+daemon stops. Start the daemon first:
+
+```bash
+geenii daemon start
+```
+
+Without a running daemon, every command except `init` and `init-all` exits
+with code 1.
+
+| Option | Short | Description |
+|---|---|---|
+| `--socket` | `-s` | Path to the daemon's Unix socket (env: `GEENII_SOCKET`, `GEENII_PM_SOCKET`) |
 
 ## App Discovery
 
-The CLI scans these directories for app subdirectories (first match wins for
-a given name):
+The daemon always knows the user apps in `~/.geenii/apps`. Each command also
+sends these directories to the daemon, which adds them to its app registry
+and keeps them until it stops:
 
 1. `~/.geenii/apps` — user-global apps
-2. `.geenii/apps` — project apps (relative to `GEENII_WORKING_DIR`)
+2. `.geenii/apps` — project apps (relative to `GEENII_WORKING_DIR`), if it exists
+3. `--dir` — an extra directory, if given
 
-All commands accept `--dir` to add an extra directory to the search path.
+When two directories contain an app with the same name, the later one wins.
 
 ## Commands
 
 ### list
 
 ```
-geenii apps list [OPTIONS]
+geenii apps list [--json] [--dir DIR]
 ```
 
-List all discovered apps with type and optional runtime status.
+List all apps with type, status (`running`, `starting`, `error`, `stopped`),
+port and pid.
 
-#### Options
-
-| Option | Short | Description |
-|---|---|---|
-| `--status` | `-s` | Show runtime status (`stopped`, `running`, `error`) |
-| `--dir` | | Additional apps directory to scan |
+| Option | Description |
+|---|---|
+| `--json` | Print the raw app list as JSON |
+| `--dir` | Additional apps directory |
 
 ### info
 
 ```
-geenii apps info <NAME> [OPTIONS]
+geenii apps info <NAME> [--json] [--dir DIR]
 ```
 
-Show details for a specific app: type, status, port, pid, path, trust, and
-sandbox flags.
-
-#### Options
-
-| Option | Short | Description |
-|---|---|---|
-| `--dir` | | Additional apps directory to scan |
+Show details for an app: type, title, status, port, pid, path, service name,
+trust and sandbox flags, failures and last exit.
 
 ### start
 
 ```
-geenii apps start <NAME> [OPTIONS]
+geenii apps start <NAME> [--port PORT] [--dir DIR]
 ```
 
-Start an app. Webapps launch `python3 -m http.server`, node apps run
-`npm start` or `node <main>`, binaries execute directly. A port is
-auto-allocated starting at 9100 unless `--port` is given.
+Start an app as a background service of the daemon. Static HTML apps launch
+`python3 -m http.server`, python apps run `<python> <main>` (using the app's
+`.venv` if present), node apps run `npm start` or `node <main>`, binaries
+execute directly. The supervisor restarts the app when it exits.
 
-#### Options
+The port is the `--port` value, else the port the app had before, else the
+manifest `port`, else a random free port from 42000-44000. It stays with the app
+across restarts. Fails if the app is already started.
 
 | Option | Short | Description |
 |---|---|---|
 | `--port` | `-p` | Port to serve on (auto-allocated if omitted) |
-| `--dir` | | Additional apps directory to scan |
+| `--dir` | | Additional apps directory |
 
 ### stop
 
 ```
-geenii apps stop <NAME> [OPTIONS]
+geenii apps stop <NAME> [--dir DIR]
 ```
 
-Stop a running app. Sends `SIGTERM`, then `SIGKILL` after 10 seconds if
-the process doesn't exit.
+Stop a running app (SIGTERM, then SIGKILL after the grace period) and remove
+its service from the supervisor.
 
-#### Options
+### restart
+
+```
+geenii apps restart <NAME> [--port PORT] [--dir DIR]
+```
+
+Restart an app with its current manifest, so manifest changes take effect.
+Starts the app if it is stopped. Without `--port`, the app keeps its port.
+
+### logs
+
+```
+geenii apps logs <NAME> [--tail N] [--dir DIR]
+```
+
+Show the app's recent output, as kept by the supervisor (lines prefixed with
+`[stdout]`, `[stderr]` or `[supervisor]`).
 
 | Option | Short | Description |
 |---|---|---|
-| `--dir` | | Additional apps directory to scan |
+| `--tail` | `-n` | Number of lines to show (default 100) |
+
+### reload
+
+```
+geenii apps reload [--dir DIR]
+```
+
+Rescan all app directories, picking up new, removed and changed apps.
+Running apps keep running; use `restart` to apply manifest changes to them.
 
 ### init
 
@@ -90,16 +130,15 @@ geenii apps init <NAME> [OPTIONS]
 
 Generate a `manifest.json` for an existing app directory. The app type is
 auto-detected from directory contents unless `--type` is given. Refuses to
-overwrite an existing manifest.
-
-#### Options
+overwrite an existing manifest. Works without the daemon; if it runs, it
+reloads its apps afterwards.
 
 | Option | Short | Description |
 |---|---|---|
-| `--type` | `-t` | App type: `webapp`, `node`, or `binary` (auto-detected if omitted) |
+| `--type` | `-t` | App type: `statichtml`, `python`, `node`, or `binary` (auto-detected if omitted) |
 | `--title` | | Human-readable title |
 | `--description` | | Short description |
-| `--dir` | | Additional apps directory to scan |
+| `--dir` | | Additional apps directory to search |
 
 ### init-all
 
@@ -108,33 +147,35 @@ geenii apps init-all [OPTIONS]
 ```
 
 Batch-generate `manifest.json` for all app directories that lack one.
-Prints each app with its inferred type.
+Prints each app with its inferred type. Works without the daemon.
 
-#### Options
-
-| Option | Short | Description |
-|---|---|---|
-| `--overwrite` | | Overwrite existing manifests |
-| `--dir` | | Apps directory to scan (defaults to all known paths) |
+| Option | Description |
+|---|---|
+| `--overwrite` | Overwrite existing manifests |
+| `--dir` | Apps directory to scan (defaults to all known paths) |
 
 ## Examples
 
 ```bash
-# List apps from a custom directory
-geenii apps list --dir ./data/apps
+# List apps, including those in a custom directory
+geenii apps list --dir ./my-apps
 
 # Inspect an app
-geenii apps info hello-world --dir ./data/apps
+geenii apps info hello-world
 
-# Start an app on a specific port
-geenii apps start hello-world --port 8080 --dir ./data/apps
+# Start an app on a specific port, then follow its output
+geenii apps start hello-world --port 8080
+geenii apps logs hello-world
+
+# Apply manifest changes to a running app
+geenii apps restart hello-world
 
 # Stop a running app
-geenii apps stop hello-world --dir ./data/apps
+geenii apps stop hello-world
 
 # Generate a manifest for a single app
 geenii apps init my-app --type node --title "My Node App"
 
 # Generate manifests for all apps
-geenii apps init-all --dir ./data/apps
+geenii apps init-all --dir ./my-apps
 ```

@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from geenii.server import daemon_routes
+from geenii.server import daemon_helper
 from geenii.server.server import app
 
 
@@ -24,11 +24,11 @@ class FakeDaemonClient:
 @pytest.fixture
 def make_client():
     def _make(fake):
-        app.dependency_overrides[daemon_routes.dep_daemon_client] = lambda: fake
+        app.dependency_overrides[daemon_helper.dep_daemon_client] = lambda: fake
         return TestClient(app)
 
     yield _make
-    app.dependency_overrides.pop(daemon_routes.dep_daemon_client, None)
+    app.dependency_overrides.pop(daemon_helper.dep_daemon_client, None)
 
 
 def test_status_running(make_client):

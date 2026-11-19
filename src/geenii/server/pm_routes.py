@@ -15,16 +15,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
 from geenii.pm.process_manager_client import ProcessManagerClient
+from geenii.server.daemon_helper import daemon_errors
 
 router = APIRouter(prefix="/pm", tags=["pm"])
-
-# Daemon error messages are "<ExceptionType>: <message>"; map the type to an HTTP status
-_ERROR_STATUS = {
-    "KeyError": 404,
-    "ValueError": 400,
-    "TimeoutError": 408,
-    "RuntimeError": 409,
-}
 
 
 class StartProcessRequest(pydantic.BaseModel):
@@ -42,22 +35,8 @@ def dep_pm_client() -> ProcessManagerClient:
 
 def _call(fn, *args, **kwargs):
     """Invoke a client method, translating daemon and connection errors into HTTPExceptions."""
-    try:
+    with daemon_errors():
         return fn(*args, **kwargs)
-    except RuntimeError as exc:
-        message = str(exc)
-        exc_type, _, detail = message.partition(": ")
-        if exc_type not in _ERROR_STATUS:
-            # Other daemon errors (e.g. "Unknown method: pm.gc") keep their full message
-            raise HTTPException(status_code=500, detail=message)
-        if exc_type == "KeyError":
-            detail = detail.strip("'\"")  # str(KeyError) quotes its message
-        raise HTTPException(status_code=_ERROR_STATUS[exc_type], detail=detail or message)
-    except OSError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Process manager is not reachable (is `geenii daemon start` running?): {exc}",
-        )
 
 
 @router.get("/ping")

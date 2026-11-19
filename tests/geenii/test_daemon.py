@@ -481,7 +481,7 @@ def test_scheduler_routes_edit_and_run_in_live_daemon(short_dir):
     """The HTTP scheduler routes against a real daemon: add a task, it gets loaded, run it now."""
     from fastapi.testclient import TestClient
 
-    from geenii.server import daemon_routes
+    from geenii.server import daemon_helper
     from geenii.server.server import app
 
     config = os.path.join(short_dir, "scheduler.json")
@@ -493,7 +493,7 @@ def test_scheduler_routes_edit_and_run_in_live_daemon(short_dir):
     server = DaemonServer(host, os.path.join(short_dir, "d.sock"))
 
     with RunningDaemon(server) as client:
-        app.dependency_overrides[daemon_routes.dep_daemon_client] = lambda: client
+        app.dependency_overrides[daemon_helper.dep_daemon_client] = lambda: client
         try:
             http = TestClient(app)
             task = {"name": "touch", "interval": "cron:0 0 1 1 *", "cmd": ["touch", marker]}
@@ -508,7 +508,7 @@ def test_scheduler_routes_edit_and_run_in_live_daemon(short_dir):
             _wait_until(lambda: os.path.exists(marker))
             assert http.post("/api/v1/scheduler/tasks/missing/run").status_code == 404
         finally:
-            app.dependency_overrides.pop(daemon_routes.dep_daemon_client, None)
+            app.dependency_overrides.pop(daemon_helper.dep_daemon_client, None)
 
 
 def test_default_configs_are_in_the_user_home():

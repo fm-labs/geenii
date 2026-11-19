@@ -4,7 +4,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
-from geenii.server import daemon_routes, scheduler_routes
+from geenii.server import daemon_helper, scheduler_routes
 from geenii.server.server import app
 
 
@@ -42,7 +42,7 @@ def api(tmp_path):
 
     def _api(fake=None):
         fake = fake or FakeDaemonClient()
-        app.dependency_overrides[daemon_routes.dep_daemon_client] = lambda: fake
+        app.dependency_overrides[daemon_helper.dep_daemon_client] = lambda: fake
         app.dependency_overrides[scheduler_routes.dep_scheduler_config_path] = lambda: default_path
         return TestClient(app)
 
@@ -55,7 +55,7 @@ def get_config(tmp_path):
     default_path = str(tmp_path / "scheduler.json")
 
     def _get(fake):
-        app.dependency_overrides[daemon_routes.dep_daemon_client] = lambda: fake
+        app.dependency_overrides[daemon_helper.dep_daemon_client] = lambda: fake
         app.dependency_overrides[scheduler_routes.dep_scheduler_config_path] = lambda: default_path
         return TestClient(app).get("/api/v1/scheduler/config")
 

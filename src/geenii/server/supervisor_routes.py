@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from geenii import proc_events
 from geenii.daemon.client import DaemonClient
-from geenii.server.daemon_routes import dep_daemon_client
+from geenii.server.daemon_helper import config_path, daemon_call, daemon_state, dep_daemon_client, reload_config
 from geenii.supervisor import MAX_FAILURES, ServiceConfig
 
 router = APIRouter(prefix="/supervisor", tags=["supervisor"])
@@ -116,29 +116,6 @@ def _live_state(status: dict, name: str) -> dict | None:
     }
 
 
-def _daemon_state(client: DaemonClient) -> tuple[dict | None, str | None, str | None]:
-    """(supervisor status, config path the daemon uses, error) — status is None when the daemon is unreachable."""
-    if not client.is_available():
-        return None, None, None
-    try:
-        config = client.info()["supervisor"].get("config")
-        return client.call("supervisor.status"), config, None
-    except (RuntimeError, OSError, KeyError) as exc:
-        return None, None, str(exc)
-
-
-def _config_path(client: DaemonClient, default_path: str) -> tuple[str, bool]:
-    """(config path to edit, whether a running daemon applies it)."""
-    if client.is_available():
-        try:
-            daemon_config = client.info()["supervisor"].get("config")
-        except RuntimeError, OSError, KeyError:
-            daemon_config = None
-        if daemon_config:
-            return daemon_config, True
-    return default_path, False
-
-
 def _read(path: str) -> dict:
     if not os.path.isfile(path):
         return {"services": []}
@@ -171,30 +148,8 @@ def _index(services: list, name: str) -> int | None:
     return next((i for i, s in enumerate(services) if isinstance(s, dict) and s.get("name") == name), None)
 
 
-def _reload(client: DaemonClient, live: bool) -> dict:
-    """Make the daemon re-apply the file if it uses it; the file change stands either way."""
-    if not live:
-        return {"reloaded": False, "changes": None, "error": None}
-    try:
-        return {"reloaded": True, "changes": client.call("supervisor.reload"), "error": None}
-    except (RuntimeError, OSError) as exc:
-        return {"reloaded": False, "changes": None, "error": str(exc)}
-
-
-def _daemon_call(client: DaemonClient, method: str, params: dict):
-    """Call the running daemon, mapping its errors to HTTP errors."""
-    if not client.is_available():
-        raise HTTPException(409, "The geenii daemon is not running (start it with `geenii daemon start`)")
-    try:
-        return client.call(method, params)
-    except RuntimeError as exc:
-        # Daemon errors are "<ExceptionType>: <message>"
-        exc_type, _, detail = str(exc).partition(": ")
-        if exc_type == "KeyError":
-            raise HTTPException(404, f"'{params.get('name')}' is not supervised by the running daemon")
-        raise HTTPException(409, detail or str(exc))
-    except OSError as exc:
-        raise HTTPException(503, f"The geenii daemon is not reachable: {exc}")
+def _not_supervised(name: str) -> str:
+    return f"'{name}' is not supervised by the running daemon"
 
 
 @router.get("/config")
@@ -209,7 +164,7 @@ def get_supervisor_config(
     supervises that are not in the file (`geenii supervisor start`) are appended
     with `not_in_config: true`.
     """
-    status, daemon_config, daemon_error = _daemon_state(client)
+    status, daemon_config, daemon_error = daemon_state(client, "supervisor")
     path = daemon_config or default_path
 
     result: dict = {
@@ -269,7 +224,7 @@ def create_service(
 ) -> dict:
     """Add a service to the services config; a running daemon that uses the file starts it."""
     _validate(service)
-    path, live = _config_path(client, default_path)
+    path, live = config_path(client, "supervisor", default_path)
     entry = service.to_entry()
     with _write_lock:
         data = _read(path)
@@ -278,7 +233,7 @@ def create_service(
         data["services"].append(entry)
         _write(path, data)
     proc_events.record("supervisor", "service.add", actor="api", name=entry["name"], cmd=entry.get("cmd"), path=path)
-    return {"service": entry, "path": path, "reload": _reload(client, live)}
+    return {"service": entry, "path": path, "reload": reload_config(client, "supervisor", live)}
 
 
 @router.put("/services/{name}")
@@ -290,7 +245,7 @@ def update_service(
 ) -> dict:
     """Replace a service in the services config (a running daemon restarts it). `service.name` may differ to rename it."""
     _validate(service)
-    path, live = _config_path(client, default_path)
+    path, live = config_path(client, "supervisor", default_path)
     new_entry = service.to_entry()
     with _write_lock:
         data = _read(path)
@@ -313,7 +268,7 @@ def update_service(
         enabled=new_entry.get("enabled", True),
         path=path,
     )
-    return {"service": data["services"][i], "path": path, "reload": _reload(client, live)}
+    return {"service": data["services"][i], "path": path, "reload": reload_config(client, "supervisor", live)}
 
 
 @router.delete("/services/{name}")
@@ -323,7 +278,7 @@ def delete_service(
     default_path: str = Depends(dep_services_config_path),
 ) -> dict:
     """Remove a service from the services config; a running daemon that uses the file stops it."""
-    path, live = _config_path(client, default_path)
+    path, live = config_path(client, "supervisor", default_path)
     with _write_lock:
         if not os.path.isfile(path):
             raise HTTPException(404, f"Config file not found: {path}")
@@ -334,27 +289,27 @@ def delete_service(
         del data["services"][i]
         _write(path, data)
     proc_events.record("supervisor", "service.delete", actor="api", name=name, path=path)
-    return {"path": path, "reload": _reload(client, live)}
+    return {"path": path, "reload": reload_config(client, "supervisor", live)}
 
 
 @router.post("/services/{name}/start")
 def start_service(name: str, client: DaemonClient = Depends(dep_daemon_client)) -> dict:
     """Start a stopped service in the running daemon (a supervised one, or an enabled one of its config file)."""
-    _daemon_call(client, "supervisor.start", {"name": name})
+    daemon_call(client, "supervisor.start", {"name": name}, not_found=_not_supervised(name))
     return {"name": name, "status": "started"}
 
 
 @router.post("/services/{name}/stop")
 def stop_service(name: str, client: DaemonClient = Depends(dep_daemon_client)) -> dict:
     """Stop a service in the running daemon. It stays listed as stopped until started or the daemon restarts."""
-    _daemon_call(client, "supervisor.stop", {"name": name, "disable_restart": False})
+    daemon_call(client, "supervisor.stop", {"name": name, "disable_restart": False}, not_found=_not_supervised(name))
     return {"name": name, "status": "stopped"}
 
 
 @router.post("/services/{name}/restart")
 def restart_service(name: str, client: DaemonClient = Depends(dep_daemon_client)) -> dict:
     """Restart a service in the running daemon now (also resets its restart backoff)."""
-    _daemon_call(client, "supervisor.restart", {"name": name})
+    daemon_call(client, "supervisor.restart", {"name": name}, not_found=_not_supervised(name))
     return {"name": name, "status": "restarted"}
 
 
@@ -365,4 +320,7 @@ def service_logs(
     client: DaemonClient = Depends(dep_daemon_client),
 ) -> dict:
     """Recent output of a service: stdout, stderr and supervisor events, as `[tag] line` strings."""
-    return {"name": name, "lines": _daemon_call(client, "supervisor.logs", {"name": name, "tail": tail})}
+    return {
+        "name": name,
+        "lines": daemon_call(client, "supervisor.logs", {"name": name, "tail": tail}, not_found=_not_supervised(name)),
+    }

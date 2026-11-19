@@ -32,10 +32,13 @@ geenii
 │   ├── list                      # configured + loaded agents
 │   └── inspect NAME              # full agent configuration
 ├── apps
-│   ├── list                      # discovered apps with type
+│   ├── list                      # apps with type and status (needs the daemon)
 │   ├── info NAME                 # app details (type, status, port, path)
-│   ├── start NAME [-p PORT]      # launch an app
+│   ├── start NAME [-p PORT]      # run an app as a daemon service
 │   ├── stop NAME                 # stop a running app
+│   ├── restart NAME [-p PORT]    # restart, applying manifest changes
+│   ├── logs NAME [-n TAIL]       # recent app output
+│   ├── reload                    # rescan app directories
 │   ├── init NAME [-t TYPE]       # generate manifest.json for one app
 │   └── init-all                  # batch-generate manifests
 ├── models
