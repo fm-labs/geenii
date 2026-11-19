@@ -19,7 +19,9 @@ export const markdownClass = [
   '[&_h1]:text-xl [&_h2]:text-lg [&_h3]:text-base [&_h1,&_h2,&_h3]:font-semibold [&_h1,&_h2,&_h3]:mt-3 [&_h1,&_h2,&_h3]:mb-1',
   '[&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground',
   '[&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-muted [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:text-[0.9em]',
-  '[&_pre]:my-2 [&_pre]:overflow-x-auto [&_table]:my-2 [&_td,&_th]:border [&_td,&_th]:px-2 [&_th]:text-left',
+  '[&_pre]:my-2 [&_pre]:overflow-x-auto [&_td,&_th]:border [&_td,&_th]:px-2 [&_th]:text-left',
+  // wide tables scroll inside the message instead of widening the chat (block + max-content, as on GitHub)
+  '[&_table]:my-2 [&_table]:block [&_table]:w-max [&_table]:max-w-full [&_table]:overflow-x-auto',
   '[&_.contains-task-list]:list-none [&_.contains-task-list]:pl-1 [&_.task-list-item_input]:mr-1.5',
 ].join(' ')
 

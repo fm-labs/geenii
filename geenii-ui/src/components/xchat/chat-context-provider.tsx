@@ -1,5 +1,11 @@
 import React, { PropsWithChildren } from 'react'
-import { ChatContext, ChatRenderersContext, ChatWidgetsContext } from './chat-context.tsx'
+import {
+  ChatContext,
+  ChatInteractionUi,
+  ChatInteractionUiContext,
+  ChatRenderersContext,
+  ChatWidgetsContext,
+} from './chat-context.tsx'
 import { ChatSession } from '@/components/xchat/chat-session.ts'
 import { ChatBackend, ChatMessage, ContentPartRenderers, WidgetRenderers } from '@/components/xchat/chat.types.ts'
 
@@ -62,11 +68,24 @@ const ChatProvider = (props: ChatProviderProps) => {
 
   const emptyRenderers = React.useMemo(() => ({}), [])
 
+  const [dismissed, setDismissed] = React.useState<ReadonlySet<string>>(() => new Set())
+  const interactionUi = React.useMemo<ChatInteractionUi>(() => ({
+    dismissed,
+    dismiss: (id) => setDismissed((d) => new Set(d).add(id)),
+    review: (id) => setDismissed((d) => {
+      const next = new Set(d)
+      next.delete(id)
+      return next
+    }),
+  }), [dismissed])
+
   return (
     <ChatContext.Provider value={session}>
       <ChatRenderersContext.Provider value={renderers ?? emptyRenderers}>
         <ChatWidgetsContext.Provider value={widgets ?? emptyRenderers}>
-          {children}
+          <ChatInteractionUiContext.Provider value={interactionUi}>
+            {children}
+          </ChatInteractionUiContext.Provider>
         </ChatWidgetsContext.Provider>
       </ChatRenderersContext.Provider>
     </ChatContext.Provider>

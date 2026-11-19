@@ -95,6 +95,8 @@ export const createEchoBackend = (options: EchoBackendOptions = {}): ChatBackend
   async function* toolTurn(contextId: string, text: string, signal: AbortSignal): AsyncIterable<ChatEvent> {
     const callId = id()
     const args = { text }
+    // like the agent: first the tool call, then the approval request for it (interaction_id = call_id)
+    yield say(contextId, 'assistant', { type: 'tool_call', name: 'echo', arguments: args, call_id: callId })
     yield say(contextId, 'assistant', {
       type: 'interaction',
       interaction_id: callId,

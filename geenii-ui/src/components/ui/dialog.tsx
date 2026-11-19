@@ -56,10 +56,12 @@ function DialogContent({
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
+      {/* centered by a flex wrapper: no translate (blurry text) and no h-fit (WebKit/Tauri ignores it and stretches the box to full height) */}
+      <div data-slot="dialog-position" className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed inset-0 m-auto h-fit z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          "pointer-events-auto relative z-50 grid max-h-full w-full overflow-y-auto max-w-[calc(100%-2rem)] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
           className
         )}
         {...props}
@@ -75,6 +77,7 @@ function DialogContent({
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
+      </div>
     </DialogPortal>
   )
 }

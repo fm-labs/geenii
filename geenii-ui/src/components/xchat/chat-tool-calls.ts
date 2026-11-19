@@ -1,5 +1,5 @@
 import React from 'react'
-import type { ChatMessage, ToolCallResultContent } from '@/components/xchat/chat.types.ts'
+import type { ChatMessage, ToolCallContent, ToolCallResultContent } from '@/components/xchat/chat.types.ts'
 
 /**
  * Links tool calls to their results across messages (by call_id).
@@ -9,22 +9,22 @@ import type { ChatMessage, ToolCallResultContent } from '@/components/xchat/chat
  */
 export type ToolCallIndex = {
   results: Map<string, ToolCallResultContent>
-  /** call_ids that have a rendered tool_call part */
-  calls: Set<string>
+  /** tool_call parts by call_id (these calls render their results themselves) */
+  calls: Map<string, ToolCallContent>
 }
 
 export const buildToolCallIndex = (messages: ChatMessage[]): ToolCallIndex => {
   const results = new Map<string, ToolCallResultContent>()
-  const calls = new Set<string>()
+  const calls = new Map<string, ToolCallContent>()
   for (const m of messages) {
     for (const part of m.message.content) {
-      if (part.type === 'tool_call' && part.call_id) calls.add(part.call_id)
+      if (part.type === 'tool_call' && part.call_id) calls.set(part.call_id, part)
       else if (part.type === 'tool_call_result' && part.call_id) results.set(part.call_id, part)
     }
   }
   return { results, calls }
 }
 
-export const ToolCallIndexContext = React.createContext<ToolCallIndex>({ results: new Map(), calls: new Set() })
+export const ToolCallIndexContext = React.createContext<ToolCallIndex>({ results: new Map(), calls: new Map() })
 
 export const useToolCallIndex = (): ToolCallIndex => React.useContext(ToolCallIndexContext)

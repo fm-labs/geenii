@@ -3,7 +3,8 @@ import { ChevronRightIcon, WrenchIcon, CheckIcon, XIcon, LoaderIcon, HandIcon } 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { useChat, useChatActions } from '@/components/xchat/chat-context.tsx'
+import { useChat, useChatInteractionUi } from '@/components/xchat/chat-context.tsx'
+import { useToolCallIndex } from '@/components/xchat/chat-tool-calls.ts'
 import {
   ContentPartRendererProps,
   FunctionCallContent,
@@ -84,54 +85,80 @@ export const FunctionCallPart = ({ part }: ContentPartRendererProps<FunctionCall
             result={part.result ?? undefined} />
 )
 
-const InteractionBox = (props: { text: string; children: React.ReactNode }) => (
-  <div className={'rounded-md border border-amber-500/50 bg-amber-500/5 p-3 text-sm space-y-2'}>
-    <div className={'flex gap-2'}>
-      <HandIcon className={'size-4 shrink-0 mt-0.5 text-amber-600'} />
-      <div className={'whitespace-pre-wrap break-words'}>{props.text}</div>
-    </div>
-    <div className={'flex flex-wrap items-center gap-2 pl-6'}>{props.children}</div>
-  </div>
-)
+/** A tool approval request: an interaction whose interaction_id is the tool call_id */
+export const isToolApproval = (part: UserInteractionContent): boolean => part.interaction_type === 'tool_call_request'
 
-/** A question for the user (e.g. tool approval). Choices are only clickable while the backend waits for them. */
-export const InteractionPart = ({ part }: ContentPartRendererProps<UserInteractionContent>) => {
-  const { respond } = useChatActions()
-  const pending = useChat((s) => Boolean(s.pendingInteractions[part.interaction_id]))
-  const [sending, setSending] = React.useState(false)
+/** The tool name of an approval request, taken from its text ("... call tool 'name' ..."); null if not found. */
+export const approvalToolName = (part: UserInteractionContent): string | null =>
+  /tool '([^']+)'/.exec(part.text)?.[1] ?? null
 
-  const choose = (choice: string) => {
-    setSending(true)
-    respond({ interactionId: part.interaction_id, choice }).catch(() => setSending(false))
-  }
+const ANSWER_LABELS: Record<string, string> = { allow: 'allowed', deny: 'denied', yes: 'confirmed', no: 'rejected' }
 
+/** Past-tense label of a choice, e.g. "Allow" -> "allowed"; unknown choices are shown as they are. */
+export const answerLabel = (choice: string): string => ANSWER_LABELS[choice.toLowerCase()] ?? choice
+
+const AnswerBadge = ({ answer }: { answer: string | null | undefined }) => {
+  if (answer == null) return <Badge variant={'secondary'}>no answer</Badge>
+  const label = answerLabel(answer)
+  const negative = ['denied', 'rejected'].includes(label)
+  return <Badge variant={negative ? 'destructive' : 'outline'}>{negative ? <XIcon /> : <CheckIcon />}{label}</Badge>
+}
+
+/** Shown while a question is pending; once dismissed from the dialog, it offers to reopen it. */
+const AwaitingBadge = ({ id }: { id: string }) => {
+  const { dismissed, review } = useChatInteractionUi()
   return (
-    <InteractionBox text={part.text}>
-      {pending
-        ? part.choices.map((choice, i) => (
-          <Button key={choice} size={'sm'} variant={i === 0 ? 'default' : 'outline'} disabled={sending}
-                  onClick={() => choose(choice)}>{choice}</Button>
-        ))
-        : <Badge variant={'secondary'}>{part.choice ?? 'No answer'}</Badge>}
-    </InteractionBox>
+    <span className={'flex items-center gap-2'}>
+      <Badge variant={'secondary'}><HandIcon className={'text-amber-600'} />awaiting approval</Badge>
+      {dismissed.has(id) && <Button size={'sm'} variant={'outline'} className={'h-6 px-2 text-xs'}
+                                    onClick={() => review(id)}>Review</Button>}
+    </span>
   )
 }
 
-/** A yes/no confirmation, answered through respond() with the confirmation_id. */
-export const ConfirmationPart = ({ part }: ContentPartRendererProps<UserConfirmationContent>) => {
-  const { respond } = useChatActions()
-  const pending = useChat((s) => Boolean(s.pendingInteractions[part.confirmation_id]))
-  const answer = part.confirmed == null ? null : part.confirmed ? 'Confirmed' : 'Rejected'
+/** One compact line in the chat; the question itself is asked in the ChatInteractionDialog. */
+const InteractionRow = (props: { icon: React.ReactNode; children: React.ReactNode; badge: React.ReactNode }) => (
+  <div className={'flex min-w-0 items-center gap-2 text-sm text-muted-foreground'}>
+    <span className={'shrink-0 [&_svg]:size-4'}>{props.icon}</span>
+    <span className={'min-w-0 truncate'}>{props.children}</span>
+    <span className={'shrink-0'}>{props.badge}</span>
+  </div>
+)
+
+/**
+ * A question for the user (e.g. tool approval), shown as one status line: the choices are made in the
+ * ChatInteractionDialog while the backend waits; afterwards the line shows the answer.
+ */
+export const InteractionPart = ({ part }: ContentPartRendererProps<UserInteractionContent>) => {
+  const pending = useChat((s) => Boolean(s.pendingInteractions[part.interaction_id]))
+  const { results, calls } = useToolCallIndex()
+
+  if (isToolApproval(part)) {
+    const result = results.get(part.interaction_id)
+    const name = calls.get(part.interaction_id)?.name ?? approvalToolName(part) ?? result?.name ?? 'tool'
+    // history may lack the choice; then the tool result tells whether the call ran
+    const answer = part.choice ?? (result ? (/rejected/i.test(toolResultError(result) ?? '') ? 'Deny' : 'Allow') : null)
+    return (
+      <InteractionRow icon={<WrenchIcon />} badge={pending ? <AwaitingBadge id={part.interaction_id} /> : <AnswerBadge answer={answer} />}>
+        Calling tool <span className={'font-mono text-foreground'}>{name}</span> …
+      </InteractionRow>
+    )
+  }
 
   return (
-    <InteractionBox text={part.text}>
-      {pending
-        ? <>
-          <Button size={'sm'} onClick={() => respond({ interactionId: part.confirmation_id, choice: 'yes' })}>Confirm</Button>
-          <Button size={'sm'} variant={'outline'}
-                  onClick={() => respond({ interactionId: part.confirmation_id, choice: 'no' })}>Reject</Button>
-        </>
-        : <Badge variant={'secondary'}>{answer ?? 'No answer'}</Badge>}
-    </InteractionBox>
+    <InteractionRow icon={<HandIcon />} badge={pending ? <AwaitingBadge id={part.interaction_id} /> : <AnswerBadge answer={part.choice} />}>
+      {part.text}
+    </InteractionRow>
+  )
+}
+
+/** A yes/no confirmation, shown as one status line; it is answered in the ChatInteractionDialog. */
+export const ConfirmationPart = ({ part }: ContentPartRendererProps<UserConfirmationContent>) => {
+  const pending = useChat((s) => Boolean(s.pendingInteractions[part.confirmation_id]))
+  const answer = part.confirmed == null ? null : part.confirmed ? 'yes' : 'no'
+  return (
+    <InteractionRow icon={<HandIcon />} badge={pending ? <AwaitingBadge id={part.confirmation_id} /> : <AnswerBadge answer={answer} />}>
+      {part.text}
+    </InteractionRow>
   )
 }

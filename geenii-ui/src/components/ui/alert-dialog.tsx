@@ -52,15 +52,18 @@ function AlertDialogContent({
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
+      {/* centered by a flex wrapper: no translate (blurry text) and no h-fit (WebKit/Tauri ignores it and stretches the box to full height) */}
+      <div data-slot="alert-dialog-position" className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         data-size={size}
         className={cn(
-          "group/alert-dialog-content fixed inset-0 m-auto h-fit z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 data-[size=sm]:max-w-xs data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[size=default]:sm:max-w-lg",
+          "group/alert-dialog-content pointer-events-auto relative z-50 grid max-h-full w-full overflow-y-auto max-w-[calc(100%-2rem)] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 data-[size=sm]:max-w-xs data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[size=default]:sm:max-w-lg",
           className
         )}
         {...props}
       />
+      </div>
     </AlertDialogPortal>
   )
 }

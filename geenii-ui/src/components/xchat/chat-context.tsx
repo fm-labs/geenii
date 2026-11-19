@@ -17,6 +17,23 @@ export const ChatRenderersContext = React.createContext<ContentPartRenderers>({}
 
 export const ChatWidgetsContext = React.createContext<WidgetRenderers>({})
 
+/** UI state of pending questions: which ones the user dismissed from the ChatInteractionDialog for now. */
+export type ChatInteractionUi = {
+  dismissed: ReadonlySet<string>
+  /** Hide the question from the dialog; it stays pending */
+  dismiss(interactionId: string): void
+  /** Show a dismissed question in the dialog again */
+  review(interactionId: string): void
+}
+
+export const ChatInteractionUiContext = React.createContext<ChatInteractionUi>({
+  dismissed: new Set(),
+  dismiss: () => undefined,
+  review: () => undefined,
+})
+
+export const useChatInteractionUi = (): ChatInteractionUi => React.useContext(ChatInteractionUiContext)
+
 export const useChatSession = (): ChatSession => {
   const session = React.useContext(ChatContext)
   if (!session) {
