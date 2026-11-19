@@ -156,7 +156,7 @@ export const useAppUrl = (app: GeeAppInfo | null): string | null => {
   } catch {
     // relative or invalid base url: same machine
   }
-  return `http://${host}:${app.port}/`
+  return `http://${host}:${app.port}/?_apptoken=geenii-app-token-for-${app.name}&_baseurl=${encodeURI(apiBaseUrl)}`
 }
 
 /** Open URL outside the UI: the system browser in the desktop app, a new tab in the web UI */
