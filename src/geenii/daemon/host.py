@@ -357,7 +357,8 @@ class ProcessHost:
         """(Re)define the app's supervisor service from its manifest"""
         port = self.apps.assign_port(app.name, params.get("port"))
         config = app.to_service_config(port=port)
-        await self.supervisor.ensure(config.name, config.to_proc_config())
+        if config:
+            await self.supervisor.ensure(config.name, config.to_proc_config())
 
     async def _apps_list(self, params: dict) -> list[dict]:
         await self._apps_sync_dirs(params)

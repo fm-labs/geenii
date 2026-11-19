@@ -1,4 +1,5 @@
 import os
+import platform
 from shutil import which
 
 
@@ -37,3 +38,19 @@ def locate_binary(binary_name: str) -> str | None:
         return which(binary_name)
     except Exception:
         return None
+
+def detect_os() -> str:
+    """Return one of: windows, macos, wsl, linux, bsd, unknown."""
+    system = platform.system().lower()
+    if system == "windows" or system.startswith(("cygwin", "msys", "mingw")):
+        return "windows"
+    if system == "darwin":
+        return "macos"
+    if system == "linux":
+        release = platform.uname().release.lower()
+        if "microsoft" in release or "wsl" in release:
+            return "wsl"
+        return "linux"
+    if "bsd" in system:
+        return "bsd"
+    return "unknown"

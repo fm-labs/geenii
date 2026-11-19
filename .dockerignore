@@ -3,6 +3,7 @@
 .git/
 .github/
 .geenii/
+apps/
 bak/
 data/
 build/

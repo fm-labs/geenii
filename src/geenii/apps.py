@@ -4,11 +4,13 @@ import random
 import re
 import socket
 from enum import Enum
+import webbrowser
 
 import pydantic
 
 from geenii import config
 from geenii.supervisor import ServiceConfig
+from geenii.utils.os_util import detect_os
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,10 @@ DEFAULT_STATIC_PORT = 8000
 APP_PORT_RANGE = (42000, 44000)  # apps without a fixed port get a random free port from this range (inclusive)
 PYTHON_MAIN_CANDIDATES = ("main.py", "app.py", "server.py")
 PYTHON_PROJECT_MARKERS = ("pyproject.toml", "requirements.txt", *PYTHON_MAIN_CANDIDATES)
+CONTAINER_IMAGE_PREFIX = "geenii-app-"
+# Docker repository name component: lowercase alnum, single separators, no leading/trailing ones
+CONTAINER_IMAGE_RE = re.compile(r"[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*")
+ENV_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 def _find_python_main(app_dir: str) -> str | None:
@@ -51,6 +57,8 @@ class AppType(str, Enum):
     PYTHON = "python"
     NODE = "node"
     BINARY = "binary"
+    CONTAINER = "container"
+    LINK = "link"
 
 
 class AppStatus(str, Enum):
@@ -203,7 +211,7 @@ class GeeApp(pydantic.BaseModel):
             cmd=cmd,
             env=env,
             cwd=self.path,
-            restart=restart,
+            restart=restart if self.manifest.type is not AppType.LINK else False,
         )
 
     def _resolve_port(self, port: int | None = None) -> int | None:
@@ -244,7 +252,66 @@ class GeeApp(pydantic.BaseModel):
                 raise FileNotFoundError(f"Binary not found: {bin_path}")
             return [bin_path], env
 
+        if app_type == AppType.CONTAINER:
+            return self._container_launch_command(port, env), env
+
+        if app_type == AppType.LINK:
+            if main is None or not main.startswith("http"):
+                raise ValueError(f"App '{self.name}' is type 'url' but has no url set in 'main'")
+            # os_type = detect_os()
+            # if os_type == "windows":
+            #     cmd = ["cmd.exe", "/C", "start", "", main]
+            #     #cmd = ["ps", "Start-Process", main] # powershell
+            # elif os_type == "linux":
+            #     cmd = ["xdg-open", main]
+            # elif os_type == "darwin":
+            #     cmd = ["open", main]
+            # else:
+            return ["python", "-m", "webbrowser", main], env
+
         raise ValueError(f"Unknown app type: {app_type}")
+
+    def _container_launch_command(self, port: int | None, env: dict[str, str]) -> list[str]:
+        """`docker build` then `docker run` as one supervised process.
+
+        The supervisor spawns an argv list without a shell, so `&&` needs `sh -c`. The script is
+        a constant; every variable value is passed as a positional arg ($1..$n), so nothing from
+        the manifest or the app path is ever parsed by the shell.
+        """
+        if port is None or not (1 <= port <= 65535):
+            raise ValueError(f"App '{self.name}' is type 'container' but has no valid port: {port!r}")
+
+        image = f"{CONTAINER_IMAGE_PREFIX}{self.name.lower()}"
+        if not CONTAINER_IMAGE_RE.fullmatch(image):
+            raise ValueError(f"App name '{self.name}' is not usable as a docker image name")
+
+        app_dir = os.path.realpath(self.path)
+        dockerfile = os.path.realpath(os.path.join(app_dir, self.manifest.main or "Dockerfile"))
+        if os.path.commonpath([app_dir, dockerfile]) != app_dir:
+            raise ValueError(f"Dockerfile must be inside the app directory: {self.manifest.main}")
+        if not os.path.isfile(dockerfile):
+            raise FileNotFoundError(f"Dockerfile not found: {dockerfile}")
+        # The supervisor runs os.path.expandvars on every arg
+        if "$" in app_dir:
+            raise ValueError(f"App path must not contain '$': {app_dir}")
+
+        # `-e NAME` without a value: docker reads it from its own env (the supervisor merges
+        # ENV into it), so values never show up in the argv / process list
+        env_flags: list[str] = []
+        for key in env:
+            if not ENV_NAME_RE.fullmatch(key):
+                raise ValueError(f"Invalid env var name in manifest: {key!r}")
+            env_flags += ["-e", key]
+
+        script = 'docker build -f "$1" -t "$2" "$3" && shift 3 && exec docker run "$@"'
+        return [
+            "sh", "-c", script, "sh",  # "sh" is $0
+            dockerfile, image, app_dir,
+            "--rm", "--name", self.service_name,
+            "-p", f"127.0.0.1:{port}:80",
+            *env_flags,
+            image,
+        ]
 
 
 def read_manifest(app_dir: str) -> GeeAppManifest | None:
