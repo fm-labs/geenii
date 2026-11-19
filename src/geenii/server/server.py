@@ -17,7 +17,7 @@ from geenii.plugins import load_plugins, plugin_tools
 from geenii.server.router import app_router
 from geenii.tool.registry import ToolRegistry
 from geenii.mcp_loader import get_mcp_loader, shutdown_mcp_loader
-from geenii.tools import init_builtin_tools
+from geenii.tools import init_builtin_os_tools, init_builtin_webtools
 
 # Same setup as the CLI (honours GEENII_LOGGING / GEENII_LOG_NAME). A no-op when the CLI
 # already configured logging; needed when uvicorn imports this module in a fresh process (--reload).
@@ -80,7 +80,8 @@ async def initialize_agent_registry():
 async def initialize_tool_registry():
     print("Initializing tool registry...")
     registry = ToolRegistry()
-    init_builtin_tools(registry)
+    init_builtin_os_tools(registry)
+    init_builtin_webtools(registry)
     for tool in plugin_tools().list_tools():
         registry.register(tool)
     # MCP servers can take long to start (e.g. pulling docker images), so their tools are discovered

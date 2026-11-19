@@ -11,7 +11,7 @@ from geenii.hitl import HumanInTheLoopController
 from geenii.memory import ChatMemory
 from geenii.plugins import plugin_agents, plugin_tools
 from geenii.tool.registry import ToolRegistry
-from geenii.tools import _redact_env_vars, init_builtin_tools, init_mcp_server_tools
+from geenii.tools import _redact_env_vars, init_builtin_os_tools, init_mcp_server_tools, init_builtin_webtools
 
 if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
@@ -145,8 +145,11 @@ def init_agent(
     if agent_spec.tools is not None:
         for tool in agent_spec.tools:
             if tool in ("read", "write", "bash"):
-                init_builtin_tools(tool_registry)
+                init_builtin_os_tools(tool_registry)
                 break
+            if tool in ("web_fetch"):
+                init_builtin_webtools(tool_registry)
+
         # tools added by plugins
         _plugin_tools = plugin_tools()
         for tool in agent_spec.tools:

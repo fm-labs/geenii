@@ -20,6 +20,63 @@ from geenii.tool.common import (
 logger = logging.getLogger(__name__)
 
 
+def spawn_toolcall_proc(command: str, cwd: str, env: dict[str, str] | None = None) -> tuple[int, bytes, bytes]:
+    
+    logger.info(f"Spawning computer tool with command: {command} in working directory={cwd}")
+    _tmpid = uuid.uuid4().hex[:8]
+    # logged before expansion and with env names only, since env may hold secrets
+    logger.info(
+        f"toolcall [{_tmpid}] Spawning command={command!r} environment={sorted(env or {})} cwd={cwd}"
+    )
+    command = expand_vars(command, env or {})
+
+    _env = os.environ.copy()
+    if env:
+        _env.update(env)
+
+    rc, stdout, stderr = (None, b"", b"")
+    p = subprocess.run(
+        command,
+        shell=True,
+        capture_output=True,
+        text=False,
+        env=_env,
+        cwd=cwd,
+        check=False,
+    )
+    logger.info(f"toolcall [{_tmpid}] stdout: {p.stdout.decode('utf-8').strip()}")
+    logger.info(f"toolcall [{_tmpid}] stderr: {p.stderr.decode('utf-8').strip()}")
+    logger.info(f"toolcall [{_tmpid}] rc: {p.returncode}")
+
+    return p.returncode, p.stdout, p.stderr
+
+
+def to_toolcall_result(rc: int, stdout: bytes | None, stderr: bytes | None):
+    try:
+        out = stdout.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        out = "stdout decoding error"
+    try:
+        err = stderr.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        err = "stderr decoding error"
+
+    # attempt json parsing; only an object is structured content
+    json_data = None
+    try:
+        json_data = json.loads(out)
+    except json.decoder.JSONDecodeError:
+        pass
+    if not isinstance(json_data, dict):  # and not isinstance(json_data, list):
+        json_data = None
+
+    _output = f"stdout:\n{out}\nstderr:\n{err}"
+    if rc != 0:
+        _output += f"\nEXITED WITH NON-ZERO EXIT CODE: {rc}"
+        return ToolCallResult(text=_output, is_error=True)
+    return ToolCallResult(text=_output, is_error=False, structured_content=json_data)
+
+
 class ComputerTool(Tool):
     """A tool that executes a command on the local machine."""
 
@@ -51,46 +108,8 @@ class ComputerTool(Tool):
             # `command` is in args too, so it must not be passed twice
             command = self.command_template.format(**{**args, "command": command})
 
-        logger.info(f"Executing ComputerTool command: {command} in working directory={working_dir}")
-        subprocess_id = uuid.uuid4().hex[:8]
-        # logged before expansion and with env names only, since env may hold secrets
-        logger.info(
-            f"ComputerTool [{subprocess_id}] Spawning command={command!r} environment={sorted(env or {})} cwd={working_dir}"
-        )
-        command = expand_vars(command, env or {})
-
-        _env = os.environ.copy()
-        if env:
-            _env.update(env)
-        p = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            env=_env,
-            cwd=working_dir,
-            check=False,
-        )
-        logger.info(f"ComputerTool [{subprocess_id}] Standard output: {p.stdout}")
-        logger.info(f"ComputerTool [{subprocess_id}] Standard error: {p.stderr}")
-        logger.info(f"ComputerTool [{subprocess_id}] Return code: {p.returncode}")
-
-        out = p.stdout.strip()
-        # attempt json parsing; only an object is structured content
-        json_data = None
-        try:
-            json_data = json.loads(out)
-        except json.decoder.JSONDecodeError:
-            pass
-        if not isinstance(json_data, dict):  # and not isinstance(json_data, list):
-            json_data = None
-
-        err = p.stderr.strip()
-        _output = f"stdout:\n{out}\nstderr:\n{err}"
-        if p.returncode != 0:
-            _output += f"\nEXITED WITH NON-ZERO EXIT CODE: {p.returncode}"
-            return ToolCallResult(text=_output, is_error=True)
-        return ToolCallResult(text=_output, is_error=False, structured_content=json_data)
+        rc, stdout, stderr = spawn_toolcall_proc(command, working_dir, env)
+        return to_toolcall_result(rc, stdout, stderr)
 
 
 class AppleScriptTool(ComputerTool):

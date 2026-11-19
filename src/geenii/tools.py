@@ -8,19 +8,22 @@ from datetime import datetime
 from pathlib import Path
 
 from geenii.config import GEENII_CACHE_DIR, GEENII_WORKING_DIR
-from geenii.core.tools import init_core_tools
+from geenii.core.tools import init_core_os_tools
 from geenii.mcp_client import McpClient
 from geenii.mcp_config import get_mcp_config, get_mcp_config_for_server
 from geenii.tool.common import Tool, ToolCallContext, ToolCallResult
 from geenii.tool.computer import ComputerTool, ReadTool, WriteTool
 from geenii.tool.registry import ToolRegistry
+from geenii.tool.webtools import WebFetchTool
 from geenii.utils.cached import cached
 from geenii.utils.json_util import append_jsonl
 
 logger = logging.getLogger(__name__)
 
 
-def init_builtin_tools(registry: ToolRegistry):
+def init_builtin_os_tools(registry: ToolRegistry):
+    init_core_os_tools(registry)
+
     registry.register(ReadTool())
     registry.register(WriteTool())
     registry.register(
@@ -56,7 +59,9 @@ def init_builtin_tools(registry: ToolRegistry):
             command_template="python3 {command}",
         )
     )
-    init_core_tools(registry)
+
+def init_builtin_webtools(registry: ToolRegistry):
+    registry.register(WebFetchTool())
 
 
 # empty results are not cached: a server that is still starting up may list no tools yet

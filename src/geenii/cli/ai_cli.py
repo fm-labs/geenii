@@ -7,7 +7,7 @@ from geenii.config import DEFAULT_COMPLETION_MODEL
 from geenii.datamodels import ModelMessage
 from geenii.tool.python import PythonFunctionTool
 from geenii.tool.registry import ToolRegistry
-from geenii.tools import init_builtin_tools, init_mcp_server_tools
+from geenii.tools import init_builtin_os_tools, init_mcp_server_tools
 
 
 @click.group()
@@ -85,7 +85,7 @@ def chat(model, temperature, output_format, prompt):
     )
 
     tool_registry = ToolRegistry()
-    init_builtin_tools(tool_registry)
+    init_builtin_os_tools(tool_registry)
     init_mcp_server_tools(tool_registry)
 
     tool_registry.register(

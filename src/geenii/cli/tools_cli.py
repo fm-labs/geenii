@@ -1,12 +1,13 @@
 import click
 
 from geenii.tool.registry import ToolRegistry
-from geenii.tools import init_builtin_tools, init_mcp_server_tools, invoke_tool
+from geenii.tools import init_builtin_os_tools, init_mcp_server_tools, invoke_tool, init_builtin_webtools
 
 
 def _init_tool_registry():
     tool_registry = ToolRegistry()
-    init_builtin_tools(tool_registry)
+    init_builtin_os_tools(tool_registry)
+    init_builtin_webtools(tool_registry)
     init_mcp_server_tools(tool_registry)
     return tool_registry
 

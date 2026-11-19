@@ -6,7 +6,7 @@ from geenii.tool.registry import ToolRegistry
 logger = logging.getLogger(__name__)
 
 
-def init_core_tools(tool_registry: ToolRegistry) -> None:
+def init_core_os_tools(tool_registry: ToolRegistry) -> None:
 
     # tool_registry = ToolRegistry()
 

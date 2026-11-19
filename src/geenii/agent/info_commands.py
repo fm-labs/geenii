@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING
 
 import pydantic
 
+from geenii.tools import init_builtin_webtools
+
 if TYPE_CHECKING:
     from geenii.agent.base_agent import BaseAgent
 
@@ -70,10 +72,11 @@ def _builtin_tools():
     global _builtin_tool_registry
     if _builtin_tool_registry is None:
         from geenii.tool.registry import ToolRegistry
-        from geenii.tools import init_builtin_tools
+        from geenii.tools import init_builtin_os_tools
 
         _builtin_tool_registry = ToolRegistry()
-        init_builtin_tools(_builtin_tool_registry)
+        init_builtin_os_tools(_builtin_tool_registry)
+        init_builtin_webtools(_builtin_tool_registry)
     return _builtin_tool_registry
 
 

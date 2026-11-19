@@ -8,7 +8,7 @@ from geenii import tools
 from geenii.tool.common import ToolCallContext, expand_vars
 from geenii.tool.computer import AppleScriptTool, ComputerTool
 from geenii.tool.registry import ToolRegistry
-from geenii.tools import init_builtin_tools
+from geenii.tools import init_builtin_os_tools
 
 pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="runs POSIX shell commands")
 
@@ -196,13 +196,13 @@ def test_expand_vars_does_not_expand_values_again():
 
 def test_builtin_bash_tool():
     registry = ToolRegistry()
-    init_builtin_tools(registry)
+    init_builtin_os_tools(registry)
     assert registry.get("bash").invoke(ctx=CTX, args={"command": "echo hi"}).text.startswith("stdout:\nhi\n")
 
 
 def test_builtin_python_tool():
     registry = ToolRegistry()
-    init_builtin_tools(registry)
+    init_builtin_os_tools(registry)
     result = registry.get("python").invoke(ctx=CTX, args={"command": "-c 'print(42)'"})
     assert result.is_error is False
     assert result.text.startswith("stdout:\n42\n")
