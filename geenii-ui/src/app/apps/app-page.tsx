@@ -69,7 +69,7 @@ const AppPlaceholder = ({ app }: { app: GeeAppInfo }) => {
 const AppDetails = ({ app }: { app: GeeAppInfo }) => (
   <dl>
     <Field label="Type">{app.type}</Field>
-    {app.version && <Field label="Version">{app.version}</Field>}
+    <Field label="Version">{app.version}</Field>
     <Field label="Path">{app.path}</Field>
     <Field label="Port">{app.port ?? 'assigned at start'}</Field>
     <Field label="Service">{app.service}</Field>

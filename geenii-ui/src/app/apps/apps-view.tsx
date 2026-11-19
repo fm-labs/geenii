@@ -28,7 +28,7 @@ const AppCard = ({ app, onDone }: { app: GeeAppInfo, onDone: (message: string, w
         <CardDescription className="flex flex-wrap items-center gap-2 text-xs">
           <Badge variant="outline" className="font-mono">{app.type}</Badge>
           {app.title !== app.name && <span className="font-mono">{app.name}</span>}
-          {app.version && <span>v{app.version}</span>}
+          <span>v{app.version}</span>
           {app.autostart && <Badge variant="secondary" title="Started when the daemon starts">autostart</Badge>}
         </CardDescription>
       </CardHeader>

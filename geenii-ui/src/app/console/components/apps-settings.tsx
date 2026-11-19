@@ -197,7 +197,7 @@ const AppSettingsDialog = ({ app, daemonRunning, onDone }: {
         <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1.5 text-sm">
           <InfoRow label="Name"><span className="font-mono">{app.name}</span></InfoRow>
           <InfoRow label="Type"><Badge variant="outline" className="font-mono">{app.type}</Badge></InfoRow>
-          {app.version && <InfoRow label="Version">{app.version}</InfoRow>}
+          <InfoRow label="Version">{app.version}</InfoRow>
           <InfoRow label="Path"><span className="font-mono text-xs">{app.path}</span></InfoRow>
           <InfoRow label="Source">{app.added ? 'Added by path' : 'App directory'}</InfoRow>
           {app.enabled && <InfoRow label="Service"><span className="font-mono text-xs">{app.service}</span></InfoRow>}

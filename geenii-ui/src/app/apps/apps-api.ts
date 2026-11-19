@@ -19,7 +19,7 @@ export type GeeAppInfo = {
   type: AppType
   title: string
   description: string | null
-  version: string | null
+  version: string
   port: number | null
   path: string
   trusted: boolean

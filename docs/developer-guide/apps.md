@@ -51,6 +51,7 @@ manifest are skipped (the latter with an error in the daemon log).
 ```json
 {
   "name": "my-app",
+  "manifest_version": "1",
   "type": "statichtml",
   "title": "My App",
   "description": "A small demo app",
@@ -64,16 +65,18 @@ manifest are skipped (the latter with an error in the daemon log).
 }
 ```
 
-Only `name` is required. All other fields have sensible defaults:
+`name` and `title` are required. All other fields have sensible defaults. Both
+versions are strings; a number (e.g. `1`) is read as one, `null` is invalid.
 
 | Field         | Default     | Description                                          |
 |---------------|-------------|------------------------------------------------------|
 | `name`        | *(required)* | Unique app identifier                               |
+| `manifest_version` | `"1"`  | Version of the manifest format                       |
 | `type`        | `statichtml` | One of `statichtml`, `python`, `node`, `binary`     |
-| `title`       | `null`      | Human-readable display name                          |
+| `title`       | *(required)* | Human-readable display name                         |
 | `description` | `null`      | Short description                                    |
 | `author`      | `null`      | Author name                                          |
-| `version`     | `null`      | Semver version string                                |
+| `version`     | `"0.0.0"`   | The app's version (semver), always set            |
 | `main`        | `null`      | Entry point file (auto-detected per type if omitted) |
 | `port`        | `null`      | Preferred port (auto-allocated if omitted)           |
 | `env`         | `{}`        | Environment variables passed to the process          |
@@ -94,6 +97,9 @@ contents:
 3. `index.html` present → `statichtml`
 4. Executable binary named after the directory → `binary`
 5. Fallback → `statichtml`
+
+The title of an inferred manifest comes from the directory name
+(`title_from_name`: `my-cool_app` → `My Cool App`).
 
 Use `geenii apps init <name>` or `geenii apps init-all` to write inferred
 manifests to disk.

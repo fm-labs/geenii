@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+import re
 import socket
 from enum import Enum
 
@@ -63,11 +64,12 @@ class GeeAppManifest(pydantic.BaseModel):
     model_config = {"extra": "allow"}
 
     name: str
+    manifest_version: str = "1"
+    version: str = "0.0.0"
+    title: str
     type: AppType = AppType.STATICHTML
-    title: str | None = None
     description: str | None = None
     author: str | None = None
-    version: str | None = None
     main: str | None = None
     port: int | None = None
     env: dict[str, str] = pydantic.Field(default_factory=dict)
@@ -75,6 +77,16 @@ class GeeAppManifest(pydantic.BaseModel):
     # Default for starting the app when the daemon starts or discovers it; the user's
     # app settings (AppSettings.autostart) override it
     autostart: bool = False
+
+    @pydantic.field_validator("manifest_version", "version", mode="before")
+    @classmethod
+    def _version_str(cls, value):
+        """Versions are strings; a number (e.g. `1`) is read as one"""
+        if isinstance(value, bool):
+            raise ValueError("must be a string or a number")
+        if isinstance(value, (int, float)):
+            return str(value)
+        return value
 
 
 class AppSettings(pydantic.BaseModel):
@@ -161,7 +173,7 @@ class GeeApp(pydantic.BaseModel):
         return {
             "name": self.name,
             "type": self.manifest.type.value,
-            "title": self.manifest.title or self.name,
+            "title": self.manifest.title,
             "description": self.manifest.description,
             "version": self.manifest.version,
             "port": self.port,
@@ -244,25 +256,33 @@ def read_manifest(app_dir: str) -> GeeAppManifest | None:
     return GeeAppManifest.model_validate_json(data)
 
 
+def title_from_name(name: str) -> str:
+    """A display title for an app name: `my-app_v2` -> `My App V2`"""
+    words = re.split(r"[\s_\-.]+", name.strip())
+    return " ".join(w[:1].upper() + w[1:] for w in words if w) or name
+
+
 def infer_manifest(app_dir: str, name: str) -> GeeAppManifest:
+    """A manifest for an app directory without one: the type from its files, the title from NAME"""
+    title = title_from_name(name)
     if os.path.isfile(os.path.join(app_dir, "package.json")):
         main = "index.js"
         if os.path.isfile(os.path.join(app_dir, "server.js")):
             main = "server.js"
-        return GeeAppManifest(name=name, type=AppType.NODE, main=main)
+        return GeeAppManifest(name=name, title=title, type=AppType.NODE, main=main)
 
     if any(os.path.isfile(os.path.join(app_dir, m)) for m in PYTHON_PROJECT_MARKERS):
-        return GeeAppManifest(name=name, type=AppType.PYTHON, main=_find_python_main(app_dir))
+        return GeeAppManifest(name=name, title=title, type=AppType.PYTHON, main=_find_python_main(app_dir))
 
     if os.path.isfile(os.path.join(app_dir, "index.html")):
-        return GeeAppManifest(name=name, type=AppType.STATICHTML, main="index.html")
+        return GeeAppManifest(name=name, title=title, type=AppType.STATICHTML, main="index.html")
 
     for ext in ("", ".exe"):
         candidate = os.path.join(app_dir, name + ext)
         if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-            return GeeAppManifest(name=name, type=AppType.BINARY, main=name + ext)
+            return GeeAppManifest(name=name, title=title, type=AppType.BINARY, main=name + ext)
 
-    return GeeAppManifest(name=name, type=AppType.STATICHTML)
+    return GeeAppManifest(name=name, title=title, type=AppType.STATICHTML)
 
 
 def load_app(app_dir: str, trusted: bool = False) -> GeeApp:

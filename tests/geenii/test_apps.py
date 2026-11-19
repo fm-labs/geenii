@@ -6,6 +6,7 @@ import tempfile
 import threading
 import time
 
+import pydantic
 import pytest
 from click.testing import CliRunner
 
@@ -106,6 +107,11 @@ def _make_host(short_dir, apps_dirs) -> ProcessHost:
     )
 
 
+def test_inferred_manifest_title(tmp_path):
+    app_dir = _make_app(str(tmp_path), "my-cool_app", {"index.html": ""})
+    assert infer_manifest(app_dir, "my-cool_app").title == "My Cool App"
+
+
 def test_infer_python_app(tmp_path):
     (tmp_path / "app.py").write_text("")
     manifest = infer_manifest(str(tmp_path), "x")
@@ -114,7 +120,7 @@ def test_infer_python_app(tmp_path):
 
 def test_service_config_has_only_app_env(tmp_path):
     app_dir = _make_app(str(tmp_path), "web", {"index.html": ""})
-    write_manifest(app_dir, GeeAppManifest(name="web", env={"A": "1"}))
+    write_manifest(app_dir, GeeAppManifest(name="web", title="Web", env={"A": "1"}))
     registry = AppRegistry([str(tmp_path)])
     registry.reload()
     config = registry.require("web").to_service_config(port=9200)
@@ -303,14 +309,17 @@ def test_autostart_apps(short_dir):
     user_apps = os.path.join(short_dir, "user-apps")
     project_apps = os.path.join(short_dir, "project-apps")
     write_manifest(
-        _make_app(user_apps, "auto", {"main.py": PY_APP}), GeeAppManifest(name="auto", type="python", autostart=True)
+        _make_app(user_apps, "auto", {"main.py": PY_APP}),
+        GeeAppManifest(name="auto", title="Auto", type="python", autostart=True),
     )
     _make_app(user_apps, "manual", {"main.py": PY_APP})
     # A broken autostart app must not keep the others (or the daemon) from starting
-    write_manifest(_make_app(user_apps, "broken", {}), GeeAppManifest(name="broken", type="binary", autostart=True))
+    write_manifest(
+        _make_app(user_apps, "broken", {}), GeeAppManifest(name="broken", title="Broken", type="binary", autostart=True)
+    )
     write_manifest(
         _make_app(project_apps, "projauto", {"main.py": PY_APP}),
-        GeeAppManifest(name="projauto", type="python", autostart=True),
+        GeeAppManifest(name="projauto", title="Projauto", type="python", autostart=True),
     )
     socket_path = os.path.join(short_dir, "d.sock")
 
@@ -332,7 +341,7 @@ def test_autostart_apps(short_dir):
 
         write_manifest(
             _make_app(user_apps, "later", {"main.py": PY_APP}),
-            GeeAppManifest(name="later", type="python", autostart=True),
+            GeeAppManifest(name="later", title="Later", type="python", autostart=True),
         )
         assert client.call("apps.reload")["autostarted"] == ["later"]
 
@@ -370,7 +379,7 @@ def test_app_settings_are_saved_in_the_user_settings(tmp_path, user_home):
 def test_settings_autostart_overrides_the_manifest(tmp_path):
     apps_dir = str(tmp_path / "apps")
     app_dir = _make_app(apps_dir, "web", {"index.html": ""})
-    write_manifest(app_dir, GeeAppManifest(name="web", autostart=True))
+    write_manifest(app_dir, GeeAppManifest(name="web", title="Web", autostart=True))
     registry = AppRegistry([apps_dir])
     registry.reload()
     assert registry.require("web").autostart is True
@@ -431,7 +440,7 @@ def test_autostart_skips_disabled_apps_and_uses_settings(short_dir):
     by_settings = _make_app(user_apps, "bysettings", {"main.py": PY_APP})
     # Never enabled: the manifest's autostart doesn't apply
     disabled = _make_app(user_apps, "disabled", {"main.py": PY_APP}, enabled=False)
-    write_manifest(disabled, GeeAppManifest(name="disabled", type="python", autostart=True))
+    write_manifest(disabled, GeeAppManifest(name="disabled", title="Disabled", type="python", autostart=True))
     save_app_settings(by_settings, autostart=True)
     socket_path = os.path.join(short_dir, "d.sock")
 
@@ -464,11 +473,11 @@ def test_add_app_by_path(short_dir, api, user_home):
     _make_app(apps_dir, "pyapp", {"main.py": PY_APP})
     elsewhere = os.path.join(short_dir, "elsewhere")
     ext_dir = _make_app(elsewhere, "ext-dir", {"main.py": PY_APP}, enabled=False)
-    write_manifest(ext_dir, GeeAppManifest(name="ext", type="python"))
+    write_manifest(ext_dir, GeeAppManifest(name="ext", title="Ext", type="python"))
     no_manifest = _make_app(elsewhere, "plain", {"index.html": ""}, enabled=False)
     broken = _make_app(elsewhere, "broken", {"manifest.json": "{not json"}, enabled=False)
     clash = _make_app(elsewhere, "clash", {}, enabled=False)
-    write_manifest(clash, GeeAppManifest(name="pyapp"))
+    write_manifest(clash, GeeAppManifest(name="pyapp", title="Pyapp"))
     socket_path = os.path.join(short_dir, "d.sock")
     http = api(socket_path, [apps_dir])
 
@@ -502,3 +511,16 @@ def test_add_app_by_path(short_dir, api, user_home):
     shutil.rmtree(ext_dir)
     registry.reload()
     assert registry.names() == []
+
+
+def test_manifest_versions():
+    manifest = GeeAppManifest(name="a", title="A")
+    assert (manifest.manifest_version, manifest.version) == ("1", "0.0.0")
+    manifest = GeeAppManifest.model_validate({"name": "a", "title": "A", "manifest_version": 1, "version": "1.2.0"})
+    assert (manifest.manifest_version, manifest.version) == ("1", "1.2.0")
+    for field in ("manifest_version", "version"):
+        with pytest.raises(pydantic.ValidationError):
+            GeeAppManifest.model_validate({"name": "a", "title": "A", field: None})
+    # The title is required
+    with pytest.raises(pydantic.ValidationError):
+        GeeAppManifest.model_validate({"name": "a"})

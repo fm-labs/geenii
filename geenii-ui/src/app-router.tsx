@@ -74,8 +74,8 @@ const AppRouter = () => {
       },
       {
         path: '/agents',
-        //element: <AgentsPage />,
-        element: <LauncherPage tabId={"agents"} />,
+        element: <AgentsPage />,
+        //element: <LauncherPage />,
       },
       {
         path: '/agents/:name',
@@ -88,7 +88,7 @@ const AppRouter = () => {
       {
         path: '/apps',
         //element: <AppsPage />,
-        element: <LauncherPage tabId={"apps"} />,
+        element: <LauncherPage />,
       },
       {
         path: '/apps/:appId',
