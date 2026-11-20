@@ -294,14 +294,6 @@ class Blackboard(Channel):
                             attachments=attachments)
 
 
-def known_channels() -> dict[str, str]:
-    """Channel name -> description: the blackboard plus every channel that has posts."""
-    channels = {BLACKBOARD: "The shared blackboard: notes under topics for all agents and the human"}
-    for name in default_mailbox_store().channels():
-        channels.setdefault(name, "Group channel")
-    return channels
-
-
 def _attach(file_ids: list[str], to: str) -> list[dict]:
     """Check the file ids, share the files with TO (unless it is a channel) and return the attachment entries
     {id, name, size, mime}."""
@@ -374,7 +366,7 @@ COMMS_TOOL_DEFS: dict[str, tuple[str, dict]] = {
     "agentmail_send": (
         "Send a direct message to another agent's inbox (or to 'human'), or post it to a channel ('@name').",
         params(
-            to=string("Receiver agent name or channel, see agentmail_contacts"),
+            to=string("Receiver agent name (see agentmail_contacts) or channel ('@name')"),
             subject=string("Subject line"),
             body=string("Message text"),
             reply_to=string("Id of the message this replies to, if any"),
@@ -391,7 +383,7 @@ COMMS_TOOL_DEFS: dict[str, tuple[str, dict]] = {
         params(message_id=string("Message id from agentmail_check_inbox"), required=["message_id"]),
     ),
     "agentmail_contacts": (
-        "List the other agents and the channels you can send mail to.",
+        "List the other agents you can send mail to.",
         params(),
     ),
 }
@@ -421,9 +413,8 @@ def comms_tools(agent_name: str):
         to = to.strip().lower()
         if to == agent_name:
             raise ValueError("You can't send mail to yourself")
-        if to not in known_agents() and to not in known_channels():
-            known = sorted(known_agents()) + sorted(known_channels())
-            raise ValueError(f"Unknown agent or channel {to!r}. Known: {', '.join(known)}")
+        if not is_channel(to) and to not in known_agents():
+            raise ValueError(f"Unknown agent {to!r}. Known: {', '.join(sorted(known_agents()))}")
         message = Mailbox.send(agent_name, to, subject, body, reply_to=reply_to or None, attachments=attachments)
         result = {"sent": True, "id": message["id"], "to": to}
         if message.get("attachments"):
@@ -441,8 +432,7 @@ def comms_tools(agent_name: str):
         return mailbox.read(message_id)
 
     def agentmail_contacts() -> dict:
-        agents = {name: desc for name, desc in known_agents().items() if name != agent_name}
-        return agents | known_channels()
+        return {name: desc for name, desc in known_agents().items() if name != agent_name}
 
     handlers = {
         "blackboard_post": blackboard_post,

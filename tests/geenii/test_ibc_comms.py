@@ -21,7 +21,6 @@ from geenii.ibc.comms import (
     format_blackboard,
     format_inbox,
     known_agents,
-    known_channels,
 )
 from geenii.ibc.mailstore import SCHEMA_VERSION, MailboxStore, SqliteMailboxStore
 
@@ -74,8 +73,9 @@ def test_geenii_home_defaults_to_dot_geenii_in_user_home(tmp_path, monkeypatch):
 def test_send_stores_the_message_in_the_sqlite_database(home):
     message = _send(subject=" hello ", body=" hi ")
     with sqlite3.connect(home / "mail.db") as conn:
-        rows = conn.execute("SELECT id, recipient, state, owner, data FROM messages").fetchall()
-    assert rows == [(message["id"], "bot", "unread", None, json.dumps(message))]
+        rows = conn.execute("SELECT id, recipient, state, owner, subject, body, metadata FROM messages").fetchall()
+    metadata = {k: v for k, v in message.items() if k not in ("subject", "body")}
+    assert rows == [(message["id"], "bot", "unread", None, "hello", "hi", json.dumps(metadata))]
     assert message["subject"] == "hello" and message["body"] == "hi"  # stripped
     assert message["from"] == "human" and message["to"] == "bot" and message["reply_to"] is None
 
@@ -388,12 +388,6 @@ def test_cursor_never_moves_backwards():
     assert store.get_cursor("@blackboard", "other") is None
 
 
-def test_known_channels_include_the_blackboard_and_used_channels():
-    assert set(known_channels()) == {"@blackboard"}
-    Channel("@team").post("human", "t", "x")
-    assert set(known_channels()) == {"@blackboard", "@team"}
-
-
 def test_attachments_on_a_channel_post_are_not_shared(tmp_path):
     from geenii.ibc.filestore import FileStore
 
@@ -446,17 +440,17 @@ def test_agentmail_check_inbox_tool_returns_full_messages_and_marks_them_read():
     assert _call(tools["agentmail_read"], message_id=message["id"]) == message
 
 
-def test_list_agents_tool_excludes_self_and_lists_channels():
-    assert set(_call(_tools("bot")["agentmail_contacts"])) == {"other", "human", "@blackboard"}
+def test_list_agents_tool_excludes_self():
+    assert set(_call(_tools("bot")["agentmail_contacts"])) == {"other", "human"}
 
 
-def test_agentmail_send_tool_posts_to_known_channels_only():
+def test_agentmail_send_tool_posts_to_any_channel():
     tools = _tools("bot")
     result = _call(tools["agentmail_send"], to="@blackboard", subject="news", body="hello")
     assert result["sent"] and result["to"] == "@blackboard"
     assert Blackboard().read()[0]["body"] == "hello"
-    with pytest.raises(ValueError, match="Unknown agent or channel"):
-        _call(tools["agentmail_send"], to="@typo", subject="s", body="b")
+    assert _call(tools["agentmail_send"], to="@team", subject="s", body="b")["sent"]
+    assert Channel("@team").read()[0]["from"] == "bot"
 
 
 def test_blackboard_tools_post_as_the_agent():
