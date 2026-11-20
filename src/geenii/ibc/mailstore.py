@@ -130,7 +130,9 @@ _SCHEMA = [
         state      TEXT NOT NULL DEFAULT 'unread',
         owner      TEXT,
         updated_at TEXT NOT NULL,
-        data       TEXT NOT NULL
+        subject    TEXT NOT NULL,
+        body       TEXT NOT NULL,
+        metadata   TEXT NOT NULL
     )""",
     "CREATE INDEX IF NOT EXISTS messages_inbox ON messages (recipient, state, seq)",
     "CREATE INDEX IF NOT EXISTS messages_reply ON messages (recipient, reply_to)",
@@ -142,6 +144,17 @@ _SCHEMA = [
         PRIMARY KEY (channel, agent)
     )""",
 ]
+
+
+_COLUMNS = "subject, body, metadata"  # what _message rebuilds a message from
+
+
+def _message(subject: str, body: str, metadata: str) -> dict:
+    """Rebuild a message from its row: subject and body have their own columns, the rest is in metadata."""
+    message = json.loads(metadata)
+    message["subject"] = subject
+    message["body"] = body
+    return message
 
 
 class SqliteMailboxStore:
@@ -199,11 +212,13 @@ class SqliteMailboxStore:
             conn.execute("COMMIT")
 
     def _insert(self, message: dict, state: str) -> int:
+        metadata = {k: v for k, v in message.items() if k not in ("subject", "body")}
         with self._connect() as conn:
             cur = conn.execute(
-                "INSERT INTO messages (id, recipient, reply_to, state, updated_at, data) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO messages (id, recipient, reply_to, state, updated_at, subject, body, metadata) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (message["id"], message["to"], message.get("reply_to"), state, _now(),
-                 json.dumps(message, ensure_ascii=False)),
+                 message["subject"], message["body"], json.dumps(metadata, ensure_ascii=False)),
             )
         return cur.lastrowid
 
@@ -218,17 +233,18 @@ class SqliteMailboxStore:
         marks = ", ".join("?" * len(states))
         with self._connect() as conn:
             rows = conn.execute(
-                f"SELECT data, state, owner FROM messages WHERE recipient = ? AND state IN ({marks}) ORDER BY seq",
+                f"SELECT {_COLUMNS}, state, owner FROM messages "
+                f"WHERE recipient = ? AND state IN ({marks}) ORDER BY seq",
                 (agent, *states),
             ).fetchall()
-        return [(json.loads(data), state, owner) for data, state, owner in rows]
+        return [(_message(*row[:3]), row[3], row[4]) for row in rows]
 
     def get(self, agent: str, message_id: str) -> tuple[dict, str, str | None] | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT data, state, owner FROM messages WHERE recipient = ? AND id = ?", (agent, message_id)
+                f"SELECT {_COLUMNS}, state, owner FROM messages WHERE recipient = ? AND id = ?", (agent, message_id)
             ).fetchone()
-        return (json.loads(row[0]), row[1], row[2]) if row else None
+        return (_message(*row[:3]), row[3], row[4]) if row else None
 
     def mark_read(self, agent: str, message_id: str) -> bool:
         with self._connect() as conn:
@@ -241,7 +257,7 @@ class SqliteMailboxStore:
     def claim_next(self, agent: str, owner: str | None = None) -> dict | None:
         with self._transaction() as conn:
             row = conn.execute(
-                "SELECT seq, data FROM messages WHERE recipient = ? AND state = ? ORDER BY seq LIMIT 1",
+                f"SELECT seq, {_COLUMNS} FROM messages WHERE recipient = ? AND state = ? ORDER BY seq LIMIT 1",
                 (agent, UNREAD),
             ).fetchone()
             if row is None:
@@ -250,7 +266,7 @@ class SqliteMailboxStore:
                 "UPDATE messages SET state = ?, owner = ?, updated_at = ? WHERE seq = ?",
                 (PROCESSING if owner is not None else READ, owner, _now(), row[0]),
             )
-        return json.loads(row[1])
+        return _message(*row[1:])
 
     def finish(self, agent: str, message_id: str, owner: str, state: str) -> bool:
         if state not in (READ, FAILED):
@@ -274,17 +290,17 @@ class SqliteMailboxStore:
     def find_reply(self, agent: str, message_id: str) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT data FROM messages WHERE recipient = ? AND reply_to = ? ORDER BY seq LIMIT 1",
+                f"SELECT {_COLUMNS} FROM messages WHERE recipient = ? AND reply_to = ? ORDER BY seq LIMIT 1",
                 (agent, message_id),
             ).fetchone()
-        return json.loads(row[0]) if row else None
+        return _message(*row) if row else None
 
     def pending_attachment_ids(self) -> set[str]:
         if not self.path.exists():
             return set()
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT j.value ->> 'id' FROM messages, json_each(messages.data, '$.attachments') AS j "
+                "SELECT j.value ->> 'id' FROM messages, json_each(messages.metadata, '$.attachments') AS j "
                 "WHERE messages.state IN (?, ?)",
                 (UNREAD, PROCESSING),
             ).fetchall()
@@ -302,18 +318,18 @@ class SqliteMailboxStore:
             where.append("seq > ?")
             args.append(int(after))
         if subject:
-            where.append("lower(data ->> '$.subject') = lower(?)")
+            where.append("lower(subject) = lower(?)")
             args.append(subject.strip())
         if sender:
-            where.append("data ->> '$.from' = ?")
+            where.append("metadata ->> '$.from' = ?")
             args.append(sender)
         order = "ASC" if after is not None else "DESC"  # first posts after the cursor, or the latest posts
         with self._connect() as conn:
             rows = conn.execute(
-                f"SELECT seq, data FROM messages WHERE {' AND '.join(where)} ORDER BY seq {order} LIMIT ?",
+                f"SELECT seq, {_COLUMNS} FROM messages WHERE {' AND '.join(where)} ORDER BY seq {order} LIMIT ?",
                 (*args, max(1, int(limit))),
             ).fetchall()
-        return sorted((seq, json.loads(data)) for seq, data in rows)
+        return [(row[0], _message(*row[1:])) for row in sorted(rows, key=lambda row: row[0])]
 
     def channel_end(self, channel: str) -> int:
         with self._connect() as conn:
@@ -325,7 +341,7 @@ class SqliteMailboxStore:
     def subjects(self, channel: str) -> dict[str, int]:
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT data ->> '$.subject' AS subject, COUNT(*) FROM messages WHERE recipient = ? AND state = ? "
+                "SELECT subject, COUNT(*) FROM messages WHERE recipient = ? AND state = ? "
                 "GROUP BY subject ORDER BY MIN(seq)",
                 (channel, POSTED),
             ).fetchall()

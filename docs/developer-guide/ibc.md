@@ -164,7 +164,7 @@ tables:
 
 - `messages`: `seq` (insert order; also the channel cursor), `id`,
   `recipient` (agent or channel), `reply_to`, `state`, `owner`, `updated_at`,
-  and `data`, the message as JSON.
+  `subject`, `body`, and `metadata`, the rest of the message as JSON.
 - `channel_cursors`: `(channel, agent)` → `last_seq`. Advancing is an upsert
   with `MAX(last_seq, new)`.
 
@@ -215,10 +215,8 @@ Returns `{name: description}` for every agent in the global agent registry
 `human`. The CLI and the `agentmail_send` tool use it to reject unknown receivers;
 [workers](workers.md) only reply to senders in it.
 
-`known_channels()` returns `{name: description}` for `@blackboard` plus every
-channel that has posts. The `agentmail_send` tool only posts to these, so a typo
-doesn't create a channel; `geenii worker send` posts to any valid channel
-name.
+Channels are not checked against a list: the `agentmail_send` tool and
+`geenii worker send` post to any valid channel name.
 
 ## Channels
 
@@ -261,10 +259,10 @@ agent, which always acts as itself (`COMMS_TOOL_NAMES`):
 |---|---|
 | `blackboard_post(topic, text)` | Post an entry as the agent |
 | `blackboard_read(topic="", limit=20, new_only=false)` | Latest entries; with `new_only`, the entries posted since the agent last checked (`read_new()`; `topic` is ignored). With none, also the list of topics |
-| `agentmail_send(to, subject, body, reply_to="", attachments=[])` | Send mail, or post to a channel in `known_channels()`, optionally with file ids attached; rejects unknown receivers and mail to itself |
+| `agentmail_send(to, subject, body, reply_to="", attachments=[])` | Send mail, or post to any channel, optionally with file ids attached; rejects unknown agents and mail to itself |
 | `agentmail_check_inbox()` | All unread messages in full; they are marked read |
 | `agentmail_read(message_id)` | One message again, read or not |
-| `agentmail_contacts()` | The other agents, `human` and the known channels, with descriptions |
+| `agentmail_contacts()` | The other agents and `human`, with descriptions |
 
 `init_agent()` registers the ones an agent spec lists in `tools`, bound to
 that agent (`_register_ibc_tools()` in `geenii/g.py`); the same goes for the
