@@ -3,7 +3,7 @@ import ConsoleLayout from '@/components/layout/console-layout.tsx'
 import { useRoute } from '@/app-router.tsx'
 import Header from '@/components/header.tsx'
 import SystemInfoView from '@/app/console/components/system-info-view.tsx'
-import SettingsView from '@/app/console/settings-view.tsx'
+import UserSettingsView from '@/app/console/user-settings-view.tsx'
 import UsageStatsView from '@/app/console/components/usage-stats-view.tsx'
 import SchedulerConfigView from '@/app/console/components/scheduler-config-view.tsx'
 import ProcessManagerView from '@/app/console/components/process-manager-view.tsx'
@@ -19,7 +19,7 @@ const SystemPage = () => {
       case 'info':
         return <SystemInfoView />
       case 'settings':
-        return <SettingsView />
+        return <UserSettingsView />
       case 'stats':
         return <UsageStatsView />
       case 'process-stats':

@@ -41,7 +41,7 @@ const DisabledFeatureSettingsView = () => {
   </div>
 }
 
-const SettingsView = () => {
+const UserSettingsView = () => {
   const [activeTab, setActiveTab] = React.useState("Profile");
 
   const activeTabElement = React.useMemo(() => {
@@ -136,4 +136,4 @@ const SettingsView = () => {
     );
 };
 
-export default SettingsView;
+export default UserSettingsView;
