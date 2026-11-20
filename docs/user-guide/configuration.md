@@ -44,10 +44,9 @@ Configuration lives in two `.geenii/` directories, resolved at import time by
 │   └── my-skill/
 │       ├── SKILL.md
 │       └── scripts/
-├── inbox/              # agent mail, one folder per agent (~/.geenii only, see workers.md)
+├── mail.db             # agent mail and channels incl. the blackboard, SQLite (~/.geenii only, see workers.md)
 ├── workers/            # status files of running workers (~/.geenii only)
-├── files/              # files agents share by id (~/.geenii only, see workers.md)
-└── blackboard.jsonl    # the shared blackboard (~/.geenii only)
+└── files/              # files agents share by id (~/.geenii only, see workers.md)
 ```
 
 Agent mail, worker status files, shared files and the blackboard live in `GEENII_HOME`,

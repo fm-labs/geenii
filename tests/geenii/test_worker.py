@@ -57,8 +57,9 @@ def answers(monkeypatch):
 
 
 def _where(agent: str, message_id: str) -> str:
-    mailbox = Mailbox(agent)
-    return str(mailbox._find(message_id).parent.relative_to(mailbox.folder))
+    """A message's state: unread, read, failed or processing/<owner>."""
+    state, owner = Mailbox(agent).status(message_id)
+    return f"{state}/{owner}" if owner and state == "processing" else state
 
 
 def _replies(agent: str = "human") -> list[dict]:

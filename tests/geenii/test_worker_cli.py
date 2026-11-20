@@ -107,6 +107,21 @@ def test_post_and_blackboard():
     assert "first" in output and "second" not in output and "Topics:" not in output
 
 
+def test_blackboard_new_only():
+    assert run("blackboard", "--new").output.strip() == "No new entries."
+    run("post", "news", "from bot", "--as", "bot")
+    run("post", "news", "from me")
+    output = run("blackboard", "--new").output
+    assert "from bot" in output and "from me" not in output
+    assert run("blackboard", "--new").output.strip() == "No new entries."
+
+
+def test_send_to_a_channel():
+    result = run("send", "@team", "plan", "let's go")
+    assert result.exit_code == 0 and "to @team" in result.output
+    assert run("send", "@Bad", "s", "b").exit_code != 0
+
+
 def test_blackboard_empty():
     assert run("blackboard").output.strip() == "The blackboard is empty."
     assert Blackboard().read() == []
@@ -188,4 +203,4 @@ def test_ask_without_a_worker_times_out():
 def test_ask_unknown_agent():
     result = run("ask", "nobody", "hi")
     assert result.exit_code == 1 and "Unknown agent 'nobody'" in result.output
-    assert not (geenii_home() / "inbox" / "nobody").exists()
+    assert Mailbox("nobody").list() == []

@@ -23,8 +23,8 @@ runs in the foreground of the calling thread:
    process with the same id), see [Delivery](#delivery).
 3. Loop until the stop flag is set:
    - every `HEARTBEAT_SECONDS`, `recover()` again;
-   - `mailbox.claim_next(owner=instance)`, which moves the message to
-     `processing/<instance>/`; with no message, exit if `once`, else sleep
+   - `mailbox.claim_next(owner=instance)`, which makes the message
+     `processing`, held by this instance; with no message, exit if `once`, else sleep
      `poll_seconds` and try again.
    - `handle(spec, message, model, approver)`: a new agent from
      `init_agent(spec, model=model, memory=ShortTermChatMemory(), hitl=approver)`,
@@ -32,17 +32,18 @@ runs in the foreground of the calling thread:
      `agent.process(prompt)` with the prompt
      `Message from agent '<from>' (subject: <subject>):\n\n<body>`. If the
      message has [attachments](ibc.md#attachments), the prompt ends with
-     `Attached files (in the shared file store; use file_read_text or
-     file_download with the id):` and one `- name (id, size)` line per file.
+     `Attached files (in the shared file store; use filestore_read_text or
+     filestore_download with the id):` and one `- name (id, size)` line per file.
      To open them, the agent's spec must list those tools and `--approve`
      must allow them.
      An exception becomes the answer `Error while handling your message: <e>`.
    - `reply(spec, message, answer)`, see [Replies](#replies), then
-     `mailbox.ack()`, which moves the message to `read/`. If the reply raises,
-     the error is logged as `message.reply_failed` and `mailbox.fail()` moves
-     the message to `failed/`; the loop goes on. If that move fails, it is
-     logged as `message.finish_failed` and the message stays in `processing/`
-     until the instance is gone.
+     `mailbox.ack()`, which marks the message `read`. If the reply raises,
+     the error is logged as `message.reply_failed` and `mailbox.fail()` marks
+     the message `failed`; the loop goes on. If that call fails (e.g. the mail
+     database is locked for longer than its timeout), it is logged as
+     `message.finish_failed` and the message stays `processing` until the
+     instance is gone.
 4. On exit (also on an exception): restores the previous signal handlers,
    stops the heartbeat and removes its file.
 
@@ -160,11 +161,11 @@ that reply (marking it read) and returns it, or returns `None` after
 ## Delivery
 
 Each message is handled **at most once**, and a message is never lost
-silently: it ends in `read/` (answered) or `failed/` (not answered), and the
+silently: it ends as `read` (answered) or `failed` (not answered), and the
 sender learns about a failure.
 
-While a worker works on a message, the message is leased to it in
-`inbox/<agent>/processing/<instance>/` (see [IBC](ibc.md#leases)).
+While a worker works on a message, the message is `processing`, leased to
+the worker's instance id (see [IBC](ibc.md#leases)).
 `recover(spec, instance, include_self=False)` takes over the messages of dead
 instances. `instance_alive(agent, instance)` decides; an instance is dead if:
 
@@ -178,8 +179,8 @@ instances. `instance_alive(agent, instance)` decides; an instance is dead if:
 For each message of a dead instance:
 
 - if the sender's inbox already holds a reply to it (`find_reply()`; the
-  worker died after replying but before `ack()`), it moves to `read/`;
-- otherwise it moves to `failed/` and the sender gets a reply saying the
+  worker died after replying but before `ack()`), it becomes `read`;
+- otherwise it becomes `failed` and the sender gets a reply saying the
   message could not be answered and will not be retried, if the
   [reply rules](#replies) allow one. This also ends a waiting `ask()`.
 
@@ -188,7 +189,7 @@ process can't take down the next worker, and nothing is answered twice. To
 try a failed message again, send it again.
 
 Recovery runs only in workers of the same agent. A message held by a dead
-worker stays in `processing/` until a worker of that agent runs again.
+worker stays `processing` until a worker of that agent runs again.
 
 ## Programmatic use
 

@@ -1,6 +1,8 @@
-"""Agent mail and the blackboard (geenii.ibc.comms): file layout, validation, claims/leases and recovery."""
+"""Agent mail and the blackboard (geenii.ibc.comms, geenii.ibc.mailstore): storage, validation, claims/leases and
+recovery."""
 
 import json
+import sqlite3
 import threading
 
 import pytest
@@ -9,7 +11,19 @@ import geenii.g
 from geenii import config
 from geenii.agent.registry import AgentRegistry, AgentSpec
 from geenii.ibc import comms
-from geenii.ibc.comms import MAX_SUBJECT, MAX_TEXT, Blackboard, Mailbox, format_inbox, known_agents
+from geenii.ibc.comms import (
+    MAX_SUBJECT,
+    MAX_TEXT,
+    MAX_TOPIC,
+    Blackboard,
+    Channel,
+    Mailbox,
+    format_blackboard,
+    format_inbox,
+    known_agents,
+    known_channels,
+)
+from geenii.ibc.mailstore import SCHEMA_VERSION, MailboxStore, SqliteMailboxStore
 
 
 @pytest.fixture(autouse=True)
@@ -35,8 +49,9 @@ def _send(subject="hello", body="hi", sender="human", to="bot", reply_to=None):
 
 
 def _where(mailbox: Mailbox, message_id: str) -> str:
-    """The folder a message is in, relative to the inbox ('.' for unread)."""
-    return str(mailbox._find(message_id).parent.relative_to(mailbox.folder))
+    """A message's state: unread, read, failed or processing/<owner>."""
+    state, owner = mailbox.status(message_id)
+    return f"{state}/{owner}" if owner and state == "processing" else state
 
 
 # -- geenii_home ----------------------------------------------------------------
@@ -56,15 +71,34 @@ def test_geenii_home_defaults_to_dot_geenii_in_user_home(tmp_path, monkeypatch):
 # -- sending and reading -----------------------------------------------------------
 
 
-def test_send_writes_one_json_file_into_the_receivers_inbox(home):
+def test_send_stores_the_message_in_the_sqlite_database(home):
     message = _send(subject=" hello ", body=" hi ")
-    files = list((home / "inbox" / "bot").glob("*.json"))
-    assert len(files) == 1
-    assert files[0].name.endswith(f"-{message['id']}.json")
-    assert json.loads(files[0].read_text()) == message
+    with sqlite3.connect(home / "mail.db") as conn:
+        rows = conn.execute("SELECT id, recipient, state, owner, data FROM messages").fetchall()
+    assert rows == [(message["id"], "bot", "unread", None, json.dumps(message))]
     assert message["subject"] == "hello" and message["body"] == "hi"  # stripped
     assert message["from"] == "human" and message["to"] == "bot" and message["reply_to"] is None
-    assert not list((home / "inbox" / "bot").glob(".*"))  # no temp file left
+
+
+def test_default_store_is_sqlite_and_a_mailbox_store():
+    mailbox = Mailbox("bot")
+    assert isinstance(mailbox.store, SqliteMailboxStore)
+    assert isinstance(mailbox.store, MailboxStore)
+
+
+def test_mailbox_uses_the_given_store(tmp_path, home):
+    store = SqliteMailboxStore(tmp_path / "other.db")
+    message = Mailbox.send("human", "bot", "s", "b", store=store)
+    assert not (home / "mail.db").exists()
+    assert Mailbox("bot", store=store).read(message["id"]) == message
+    assert Mailbox("bot").list() == []  # not in the default store
+
+
+def test_inboxes_are_separate():
+    message = _send(to="other")
+    assert Mailbox("bot").list() == []
+    with pytest.raises(ValueError, match="No message"):
+        Mailbox("bot").read(message["id"])
 
 
 def test_list_returns_unread_headers_oldest_first():
@@ -247,9 +281,11 @@ def test_recover_moves_answered_messages_to_read():
 def test_blackboard_post_and_read(home):
     board = Blackboard()
     entry = board.post("human", " News ", " first ")
-    assert entry["topic"] == "News" and entry["text"] == "first" and entry["author"] == "human"
-    assert board.path == home / "blackboard.jsonl"
+    assert entry["to"] == "@blackboard" and entry["from"] == "human"
+    assert entry["subject"] == "News" and entry["body"] == "first"
     assert board.read() == [entry]
+    with sqlite3.connect(home / "mail.db") as conn:
+        assert conn.execute("SELECT recipient, state FROM messages").fetchall() == [("@blackboard", "posted")]
 
 
 def test_blackboard_filters_and_limit():
@@ -257,30 +293,123 @@ def test_blackboard_filters_and_limit():
     board.post("human", "news", "one")
     board.post("bot", "News", "two")
     board.post("bot", "other", "three")
-    assert [e["text"] for e in board.read(topic="NEWS")] == ["one", "two"]
-    assert [e["text"] for e in board.read(author="bot")] == ["two", "three"]
-    assert [e["text"] for e in board.read(limit=2)] == ["two", "three"]
+    assert [e["body"] for e in board.read(topic="NEWS")] == ["one", "two"]
+    assert [e["body"] for e in board.read(author="bot")] == ["two", "three"]
+    assert [e["body"] for e in board.read(limit=2)] == ["two", "three"]
     assert board.topics() == {"news": 1, "News": 1, "other": 1}
-
-
-def test_blackboard_skips_damaged_lines(home):
-    board = Blackboard()
-    board.post("human", "t", "good")
-    with open(board.path, "a", encoding="utf-8") as f:
-        f.write("not json\n")
-    board.post("human", "t", "also good")
-    assert [e["text"] for e in board.read()] == ["good", "also good"]
 
 
 def test_blackboard_validates():
     board = Blackboard()
     with pytest.raises(ValueError):
         board.post("Not Valid", "t", "x")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Topic must not be empty"):
         board.post("human", "", "x")
+    with pytest.raises(ValueError, match="Topic is too long"):
+        board.post("human", "t" * (MAX_TOPIC + 1), "x")
     with pytest.raises(ValueError):
         board.post("human", "t", "x" * (MAX_TEXT + 1))
     assert board.read() == []
+
+
+def test_format_blackboard():
+    assert format_blackboard([]) == "The blackboard is empty."
+    entry = Blackboard().post("bot", "news", "hello")
+    assert format_blackboard([entry]) == f"[{entry['ts']}] bot on news:\nhello"
+
+
+# -- channels and cursors ----------------------------------------------------------
+
+
+def test_send_to_a_channel_posts_instead_of_delivering():
+    post = Mailbox.send("bot", "@team", "plan", "let's go")
+    assert Channel("@team").read() == [post]
+    assert Mailbox("bot").list() == [] and Mailbox("other").list() == []
+    assert Blackboard().read() == []  # channels are separate
+
+
+def test_channel_posts_are_never_claimed():
+    Mailbox.send("human", "@blackboard", "t", "x")
+    assert Mailbox("bot").claim_next(owner="host-1") is None
+
+
+@pytest.mark.parametrize("name", ["blackboard", "@", "@Bad", "@a/b", "@" + "x" * 65])
+def test_invalid_channel_names(name):
+    with pytest.raises(ValueError, match="Invalid channel name"):
+        Channel(name)
+
+
+def test_mailbox_rejects_a_channel_name():
+    with pytest.raises(ValueError, match="Invalid agent name"):
+        Mailbox("@blackboard")
+    with pytest.raises(ValueError, match="Invalid agent name"):
+        Mailbox.send("@blackboard", "bot", "s", "b")
+
+
+def test_read_new_starts_at_the_end_then_returns_only_unseen_posts():
+    board = Blackboard()
+    board.post("human", "t", "old")
+    assert board.read_new("bot") == []  # first call: the cursor starts after "old"
+    board.post("human", "t", "one")
+    board.post("other", "t", "two")
+    assert [e["body"] for e in board.read_new("bot")] == ["one", "two"]
+    assert board.read_new("bot") == []
+    assert [e["body"] for e in board.read()] == ["old", "one", "two"]  # browsing doesn't move cursors
+
+
+def test_read_new_pages_with_limit_and_skips_own_posts():
+    board = Blackboard()
+    board.read_new("bot")
+    for i in range(5):
+        board.post("human", "t", f"m{i}")
+    board.post("bot", "t", "mine")
+    assert [e["body"] for e in board.read_new("bot", limit=3)] == ["m0", "m1", "m2"]
+    assert [e["body"] for e in board.read_new("bot", limit=3)] == ["m3", "m4"]  # "mine" is skipped
+    assert board.read_new("bot") == []
+
+
+def test_cursors_are_per_agent_and_per_channel():
+    board, team = Blackboard(), Channel("@team")
+    for channel in (board, team):
+        channel.read_new("bot")
+        channel.read_new("other")
+    board.post("human", "t", "board")
+    team.post("human", "t", "team")
+    assert [e["body"] for e in board.read_new("bot")] == ["board"]
+    assert [e["body"] for e in team.read_new("bot")] == ["team"]
+    assert [e["body"] for e in board.read_new("other")] == ["board"]
+
+
+def test_cursor_never_moves_backwards():
+    store = SqliteMailboxStore()
+    store.advance_cursor("@blackboard", "bot", 5)
+    store.advance_cursor("@blackboard", "bot", 3)
+    assert store.get_cursor("@blackboard", "bot") == 5
+    assert store.get_cursor("@blackboard", "other") is None
+
+
+def test_known_channels_include_the_blackboard_and_used_channels():
+    assert set(known_channels()) == {"@blackboard"}
+    Channel("@team").post("human", "t", "x")
+    assert set(known_channels()) == {"@blackboard", "@team"}
+
+
+def test_attachments_on_a_channel_post_are_not_shared(tmp_path):
+    from geenii.ibc.filestore import FileStore
+
+    meta = FileStore().put_text("bot", "notes.txt", "hello")
+    post = Blackboard().post("bot", "t", "see file", attachments=[meta["id"]])
+    assert post["attachments"][0]["id"] == meta["id"]
+    assert FileStore().info(meta["id"])["shared_with"] == []
+
+
+def test_new_database_gets_the_schema(home):
+    Mailbox("bot").list()
+    with sqlite3.connect(home / "mail.db") as conn:
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        assert {"messages", "channel_cursors"} <= tables
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+        assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
 
 
 # -- known agents and agent tools --------------------------------------------------
@@ -298,31 +427,49 @@ def _call(tool, **args):
     return tool.handler(**args)
 
 
-def test_send_mail_tool_checks_receiver():
+def test_agentmail_send_tool_checks_receiver():
     tools = _tools("bot")
     with pytest.raises(ValueError, match="yourself"):
-        _call(tools["send_mail"], to="bot", subject="s", body="b")
+        _call(tools["agentmail_send"], to="bot", subject="s", body="b")
     with pytest.raises(ValueError, match="Unknown agent"):
-        _call(tools["send_mail"], to="nobody", subject="s", body="b")
-    result = _call(tools["send_mail"], to=" Other ", subject="s", body="b")
+        _call(tools["agentmail_send"], to="nobody", subject="s", body="b")
+    result = _call(tools["agentmail_send"], to=" Other ", subject="s", body="b")
     assert result["sent"] and result["to"] == "other"
     assert Mailbox("other").list()[0]["from"] == "bot"
 
 
-def test_check_inbox_tool_returns_full_messages_and_marks_them_read():
+def test_agentmail_check_inbox_tool_returns_full_messages_and_marks_them_read():
     message = _send()
     tools = _tools("bot")
-    assert _call(tools["check_inbox"]) == {"new_messages": [message]}
-    assert _call(tools["check_inbox"])["new_messages"] == []
-    assert _call(tools["read_mail"], message_id=message["id"]) == message
+    assert _call(tools["agentmail_check_inbox"]) == {"new_messages": [message]}
+    assert _call(tools["agentmail_check_inbox"])["new_messages"] == []
+    assert _call(tools["agentmail_read"], message_id=message["id"]) == message
 
 
-def test_list_agents_tool_excludes_self():
-    assert set(_call(_tools("bot")["list_agents"])) == {"other", "human"}
+def test_list_agents_tool_excludes_self_and_lists_channels():
+    assert set(_call(_tools("bot")["agentmail_contacts"])) == {"other", "human", "@blackboard"}
+
+
+def test_agentmail_send_tool_posts_to_known_channels_only():
+    tools = _tools("bot")
+    result = _call(tools["agentmail_send"], to="@blackboard", subject="news", body="hello")
+    assert result["sent"] and result["to"] == "@blackboard"
+    assert Blackboard().read()[0]["body"] == "hello"
+    with pytest.raises(ValueError, match="Unknown agent or channel"):
+        _call(tools["agentmail_send"], to="@typo", subject="s", body="b")
 
 
 def test_blackboard_tools_post_as_the_agent():
     tools = _tools("bot")
     _call(tools["blackboard_post"], topic="t", text="x")
-    assert _call(tools["blackboard_read"])["entries"][0]["author"] == "bot"
+    assert _call(tools["blackboard_read"])["entries"][0]["from"] == "bot"
     assert _call(tools["blackboard_read"], topic="none") == {"entries": [], "topics": {"t": 1}}
+
+
+def test_blackboard_read_tool_new_only():
+    tools = _tools("bot")
+    assert _call(tools["blackboard_read"], new_only=True) == {"entries": [], "note": "No new entries.", "topics": {}}
+    Blackboard().post("other", "t", "fresh")
+    (entry,) = _call(tools["blackboard_read"], new_only=True)["entries"]
+    assert entry["body"] == "fresh"
+    assert _call(tools["blackboard_read"], new_only=True)["entries"] == []

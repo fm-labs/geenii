@@ -1,6 +1,7 @@
-"""The shared file store (geenii.ibc.files): storage, the agent tools, mail attachments, the worker and the CLI."""
+"""The shared file store (geenii.ibc.filestore, geenii.storage.filestorage): storage, the agent tools, mail attachments, the worker and the CLI."""
 
 import hashlib
+import io
 import json
 import os
 from datetime import timedelta
@@ -15,16 +16,16 @@ from geenii.agent import base_agent as base_agent_mod
 from geenii.agent.registry import AgentRegistry, AgentSpec
 from geenii.cli.worker_cli import worker as worker_cli
 from geenii.hitl import PolicyHumanInTheLoopController
-from geenii.ibc import files as files_mod
+from geenii.ibc import filestore as files_mod
 from geenii.ibc.comms import Mailbox, comms_tools, format_inbox
-from geenii.ibc.files import (
-    FILE_TOOL_NAMES,
+from geenii.storage.filestorage import FileStorageAdapter, LocalFileStorage, default_file_storage
+from geenii.ibc.filestore import (
     MAX_FILE_SIZE,
     FileStore,
     attached_to_pending_mail,
     clean_name,
-    files_tools,
 )
+from geenii.ibc.tools import FILE_TOOL_NAMES, files_tools
 from geenii.tool.common import ToolCallContext
 from geenii.tool.registry import ToolRegistry
 
@@ -107,7 +108,6 @@ def test_read_text_rejects_binary_files(store):
 
 def test_put_rejects_files_over_the_size_limit(store, monkeypatch, home, workdir):
     monkeypatch.setattr(files_mod, "MAX_FILE_SIZE", 10)
-    monkeypatch.setattr(files_mod, "_CHUNK", 4)
     with pytest.raises(ValueError, match="too large"):
         store.put_text("bot", "big.txt", "x" * 11)
     (workdir / "big.txt").write_text("x" * 11)
@@ -115,6 +115,82 @@ def test_put_rejects_files_over_the_size_limit(store, monkeypatch, home, workdir
         store.put("bot", workdir / "big.txt")  # streamed: stops while copying
     assert not any((home / "files").iterdir())  # the temp folder was removed
     assert MAX_FILE_SIZE == 25 * 1024 * 1024
+
+
+class MemoryStorage:
+    """A minimal FileStorageAdapter that keeps everything in dicts, to show FileStore only needs the protocol."""
+
+    def __init__(self):
+        self.data, self.meta = {}, {}
+
+    def create(self, file_id, data, meta):
+        content = data.read()
+        stored = meta()
+        self.data[file_id], self.meta[file_id] = content, stored
+        return stored
+
+    def read_meta(self, file_id):
+        if file_id not in self.meta:
+            raise FileNotFoundError(file_id)
+        return dict(self.meta[file_id])
+
+    def update_meta(self, file_id, change):
+        changed = change(self.read_meta(file_id))
+        if changed is not None:
+            self.meta[file_id] = changed
+        return self.read_meta(file_id)
+
+    def open(self, file_id):
+        self.read_meta(file_id)
+        return io.BytesIO(self.data[file_id])
+
+    def delete(self, file_id):
+        self.read_meta(file_id)
+        del self.data[file_id], self.meta[file_id]
+
+    def ids(self):
+        return iter(list(self.meta))
+
+    def purge_incomplete(self, before):
+        pass
+
+
+def test_the_default_storage_is_local_in_geenii_home(home):
+    storage = default_file_storage()
+    assert isinstance(storage, LocalFileStorage) and isinstance(storage, FileStorageAdapter)
+    assert storage.root == home / "files"
+    assert isinstance(MemoryStorage(), FileStorageAdapter)
+
+
+def test_root_is_a_local_storage_folder(tmp_path):
+    store = FileStore(root=tmp_path / "elsewhere")
+    meta = store.put_text("bot", "a.txt", "a")
+    assert (tmp_path / "elsewhere" / meta["id"] / "data").read_text() == "a"
+    with pytest.raises(ValueError, match="not both"):
+        FileStore(root=tmp_path, storage=MemoryStorage())
+
+
+def test_file_store_works_on_any_storage_adapter(home, workdir):
+    storage = MemoryStorage()
+    store = FileStore(storage=storage)
+    meta = store.put_text("bot", "a.txt", "héllo", note="n")
+    assert storage.data[meta["id"]] == "héllo".encode()
+    assert meta["size"] == 6 and meta["sha256"] == hashlib.sha256("héllo".encode()).hexdigest()
+    assert store.read_text(meta["id"]) == ("héllo", False)
+    assert store.share(meta["id"], ["other"])["shared_with"] == ["other"]
+    assert [m["id"] for m in store.list("other")] == [meta["id"]]
+    assert store.copy_to(meta["id"], workdir).read_text() == "héllo"
+    store.delete(meta["id"], by="bot")
+    assert not store.exists(meta["id"]) and storage.data == {}
+    assert not (home / "files").exists()  # nothing was written locally
+
+
+def test_an_upload_over_the_limit_reaches_no_storage(monkeypatch):
+    monkeypatch.setattr(files_mod, "MAX_FILE_SIZE", 10)
+    storage = MemoryStorage()
+    with pytest.raises(ValueError, match="too large"):
+        FileStore(storage=storage)._store("bot", io.BytesIO(b"x" * 11), "a.txt", "")
+    assert storage.meta == {}
 
 
 @pytest.mark.parametrize(("name", "expected"), [
@@ -211,9 +287,9 @@ def test_copy_to_a_folder_or_file_and_never_overwrites_by_default(store, workdir
 def test_gc_deletes_old_files_but_keeps_those_on_pending_mail(store, home):
     old = store.put_text("bot", "old.txt", "x")
     attached = store.put_text("bot", "attached.txt", "x")
-    read_mail = store.put_text("bot", "read.txt", "x")
+    agentmail_read = store.put_text("bot", "read.txt", "x")
     Mailbox.send("bot", "other", "pending", "see file", attachments=[attached["id"]])
-    sent = Mailbox.send("bot", "other", "done", "see file", attachments=[read_mail["id"]])
+    sent = Mailbox.send("bot", "other", "done", "see file", attachments=[agentmail_read["id"]])
     Mailbox("other").read(sent["id"])
     leftover = home / "files" / ".tmp-f_leftover"
     leftover.mkdir()
@@ -221,7 +297,7 @@ def test_gc_deletes_old_files_but_keeps_those_on_pending_mail(store, home):
     assert attached_to_pending_mail() == {attached["id"]}
     assert store.gc(timedelta(days=1)) == []  # nothing is old enough yet
     deleted = store.gc(timedelta(seconds=-1))  # everything counts as old
-    assert set(deleted) == {old["id"], read_mail["id"]}
+    assert set(deleted) == {old["id"], agentmail_read["id"]}
     assert [m["id"] for m in store.list()] == [attached["id"]]
     assert not leftover.exists()
 
@@ -276,11 +352,11 @@ def test_send_rejects_too_many_attachments(store, monkeypatch):
         Mailbox.send("bot", "other", "s", "b", attachments=ids)
 
 
-def test_send_mail_tool_takes_attachments(store):
+def test_agentmail_send_tool_takes_attachments(store):
     meta = store.put_text("bot", "a.txt", "x")
-    send_mail = {t.name: t for t in comms_tools("bot")}["send_mail"]
-    assert send_mail.input_schema["properties"]["attachments"]["type"] == "array"
-    result = send_mail.handler(to="other", subject="s", body="b", attachments=[meta["id"]])
+    agentmail_send = {t.name: t for t in comms_tools("bot")}["agentmail_send"]
+    assert agentmail_send.input_schema["properties"]["attachments"]["type"] == "array"
+    result = agentmail_send.handler(to="other", subject="s", body="b", attachments=[meta["id"]])
     assert result["attachments"] == [meta["id"]]
     assert store.list("other")[0]["id"] == meta["id"]
 
@@ -303,73 +379,73 @@ def test_files_tools_are_the_documented_set():
 
 def test_upload_and_download_between_agents(workdir, tmp_path, store):
     (workdir / "data.csv").write_text("a,b\n1,2\n")
-    upload = _invoke(_tools("bot")["file_upload"], workdir, path="data.csv", note="numbers")
+    upload = _invoke(_tools("bot")["filestore_upload"], workdir, path="data.csv", note="numbers")
     assert not upload.is_error, upload.text
     file_id = upload.structured_content["id"]
     assert upload.structured_content["owner"] == "bot" and upload.structured_content["note"] == "numbers"
 
     other_dir = tmp_path / "other-work"
     other_dir.mkdir()
-    download = _invoke(_tools("other")["file_download"], other_dir, file_id=file_id)
+    download = _invoke(_tools("other")["filestore_download"], other_dir, file_id=file_id)
     assert not download.is_error, download.text
     assert (other_dir / "data.csv").read_text() == "a,b\n1,2\n"
     assert download.structured_content["saved"] == str((other_dir / "data.csv").resolve())
 
-    again = _invoke(_tools("other")["file_download"], other_dir, file_id=file_id)
+    again = _invoke(_tools("other")["filestore_download"], other_dir, file_id=file_id)
     assert again.is_error and "already exists" in again.text
-    renamed = _invoke(_tools("other")["file_download"], other_dir, file_id=file_id, path="copy.csv")
+    renamed = _invoke(_tools("other")["filestore_download"], other_dir, file_id=file_id, path="copy.csv")
     assert not renamed.is_error and (other_dir / "copy.csv").exists()
 
 
 def test_upload_refuses_files_outside_the_allowed_folders(workdir, tmp_path):
     outside = tmp_path / "outside.txt"
     outside.write_text("secret")
-    result = _invoke(_tools()["file_upload"], workdir, path=str(outside))
+    result = _invoke(_tools()["filestore_upload"], workdir, path=str(outside))
     assert result.is_error and "not allowed" in result.text
-    result = _invoke(_tools()["file_upload"], workdir, path="../outside.txt")
+    result = _invoke(_tools()["filestore_upload"], workdir, path="../outside.txt")
     assert result.is_error and "not allowed" in result.text
 
 
 def test_upload_refuses_a_symlink_out_of_the_working_folder(workdir, tmp_path):
     (tmp_path / "outside.txt").write_text("secret")
     os.symlink(tmp_path / "outside.txt", workdir / "link.txt")
-    result = _invoke(_tools()["file_upload"], workdir, path="link.txt")
+    result = _invoke(_tools()["filestore_upload"], workdir, path="link.txt")
     assert result.is_error and "not allowed" in result.text
 
 
 def test_download_refuses_paths_outside_the_allowed_folders(workdir, tmp_path, store):
     meta = store.put_text("human", "a.txt", "x")
-    result = _invoke(_tools()["file_download"], workdir, file_id=meta["id"], path="../escaped.txt")
+    result = _invoke(_tools()["filestore_download"], workdir, file_id=meta["id"], path="../escaped.txt")
     assert result.is_error and "not allowed" in result.text
     assert not (tmp_path / "escaped.txt").exists()
 
 
 def test_save_text_read_text_info_and_list(workdir, store):
     tools = _tools("bot")
-    saved = _invoke(tools["file_save_text"], workdir, name="summary.md", text="# Done")
+    saved = _invoke(tools["filestore_save_text"], workdir, name="summary.md", text="# Done")
     file_id = saved.structured_content["id"]
-    read = _invoke(_tools("other")["file_read_text"], workdir, file_id=file_id)
+    read = _invoke(_tools("other")["filestore_read_text"], workdir, file_id=file_id)
     assert read.structured_content == {"id": file_id, "name": "summary.md", "text": "# Done"}
 
-    info = _invoke(tools["file_info"], workdir, file_id=file_id).structured_content
+    info = _invoke(tools["filestore_info"], workdir, file_id=file_id).structured_content
     assert info["name"] == "summary.md" and info["sha256"] and info["shared_with"] == []
 
     shared = store.put_text("other", "for-bot.txt", "x")
     store.share(shared["id"], ["bot"])
-    listing = _invoke(tools["file_list"], workdir).structured_content["files"]
+    listing = _invoke(tools["filestore_list"], workdir).structured_content["files"]
     assert {(f["name"], f["shared"]) for f in listing} == {("summary.md", False), ("for-bot.txt", True)}
-    empty = _invoke(_tools("human")["file_list"], workdir).structured_content
+    empty = _invoke(_tools("human")["filestore_list"], workdir).structured_content
     assert empty == {"files": [], "note": "Your filebox is empty."}
 
 
 def test_read_text_tool_says_when_it_is_truncated(workdir, store, monkeypatch):
     meta = store.put_text("bot", "long.txt", "x" * 30_000)
-    result = _invoke(_tools()["file_read_text"], workdir, file_id=meta["id"]).structured_content
+    result = _invoke(_tools()["filestore_read_text"], workdir, file_id=meta["id"]).structured_content
     assert len(result["text"]) == files_mod.MAX_TEXT and "truncated" in result
 
 
 def test_tools_report_errors_instead_of_raising(workdir):
-    result = _invoke(_tools()["file_info"], workdir, file_id="nope")
+    result = _invoke(_tools()["filestore_info"], workdir, file_id="nope")
     assert result.is_error and "Invalid file id" in result.text
 
 
@@ -378,19 +454,19 @@ def test_tools_report_errors_instead_of_raising(workdir):
 
 def test_init_agent_registers_named_file_and_mail_tools(monkeypatch, workdir):
     monkeypatch.setattr(geenii.g, "plugin_tools", ToolRegistry)
-    spec = AgentSpec(name="bot", model="fake:test", tools=["file_upload", "send_mail", "read"],
+    spec = AgentSpec(name="bot", model="fake:test", tools=["filestore_upload", "agentmail_send", "read"],
                      working_dir=str(workdir))
     agent = geenii.g.init_agent(spec)
     names = agent._tool_registry.list_tool_names()
-    assert {"file_upload", "send_mail", "read"} <= names
-    assert not names & {"file_download", "check_inbox"}
+    assert {"filestore_upload", "agentmail_send", "read"} <= names
+    assert not names & {"filestore_download", "agentmail_check_inbox"}
 
 
 def test_init_agent_skips_ibc_tools_for_names_that_cant_own_files(monkeypatch, workdir):
     monkeypatch.setattr(geenii.g, "plugin_tools", ToolRegistry)
-    spec = AgentSpec(name="Bad Name", model="fake:test", tools=["file_list"], working_dir=str(workdir))
+    spec = AgentSpec(name="Bad Name", model="fake:test", tools=["filestore_list"], working_dir=str(workdir))
     agent = geenii.g.init_agent(spec)
-    assert not agent._tool_registry.has("file_list")
+    assert not agent._tool_registry.has("filestore_list")
 
 
 # -- worker: attachments reach the agent ---------------------------------------------
@@ -411,15 +487,15 @@ def fake_model(tmp_path, monkeypatch):
 def test_worker_lists_attachments_and_the_agent_can_read_them(fake_model, store, workdir):
     meta = store.put_text("human", "todo.txt", "buy milk")
     message = Mailbox.send("human", "bot", "todo", "what is on my list?", attachments=[meta["id"]])
-    spec = AgentSpec(name="bot", model="fake:test", tools=["file_read_text"], working_dir=str(workdir))
-    fake_model.enqueue_tool_call("file_read_text", {"file_id": meta["id"]})
+    spec = AgentSpec(name="bot", model="fake:test", tools=["filestore_read_text"], working_dir=str(workdir))
+    fake_model.enqueue_tool_call("filestore_read_text", {"file_id": meta["id"]})
     fake_model.enqueue("milk")
 
-    answer = worker.handle(spec, message, None, PolicyHumanInTheLoopController.from_policy("file_read_text"))
+    answer = worker.handle(spec, message, None, PolicyHumanInTheLoopController.from_policy("filestore_read_text"))
 
     assert answer == "milk"
     prompt = [m.to_text() for m in fake_model.requests[0].messages if m.role == "user"][0]
-    assert prompt.endswith(f"Attached files (in the shared file store; use file_read_text or file_download "
+    assert prompt.endswith(f"Attached files (in the shared file store; use filestore_read_text or filestore_download "
                            f"with the id):\n- todo.txt ({meta['id']}, 8 B)")
     tool_results = json.dumps([m.model_dump() if hasattr(m, "model_dump") else str(m)
                                for m in fake_model.requests[1].messages], default=str)

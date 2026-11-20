@@ -116,8 +116,8 @@ geenii
     ├── ask AGENT TEXT            # mail a running worker and print its reply
     ├── list                      # running workers and their status
     ├── inbox [AGENT] [--read ID] # show an inbox (default: yours, 'human')
-    ├── send TO SUBJECT BODY      # send agent mail (-a ID|PATH to attach files)
-    ├── blackboard [-t TOPIC]     # read the shared blackboard
+    ├── send TO SUBJECT BODY      # send agent mail, or post to @channel (-a ID|PATH to attach files)
+    ├── blackboard [-t TOPIC]     # read the shared blackboard (--new: unseen only)
     ├── post TOPIC TEXT           # post to the shared blackboard
     └── files                     # shared file store
         ├── list [AGENT]          # all files, or an agent's filebox

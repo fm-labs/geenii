@@ -151,7 +151,7 @@ def inbox(agent, message_id, include_read):
     if message.get("reply_to"):
         click.echo(f"In reply to: {message['reply_to']}")
     if message.get("attachments"):
-        from geenii.ibc.files import format_attachments
+        from geenii.ibc.filestore import format_attachments
 
         click.echo("Attachments:\n" + format_attachments(message["attachments"]))
     click.echo(f"\n{message['body']}")
@@ -166,11 +166,13 @@ def inbox(agent, message_id, include_read):
               help="Attach a stored file by id, or upload a local file first. Repeatable.")
 @_value_errors_as_click
 def send(to, subject, body, sender, attach):
-    """Send agent mail to TO (an agent name or 'human')."""
-    from geenii.ibc.comms import Mailbox, known_agents
-    from geenii.ibc.files import FILE_ID_RE, FileStore
+    """Send agent mail to TO (an agent name or 'human'), or post it to the channel TO ('@name')."""
+    from geenii.ibc.comms import Mailbox, check_channel_name, is_channel, known_agents
+    from geenii.ibc.filestore import FILE_ID_RE, FileStore
 
-    if to not in known_agents():
+    if is_channel(to):
+        check_channel_name(to)  # channels are open: posting to a new name creates it
+    elif to not in known_agents():
         raise click.ClickException(f"Unknown agent '{to}'. Run 'geenii agents list' to see all agents.")
     store = FileStore()
     file_ids = []
@@ -190,11 +192,19 @@ def send(to, subject, body, sender, attach):
 @worker.command(name="blackboard")
 @click.option("--topic", "-t", default=None, help="Only entries with this topic.")
 @click.option("--limit", "-n", default=20, show_default=True, type=int, help="Maximum number of entries.")
-def blackboard(topic, limit):
-    """Read the shared blackboard."""
+@click.option("--new", "new_only", is_flag=True, default=False,
+              help="Only entries you haven't seen yet (as --as), without your own.")
+@click.option("--as", "reader", default="human", show_default=True, help="Reader name for --new.")
+@_value_errors_as_click
+def blackboard(topic, limit, new_only, reader):
+    """Read the shared blackboard (the channel '@blackboard')."""
     from geenii.ibc.comms import Blackboard, format_blackboard
 
     board = Blackboard()
+    if new_only:
+        entries = board.read_new(reader, limit=limit)
+        click.echo(format_blackboard(entries) if entries else "No new entries.")
+        return
     click.echo(format_blackboard(board.read(topic=topic, limit=limit)))
     topics = board.topics() if not topic else {}
     if topics:
@@ -211,7 +221,7 @@ def post(topic, text, author):
     from geenii.ibc.comms import Blackboard
 
     entry = Blackboard().post(author, topic, text)
-    click.echo(f"Posted {entry['id']} on {entry['topic']}.")
+    click.echo(f"Posted {entry['id']} on {entry['subject']}.")
 
 
 # -- file store -----------------------------------------------------------------
@@ -227,7 +237,7 @@ def files():
 @_value_errors_as_click
 def files_list(agent):
     """List stored files, newest first; with AGENT only its filebox (uploaded by or shared with it)."""
-    from geenii.ibc.files import FileStore, format_size
+    from geenii.ibc.filestore import FileStore, format_size
 
     metas = FileStore().list(agent)
     if not metas:
@@ -255,7 +265,7 @@ def files_list(agent):
 @_value_errors_as_click
 def files_put(path, owner, name, note, share_with):
     """Upload a local file; prints its id."""
-    from geenii.ibc.files import FileStore
+    from geenii.ibc.filestore import FileStore
 
     store = FileStore()
     meta = store.put(owner, path, name=name, note=note)
@@ -271,7 +281,7 @@ def files_put(path, owner, name, note, share_with):
 @_value_errors_as_click
 def files_get(file_id, dest, force):
     """Save a stored file to DEST (a file, or a folder to put it in under its own name; default: here)."""
-    from geenii.ibc.files import FileStore
+    from geenii.ibc.filestore import FileStore
 
     click.echo(f"Saved {FileStore().copy_to(file_id, dest, overwrite=force)}")
 
@@ -283,7 +293,7 @@ def files_info(file_id):
     """Show a stored file's metadata."""
     import json
 
-    from geenii.ibc.files import FileStore
+    from geenii.ibc.filestore import FileStore
 
     click.echo(json.dumps(FileStore().info(file_id), indent=2, ensure_ascii=False))
 
@@ -293,7 +303,7 @@ def files_info(file_id):
 @_value_errors_as_click
 def files_rm(file_ids):
     """Delete stored files (as the human, any owner's)."""
-    from geenii.ibc.files import FileStore
+    from geenii.ibc.filestore import FileStore
 
     store = FileStore()
     for file_id in file_ids:
@@ -309,7 +319,7 @@ def files_gc(days):
     """Delete old files, except those attached to mail that is still unread or being handled."""
     from datetime import timedelta
 
-    from geenii.ibc.files import FileStore
+    from geenii.ibc.filestore import FileStore
 
     deleted = FileStore().gc(timedelta(days=days))
     click.echo(f"Deleted {len(deleted)} file(s).")

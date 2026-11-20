@@ -151,7 +151,8 @@ def init_agent_by_name(name: str, context_id: str | None = None, cwd: str | None
 def _register_ibc_tools(tool_registry: ToolRegistry, agent_name: str, wanted: set[str]) -> None:
     """Register the agent mail / blackboard and file store tools the spec names, bound to this agent."""
     from geenii.ibc.comms import COMMS_TOOL_NAMES, comms_tools
-    from geenii.ibc.files import FILE_TOOL_NAMES, files_tools
+    from geenii.ibc.tools import files_tools
+    from geenii.ibc.tools import FILE_TOOL_NAMES
 
     for names, factory in ((COMMS_TOOL_NAMES, comms_tools), (FILE_TOOL_NAMES, files_tools)):
         if not wanted & names:

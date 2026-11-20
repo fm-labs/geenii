@@ -3,11 +3,10 @@
 import pytest
 
 from geenii.ibc.comms import COMMS_TOOL_NAMES, comms_tools
-from geenii.ibc.files import FILE_TOOL_NAMES, files_tools
 from geenii.ibc.tools import (
     init_builtin_comms_tools_stubs,
     init_builtin_file_tools_stubs,
-    init_builtin_ibc_tools_stubs,
+    init_builtin_ibc_tools_stubs, FILE_TOOL_NAMES, files_tools,
 )
 from geenii.tool.common import ToolCallContext
 from geenii.tool.registry import ToolRegistry

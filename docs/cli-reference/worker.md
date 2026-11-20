@@ -45,9 +45,9 @@ Nobody is there to approve tool calls, so the policy decides. With the
 default `none`, the agent can't call any tool.
 
 A message is answered at most once. If a worker dies while working on a
-message, the next worker of the same agent moves it to `failed/` and tells the
-sender; it is not retried. A message whose reply can't be sent also ends in
-`failed/`.
+message, the next worker of the same agent marks it failed and tells the
+sender; it is not retried. A message whose reply can't be sent is also marked
+failed.
 
 Exits with code 1 for an unknown agent.
 
@@ -106,7 +106,10 @@ geenii worker send <TO> <SUBJECT> <BODY> [--from NAME] [--attach ID|PATH ...]
 ```
 
 Put a message into the inbox of `TO`, an agent name or `human`. It is
-answered once a worker for that agent runs.
+answered once a worker for that agent runs. A `TO` starting with `@` (e.g.
+`@blackboard`, `@team`) posts to that channel instead, which everyone can
+read; channels are created by their first post and are never answered by
+workers.
 
 | Option | Short | Description |
 |---|---|---|
@@ -114,25 +117,28 @@ answered once a worker for that agent runs.
 | `--attach` | `-a` | Attach a stored file by id, or a local file, which is uploaded first (owned by the sender). Repeatable, up to 20 |
 
 All attachments are checked before anything is uploaded or sent. Attached
-files are shared with the receiver (see [files](#files)).
+files are shared with the receiving agent (see [files](#files)).
 
-Exits with code 1 for an unknown receiver, an unknown file id or missing
+Exits with code 1 for an unknown agent or invalid channel name, an unknown file id or missing
 file, or an empty or too long subject (max 200 characters) or body (max
 20,000).
 
 ### blackboard
 
 ```
-geenii worker blackboard [--topic T] [--limit N]
+geenii worker blackboard [--topic T] [--limit N] [--new [--as NAME]]
 ```
 
-Show the latest blackboard entries, oldest first. Without `--topic`, also
-list all topics with their number of entries.
+Show the latest blackboard entries (posts to the channel `@blackboard`),
+oldest first. Without `--topic`, also list all topics with their number of
+entries.
 
 | Option | Short | Description |
 |---|---|---|
 | `--topic` | `-t` | Only entries with this topic (case-insensitive) |
 | `--limit` | `-n` | Maximum number of entries (default 20) |
+| `--new` | | Only entries the reader hasn't seen yet, without its own; marks them seen. The first `--new` shows nothing and marks everything seen |
+| `--as` | | Reader name for `--new` (default `human`) |
 
 ### post
 
@@ -140,7 +146,8 @@ list all topics with their number of entries.
 geenii worker post <TOPIC> <TEXT> [--as NAME]
 ```
 
-Add an entry to the blackboard.
+Add an entry to the blackboard (the same as `send @blackboard TOPIC TEXT`,
+with the topic limited to 100 characters).
 
 | Option | Description |
 |---|---|

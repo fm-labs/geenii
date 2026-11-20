@@ -2,12 +2,12 @@
 
 `geenii worker serve <agent>` runs one instance: it takes messages from the agent's inbox one at a time, answers each
 with a fresh agent (no memory carried between messages), and mails the answer back to the sender. Several
-instances of the same agent can share one inbox: taking a message is an atomic rename, so each message is
-handled at most once.
+instances of the same agent can share one inbox: taking a message is atomic in the mailbox store, so each
+message is handled at most once.
 
-A message being worked on sits in inbox/<agent>/processing/<instance>/ and moves to read/ once it is answered.
-If the instance dies first, another instance of the agent finds the message (see `recover`), moves it to
-failed/ and tells the sender; it is never handled a second time.
+A message being worked on is processing, held by the instance, and becomes read once it is answered. If the
+instance dies first, another instance of the agent finds the message (see `recover`), marks it failed and
+tells the sender; it is never handled a second time.
 
 Safety rules:
 - Every tool call follows an approval policy, since nobody is there to ask: "none" (default) denies all tool
@@ -37,7 +37,7 @@ from geenii.hitl import HumanInTheLoopController, PolicyHumanInTheLoopController
 from geenii.memory import ShortTermChatMemory
 
 from geenii.ibc.comms import MAX_SUBJECT, MAX_TEXT, Mailbox, known_agents
-from geenii.ibc.files import format_attachments
+from geenii.ibc.filestore import format_attachments
 
 HEARTBEAT_SECONDS = 15  # how often a running worker refreshes its heartbeat file, also while busy
 STALE_SECONDS = 4 * HEARTBEAT_SECONDS  # a worker not seen for this long is probably gone
@@ -79,7 +79,7 @@ def instance_alive(agent: str, instance: str, stale_seconds: float = STALE_SECON
 def recover(spec: AgentSpec, instance: str, *, include_self: bool = False) -> list[tuple[str, dict, bool]]:
     """Take over the messages that dead instances of the agent were working on.
 
-    A message that was already answered moves to read/. Every other one moves to failed/ and the sender is
+    A message that was already answered becomes read. Every other one becomes failed and the sender is
     told that it wasn't answered; it is not handled again. With include_self, messages held under this
     instance's own id are taken too (at startup they can only come from an earlier process with the same id).
     """
@@ -137,7 +137,7 @@ def handle(spec: AgentSpec, message: dict, model: str | None, hitl: HumanInTheLo
     #else:
     prompt = f"Message from agent '{message['from']}' (subject: {message['subject']}):\n\n{message['body']}"
     if message.get("attachments"):
-        prompt += ("\n\nAttached files (in the shared file store; use file_read_text or file_download with the id):\n"
+        prompt += ("\n\nAttached files (in the shared file store; use filestore_read_text or filestore_download with the id):\n"
                    + format_attachments(message["attachments"]))
     return final_answer(list(agent.process(prompt)))
 
@@ -237,14 +237,14 @@ def serve(spec: AgentSpec, model: str | None = None, *, poll_seconds: float = 2.
             seconds = round(time.monotonic() - started, 1)
             try:
                 replied = reply(spec, message, answer)
-                finish = mailbox.ack  # done: read/
+                finish = mailbox.ack  # done: read
             except Exception as e:  # a failed reply must not stop the worker either
                 replied = False
                 log("message.reply_failed", agent=spec.name, instance=instance, id=message["id"], error=str(e))
-                finish = mailbox.fail  # not answered: failed/
+                finish = mailbox.fail  # not answered: failed
             try:
                 finish(message["id"], instance)
-            except OSError as e:  # stays in processing/; recovered once this instance is gone
+            except Exception as e:  # stays processing; recovered once this instance is gone
                 log("message.finish_failed", agent=spec.name, instance=instance, id=message["id"], error=str(e))
             heartbeat.beat(handled=heartbeat.state["handled"] + 1, message_id=None, busy_since=None)
             log("message.done", agent=spec.name, instance=instance, id=message["id"], ok=ok, seconds=seconds, replied=replied)

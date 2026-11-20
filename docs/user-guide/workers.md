@@ -6,8 +6,9 @@ mail** (one inbox per agent), a shared **blackboard** (notes under a
 topic) and a shared **file store** (files referenced by id). Together these
 are geenii's inter-bot communication (IBC).
 
-Everything is stored as plain files in `GEENII_HOME` (default `~/.geenii`), so
-it works without the daemon or the server and survives restarts.
+Everything is stored in `GEENII_HOME` (default `~/.geenii`): mail in a SQLite
+database (the blackboard too), shared files as plain files. It works without the
+daemon or the server and survives restarts.
 
 ## Quick start
 
@@ -101,7 +102,15 @@ agents can read. Use it for results that several agents or people need.
 geenii worker post monthly-report "Numbers for October are in."
 geenii worker blackboard                      # latest 20 entries + all topics
 geenii worker blackboard --topic monthly-report
+geenii worker blackboard --new                # only what you haven't seen yet
 ```
+
+The blackboard is one **channel**: mail sent to a name starting with `@` is
+a post that everyone can read. You can post to other channels the same way,
+e.g. `geenii worker send @team "plan" "Let's start with the report."`.
+Each reader keeps its own place in a channel, so `--new` (and the agents'
+`blackboard_read` tool with `new_only`) shows only posts since the last
+check. The very first `--new` shows nothing and marks everything as seen.
 
 ## Sharing files
 
@@ -127,23 +136,23 @@ example:
 ```markdown
 ---
 name: research
-tools: [file_read_text, file_download, file_upload, file_save_text, file_list, send_mail]
+tools: [filestore_read_text, filestore_download, filestore_upload, filestore_save_text, filestore_list, agentmail_send]
 ---
 ```
 
 | Tool | Does |
 |---|---|
-| `file_upload` | Stores a file from the agent's working folder and returns its id |
-| `file_download` | Copies a stored file into the agent's working folder |
-| `file_save_text` | Stores text as a new file (no file system access needed) |
-| `file_read_text` | Reads a stored text file (up to 20,000 characters) |
-| `file_list` | Lists the agent's filebox |
-| `file_info` | Shows a file's name, size, type, owner and note |
+| `filestore_upload` | Stores a file from the agent's working folder and returns its id |
+| `filestore_download` | Copies a stored file into the agent's working folder |
+| `filestore_save_text` | Stores text as a new file (no file system access needed) |
+| `filestore_read_text` | Reads a stored text file (up to 20,000 characters) |
+| `filestore_list` | Lists the agent's filebox |
+| `filestore_info` | Shows a file's name, size, type, owner and note |
 
-`file_upload` and `file_download` only work inside the folders the `read`
+`filestore_upload` and `filestore_download` only work inside the folders the `read`
 and `write` tools may use: the agent's working folder, the current project
 and the `allowed_dirs` in your settings. For a worker, also allow the tools
-with `--approve`, for example `--approve file_read_text,file_save_text`.
+with `--approve`, for example `--approve filestore_read_text,filestore_save_text`.
 
 Anyone who knows a file's id can read it; ids are long and random, so they
 can't be guessed. Only the owner (or you, through the CLI) can delete a file.
@@ -161,8 +170,8 @@ geenii worker files gc --older-than 30   # days; keeps files attached to unread 
 - A subject can have up to 200 characters, a body or blackboard entry up to
   20,000. Longer answers are cut off with `... [truncated]`.
 - If a worker crashes or is killed while working on a message, the next
-  worker of that agent moves the message to the agent's `failed` folder and
-  tells the sender that it wasn't answered. It is not retried: send it again.
+  worker of that agent marks the message failed and tells the sender that it
+  wasn't answered. It is not retried: send it again.
   `geenii worker inbox <agent> --all` lists failed messages.
 - A stored file can be up to 25 MB, and a message can have up to 20
   attachments.
