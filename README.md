@@ -63,3 +63,9 @@ See the [Docker guide](docs/user-guide/docker.md).
 - [CLI Reference](docs/cli-reference/index.md) — every command and option
 - [Developer Guide](docs/developer-guide/) — architecture, internals,
   provider/tool APIs
+
+## License
+
+Copyright (C) 2025-2026 fm-labs
+
+Licensed under the [GNU General Public License v3.0 or later](LICENSE).
