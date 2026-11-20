@@ -4,7 +4,7 @@
 nodes, and **edges** (`from_step -> to_step`) define the order. A step's output
 becomes the input of the steps after it, and a step's config can reference the
 results of any step that ran before it. Flows are defined in Python or loaded
-from a JSON or TOML file.
+from a YAML, JSON or TOML file.
 
 Two terms:
 
@@ -18,20 +18,25 @@ Two terms:
 | Module | Contents |
 |---|---|
 | `geenii/flow/flow.py` | `Flow`, `FlowStepSpec`, `FlowProcessor`, `FlowContext`, results, processor registry |
-| `geenii/flow/processor/` | Built-in processors: `echo`, `execute_command`, `execute_script`, `read_file`, `read_http` |
+| `geenii/flow/processor/` | Built-in processors: `echo`, `execute_command`, `execute_pm_command`, `execute_script`, `read_file`, `read_http` |
+| `geenii/flows.py` | `FlowRegistry` and `FlowSpec`: the flow files found in the flow directories (see [Flow directories](#flow-directories)) |
 
-A runnable example is in `src/xflow.py` (`uv run python src/xflow.py`), and a
-file-based one is in `examples/flow_example.yaml`.
+A runnable example is in `src/xflow.py` (`uv run python src/xflow.py`), and
+file-based ones are in `examples/flow_example.yaml` and
+`examples/pm_flow_example.yaml` (runs steps through the daemon's process
+manager; see [`execute_pm_command`](#execute_pm_command)).
 
 `run()` is **synchronous**: it returns when the flow is done. By default steps
 run one at a time in the calling thread; with `max_workers > 1`, independent
 steps run in parallel in a thread pool (see
-[Parallel execution](#parallel-execution)). Flows are not wired into the
-daemon or scheduler yet.
+[Parallel execution](#parallel-execution)). The flow itself runs in the calling
+process; the daemon and the scheduler don't run flows, but a scheduled task
+can run `geenii flow run FILE`, and an [`execute_pm_command`](#execute_pm_command)
+step runs its command as a background process of the daemon.
 
 From the command line, use [`geenii flow`](../cli-reference/flow.md):
-`geenii flow run FILE`, `geenii flow validate FILE`, `geenii flow graph FILE`
-and `geenii flow processors`.
+`geenii flow run FILE`, `geenii flow validate FILE`, `geenii flow graph FILE`,
+`geenii flow list` and `geenii flow processors`.
 
 ---
 
@@ -474,6 +479,23 @@ a pydantic model: `result.model_dump_json(indent=2)` gives the status, outputs,
 errors and durations of all steps, but not the flow definition or the input.
 This is what `geenii flow run --json` prints.
 
+### Flow directories
+
+Flow files can be kept in two directories, returned by `config.flow_dirs()`
+(duplicates removed):
+
+1. `~/.geenii/flows` — your own flows
+2. `$GEENII_WORKING_DIR/.geenii/flows` — the project's flows
+
+`init_flow_registry()` (`geenii/g.py`) builds a `FlowRegistry`
+(`geenii/flows.py`) with `load_all_from_dir()` for each existing directory. It
+lists every file ending in `.yaml`, `.yml`, `.json` or `.toml`, sorted by
+name, as a `FlowSpec(name, filepath)`; the name is the file name without
+its extension. Files are not parsed, so an invalid flow is only noticed when it
+is run or validated, and a name that exists in both directories is listed
+twice. `geenii flow list` prints the registry; `geenii flow run` still takes a
+file path, not a name.
+
 ---
 
 ## Built-in processors
@@ -508,6 +530,42 @@ lines only when its buffer fills or the program exits.
 
 Without `shell`, a string command is split with `shlex.split`.
 Output: `{"stdout", "stderr", "rc"}`.
+
+### `execute_pm_command`
+
+Starts the command as a background process of the
+[geenii daemon](processes.md#the-geenii-daemon-geeniidaemon)'s process
+manager (`ProcessManagerClient`, actor `flow`), so the daemon must be running
+(`geenii daemon start`). The process shows up in `geenii pm list` and keeps
+its logs like any other process.
+
+| Config | Default | Meaning |
+|---|---|---|
+| `command` | required | A string runs through the shell; a list is executed directly |
+| `cwd` | `None` | Working directory |
+| `env` | `None` | Extra variables |
+| `pid` | `None` | Custom process ID (auto-generated if omitted) |
+| `wait` | `true` | Wait for the process to finish; with `false`, the step returns right after starting it and the process keeps running |
+| `timeout` | `None` | With `wait`: kill the process and fail the step after this many seconds |
+| `check` | `false` | With `wait`: fail the step unless the process completed (exit code 0) |
+| `poll_interval` | `0.5` | Seconds between status and output polls while waiting |
+| `socket` | `None` | Daemon socket (default: `GEENII_SOCKET` or the cache dir) |
+
+While waiting, the step reads the process's output in 64 KiB chunks
+(`pm.output` with `offset`/`limit`) and emits each new line as a `stdout` or
+`stderr` event, as `execute_command` does. If the step fails while waiting
+(timeout, the flow is stopping, or an error), it kills the process, so a
+waiting step never leaves one behind. A process started with `wait: false` is
+not stopped by the flow; stop it later, for example with a step running
+`geenii pm kill ${step.process_id}`.
+
+Output: `{"process_id", "system_pid", "state", "rc", "stdout", "stderr"}`.
+`state` is the final state (`completed`, `failed`, `killed` or `orphaned`).
+With `wait: false` it is the state right after starting (`running`), and
+`rc`, `stdout` and `stderr` are `null`.
+
+`examples/pm_flow_example.yaml` starts a web server in the background, runs a
+build in the foreground, checks the server and stops it again.
 
 ### `execute_script`
 
@@ -647,7 +705,8 @@ monkeypatch.setattr(ReadHttpProcessor, "transport", httpx.MockTransport(handler)
 
 ## Not implemented yet
 
-- Async execution and integration with the daemon or scheduler.
+- Async execution, and running whole flows in the daemon or the scheduler
+  (only single steps, with `execute_pm_command`).
 - Process-based parallelism, and cancelling a running step.
 - Conditional edges, loops and retries.
 - Branch-local failure handling: with `on_error="stop"` a failure stops the

@@ -44,7 +44,14 @@ Configuration lives in two `.geenii/` directories, resolved at import time by
 │   └── my-skill/
 │       ├── SKILL.md
 │       └── scripts/
+├── inbox/              # agent mail, one folder per agent (~/.geenii only, see workers.md)
+├── workers/            # status files of running workers (~/.geenii only)
+└── blackboard.jsonl    # the shared blackboard (~/.geenii only)
 ```
+
+Agent mail, worker status files and the blackboard live in `GEENII_HOME`,
+which defaults to `~/.geenii`; they are never read from the project
+directory.
 
 Which files are read from the project directory, from `~/.geenii`, or from
 both is listed per feature: agents, skills, flows, apps and `mcp.json` are read
@@ -64,6 +71,14 @@ and agent memory.) See
 | `GEENII_WORKING_DIR` | `os.getcwd()` | Base working directory |
 | `GEENII_CACHE_DIR` | `~/.cache/geenii` | Cache and log directory (in the user's home, shared by all working directories) |
 | `GEENII_CACHE_DISABLED` | `false` | Set `true` to disable the `@cached` function cache |
+| `GEENII_HOME` | `~/.geenii` | Folder for agent mail, worker status files and the blackboard ([workers](workers.md)); read on every use. Other `~/.geenii` files don't move |
+| `GEENII_MCP_INIT_TIMEOUT` | `30` | Seconds to wait for an MCP server's `initialize` handshake ([MCP](../developer-guide/mcp.md)) |
+| `GEENII_MCP_AUTOLOAD` | `true` | The HTTP server discovers all MCP servers' tools in the background at startup; with `false`, a server loads only when an agent needs it |
+| `GEENII_MCP_LOAD_CONCURRENCY` | `4` | Number of MCP servers discovered at the same time |
+| `GEENII_MCP_AGENT_WAIT_TIMEOUT` | `90` | Seconds an agent waits in total for its MCP servers that are still loading |
+| `GEENII_MCP_RETRY_COOLDOWN` | `60` | Seconds before an MCP server whose discovery failed is tried again |
+| `GEENII_PM_GC_MAX_AGE` | `604800` (7 days) | Default minimum age, in seconds, of finished processes removed by `geenii pm gc` |
+| `GEENII_APPROVE` | `none` | Default tool approval policy of `geenii worker serve`: `none`, `all` or a comma-separated list of tool names |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama API endpoint |
 | `OLLAMA_API_KEY` | _(empty)_ | Bearer token for Ollama (needed for Ollama Cloud) |
 | `OPENAI_API_KEY` | _(empty)_ | OpenAI API key; the OpenAI provider counts as "configured" only when set |

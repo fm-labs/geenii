@@ -75,6 +75,13 @@ Show captured output of a background process.
 |---|---|---|
 | `--stream` | | Output stream: `stdout` (default) or `stderr` |
 | `--tail` | `-n` | Show only the last N lines |
+| `--offset` | | Start reading at this byte position (default 0) |
+| `--limit` | | Read at most this many bytes |
+
+`--offset`/`--limit` read the output in chunks; they can't be combined with
+`--tail`. To read all of a large output, increase `--offset` by `--limit`
+until nothing is printed. A UTF-8 character that crosses a chunk boundary is
+printed whole with the chunk that holds its first byte.
 
 ### wait
 
@@ -130,6 +137,26 @@ geenii pm cleanup <PROCESS_ID>
 
 Remove on-disk logs for a finished process.
 
+### gc
+
+```
+geenii pm gc [--max-age AGE] [--state STATE ...] [--dry-run]
+```
+
+Remove the on-disk logs of all processes that finished longer ago than
+`--max-age`, oldest first, and print their IDs. Running processes, processes
+the daemon still tracks, and directories without a `meta.json` (a process
+being started) are never removed. Garbage collection only runs when you call
+it; the daemon doesn't do it on its own.
+
+#### Options
+
+| Option | Short | Description |
+|---|---|---|
+| `--max-age` | | Minimum time since the process finished: seconds, or a number with `s`, `m`, `h`, `d` or `w` (e.g. `12h`, `7d`). Default: `GEENII_PM_GC_MAX_AGE` (seconds), or 7 days |
+| `--state` | | Only collect processes in this state: `completed`, `failed`, `killed` or `orphaned`. Repeatable. Default: `completed`, `failed` and `killed` |
+| `--dry-run` | `-n` | Only list what would be removed |
+
 ## Examples
 
 ```bash
@@ -140,4 +167,7 @@ geenii pm list -a
 geenii pm output my-proc -n 20
 geenii pm kill my-proc -f
 geenii pm cleanup my-proc
+geenii pm output my-proc --offset 0 --limit 65536   # first 64 KiB
+geenii pm gc --max-age 2d --dry-run                 # what would be removed
+geenii pm gc --state orphaned --max-age 0
 ```

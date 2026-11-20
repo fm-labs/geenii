@@ -73,7 +73,11 @@ geenii apps start <NAME> [--port PORT] [--dir DIR]
 Start an app as a background service of the daemon. Static HTML apps launch
 `python3 -m http.server`, python apps run `<python> <main>` (using the app's
 `.venv` if present), node apps run `npm start` or `node <main>`, binaries
-execute directly. The supervisor restarts the app when it exits.
+execute directly, and container apps build their Dockerfile and run the image
+with the app's port forwarded to port 80 in the container (needs Docker).
+Link apps (experimental) open their URL in the browser of the machine the
+daemon runs on. The supervisor restarts the app when it exits (not link
+apps).
 
 The port is the `--port` value, else the port the app had before, else the
 manifest `port`, else a random free port from 42000-44000. It stays with the app
@@ -160,7 +164,7 @@ reloads its apps afterwards.
 
 | Option | Short | Description |
 |---|---|---|
-| `--type` | `-t` | App type: `statichtml`, `python`, `node`, or `binary` (auto-detected if omitted) |
+| `--type` | `-t` | App type: `statichtml`, `python`, `node`, `binary`, `container` or `link` (auto-detected if omitted; `container` and `link` are never detected) |
 | `--title` | | Human-readable title (default: from the name, `my-app` → `My App`) |
 | `--description` | | Short description |
 | `--autostart` | | Write `"autostart": true` as the manifest default |

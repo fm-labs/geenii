@@ -32,6 +32,8 @@ How to set up, configure, and use Geenii.
 - **[Agents](user-guide/agents.md)** — defining agents in markdown, AgentSpec
   fields, running and listing agents.
 - **[Scheduler](user-guide/scheduler.md)** — running agents on a cron schedule.
+- **[Workers and Agent Mail](user-guide/workers.md)** — running agents
+  unattended, sending them mail, and the shared blackboard.
 - **[Docker](user-guide/docker.md)** — running Geenii in Docker.
 
 ## CLI Reference
@@ -47,8 +49,14 @@ Internals for contributors and library consumers.
 
 - **[Architecture](developer-guide/architecture.md)** — components, package
   layout, request lifecycle, caching, and concurrency model.
-- **[Agents](developer-guide/agents.md)** — agent runtime, task queue, HITL
-  controllers, and programmatic API.
+- **[Agents](developer-guide/agents.md)** — agent runtime, agent registry and
+  plugins, task queue, HITL controllers, and programmatic API.
+- **[Workers](developer-guide/workers.md)** — the unattended serve loop,
+  replies, tool approval policy, heartbeat, and delivery.
+- **[Inter-Bot Communication](developer-guide/ibc.md)** — agent mail and the
+  blackboard: storage, formats, atomicity, and the agent tools.
+- **[Apps](developer-guide/apps.md)** — GeeApps: manifests, app types
+  (including container and link apps), the daemon, HTTP API and UI.
 - **[Messages & Content Parts](developer-guide/messages.md)** — internal
   message formats, content part types, and per-provider wire mappings.
 - **[Providers & Models](developer-guide/providers.md)** — provider interfaces,

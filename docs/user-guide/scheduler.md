@@ -31,8 +31,8 @@ While the daemon runs, the `geenii scheduler` commands work against it:
 
 Without a daemon, these commands work on the config file alone.
 
-See [cli.md](cli.md) for the full set of `geenii scheduler` subcommands
-(`start`, `status`, `list`, `add`, `remove`, `run`).
+See the [scheduler CLI reference](../cli-reference/scheduler.md) for the full set of `geenii scheduler` subcommands
+(`start`, `status`, `list`, `add`, `remove`, `reload`, `run`).
 
 ## Task configuration
 

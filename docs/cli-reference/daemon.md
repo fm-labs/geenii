@@ -80,5 +80,5 @@ geenii daemon stop
 
 ## Related Entry Points
 
-- `geenii-daemon [--socket PATH] [--scheduler-config PATH]` runs the daemon
+- `geenii-daemon [--socket PATH] [--scheduler-config PATH] [--services-config PATH]` runs the daemon
   without the rest of the CLI.

@@ -14,6 +14,10 @@ these directories, and each one sets the agent's `scope`:
 | `$GEENII_WORKING_DIR/.geenii/agents` | `project` |
 | `~/.geenii/agents` | `user` |
 | `/var/geenii/agents` | `global` |
+| `/etc/geenii/agents` | `global` |
+
+[Plugins](../developer-guide/agents.md#plugins) can add agents too; a plugin
+agent replaces an agent file with the same name.
 
 `geenii agents list` and the HTTP server also load the agents of every
 project registered in the user settings (`projects`, see
@@ -61,10 +65,10 @@ tools:
 | `allowed_dirs` | list[str] | Intended extra allowed directories for `project` agents. Stored and shown, not yet enforced |
 | `mcp_servers` | list[str] | Names of MCP servers (from `mcp.json`) whose tools are loaded; servers not listed are not loaded. Their tools (`mcp__<server>__<tool>`) must still be listed in `tools` to be callable |
 
-Built-in agents always exist: `default` and `routing` (both using
-`DEFAULT_COMPLETION_MODEL`), `chatgpt` (`openai:gpt-3.5-turbo`) and `claude`
-(`anthropic:claude-opus-4-6`). A file with the same name in an agents
-directory overrides it.
+Built-in agents always exist: `default` (`DEFAULT_COMPLETION_MODEL`; it hands
+each conversation to the best-fitting configured agent), `chatgpt`
+(`openai:gpt-4o-mini`) and `claude` (`anthropic:claude-opus-4-6`). A file with
+the same name in an agents directory overrides it.
 
 ## Running an agent
 
@@ -92,3 +96,16 @@ geenii agents inspect fm4-track-checker
 ```
 
 See the [agents CLI reference](../cli-reference/agents.md) for details.
+
+## Running an agent unattended
+
+A [worker](workers.md) runs an agent in the background and answers the
+messages sent to it, from you or from other agents:
+
+```bash
+geenii worker serve fm4-track-checker --approve python
+geenii worker ask fm4-track-checker "What's playing right now?"
+```
+
+Agent names used with workers and agent mail must be lowercase letters,
+digits, `-` and `_`.

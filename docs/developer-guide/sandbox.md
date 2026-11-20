@@ -126,25 +126,28 @@ run_docker_subprocess(
 ## Agent integration — `SandboxTool`
 
 `geenii/tool/sandbox.py` provides `SandboxTool`, a `Tool` subclass that wraps
-the sandbox module behind the standard tool interface. Two instances are
-registered by `init_builtin_tools()`:
+the sandbox module behind the standard tool interface. It is designed to be
+registered as two tools, but **nothing registers them at the moment**:
+`init_builtin_os_tools()` doesn't, so agents can't use them yet:
 
 | Tool name | Runtime | Description |
 |---|---|---|
 | `sandbox_python` | `python` | Run a Python command in a sandboxed container |
 | `sandbox_bash` | `bash` | Run a shell command in a sandboxed container |
 
-These sit alongside the unsandboxed `bash` and `python` `ComputerTool`s. An
-agent's `tools` list controls which ones are visible to the model — use
-`sandbox_python` instead of (or in addition to) `python` to route execution
-through Docker.
+Once registered, they would sit alongside the unsandboxed `bash` and
+`python` `ComputerTool`s, and an agent's `tools` list would control which ones
+the model sees — `sandbox_python` instead of (or in addition to) `python`
+routes execution through Docker.
 
 ### How it works
 
 When the model invokes `sandbox_python` (or `sandbox_bash`):
 
-1. `SandboxTool.invoke()` reads `SKILL_DIR` from the tool env (set automatically
-   by `ToolCallTask` to the first active skill's directory).
+1. `SandboxTool.invoke()` reads `SKILL_DIR` (or `SCRIPT_DIR`) from the tool
+   env. `ToolCallTask` no longer sets `SKILL_DIR` (that code is commented out,
+   see [skills.md](skills.md#scripts)), so today it has to come from the
+   agent's own variables (`geenii agents env set <agent> SKILL_DIR=...`).
 2. It calls `build_sandbox_container()` with the skill directory as the app dir,
    installing any `requirements.txt` or `pyproject.toml` dependencies.
 3. It runs the command inside the container with all the security controls from
@@ -153,8 +156,8 @@ When the model invokes `sandbox_python` (or `sandbox_bash`):
    stderr are returned.
 
 If Docker is not installed, `invoke()` raises `RuntimeError` immediately. If
-no skill is active (no `SKILL_DIR` in env), it raises `ValueError` — the
-sandbox needs a directory to mount.
+neither `SKILL_DIR` nor `SCRIPT_DIR` is in the env, it raises `ValueError` —
+the sandbox needs a directory to mount.
 
 ### Agent spec example
 

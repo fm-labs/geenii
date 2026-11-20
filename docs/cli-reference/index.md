@@ -29,8 +29,12 @@ geenii
 ├── info                          # version, providers, system report
 ├── agent PROMPT                  # run an agent with a prompt
 ├── agents
-│   ├── list                      # configured + loaded agents
-│   └── inspect NAME              # full agent configuration
+│   ├── list                      # configured agents, including registered projects
+│   ├── inspect NAME              # full agent configuration
+│   └── env
+│       ├── list NAME             # an agent's variables and secret names
+│       ├── set NAME KEY=VALUE    # set a variable (--secret: a secret)
+│       └── unset NAME KEY        # remove a variable (--secret: a secret)
 ├── apps
 │   ├── list                      # apps with type and status (needs the daemon)
 │   ├── info NAME                 # app details (type, status, port, path)
@@ -48,9 +52,12 @@ geenii
 ├── mcp
 │   └── server
 │       ├── list                  # configured MCP servers
-│       ├── show SERVER_ID        # server config as JSON
+│       ├── inspect SERVER_ID     # server config as JSON
+│       ├── info SERVER_ID        # capabilities, tools and resources (connects to the server)
 │       ├── tools SERVER_ID       # tools provided by a server
-│       └── tool_exec SERVER_ID TOOL_NAME  # execute a tool on a server
+│       ├── tool_info SERVER_ID TOOL_NAME  # one tool's schema
+│       ├── tool_exec SERVER_ID TOOL_NAME  # execute a tool on a server
+│       └── resource SERVER_ID URI         # read (or --download) a resource
 ├── tools
 │   ├── list                      # all registered tools (built-in + MCP)
 │   ├── inspect NAME              # tool schema and description
@@ -67,17 +74,19 @@ geenii
 │   ├── run PATH                  # run a flow file (-i input, -v k=v, -w workers)
 │   ├── validate PATH             # check a flow and print its execution order
 │   ├── graph PATH [-o FILE]      # flow graph as Mermaid / DOT, or an svg/png/pdf image
+│   ├── list                      # flows in ~/.geenii/flows and .geenii/flows
 │   └── processors                # list registered processor types
 ├── pm
 │   ├── ping                      # check if the daemon is running
 │   ├── serve                     # alias for `daemon start`
 │   ├── start COMMAND             # start a background process
 │   ├── status PROCESS_ID         # check process state
-│   ├── output PROCESS_ID         # show captured output
+│   ├── output PROCESS_ID         # show captured output (--tail, or --offset/--limit)
 │   ├── wait PROCESS_ID           # wait for a process to finish (exits with its code)
 │   ├── kill PROCESS_ID           # kill a process
 │   ├── list                      # list background processes
-│   └── cleanup PROCESS_ID        # remove on-disk logs for a finished process
+│   ├── cleanup PROCESS_ID        # remove on-disk logs for a finished process
+│   └── gc [--max-age AGE]        # remove the logs of all old finished processes
 ├── projects
 │   └── list                      # projects configured in settings.json
 ├── scheduler
@@ -92,16 +101,24 @@ geenii
 │   ├── start [-d] [-p PORT|--uds] # run the HTTP server (API + web UI); -d to detach
 │   ├── status                    # pid, url, uptime, health
 │   └── stop                      # stop the running server
-└── supervisor
-    ├── status                    # supervised processes and their state
-    ├── start NAME CMD            # start and keep a process running (ad hoc)
-    ├── stop NAME                 # stop a process and stop supervising it
-    ├── restart NAME              # restart a process now
-    ├── logs NAME                 # recent output of a process
-    ├── list                      # services declared in services.json
-    ├── add NAME CMD              # declare a service in services.json (reloads the daemon)
-    ├── remove NAME               # remove a service from services.json (reloads the daemon)
-    └── reload                    # make the daemon apply services.json
+├── supervisor
+│   ├── status                    # supervised processes and their state
+│   ├── start NAME CMD            # start and keep a process running (ad hoc)
+│   ├── stop NAME                 # stop a process and stop supervising it
+│   ├── restart NAME              # restart a process now
+│   ├── logs NAME                 # recent output of a process
+│   ├── list                      # services declared in services.json
+│   ├── add NAME CMD              # declare a service in services.json (reloads the daemon)
+│   ├── remove NAME               # remove a service from services.json (reloads the daemon)
+│   └── reload                    # make the daemon apply services.json
+└── worker
+    ├── serve AGENT [--approve P] # run an agent unattended, answering its mail
+    ├── ask AGENT TEXT            # mail a running worker and print its reply
+    ├── list                      # running workers and their status
+    ├── inbox [AGENT] [--read ID] # show an inbox (default: yours, 'human')
+    ├── send TO SUBJECT BODY      # send agent mail
+    ├── blackboard [-t TOPIC]     # read the shared blackboard
+    └── post TOPIC TEXT           # post to the shared blackboard
 ```
 
 ## Subcommand Reference
@@ -121,10 +138,11 @@ geenii
 - [scheduler](scheduler.md) — manage and run the task scheduler
 - [server](server.md) — start, stop and inspect the HTTP server (API + web UI)
 - [supervisor](supervisor.md) — keep long-running processes up
+- [worker](worker.md) — run agents unattended, agent mail and the blackboard
 
 ## Related Entry Points
 
-- `geenii-daemon [--socket PATH] [--scheduler-config PATH]` runs the daemon
+- `geenii-daemon [--socket PATH] [--scheduler-config PATH] [--services-config PATH]` runs the daemon
   (see [daemon](daemon.md)).
 - `geenii-scheduler <config.json>` is an alias for
   `geenii-daemon --scheduler-config <config.json>`.

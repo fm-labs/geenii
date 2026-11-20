@@ -92,16 +92,18 @@ connection may send several requests.
 | `daemon.shutdown` | none | `"shutting down"` (the daemon stops right after replying) |
 | `pm.start` | `command` (string, or list of strings), `env?`, `cwd?`, `pid?` | `ProcessInfo` dict |
 | `pm.status` | `process_id` | `ProcessInfo` dict |
-| `pm.output` | `process_id`, `stream?`, `tail?` (a value of 0 or less means all output) | string |
+| `pm.output` | `process_id`, `stream?`, `tail?` (a value of 0 or less means all output), `offset?`, `limit?` (bytes; not with `tail`) | string |
 | `pm.wait` | `process_id`, `timeout?` | Final `ProcessInfo` dict once the process has finished. Fails with `TimeoutError` after `timeout` seconds; the process keeps running |
 | `pm.kill` | `process_id`, `force?` | `ProcessInfo` dict |
 | `pm.list` | `include_finished?` | list of `ProcessInfo` dicts |
 | `pm.cleanup` | `process_id` | `"ok"` |
+| `pm.gc` | `max_age?` (seconds, default `GEENII_PM_GC_MAX_AGE`), `states?` (list), `dry_run?` | list of the removed (or, with `dry_run`, removable) process IDs, oldest first |
 | `scheduler.status` | none | `Scheduler.status` (live: next and last run, `running` flag per task) |
 | `scheduler.run` | `name` | `"started"`. Starts a run now via `Scheduler.run_now()`, without waiting for it. Fails for unknown tasks, or if the task is still running and doesn't allow overlap |
 | `scheduler.reload` | none | `{"added": [...], "removed": [...], "updated": [...]}`. Re-reads the daemon's scheduler config via `Scheduler.reload_config()`. Fails if the daemon was started without a config file |
 | `supervisor.status` | none | `Supervisor.status()` |
 | `supervisor.ensure` | `name`, `cmd` (list of strings), `restart?`, `env?`, `cwd?`, `capture_output?`, `max_failures?` | `"ok"` |
+| `supervisor.start` | `name` | `"ok"`. Starts a supervised process again (e.g. one stopped with `disable_restart: false`), or an enabled service of the daemon's services file that isn't running. `KeyError` otherwise |
 | `supervisor.stop` | `name`, `disable_restart?` (default `true`) | `"ok"` |
 | `supervisor.restart` | `name` | `"ok"` |
 | `supervisor.logs` | `name`, `tail?` (default 100) | list of log lines |
@@ -276,7 +278,7 @@ group.
 | `await restart_process(name)` | Cancels the watcher, terminates the process, resets the backoff and starts a new watcher, which spawns the process right away. This also works when `restart=False`. Raises `KeyError` for unknown names. |
 | `await update_config(name, req)` | Partial update. `env` and `cwd` change only if they are present in the request body (`model_fields_set`); an explicit `null` clears them. Takes effect at the next spawn. |
 | `status()` | Returns `{"desired": {...}, "running": {...}, "watchers": {...}}`. Env **values** are never exposed, only `env_keys`. |
-| `logs(name, tail=100)` | The last `tail` log lines as text. |
+| `logs(name, tail=100)` | The last `tail` log lines, as a list of strings. `KeyError` for an unknown name. |
 | `stream_logs(name)` | Async iterator: replays the buffer, then yields live lines. Every 15 seconds without output it yields `""` as a keepalive, which the HTTP route turns into an SSE comment. |
 | `stream_logs_jsonl(name)` | The same, but yields `LogEvent` objects, with `None` as the keepalive. |
 | `await run(cmd, env=, cwd=, timeout=, name=)` | One-shot command that is **not** part of the desired state. Output goes to a LogBus (so it can be streamed live) and is returned as a `RunResult`. On timeout, or when the caller cancels the coroutine, the process group is sent `SIGKILL` and the exception is raised again. If the command can't be started (for example, the binary doesn't exist), the error is logged to the job's LogBus and raised. Only the last `RUN_LOG_HISTORY` finished jobs keep their LogBus. Older ones are removed, unless a supervised process has the same name. |
@@ -524,11 +526,12 @@ rejected as well. An empty `pid` means "auto-generate".
 |---|---|
 | `await start(cmd, env=, cwd=, pid=)` | Validates `cmd` and `pid`. Under a lock, so that concurrent starts can't claim the same ID, it creates the process directory, opens the log files, and calls `proc.spawn()`, which gives the command its own process group. If spawning fails (for example, `cwd` doesn't exist), the directory is removed again. Then it writes `meta.json`, starts a waiter task and returns `ProcessInfo` with state `running`. |
 | `await status(pid)` | Answers from memory while the process runs, otherwise from `meta.json`. Raises `KeyError` if the ID is unknown. Never creates files. |
-| `await output(pid, stream="stdout", tail=None)` | Returns the log contents, or only the last `tail` lines. Works while the process is still running. `stream` must be `stdout` or `stderr`. |
+| `await output(pid, stream="stdout", tail=None, *, offset=None, limit=None)` | Returns the log contents, only the last `tail` lines, or a chunk of `limit` bytes starting at byte `offset` (not combined with `tail`). A UTF-8 character split across a chunk boundary is returned whole with the chunk that holds its first byte, so concatenated chunks equal the full output. Works while the process is still running. `stream` must be `stdout` or `stderr`. |
 | `await wait(pid, timeout=None)` | Waits until the process has finished and returns its final `ProcessInfo`. Returns right away for finished or orphaned processes. On timeout it raises `asyncio.TimeoutError`; a timeout or cancelled wait doesn't affect the process. |
 | `await kill(pid, force=False)` | Sends `SIGTERM` (or `SIGKILL` with `force`) to the **process group**, so child processes are signalled as well. Waits up to `KILL_WAIT_S` (5s) for the exit, so the returned state is normally already `killed`. |
 | `await list(include_finished=False)` | Processes in memory, plus finished ones from disk if requested, newest first. Each ID appears only once. |
 | `await cleanup(pid)` | Runs `rmtree` on the process directory. Refuses while the process is still tracked. |
+| `await gc(max_age=None, *, states=None, dry_run=False)` | Removes the directories of processes that finished more than `max_age` seconds ago (default `PM_GC_MAX_AGE`, from `GEENII_PM_GC_MAX_AGE`, 7 days) and whose state is in `states` (default `completed`, `failed`, `killed`; `orphaned` only when asked). Skips tracked processes and directories without `meta.json`. Returns the IDs, oldest first. `ValueError` for a negative `max_age` or a pending/running state. Only runs when called (`pm.gc`, `geenii pm gc`, `POST /pm/gc`). |
 | `await shutdown()` | Terminates all running processes at the same time with `proc.terminate()` (process group `SIGTERM`, then `SIGKILL` after `TERMINATE_GRACE_S`), waits for their waiter tasks and records their final state. Called by `ProcessHost.stop()` when the daemon shuts down. |
 
 The waiter task sets the final state from the return code:
@@ -583,7 +586,7 @@ file exists and that `ping` succeeds. The client has no socket timeout.
   - Errors (for example an invalid ID) are returned to the model as
     `{"error": ...}`.
 - `geenii pm` (`cli/pm_cli.py`) provides `ping`, `start`, `status`, `output`,
-  `kill`, `list` and `cleanup`, plus `serve`, an alias for
+  `wait`, `kill`, `list`, `cleanup` and `gc`, plus `serve`, an alias for
   `geenii daemon start`. The socket path can be overridden with `--socket`,
   `GEENII_SOCKET` or `GEENII_PM_SOCKET`.
 

@@ -40,7 +40,8 @@ context; `invoke_tool()` builds it from its `cwd` argument:
 | `PythonCliTool` | `python` | Like `ComputerTool`, intended for running Python scripts. Runs without a shell, in `ctx.cwd` |
 | `SandboxTool` | `sandbox` | Runs a command inside a Docker container with security hardening (see [sandbox.md](sandbox.md)) |
 | `McpTool` | `mcp_tool` | Forwards the call to an MCP server via fastmcp |
-| `ScriptTool` | `function` | Runs an executable script from a skill's `scripts/` directory, with the `args` string (`shlex`-split) as its arguments and the script's directory as cwd. Returns stdout and stderr joined by a newline as `text`, parsed into `structured_content` if that is valid JSON; a non-zero exit sets `is_error`. Auto-registered when a skill is activated, named `{skill}__{script_stem}`. See [skills.md](skills.md). |
+| `WebFetchTool` | — | The built-in `web_fetch` tool (`geenii/tool/webtools.py`), see [`web_fetch`](#web_fetch) |
+| `ScriptTool` | `function` | Runs an executable script from a skill's `scripts/` directory, with the `args` string (`shlex`-split) as its arguments and the script's directory as cwd. Returns stdout and stderr joined by a newline as `text`, parsed into `structured_content` if that is valid JSON; a non-zero exit sets `is_error`. `register_skill_scripts()` (`geenii/skills.py`) registers one per script, named `{skill}__{script_stem}`, but nothing calls it at the moment, so skill scripts are not exposed as tools. See [skills.md](skills.md#scripts). |
 
 `to_tool_call_result(result)` (`geenii/tool/common.py`) maps a handler's
 return value: a `ToolCallResult` is passed through, `None` becomes empty text,
@@ -54,21 +55,27 @@ style), `to_openai()`, and `to_ollama()` — providers pick the one they need.
 
 ## Built-in tools
 
-Registered by `init_builtin_tools()` (`geenii/tools.py`). `init_agent()` calls
-it only when the agent spec's `tools` list contains `read`, `write` or `bash`;
-in that case all of these are registered (the model still only sees the ones in
-`allowed_tools`):
+Two functions in `geenii/tools.py` register them:
+
+- `init_builtin_os_tools()` registers `bash`, `python`, `read`, `write` and,
+  through `init_core_os_tools()` (`geenii/core/tools.py`),
+  `display_desktop_notification`.
+- `init_builtin_webtools()` registers `web_fetch`.
+
+`init_agent()` calls `init_builtin_os_tools()` when the agent spec's `tools`
+list contains `read`, `write` or `bash`, and `init_builtin_webtools()` when it
+contains `web_fetch`. All tools of a group are registered, but the model only
+sees the ones in `allowed_tools`. `geenii tools`, the HTTP server and the
+`/tools` info command always register both groups.
 
 | Name | Type | Description |
 |---|---|---|
 | `bash` | ComputerTool | Run a single-line shell command on the local machine |
-| `python` | ComputerTool | Run a python command line (e.g. `python3 script.py`) — note: this executes an arbitrary command, same mechanics as `bash` |
+| `python` | ComputerTool | Run Python: the `command` argument is everything after the interpreter (e.g. `-m mymodule` or `script.py --flag`), and `python3 ` is put in front. It runs through the shell like `bash`, so it can execute an arbitrary command too |
 | `read` | ReadTool | Read a text file |
 | `write` | WriteTool | Write a text file |
 | `display_desktop_notification` | PythonFunctionTool | Show a desktop notification (macOS, via `osascript`) |
-
-`display_desktop_notification` is registered by `init_core_tools()` in
-`geenii/core/tools.py`. In `read` and `write`, relative paths are resolved
+| `web_fetch` | WebFetchTool | Fetch a URL over HTTP(S), see [`web_fetch`](#web_fetch) | In `read` and `write`, relative paths are resolved
 against `ctx.cwd`, and only paths inside that directory, `GEENII_WORKING_DIR` or a
 directory listed in the user settings' `allowed_dirs` (a list; any other value
 is ignored) are accepted. The check runs on the fully resolved path, so `..`
@@ -81,6 +88,31 @@ missing, and does not create parent directories. Both are tested in
 `tests/geenii/test_file_tools.py`. The sandbox tools (`SandboxTool`) are not
 registered by default.
 
+### `web_fetch`
+
+`WebFetchTool` sends a `GET` request with `httpx` and returns the response.
+
+| Argument | Meaning |
+|---|---|
+| `url` | Required. Only `http` and `https` URLs are accepted |
+| `parser` | `none` (raw body), `json`, `html` or `xml`. The schema advertises `html` as the default, but when the model leaves it out the tool uses `none` |
+
+- **Limits:** at most 3 redirects, a 30-second timeout and 5 MB of content
+  (`MAX_REDIRECTS`, `TIMEOUT`, `MAX_CONTENT_BYTES`); a larger response is an
+  error result. The `User-Agent` is `geenii-web-fetch/1.0`.
+- **Parsers:** `json` returns the parsed data pretty-printed; `html` returns the
+  page title and its readable text (scripts, styles and `<head>` dropped, one
+  line per block element); `xml` returns the indented document.
+- **`structured_content`:** the final `url`, `status_code`, `content_type`,
+  `redirects`, `fetched_at`, plus `data` (json), `title` and `body` (html) or
+  `root_tag` (xml).
+- **Errors:** an HTTP status of 400 or more is an error result with the start
+  of the body; so are request failures, a body that doesn't parse, and invalid
+  arguments.
+- **Cache:** successful responses are cached by URL for an hour (`CACHE_TTL`)
+  in `$GEENII_CACHE_DIR/web_fetch/`, unless caching is disabled
+  (`--no-cache` / `GEENII_CACHE_DISABLED`).
+
 ### Command execution details
 
 - The command runs in the `cwd` passed to `invoke()` (the agent's `cwd`, see
@@ -88,11 +120,12 @@ registered by default.
 - The command string is run through the shell (`shell=True`), so pipes,
   redirects and `&&` work. The `shlex`-split argument list is only logged.
 - `${VAR}` / `$VAR` placeholders in the command are expanded from the tool
-  invocation env (notably `SKILL_NAME` — the comma-separated list of active
-  skill names — see [skills.md](skills.md)).
+  invocation env. For agents that is the agent's variables and secrets
+  ([`geenii agents env`](../cli-reference/agents.md#env)); the same env is also
+  passed to the process.
 - `text` is `stdout:\n<stdout>\nstderr:\n<stderr>`. On a non-zero exit code
   `EXITED WITH NON-ZERO EXIT CODE: <code>` is appended and `is_error` is set.
-  On success, stdout that is valid JSON is also returned as
+  On success, stdout that is a JSON **object** is also returned as
   `structured_content` (`PythonCliTool` only tries this for a zero exit code
   and non-empty stdout).
 - **Tool filters** can restrict which commands a tool is allowed to execute.
@@ -115,9 +148,10 @@ MCP servers are declared in `~/.geenii/mcp.json` and `$GEENII_WORKING_DIR/.geeni
 `mcp_servers` gets no MCP tools. For each selected server:
 
 1. Each server is contacted through `McpClient` (a fastmcp wrapper) and its
-   `tools/list` result is fetched — without a retry (a failed listing logs an
-   error and skips the server), and cached for 1 hour via `@cached` (empty
-   results are not cached).
+   `tools/list` result is fetched, with one retry after a second (a server
+   that still fails is skipped), and cached for 1 hour via `@cached` (empty
+   results and failures are not cached). Discovery runs in the background
+   loader, see [mcp.md](mcp.md#background-loading).
 2. Each advertised tool is registered as an `McpTool` named
    `mcp__<server>__<tool>` (e.g. `mcp__duckduckgo__search`).
 
@@ -146,7 +180,7 @@ resources only).
 
 ## Invocation and logging
 
-`invoke_tool(tool, args, env, cwd=None, caller_id="anonymous")`
+`invoke_tool(tool, args, env, cwd=None, caller_id="anonymous", secret_keys=None)`
 (`geenii/tools.py`) builds a `ToolCallContext(cwd=cwd or GEENII_WORKING_DIR,
 caller_id=caller_id)`, wraps
 `tool.invoke(args=..., env=..., ctx=ctx)` and appends one JSON line per call to
@@ -158,15 +192,19 @@ caller_id=caller_id)`, wraps
 ```
 
 When the tool raises, `result` is `{"exception": ..., "traceback": ...}` and the
-exception is re-raised. Env values whose name contains `password`, `secret`,
-`api_key` or `token` (case-insensitive) are logged as `REDACTED`, here and in
-the `Invoking tool …` line `invoke_tool` writes to the Python logger before the
-call. Arguments and output are logged in full, so treat the log as sensitive.
+exception is re-raised. Env values are logged as `REDACTED`, here and in the
+`Invoking tool …` line `invoke_tool` writes to the Python logger before the
+call, when:
 
-> **Known issue:** `_redact_env_vars()` overwrites the values in the `env` dict
-> it is given, and `invoke_tool` calls it before `tool.invoke()`. A tool
-> therefore receives `REDACTED` for those variables. All current callers pass
-> an empty env, so this has no effect yet.
+- the name is in `secret_keys` (an agent passes the names of its secrets,
+  see [`geenii agents env`](../cli-reference/agents.md#env)), or
+- the name contains `password`, `secret`, `api_key` or `token`, or one of its
+  `_`-separated parts is `pass`, `passwd` or `pat` (case-insensitive; so
+  `GITHUB_PAT` is redacted, `PATH` is not).
+
+`_redact_env_vars()` returns a redacted copy, so the tool itself gets the real
+values. Arguments and output are logged in full, so treat the log as
+sensitive.
 
 Callers and their `caller_id`:
 

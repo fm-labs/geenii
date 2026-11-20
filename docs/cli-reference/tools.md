@@ -16,8 +16,11 @@ geenii tools <command>
 geenii tools list
 ```
 
-List all registered tools (built-in and MCP), showing name, description, and
-type.
+List all registered tools, showing name, description, and type: the built-in
+tools (`bash`, `python`, `read`, `write`, `display_desktop_notification`,
+`web_fetch`) and the tools of every MCP server in `mcp.json`. It waits until
+all MCP servers have been contacted, so it can take a while when a server is
+starting.
 
 ### inspect
 

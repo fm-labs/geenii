@@ -1,6 +1,6 @@
 # Apps (GeeApps)
 
-A GeeApp is a sandboxed micro-application managed by geenii. Four app types
+A GeeApp is a sandboxed micro-application managed by geenii. Six app types
 are supported:
 
 | Type         | Runtime               | Default entry point                  | Launch command                  |
@@ -9,6 +9,8 @@ are supported:
 | `python`     | Python                | `main.py`, `app.py` or `server.py`   | `<python> $main`                |
 | `node`       | Node.js               | `index.js`                           | `npm start` or `node $main`     |
 | `binary`     | None (compiled)       | *(must be set)*                      | `./$main`                       |
+| `container`  | Docker                | `Dockerfile`                         | `docker build` + `docker run`   |
+| `link`       | The user's browser    | *(a URL, must be set)*               | `python -m webbrowser $main` (experimental) |
 
 ## Concepts
 
@@ -27,6 +29,7 @@ overridden per app via the manifest `port` field or the `--port` CLI flag.
 apps/
 └── my-app/
     ├── manifest.json       # metadata + launch config
+    ├── icon.svg            # optional: icon shown in the UI
     ├── index.html          # entry point (statichtml)
     ├── script.js           # optional
     └── styles.css          # optional
@@ -72,12 +75,12 @@ versions are strings; a number (e.g. `1`) is read as one, `null` is invalid.
 |---------------|-------------|------------------------------------------------------|
 | `name`        | *(required)* | Unique app identifier                               |
 | `manifest_version` | `"1"`  | Version of the manifest format                       |
-| `type`        | `statichtml` | One of `statichtml`, `python`, `node`, `binary`     |
+| `type`        | `statichtml` | One of `statichtml`, `python`, `node`, `binary`, `container`, `link` |
 | `title`       | *(required)* | Human-readable display name                         |
 | `description` | `null`      | Short description                                    |
 | `author`      | `null`      | Author name                                          |
 | `version`     | `"0.0.0"`   | The app's version (semver), always set            |
-| `main`        | `null`      | Entry point file (auto-detected per type if omitted) |
+| `main`        | `null`      | Entry point file (auto-detected per type if omitted); the Dockerfile for `container`, the URL for `link` |
 | `port`        | `null`      | Preferred port (auto-allocated if omitted)           |
 | `env`         | `{}`        | Environment variables passed to the process          |
 | `sandbox`     | `false`     | Run inside Docker sandbox (not yet wired)            |
@@ -98,6 +101,10 @@ contents:
 4. Executable binary named after the directory → `binary`
 5. Fallback → `statichtml`
 
+`container` and `link` are never inferred: those apps need a manifest that
+sets the type. A directory with only a `Dockerfile` is inferred as
+`statichtml`.
+
 The title of an inferred manifest comes from the directory name
 (`title_from_name`: `my-cool_app` → `My Cool App`).
 
@@ -110,7 +117,7 @@ manifests to disk.
 
 **Enums:**
 
-- `AppType` — `statichtml`, `python`, `node`, `binary`
+- `AppType` — `statichtml`, `python`, `node`, `binary`, `container`, `link`
 - `AppStatus` — `stopped`, `starting`, `running`, `error`
 
 **Models:**
@@ -193,6 +200,47 @@ environment variable is set if a port is assigned.
 Executes the binary at `<app_dir>/<main>` directly. The `main` field is
 required — inference looks for an executable file named after the app
 directory. No runtime needed.
+
+### `container`
+
+Builds a Docker image from the app's Dockerfile and runs it, as one
+supervised process (`GeeApp._container_launch_command()`):
+
+```
+sh -c 'docker build -f "$1" -t "$2" "$3" && shift 3 && exec docker run "$@"' sh \
+   <dockerfile> geenii-app-<name> <app_dir> \
+   --rm --name app-<name> -p 127.0.0.1:<port>:80 -e PORT [-e VAR ...] geenii-app-<name>
+```
+
+- The Dockerfile is `main` (default `Dockerfile`), relative to the app
+  directory; it must be inside the directory. The build context is the app
+  directory.
+- The image is `geenii-app-<name>` (`CONTAINER_IMAGE_PREFIX`, name
+  lowercased); the app name must make a valid Docker repository name.
+- The container is named after the service (`app-<name>`) and removed when it
+  stops (`--rm`). Every start builds the image again (cached by Docker).
+- The app's port is published on `127.0.0.1` only and forwarded to port
+  **80** in the container, so the image must listen on port 80. A port is
+  required; it is assigned like for every app.
+- The manifest `env` and `PORT` are passed as `-e NAME` without a value:
+  `docker run` takes the values from its own environment, so they don't show
+  in the process list. Variable names must match `[A-Za-z_][A-Za-z0-9_]*`.
+- The shell script is constant and every value is a positional argument, so
+  nothing from the manifest or the path is parsed by the shell. The app path
+  must not contain `$` (the supervisor expands variables in arguments).
+- Docker must be installed and its daemon reachable by the geenii daemon.
+  `sandbox` has no effect.
+
+Invalid settings (no port, bad image or env name, Dockerfile missing or
+outside the app directory) make the start fail with an error.
+
+### `link` (experimental)
+
+An app that is just a URL. `main` must start with `http`. Starting the app
+runs `python -m webbrowser <main>`, which opens the URL in the default
+browser **of the machine the daemon runs on**, then exits. The service is
+created with `restart=False`, so the supervisor doesn't open it again; the
+app's status then follows that short-lived process.
 
 ## Running as a background service
 
@@ -325,6 +373,7 @@ knows the server's project apps. Responses use the app info dict of the
 |---|---|
 | `GET /apps/` | `{"apps": [...], "daemon": {"running": bool}}`. Without a daemon, the apps on disk with `status: null` |
 | `GET /apps/{name}` | App info (`status: null` without a daemon). 404 unknown |
+| `GET /apps/{name}/icon` | The app's `icon.svg` as `image/svg+xml`, or a built-in default icon when it has none. Works without a daemon. 404 unknown |
 | `POST /apps/{name}/start` | Optional body `{"port": int}`. App info. 409 already started or disabled |
 | `POST /apps/{name}/stop` | App info. 409 not started |
 | `POST /apps/{name}/restart` | Optional body `{"port": int}`; keeps the port if omitted. App info |
@@ -334,7 +383,13 @@ knows the server's project apps. Responses use the app info dict of the
 | `POST /apps/add` | Body `{"path": str}`, an absolute app directory with a `manifest.json`. Adds it disabled. App info. 400 missing directory or manifest, invalid manifest or relative path; 409 already added or name taken |
 | `PUT /apps/{name}/enabled` | Body `{"enabled": bool}`. Enables or disables the app in the user settings; disabling a running app stops it. App info |
 
-Every route except the two reads returns 409 when the daemon isn't running,
+The icon route only serves `icon.svg` if it is a regular file directly in
+the app directory (a symlink that leads out of it gets the default icon). It
+sends `Cache-Control: no-cache`, `X-Content-Type-Options: nosniff` and
+`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`,
+so scripts in an SVG don't run when the icon is opened directly.
+
+Every route except the reads (`GET /apps/`, `GET /apps/{name}` and its icon) returns 409 when the daemon isn't running,
 and 503 when it can't be reached. Unknown apps are 404, and invalid params
 are 400 or 422.
 
@@ -344,20 +399,27 @@ are 400 or 422.
 
 - `apps-api.ts` — types, the `useApps(poll = true)` / `useApp(name)` hooks
   (polled every 5 s while the daemon runs; `useApps(false)` loads once),
-  `useAppAction()`, `useSetAppSetting()`, and `useAppUrl()`: a running app is
-  reached at `http://<API server host>:<port>/`
+  `useAppAction()`, `useSetAppSetting()`, `useAppIconUrl(name)` (the
+  `/apps/{name}/icon` URL, for an `<img>`), `useOpenExternal()` (opens a URL
+  in the system browser in the desktop app, in a new tab in the web UI) and
+  `useAppUrl()`: a running app is reached at
+  `http://<API server host>:<port>/?_apptoken=geenii-app-token-for-<name>&_baseurl=<API base URL>`.
+  `_baseurl` tells the app where the geenii API is. `_apptoken` is a fixed
+  stub for testing: the server doesn't issue or check app tokens, so it is
+  **not** authentication
 - `apps-components.tsx` — status badge, start/stop/restart controls, log
   viewer (polled every 2 s while open)
 - `#/` launcher, **Apps** tab (`launcher/launcher-apps.tsx`) — icon tiles
-  of the enabled apps with a status dot, filtered by the launcher search.
+  (the app's icon) of the enabled apps with a status dot, filtered by the launcher search.
   Clicking a tile opens `#/apps/<name>`, starting the app first if it is
   stopped; a hover button starts or stops it in place. The list is polled only
   while the tab is shown. A **Manage your apps** link leads to the console
   app settings
-- `#/apps` (`apps-page.tsx`, `apps-view.tsx`) — app cards with status and
-  controls (not linked in the navigation)
-- `#/apps/<name>` (`app-page.tsx`) — the running app in an iframe, plus its
-  log and details
+- `#/apps` (`apps-page.tsx`, `apps-view.tsx`) — app cards with status,
+  controls and an **Open in browser** button (not linked in the navigation)
+- `#/apps/<name>` (`app-page.tsx`) — the app's icon and title, the running
+  app in an iframe (70% of the viewport height), an **Open in browser**
+  button, and its log and details
 - `#/console/configure/apps` (`console/components/apps-settings.tsx`) — tabs
   **Installed** (enabled apps) and **Available** (disabled apps, with an
   **Install** button = enable). Each card shows the status dot and badge,
@@ -388,6 +450,8 @@ the `geenii://` scheme) is no longer used by the app page.
 | Daemon integration | Done             | `AppRegistry` in the daemon, `apps.*` RPC methods  |
 | Process lifecycle  | Done             | Supervisor services `app-<name>`: restart, logs, status |
 | Sandbox mode       | Flag only        | `sandbox: true` in manifest, not wired to `sandbox.py` |
+| Container apps     | Done             | `type: container`: Docker build + run, see [`container`](#container) |
+| Link apps          | Experimental     | `type: link`: opens the URL in the daemon host's browser, see [`link`](#link-experimental) |
 | HTTP routes        | Done             | `/api/v1/apps`, see [HTTP API](#http-api)         |
 | UI                 | Done             | Launcher Apps tab, `#/apps/<name>`, console app settings, see [UI](#ui) |
 | Autostart          | Done             | Manifest `autostart`, see [Autostart](#autostart) |

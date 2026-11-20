@@ -33,6 +33,18 @@ input.
 | `--output-format` | `-f` | `text` | Output format: `text` or `json` |
 | `--interactive` | `-i` | | Keep prompting after the first response (type `exit` to quit) |
 | `--context` | `-c` | | Continue a previous conversation by context ID |
+| `--resume` | `-r` | | Continue the agent's last conversation (ignored with `--context`) |
+
+## Conversations
+
+Each run gets a new context ID unless `--context` or `--resume` is given.
+The context ID of the last run of each agent is saved in
+`$GEENII_CACHE_DIR/agents/<name>/last_context_id`; `--resume` continues that
+conversation. With `--interactive` and neither option, the command asks
+whether to restore the last conversation (default: no). The messages of a
+restored conversation are loaded from the agent's memory, which is kept in a
+file per conversation by default (see
+[memory](../developer-guide/memory.md)).
 
 ## Examples
 

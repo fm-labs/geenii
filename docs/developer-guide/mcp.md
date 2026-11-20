@@ -192,7 +192,8 @@ its image first. So discovery goes through one process-wide `McpToolLoader`
   `GEENII_MCP_AGENT_WAIT_TIMEOUT`, so an agent only gets tools from the servers
   it lists, and none without `mcp_servers`. A server already loaded by the
   startup preload is used as is; one still loading is waited for.
-- **CLI:** `geenii tools` and `geenii ai` wait for all servers, with no timeout.
+- **CLI:** `geenii tools` waits for all servers, with no timeout. (`cli/ai_cli.py`
+  does the same, but it isn't registered as a `geenii` command.)
 
 `McpTool.invoke()` calls the tool through the cached client and maps the
 `CallToolResult` to a `ToolCallResult`:
@@ -342,7 +343,7 @@ McpServersSettingsView
 ## Tests
 
 ```bash
-uv run pytest tests/geenii/test_mcp_config.py tests/geenii/test_mcp_routes.py
+uv run pytest tests/geenii/test_mcp_config.py tests/geenii/test_mcp_loader.py tests/geenii/test_mcp_routes.py
 ```
 
 | File | Covers |
@@ -351,7 +352,7 @@ uv run pytest tests/geenii/test_mcp_config.py tests/geenii/test_mcp_routes.py
 | `tests/geenii/test_mcp_loader.py` | `McpToolLoader` with a fake discovery: one discovery per server, attached registries, retries and the cooldown, timeouts, reload and forget, the server's tool registry not waiting at startup, the status and reload routes, and concurrent SQLite cache writes |
 | `tests/geenii/test_mcp_routes.py` | The `/mcp/servers` CRUD routes: masking, create validation and name clashes, keeping masked values on update, `404` / `409` for unknown and project-only servers, delete |
 
-Both use the `mcp_dirs` fixture in `tests/geenii/conftest.py`. It points the
+All three use the `mcp_dirs` fixture in `tests/geenii/conftest.py`. It points the
 root and project `mcp.json` at temp dirs and empties the config and client
 caches, so the real `~/.geenii/mcp.json` is never read or written. The route
 tests use `TestClient(app)` without `with`, so the app's lifespan, which

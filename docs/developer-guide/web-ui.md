@@ -187,8 +187,10 @@ The components for the previous catalog format
 (`DockerMcpCatalogV3`, `DockerMcpCatalogV3Provider`,
 `DockerMcpCatalogV3ConfigBuilder`) and are deprecated.
 
-Other pages (`#/mcp`, `#/flows`, parts of `#/settings`) call endpoints the server does not have yet; see
-`geenii-ui/SUMMARY.md`.
+MCP servers are managed under Console → Configure → MCP, backed by the `/mcp`
+API (see [mcp.md](mcp.md#web-ui)); there is no separate `#/mcp` page. The
+`#/flows` page shows a built-in example graph and calls no API: the server
+has no flow endpoints yet (`flow_routes.py` is a placeholder).
 
 ### xchat
 

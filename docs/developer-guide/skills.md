@@ -2,16 +2,15 @@
 
 A skill is a reusable, self-contained capability packaged as a directory with a
 `SKILL.md` file — following Anthropic's skill specification format. Skills add
-domain knowledge, tool scoping, and executable scripts to an agent by injecting
-instructions into its system prompt and optionally registering script-backed
-tools.
+domain knowledge, tool scoping and helper scripts to an agent by injecting
+instructions into its system prompt and narrowing the tools it may call.
 
 ## Anatomy of a skill
 
 ```
 my-skill/
 ├── SKILL.md            # required: frontmatter + instructions
-├── scripts/            # optional: executable scripts auto-registered as tools
+├── scripts/            # optional: helper scripts the instructions tell the agent to run
 │   └── fetch_data.py
 └── references/         # convention: extra docs the instructions may point to
 ```
@@ -28,7 +27,8 @@ triggers: fm4, radio, track
 
 # FM4 skills
 
-You can retrieve live FM4 data using the `fm4-skills__fm4` tool.
+Retrieve live FM4 data by running `scripts/fm4.py` from this skill's
+directory with the `python` tool.
 ```
 
 ### Argument-level tool filtering
@@ -100,16 +100,23 @@ registering a duplicate name raises an error.
    filters (e.g. `Bash(command:uname *)`), the tool is visible to the model
    but `ToolCallTask` enforces the argument restrictions at invocation time —
    calls that don't match any filter are rejected before execution.
-5. **Script tools** — when a skill is activated, any executable files in its
-   `scripts/` directory are automatically registered as tools named
-   `{skill_name}__{script_stem}` (e.g. `fm4-skills__fm4`). These appear in
-   the agent's tool registry and are added to `allowed_tools`, so the model
-   can invoke them like any other tool. Scripts receive JSON on stdin and
-   return output on stdout. See [tools.md](tools.md) for the `ScriptTool`
-   class details.
+### Scripts
 
-Tool invocations also receive a `SKILL_NAME` environment variable containing
-the comma-separated names of all active skills.
+Scripts in a skill's `scripts/` directory are **not** exposed as tools at the
+moment. `register_skill_scripts()` (`geenii/skills.py`) can register each
+executable script as a `ScriptTool` named `{skill_name}__{script_stem}`
+(e.g. `fm4-skills__fm4`, see [tools.md](tools.md#tool-types)), but nothing
+calls it: the call in `FindBestSkillTask._activate_skills()` has been
+commented out since 2026-10-10. So a skill's instructions should tell the
+model to run its scripts with a regular tool such as `bash` or `python`, and
+the skill's `allowed-tools` must allow that tool.
+
+Tools also don't get `SKILL_NAME` or `SKILL_DIR` environment variables any
+more; the code that set them is commented out in `ToolCallTask`. Tools get
+the agent's own variables and secrets instead (see
+[`geenii agents env`](../cli-reference/agents.md#env)). Instructions that
+refer to the skill's directory should spell out the path, which
+`geenii skills inspect <name>` shows.
 
 ## Multi-skill composition
 
@@ -125,7 +132,6 @@ When multiple skills are active:
   own `## Skill: <name>` section).
 - Tool scoping is the union of all active skills' `allowed-tools`,
   intersected with the agent's base tool set.
-- Script tools from all active skills are registered.
 
 ## CLI
 

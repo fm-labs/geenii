@@ -39,7 +39,11 @@ and allowed tools.
 geenii skills install <NAME> <SOURCE>
 ```
 
-Install a skill from a source. Currently only local file sources are supported.
+Install a skill from a source by copying it to the working directory's
+`.geenii/skills/<NAME>`. Fails if a skill with that name is already there.
+Currently only local file sources are supported.
+Only install skills you trust: their instructions are followed by agents that
+may have shell access.
 
 #### Arguments
 

@@ -1,7 +1,8 @@
 # HTTP Server
 
 `geenii.server` is a FastAPI app that exposes agents, tools, AI completions,
-agent chat sessions and the process manager over HTTP. It is the backend of
+agent chat sessions, apps and the [geenii daemon](processes.md#the-geenii-daemon-geeniidaemon)
+(process manager, scheduler, supervisor) over HTTP. It is the backend of
 the web UI ([web-ui.md](web-ui.md)) and also serves the built UI as static
 files.
 
@@ -23,8 +24,8 @@ Interactive API docs are at `http://localhost:33311/docs` (OpenAPI at
 |---|---|
 | `server.py` | App setup: lifespan (registries), middleware, exception handlers, static web GUI mount |
 | `router.py` | Mounts every route module under `API_ROUTE_PREFIX = "/api/v1"` |
-| `api_routes.py` | `/health`, `/info` |
-| `agents_routes.py` | `/agents` — agent configs, their slash commands, and writing spec files |
+| `public_routes.py` | `/health`, `/info` (no `dep_current_user`) |
+| `agents_routes.py` | `/agents` — agent configs, their slash commands, writing spec files, and their environment (variables and secrets) |
 | `tools_routes.py` | `/tools` — tool definitions and direct execution |
 | `mcp_routes.py` | `/mcp` — configured MCP servers, their tools, and tool calls (see [mcp.md](mcp.md#http-api)) |
 | `skills_routes.py` | `/skills` — skills in the app's `SkillRegistry` (`app.state.skill_registry`), read-only |
@@ -35,6 +36,9 @@ Interactive API docs are at `http://localhost:33311/docs` (OpenAPI at
 | `chat_sessions.py` | `ChatSessionStore`: chat sessions on disk + per-session agent runners |
 | `web_runner.py` | `WebAgentRunner`: runs one agent turn in a thread and turns it into stream events |
 | `pm_routes.py` | `/pm` — proxy to the process manager daemon |
+| `daemon_routes.py` | `/daemon` — whether the geenii daemon runs, and what it hosts |
+| `scheduler_routes.py` | `/scheduler` — the scheduler config file with live task state, task editing, and manual runs |
+| `supervisor_routes.py` | `/supervisor` — the services config file with live service state, service editing, start/stop/restart and logs |
 | `daemon_helper.py` | Shared helpers for routes that use the geenii daemon (see [Daemon-backed routes](#daemon-backed-routes)) |
 | `apps_routes.py` | `/apps` — GeeApps, through the daemon's `apps.*` methods (see [apps.md](apps.md#http-api)) |
 | `security.py` | `dep_current_user` (stub, see [Security](#security)) |
@@ -46,8 +50,8 @@ The `lifespan` in `server.py` builds the shared state once per process:
 
 | `app.state` | Built by | Contents |
 |---|---|---|
-| `agent_registry` | `init_global_agent_registry(projects=True)` | All agent specs from `$GEENII_WORKING_DIR/.geenii/agents/`, `~/.geenii/agents/` and `/var/geenii/agents/` (`config.agent_paths()`), plus `<project>/.geenii/agents/` of every project in the user settings (`config.project_paths()`) |
-| `tool_registry` | `init_builtin_tools()`, `McpToolLoader.attach()` | Built-in tools plus the tools of **all** servers in `mcp.json`. MCP servers are discovered in the background, so startup doesn't wait for them; their tools are added as each one becomes ready (see [mcp.md](mcp.md#background-loading)). Agents load their own MCP tools when they start, from the same loader |
+| `agent_registry` | `init_global_agent_registry(projects=True)` | The built-in agents, all agent specs from `config.agent_paths()` (`$GEENII_WORKING_DIR/.geenii/agents/`, `~/.geenii/agents/`, `/var/geenii/agents/`, `/etc/geenii/agents/`), the agents added by [plugins](agents.md#plugins), plus `<project>/.geenii/agents/` of every project in the user settings (`config.project_paths()`); see [agents.md](agents.md#agent-registry) |
+| `tool_registry` | `init_builtin_os_tools()`, `init_builtin_webtools()`, `McpToolLoader.attach()` | Built-in tools plus the tools of **all** servers in `mcp.json`. MCP servers are discovered in the background, so startup doesn't wait for them; their tools are added as each one becomes ready (see [mcp.md](mcp.md#background-loading)). Agents load their own MCP tools when they start, from the same loader |
 | `chat_sessions` | `dep_chat_sessions` (lazily, on first `/chats` request) | `ChatSessionStore` over `GEENII_CHAT_SESSIONS_DIR` |
 
 Route modules read this state through small `Depends()` helpers
@@ -94,7 +98,23 @@ All paths are relative to `/api/v1`.
 | `POST /chats/{id}/cancel` | Cancel the running turn |
 | `/chats/{id}/files…` | 501, not implemented |
 | `/pm/…` | Process manager: `ping`, `processes` (list/start/get/output/wait/kill/delete), `gc` — see [processes.md](processes.md) |
-| `/apps/…` | GeeApps: list, get, start, stop, restart, logs, reload — see [apps.md](apps.md#http-api) |
+| `/apps/…` | GeeApps: list, get, icon, start, stop, restart, logs, reload, add, enabled, autostart — see [apps.md](apps.md#http-api) |
+| `GET /agents/{name}/env` | `AgentEnv {vars, secrets}`: the agent's variables and the **names** of its secrets (the HTTP side of [`geenii agents env`](../cli-reference/agents.md#env)). Changes apply to agent instances created afterwards. 404 unknown agent |
+| `PUT /agents/{name}/env/vars` | Body: an object of strings. Replaces **all** variables of the agent. `AgentEnv`; 400 invalid variable name, 404 unknown agent |
+| `PUT /agents/{name}/env/secrets/{key}` | Body `{"value": str}`. Creates or replaces one secret. `AgentEnv`; 400 invalid name, 404 unknown agent |
+| `DELETE /agents/{name}/env/secrets/{key}` | Deletes one secret. `AgentEnv`; 404 unknown agent or secret |
+| `GET /daemon/status` | `{running, socket, info, error}`. Always 200; `running` is false when the daemon socket can't be reached, `info` is the daemon's `info` result otherwise |
+| `GET /scheduler/config` | `{path, exists, daemon: {running, config, status, error}, tasks, error}`. `path` is the config file the daemon uses, else `~/.geenii/scheduler.json`. `tasks` are the file's entries, disabled ones included, each with `live` (the running scheduler's state, or `null` if it hasn't loaded the task); tasks the daemon runs that aren't in the file are appended with `not_in_config: true`. A file that can't be read sets `error` |
+| `POST /scheduler/tasks` | Body `TaskInput` (`name`, `interval`, `cmd` **or** `module`, `params`, `env`, `working_dir`, `timeout`, `allow_overlap`, `enabled`; see [scheduler.md](../user-guide/scheduler.md#task-configuration)). Appends the task to the config file. 201 with `{task, path, reload}`; 400 invalid, 409 name taken |
+| `PUT /scheduler/tasks/{name}` | Body `TaskInput`; a different `name` renames the task. Keys the editor doesn't know are kept. `{task, path, reload}`; 404 unknown, 409 new name taken |
+| `DELETE /scheduler/tasks/{name}` | Removes the task from the config file; a run in progress may finish. `{path, reload}`; 404 |
+| `POST /scheduler/tasks/{name}/run` | Starts a run in the daemon now, outside the schedule. 202 `{name, status: "started", path}`; 409 when no daemon runs a scheduler, 404 task not loaded (disabled or invalid) |
+| `GET /supervisor/config` | `{path, exists, daemon: {running, config, error}, services, error}`, like `/scheduler/config`, for `~/.geenii/services.json` (or the daemon's file). Each service has `live`; services the daemon supervises that aren't in the file (`geenii supervisor start`) are appended with `not_in_config: true` |
+| `POST /supervisor/services` | Body `ServiceInput` (`name`, `cmd`, `restart`, `env`, `cwd`, `capture_output`, `max_failures`, `enabled`). Appends the service; a daemon that uses the file starts it. 201 with `{service, path, reload}`; 400 invalid, 409 name taken |
+| `PUT /supervisor/services/{name}` | Body `ServiceInput`; a different `name` renames it. The daemon restarts the service. `{service, path, reload}`; 404, 409 |
+| `DELETE /supervisor/services/{name}` | Removes the service; the daemon stops it. `{path, reload}`; 404 |
+| `POST /supervisor/services/{name}/start`, `…/stop`, `…/restart` | `{name, status}` (`started`, `stopped`, `restarted`). Stop leaves the service listed as stopped until it is started or the daemon restarts; restart also resets the restart backoff. 404 not supervised, 409 no daemon |
+| `GET /supervisor/services/{name}/logs?tail=200` | `{name, lines}`: stdout, stderr and supervisor events as `[tag] line` strings (`tail` 1–10000). 404 not supervised |
 
 `POST /tools/{name}/execute` runs the tool with an empty env and **no HITL
 approval** — it is an admin endpoint, so it can run arbitrary shell commands
@@ -138,6 +158,12 @@ helpers in `daemon_helper.py`:
 | `daemon_state(client, component)` | `(status, config path, error)` of the `scheduler` or `supervisor`; the status is `None` without a daemon |
 | `config_path(client, component, default)` | `(path, live)`: the config file the daemon uses, else the default |
 | `reload_config(client, component, live)` | Makes a daemon that uses the file reload it; returns `{reloaded, changes, error}` |
+
+The scheduler and supervisor routes edit the config file directly (written
+atomically, under a lock) and then call `reload_config()`, so they also work
+without a daemon; the `reload` field of their responses says whether a
+running daemon picked the change up. Only `run`, `start`, `stop`, `restart`
+and `logs` need the daemon.
 
 Daemon errors arrive as `"<ExceptionType>: <message>"` and are mapped to
 `KeyError` 404, `ValueError` 400, `TimeoutError` 408 and any other exception
@@ -198,7 +224,9 @@ API server.
 ## Security
 
 There is **no authentication** yet. `dep_current_user` is attached to every
-router except `api_routes`, but it always returns `User("test_user")`. CORS
+router except `public_routes`, but it always returns
+`User(username="user@localhost")`. The `_apptoken` the UI adds to app URLs
+(see [apps.md](apps.md#ui)) is a fixed stub that nothing checks. CORS
 allows all origins. Because `/tools/{name}/execute` and `/chats` can run
 shell commands, bind the server to `127.0.0.1` (the default) and do not
 expose it on a network.
