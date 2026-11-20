@@ -4,7 +4,6 @@ from rich.table import Table
 
 from geenii.agent.env import AgentEnvStore
 from geenii.cli.click_helper import click_error, click_info
-from geenii.g import init_global_agent_registry
 
 
 @click.group()
@@ -15,8 +14,12 @@ def agents():
 @agents.command(name="list")
 def list_agents():
     """List all configured and loaded agents."""
-    click.echo("Configured agents:")
+    from geenii.g import init_global_agent_registry
+
+    # a fresh registry with the agents of all registered projects; the global one has none
     _agents = init_global_agent_registry(projects=True)
+
+    click.echo("Configured agents:")
     for agent_name in sorted(_agents.list_configured()):
         click.echo(f"- {agent_name}")
 
@@ -49,7 +52,9 @@ def list_agents():
 @click.option("--instructions", default=False, is_flag=True, help="Show agent instructions.")
 @click.argument("name")
 def inspect_agent(name: str, instructions: bool):
-    _agents = init_global_agent_registry()
+    from geenii.g import get_agent_registry
+    _agents = get_agent_registry()
+
     agent_config = _agents.get_config(name)
     if not agent_config:
         click_error(f"Agent '{name}' not found. Please check the available agents with 'agents list'.")

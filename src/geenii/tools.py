@@ -64,6 +64,7 @@ def init_builtin_webtools(registry: ToolRegistry):
     registry.register(WebFetchTool())
 
 
+
 # empty results are not cached: a server that is still starting up may list no tools yet
 @cached(ttl=3600, cache_if=bool)
 def read_mcp_server_tools(server_name) -> list[dict]:

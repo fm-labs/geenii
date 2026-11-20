@@ -124,22 +124,21 @@ def agent_cli(
             prompt = click.prompt(text="Please enter a prompt", type=str, default="No prompt")
 
     if context_id is None or len(context_id) < 1:
-        context_id = f"{uuid.uuid4().hex}-cli"
-        if resume:
-            restored_context_id = restore_last_context_id(name)
-            if restored_context_id is not None:
-                logger.info(f"Restored context_id: {restored_context_id}")
-                context_id = restored_context_id
-
-        if interactive:
-            restored_context_id = restore_last_context_id(name)
-            if restored_context_id is not None:
-                logger.info(f"Restored context_id: {restored_context_id}")
-                click.prompt(
-                    f"Want to restore last conversation? ({restored_context_id})",
-                    type=click.Choice(["y", "n"]),
-                    default="n",
-                )
+        # --resume continues the last conversation; in interactive mode the user is asked
+        restored_context_id = restore_last_context_id(name) if resume or interactive else None
+        if restored_context_id is not None and (
+            resume
+            or click.prompt(
+                f"Want to restore last conversation? ({restored_context_id})",
+                type=click.Choice(["y", "n"]),
+                default="n",
+            )
+            == "y"
+        ):
+            logger.info(f"Restored context_id: {restored_context_id}")
+            context_id = restored_context_id
+        else:
+            context_id = f"{uuid.uuid4().hex}-cli"
 
     agent_run(
         prompt=prompt,

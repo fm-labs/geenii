@@ -71,7 +71,7 @@ def test_find_best_skill_task(agent, requests):
 def test_find_best_agent_task(agent, requests, monkeypatch):
     registry = AgentRegistry()
     registry.configs["other"] = AgentSpec(name="other", model="fake:test")
-    monkeypatch.setattr(tasks, "init_global_agent_registry", lambda: registry)
+    monkeypatch.setattr(tasks, "get_agent_registry", lambda: registry)
     _run(
         tasks.FindBestAgentTask(agent, prompt="who should answer?"),
         requests,

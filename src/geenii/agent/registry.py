@@ -5,7 +5,6 @@ from typing import Literal
 
 import pydantic
 
-from geenii.agent.base_agent import BaseAgent
 from geenii.utils.mdfile import read_frontmatter_file
 
 logger = logging.getLogger(__name__)
@@ -77,20 +76,20 @@ class AgentSpec(pydantic.BaseModel):
 
 class AgentRegistry:
     def __init__(self):
-        self._agent_configs: dict[str, AgentSpec] = {}
-        self._agents: dict[str, BaseAgent] = {}
+        self._specs: dict[str, AgentSpec] = {}
+        # self._agents: dict[str, BaseAgent] = {}
 
     @property
     def configs(self) -> dict[str, AgentSpec]:
-        return self._agent_configs
+        return self._specs
 
-    @property
-    def agents(self) -> dict[str, BaseAgent]:
-        return self._agents
+    # @property
+    # def agents(self) -> dict[str, BaseAgent]:
+    #     return self._agents
 
     def get_config(self, name: str) -> AgentSpec | None:
         """Get the configuration for a agent by name. Returns None if no configuration is found."""
-        return self._agent_configs.get(name)
+        return self._specs.get(name)
 
     # def get_instance(self, name: str, context_id: str|None = None) -> BotInterface | None:
     #     """Get a Agent instance by name. If the agent is not already loaded, it will be initialized from its configuration if available. Returns None if no agent instance can be found or initialized."""
@@ -108,34 +107,34 @@ class AgentRegistry:
 
     def list_configured(self) -> set[str]:
         """Names of configured agents"""
-        return set(self._agent_configs.keys())
+        return set(self._specs.keys())
 
-    def list_loaded(self) -> set[str]:
-        """Names of currently loaded agents"""
-        return set(self._agents.keys())
+    # def list_loaded(self) -> set[str]:
+    #     """Names of currently loaded agents"""
+    #     return set(self._agents.keys())
 
-    def unload_agent(self, name: str) -> None:
-        """Unload a agent by name. This removes the agent instance from the registry but keeps its configuration available for future loading. If the agent is not currently loaded, this method does nothing."""
-        if name in self._agents:
-            del self._agents[name]
-            logger.info(f"Agent '{name}' unloaded.")
-        else:
-            logger.warning(f"Attempted to unload agent '{name}' which is not currently loaded.")
+    # def unload_agent(self, name: str) -> None:
+    #     """Unload a agent by name. This removes the agent instance from the registry but keeps its configuration available for future loading. If the agent is not currently loaded, this method does nothing."""
+    #     if name in self._agents:
+    #         del self._agents[name]
+    #         logger.info(f"Agent '{name}' unloaded.")
+    #     else:
+    #         logger.warning(f"Attempted to unload agent '{name}' which is not currently loaded.")
 
-    def _register_agent(self, agent: BaseAgent) -> None:
-        """Internal method"""
-        if not agent or not isinstance(agent, BaseAgent):
-            raise ValueError("Invalid agent object provided for registration.")
-        if agent.name in self._agents:
-            raise ValueError(f"Agent with name '{agent.name}' is already registered.")
-        self._agents[agent.name] = agent
-        logger.info(f"Agent '{agent.name}' registered.")
+    # def _register_agent(self, agent: BaseAgent) -> None:
+    #     """Internal method"""
+    #     if not agent or not isinstance(agent, BaseAgent):
+    #         raise ValueError("Invalid agent object provided for registration.")
+    #     if agent.name in self._agents:
+    #         raise ValueError(f"Agent with name '{agent.name}' is already registered.")
+    #     self._agents[agent.name] = agent
+    #     logger.info(f"Agent '{agent.name}' registered.")
 
     def load_from_file(self, config_path: str):
         if os.path.exists(config_path):
             try:
                 agent_conf = AgentSpec.from_md_file(config_path)
-                self._agent_configs[agent_conf.name] = agent_conf
+                self._specs[agent_conf.name] = agent_conf
                 logger.debug(f"Agent config '{agent_conf.name}' loaded from file '{config_path}'.")
             except Exception as e:
                 logger.error(
@@ -159,7 +158,7 @@ class AgentRegistry:
                     agent_conf.scope = scope
                     if scope == "project":
                         agent_conf.working_dir = str(base_path.parent.parent.resolve().absolute())
-                    self._agent_configs[agent_conf.name] = agent_conf
+                    self._specs[agent_conf.name] = agent_conf
                     logger.info(f"Agent config '{agent_conf.name}' loaded from file '{file_path}'.")
                 except Exception as e:
                     logger.error(f"Error loading agent from config: {e!s}", exc_info=e)

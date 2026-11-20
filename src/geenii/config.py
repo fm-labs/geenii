@@ -204,6 +204,13 @@ def get_projects() -> dict[str, dict]:
     return result
 
 
+def geenii_home() -> Path:
+    """geenii's data folder: GEENII_HOME if set, else ~/.geenii."""
+    home = Path(os.environ.get("GEENII_HOME") or Path(GEENII_USER_HOME or Path.home()) / ".geenii").expanduser()
+    home.mkdir(parents=True, exist_ok=True)
+    return home
+
+
 def project_paths() -> list[str]:
     """The configured project directories (resolved, absolute)."""
     return list(get_projects())

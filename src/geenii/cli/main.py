@@ -19,6 +19,7 @@ from geenii.cli.server_cli import server as server_cli
 from geenii.cli.skills_cli import skills as skills_cli
 from geenii.cli.supervisor_cli import supervisor as supervisor_cli
 from geenii.cli.tools_cli import tools as tools_cli
+from geenii.cli.worker_cli import worker as worker_cli
 from geenii.config import APP_VERSION, GEENII_CACHE_DIR
 from geenii.logs import init_logging
 
@@ -128,6 +129,7 @@ geecli.add_command(scheduler_cli)
 geecli.add_command(server_cli)
 geecli.add_command(supervisor_cli)
 geecli.add_command(flow_cli)
+geecli.add_command(worker_cli)
 
 
 def main():

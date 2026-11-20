@@ -50,7 +50,7 @@ def get_bot(botname: str) -> BotInterface:
 def init_global_agent_registry(registry: AgentRegistry | None = None, projects: bool = False) -> AgentRegistry:
     registry = registry or AgentRegistry()
     # default
-    registry._agent_configs.update(
+    registry._specs.update(
         {
             "default": AgentSpec(
                 name="default",
@@ -72,9 +72,9 @@ def init_global_agent_registry(registry: AgentRegistry | None = None, projects: 
     #     }
     # )
     # chatgpt
-    registry._agent_configs.update({"chatgpt": AgentSpec(name="chatgpt", model="openai:gpt-4o-mini", scope="global")})
+    registry._specs.update({"chatgpt": AgentSpec(name="chatgpt", model="openai:gpt-4o-mini", scope="global")})
     # claude
-    registry._agent_configs.update({"claude": AgentSpec(name="claude", model="anthropic:claude-opus-4-6", scope="global")})
+    registry._specs.update({"claude": AgentSpec(name="claude", model="anthropic:claude-opus-4-6", scope="global")})
     # deepseek
     #registry._agent_configs.update({"deepseek": AgentSpec(name="deepseek", model="ollama:deepseek:v1", scope="global")})
 
@@ -82,7 +82,7 @@ def init_global_agent_registry(registry: AgentRegistry | None = None, projects: 
         registry.load_from_directory(agent_dir, scope=scope)
 
     # agents added by plugins; agent md files with the same name take precedence
-    registry._agent_configs.update(plugin_agents())
+    registry._specs.update(plugin_agents())
 
     # also load from all registered projects
     if projects:
@@ -92,6 +92,25 @@ def init_global_agent_registry(registry: AgentRegistry | None = None, projects: 
 
     return registry
 
+
+# The global agent registry, built on first use. Building it loads plugins, and plugins import modules that
+# import geenii.g, so it must never be built while geenii.g itself is being imported.
+_agent_registry: AgentRegistry | None = None
+
+
+def get_agent_registry() -> AgentRegistry:
+    """The global agent registry, built on the first call."""
+    global _agent_registry
+    if _agent_registry is None:
+        _agent_registry = init_global_agent_registry()
+    return _agent_registry
+
+
+def reload_global_agent_registry() -> AgentRegistry:
+    """Build the global agent registry again (e.g. after agent files changed)."""
+    global _agent_registry
+    _agent_registry = init_global_agent_registry()
+    return _agent_registry
 
 def locate_agent_md_file(agent_name: str) -> tuple[str, str] | tuple[None, None]:
     for agent_dir, scope in agent_paths():
@@ -132,6 +151,7 @@ def init_agent_by_name(name: str, context_id: str | None = None, cwd: str | None
 def init_agent(
     agent_spec: AgentSpec,
     context_id: str | None = None,
+    model: str | None = None,
     *,
     memory: ChatMemory | None = None,
     hitl: HumanInTheLoopController | None = None,
@@ -143,12 +163,11 @@ def init_agent(
 
     tool_registry = ToolRegistry()
     if agent_spec.tools is not None:
-        for tool in agent_spec.tools:
-            if tool in ("read", "write", "bash"):
-                init_builtin_os_tools(tool_registry)
-                break
-            if tool in ("web_fetch"):
-                init_builtin_webtools(tool_registry)
+        wanted = set(agent_spec.tools)
+        if wanted & {"read", "write", "bash"}:
+            init_builtin_os_tools(tool_registry)
+        if "web_fetch" in wanted:
+            init_builtin_webtools(tool_registry)
 
         # tools added by plugins
         _plugin_tools = plugin_tools()
@@ -188,7 +207,7 @@ def init_agent(
         agent = agent_class(
             name=agent_spec.name,
             description=agent_spec.description,
-            model=agent_spec.model,
+            model=model or agent_spec.model,
             system_prompt=agent_spec.full_instructions,
             allowed_tools=set(agent_spec.tools),
             mcp_servers=agent_spec.mcp_servers,

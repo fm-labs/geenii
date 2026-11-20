@@ -208,3 +208,33 @@ class WebHumanInTheLoopController(HumanInTheLoopController):
             self._events.pop(call_id, None)
             self._answers.pop(call_id, None)
         return choice is not None and choice.strip().lower() in self.APPROVE_CHOICES
+
+
+class PolicyHumanInTheLoopController(HumanInTheLoopController):
+    """
+    HITL handler for unattended runs (nobody is there to ask): approves tool calls from a fixed policy.
+
+    Policy strings: "none" denies every tool call, "all" approves every tool call, and a comma-separated
+    list of tool names ("read,web_fetch") approves only those tools.
+    """
+
+    def __init__(self, allowed: set[str] | None):
+        # None means every tool is allowed
+        self.allowed = allowed
+
+    @classmethod
+    def from_policy(cls, policy: str | None) -> "PolicyHumanInTheLoopController":
+        policy = (policy or "none").strip()
+        if policy.lower() == "all":
+            return cls(None)
+        if policy.lower() in ("", "none"):
+            return cls(set())
+        return cls({name.strip() for name in policy.split(",") if name.strip()})
+
+    def describe(self) -> str:
+        if self.allowed is None:
+            return "all"
+        return ",".join(sorted(self.allowed)) or "none"
+
+    def request_tool_execution(self, tool_name: str, arguments: dict, call_id: str) -> bool:
+        return self.allowed is None or tool_name in self.allowed

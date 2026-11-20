@@ -99,7 +99,7 @@ class WebFetchTool(Tool):
         ctx: ToolCallContext,
     ) -> ToolCallResult:
         url = (args.get("url") or "").strip()
-        parser = args.get("parser") or "none"
+        parser = args.get("parser") or "html"
 
         if not url:
             return ToolCallResult(text="Missing 'url' argument", is_error=True)

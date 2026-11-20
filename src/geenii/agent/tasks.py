@@ -28,7 +28,7 @@ from geenii.datamodels import (
     ModelMessage,
     SystemMessage,
 )
-from geenii.g import init_agent_by_name, init_global_agent_registry
+from geenii.g import get_agent_registry, init_agent_by_name
 from geenii.tool.registry import ToolRegistry
 from geenii.tool.tool_filter import ToolFilterSet
 from geenii.utils.json_util import parse_json_safe
@@ -631,7 +631,7 @@ class FindBestAgentTask(BaseAgentTask):
     def __init__(self, agent: BaseAgent, prompt: str):
         super().__init__(agent)
         self.prompt = prompt
-        self.agent_registry = init_global_agent_registry()
+        self.agent_registry = get_agent_registry()
 
     def execute(self) -> Iterator[ModelMessage | BaseTask]:
         def format_agent(agent) -> str:
