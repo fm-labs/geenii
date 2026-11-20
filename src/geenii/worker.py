@@ -37,6 +37,7 @@ from geenii.hitl import HumanInTheLoopController, PolicyHumanInTheLoopController
 from geenii.memory import ShortTermChatMemory
 
 from geenii.ibc.comms import MAX_SUBJECT, MAX_TEXT, Mailbox, known_agents
+from geenii.ibc.files import format_attachments
 
 HEARTBEAT_SECONDS = 15  # how often a running worker refreshes its heartbeat file, also while busy
 STALE_SECONDS = 4 * HEARTBEAT_SECONDS  # a worker not seen for this long is probably gone
@@ -135,6 +136,9 @@ def handle(spec: AgentSpec, message: dict, model: str | None, hitl: HumanInTheLo
     #    prompt = message["body"]  # recommenders take the task as-is
     #else:
     prompt = f"Message from agent '{message['from']}' (subject: {message['subject']}):\n\n{message['body']}"
+    if message.get("attachments"):
+        prompt += ("\n\nAttached files (in the shared file store; use file_read_text or file_download with the id):\n"
+                   + format_attachments(message["attachments"]))
     return final_answer(list(agent.process(prompt)))
 
 

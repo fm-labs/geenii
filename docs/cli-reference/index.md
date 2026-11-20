@@ -116,9 +116,16 @@ geenii
     ├── ask AGENT TEXT            # mail a running worker and print its reply
     ├── list                      # running workers and their status
     ├── inbox [AGENT] [--read ID] # show an inbox (default: yours, 'human')
-    ├── send TO SUBJECT BODY      # send agent mail
+    ├── send TO SUBJECT BODY      # send agent mail (-a ID|PATH to attach files)
     ├── blackboard [-t TOPIC]     # read the shared blackboard
-    └── post TOPIC TEXT           # post to the shared blackboard
+    ├── post TOPIC TEXT           # post to the shared blackboard
+    └── files                     # shared file store
+        ├── list [AGENT]          # all files, or an agent's filebox
+        ├── put PATH              # upload a file, prints its id
+        ├── get ID [DEST]         # save a stored file
+        ├── info ID               # a file's metadata
+        ├── rm ID...              # delete files
+        └── gc [--older-than D]   # delete old files
 ```
 
 ## Subcommand Reference
@@ -138,7 +145,7 @@ geenii
 - [scheduler](scheduler.md) — manage and run the task scheduler
 - [server](server.md) — start, stop and inspect the HTTP server (API + web UI)
 - [supervisor](supervisor.md) — keep long-running processes up
-- [worker](worker.md) — run agents unattended, agent mail and the blackboard
+- [worker](worker.md) — run agents unattended, agent mail, the blackboard and shared files
 
 ## Related Entry Points
 

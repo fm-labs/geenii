@@ -12,6 +12,7 @@ from starlette.responses import JSONResponse
 from geenii.config import APP_VERSION, MCP_AUTOLOAD, WWW_DIR
 from geenii.datamodels import Problem
 from geenii.g import init_global_agent_registry, init_global_skill_registry
+from geenii.ibc.tools import init_builtin_ibc_tools_stubs
 from geenii.logs import init_logging
 from geenii.plugins import load_plugins, plugin_tools
 from geenii.server.router import app_router
@@ -82,6 +83,7 @@ async def initialize_tool_registry():
     registry = ToolRegistry()
     init_builtin_os_tools(registry)
     init_builtin_webtools(registry)
+    init_builtin_ibc_tools_stubs(registry)
     for tool in plugin_tools().list_tools():
         registry.register(tool)
     # MCP servers can take long to start (e.g. pulling docker images), so their tools are discovered

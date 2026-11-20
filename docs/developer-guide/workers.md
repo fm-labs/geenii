@@ -30,7 +30,12 @@ runs in the foreground of the calling thread:
      `init_agent(spec, model=model, memory=ShortTermChatMemory(), hitl=approver)`,
      so no state carries over between messages, and
      `agent.process(prompt)` with the prompt
-     `Message from agent '<from>' (subject: <subject>):\n\n<body>`.
+     `Message from agent '<from>' (subject: <subject>):\n\n<body>`. If the
+     message has [attachments](ibc.md#attachments), the prompt ends with
+     `Attached files (in the shared file store; use file_read_text or
+     file_download with the id):` and one `- name (id, size)` line per file.
+     To open them, the agent's spec must list those tools and `--approve`
+     must allow them.
      An exception becomes the answer `Error while handling your message: <e>`.
    - `reply(spec, message, answer)`, see [Replies](#replies), then
      `mailbox.ack()`, which moves the message to `read/`. If the reply raises,

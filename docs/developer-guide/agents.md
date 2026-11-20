@@ -54,6 +54,9 @@ agent is constructed, based on its spec:
 - If the spec's `tools` list contains `read`, `write` or `bash`, the built-in
   OS tools are registered (`init_builtin_os_tools()`); `web_fetch` registers
   `WebFetchTool` (`init_builtin_webtools()`). Both can be combined.
+- The agent mail, blackboard and file store tools (`send_mail`,
+  `file_upload`, …, see [IBC](ibc.md#tools-for-agents)) are registered,
+  bound to the agent, if the spec's `tools` names them.
 - Tools added by [plugins](#plugins) are registered if the spec's `tools`
   names them.
 - If the spec lists `mcp_servers`, only the tools of those servers are

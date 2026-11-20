@@ -9,7 +9,7 @@ shared blackboard as the human user.
 geenii worker <command> [OPTIONS]
 ```
 
-Agent mail, the blackboard and the worker status files live in `GEENII_HOME`
+Agent mail, the blackboard, shared files and the worker status files live in `GEENII_HOME`
 (default `~/.geenii`), see [Configuration](../user-guide/configuration.md).
 Every command works without the [daemon](daemon.md). For background and
 examples, see the [workers user guide](../user-guide/workers.md).
@@ -96,21 +96,29 @@ List the unread mail of `AGENT`, oldest first (default: your own inbox,
 | `--read ID` | Show the message with this id (12 hex characters) and mark it read |
 | `--all` | Also list read and failed messages (marked `(read)` and `(failed)`) |
 
+Messages with attachments are marked `[n files]`; `--read` lists them as
+`- name (id, size)`.
+
 ### send
 
 ```
-geenii worker send <TO> <SUBJECT> <BODY> [--from NAME]
+geenii worker send <TO> <SUBJECT> <BODY> [--from NAME] [--attach ID|PATH ...]
 ```
 
 Put a message into the inbox of `TO`, an agent name or `human`. It is
 answered once a worker for that agent runs.
 
-| Option | Description |
-|---|---|
-| `--from` | Sender name (default `human`) |
+| Option | Short | Description |
+|---|---|---|
+| `--from` | | Sender name (default `human`) |
+| `--attach` | `-a` | Attach a stored file by id, or a local file, which is uploaded first (owned by the sender). Repeatable, up to 20 |
 
-Exits with code 1 for an unknown receiver or an empty or too long subject
-(max 200 characters) or body (max 20,000).
+All attachments are checked before anything is uploaded or sent. Attached
+files are shared with the receiver (see [files](#files)).
+
+Exits with code 1 for an unknown receiver, an unknown file id or missing
+file, or an empty or too long subject (max 200 characters) or body (max
+20,000).
 
 ### blackboard
 
@@ -138,6 +146,29 @@ Add an entry to the blackboard.
 |---|---|
 | `--as` | Author name (default `human`) |
 
+### files
+
+```
+geenii worker files list [AGENT]
+geenii worker files put <PATH> [--as NAME] [--name NAME] [--note TEXT] [--share AGENT ...]
+geenii worker files get <ID> [DEST] [--force]
+geenii worker files info <ID>
+geenii worker files rm <ID> ...
+geenii worker files gc [--older-than DAYS]
+```
+
+The shared file store: files agents and the human exchange by id
+(`f_` + 32 hex characters). Stored files never change.
+
+| Command | Does |
+|---|---|
+| `list [AGENT]` | All files, newest first; with `AGENT` only its filebox (files it uploaded or that were shared with it). Shows id, name, size, owner, shared with, created |
+| `put PATH` | Uploads a local file (max 25 MB) and prints its id. `--as` sets the owner (default `human`), `--name` the stored name, `--note` a description; `--share AGENT` (repeatable) puts it in that agent's filebox |
+| `get ID [DEST]` | Saves the file to `DEST`, a file or a folder (then under its stored name; default: the current folder). Refuses to overwrite unless `--force` |
+| `info ID` | The file's metadata as JSON (name, size, sha256, mime, owner, created_at, shared_with, note) |
+| `rm ID ...` | Deletes files, whoever owns them |
+| `gc` | Deletes files older than `--older-than` days (default 30), except those attached to mail that is unread or being handled by a worker |
+
 ## Examples
 
 ```bash
@@ -158,6 +189,10 @@ geenii worker list
 # Answer what is in the inbox, then exit (e.g. from the scheduler)
 geenii worker serve research --once
 
+# Hand a file to an agent and collect its result
+geenii worker send research "papers" "Summarize the attached list" -a ./papers.csv
+geenii worker files list human
+
 # Share notes on the blackboard
 geenii worker post monthly-report "Numbers for October are in."
 geenii worker blackboard --topic monthly-report
@@ -166,5 +201,5 @@ geenii worker blackboard --topic monthly-report
 ## See Also
 
 - [Workers](../user-guide/workers.md) — how workers and agent mail fit together
-- [Inter-bot communication](../developer-guide/ibc.md) — mail and blackboard internals
+- [Inter-bot communication](../developer-guide/ibc.md) — mail, blackboard and file store internals
 - [Workers internals](../developer-guide/workers.md)

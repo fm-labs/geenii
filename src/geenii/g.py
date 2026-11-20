@@ -148,6 +148,24 @@ def init_agent_by_name(name: str, context_id: str | None = None, cwd: str | None
         raise
 
 
+def _register_ibc_tools(tool_registry: ToolRegistry, agent_name: str, wanted: set[str]) -> None:
+    """Register the agent mail / blackboard and file store tools the spec names, bound to this agent."""
+    from geenii.ibc.comms import COMMS_TOOL_NAMES, comms_tools
+    from geenii.ibc.files import FILE_TOOL_NAMES, files_tools
+
+    for names, factory in ((COMMS_TOOL_NAMES, comms_tools), (FILE_TOOL_NAMES, files_tools)):
+        if not wanted & names:
+            continue
+        try:
+            tools = factory(agent_name)
+        except ValueError as e:  # the agent's name can't be a mailbox / file owner name
+            logger.warning(f"Agent '{agent_name}' can't use the {', '.join(sorted(wanted & names))} tools: {e}")
+            continue
+        for tool in tools:
+            if tool.name in wanted and not tool_registry.has(tool.name):
+                tool_registry.register(tool)
+
+
 def init_agent(
     agent_spec: AgentSpec,
     context_id: str | None = None,
@@ -168,6 +186,7 @@ def init_agent(
             init_builtin_os_tools(tool_registry)
         if "web_fetch" in wanted:
             init_builtin_webtools(tool_registry)
+        _register_ibc_tools(tool_registry, agent_spec.name, wanted)
 
         # tools added by plugins
         _plugin_tools = plugin_tools()

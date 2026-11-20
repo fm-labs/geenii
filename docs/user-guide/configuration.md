@@ -46,10 +46,11 @@ Configuration lives in two `.geenii/` directories, resolved at import time by
 │       └── scripts/
 ├── inbox/              # agent mail, one folder per agent (~/.geenii only, see workers.md)
 ├── workers/            # status files of running workers (~/.geenii only)
+├── files/              # files agents share by id (~/.geenii only, see workers.md)
 └── blackboard.jsonl    # the shared blackboard (~/.geenii only)
 ```
 
-Agent mail, worker status files and the blackboard live in `GEENII_HOME`,
+Agent mail, worker status files, shared files and the blackboard live in `GEENII_HOME`,
 which defaults to `~/.geenii`; they are never read from the project
 directory.
 

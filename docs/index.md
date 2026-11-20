@@ -53,8 +53,9 @@ Internals for contributors and library consumers.
   plugins, task queue, HITL controllers, and programmatic API.
 - **[Workers](developer-guide/workers.md)** — the unattended serve loop,
   replies, tool approval policy, heartbeat, and delivery.
-- **[Inter-Bot Communication](developer-guide/ibc.md)** — agent mail and the
-  blackboard: storage, formats, atomicity, and the agent tools.
+- **[Inter-Bot Communication](developer-guide/ibc.md)** — agent mail, the
+  blackboard and the shared file store: storage, formats, atomicity, and the
+  agent tools.
 - **[Apps](developer-guide/apps.md)** — GeeApps: manifests, app types
   (including container and link apps), the daemon, HTTP API and UI.
 - **[Messages & Content Parts](developer-guide/messages.md)** — internal

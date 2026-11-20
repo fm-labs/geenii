@@ -10,6 +10,9 @@ Agent mail
     hidden temp file inside the receiver's inbox and renames it into place, so the receiver never sees a
     half-written message. Reading a message moves it to inbox/<agent>/read/.
 
+    A message can carry `attachments`: files of the file store (geenii.ibc.files), referenced by id. Sending
+    shares them with the receiver, so they show in its filebox.
+
     A worker claims a message instead: it moves it to processing/<owner>/ while it works on it, then to
     read/ when it is done (ack) or to failed/ when it couldn't answer it (fail). If the owner dies, recover()
     moves what it held to failed/, so a message is never handled twice.
@@ -30,7 +33,7 @@ from pathlib import Path
 
 from geenii.config import geenii_home
 from geenii.tool.python import PythonFunctionTool
-from geenii.utils.schema import integer, params, string
+from geenii.utils.schema import array, integer, params, string
 
 try:
     import fcntl
@@ -41,6 +44,7 @@ HUMAN = "human"
 MAX_TOPIC = 100
 MAX_SUBJECT = 200
 MAX_TEXT = 20_000
+MAX_ATTACHMENTS = 20
 _MESSAGE_ID_RE = re.compile(r"^[0-9a-f]{12}$")
 
 AGENT_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
@@ -162,7 +166,9 @@ class Mailbox:
         return inbox_dir(self.agent)
 
     @staticmethod
-    def send(sender: str, to: str, subject: str, body: str, reply_to: str | None = None) -> dict:
+    def send(sender: str, to: str, subject: str, body: str, reply_to: str | None = None,
+             attachments: list[str] | None = None) -> dict:
+        """Deliver a message. ATTACHMENTS are file store ids; each is shared with the receiver."""
         now = _now()
         message = {
             "id": _new_id(),
@@ -173,6 +179,8 @@ class Mailbox:
             "body": _check_text(body, "Body", MAX_TEXT),
             "reply_to": reply_to or None,
         }
+        if attachments:  # after the checks above, so a rejected message shares nothing
+            message["attachments"] = _attach(attachments, to)
         folder = inbox_dir(to)
         folder.mkdir(parents=True, exist_ok=True)
         name = f"{now.strftime('%Y%m%dT%H%M%S%fZ')}-{message['id']}.json"
@@ -215,6 +223,7 @@ class Mailbox:
                     "reply_to": message.get("reply_to"),
                     "read": path.parent.name == "read",
                     "failed": path.parent.name == "failed",
+                    "attachments": len(message.get("attachments") or []),
                 }
             )
             if preview_chars:
@@ -333,6 +342,24 @@ class Mailbox:
         return None
 
 
+def _attach(file_ids: list[str], to: str) -> list[dict]:
+    """Check the file ids, share the files with TO and return the attachment entries {id, name, size, mime}."""
+    from geenii.ibc.files import FileStore  # lazy: files imports this module
+
+    if isinstance(file_ids, str):
+        file_ids = [file_ids]
+    file_ids = list(dict.fromkeys(f.strip() for f in file_ids if isinstance(f, str) and f.strip()))
+    if len(file_ids) > MAX_ATTACHMENTS:
+        raise ValueError(f"Too many attachments ({len(file_ids)}, max {MAX_ATTACHMENTS})")
+    store = FileStore()
+    metas = [store.info(file_id) for file_id in file_ids]  # all must exist before anything is shared
+    check_agent_name(to)
+    return [
+        {k: meta[k] for k in ("id", "name", "size", "mime")}
+        for meta in (store.share(m["id"], [to]) for m in metas)
+    ]
+
+
 # -- text formatting for slash commands and the CLI ----------------------------
 
 
@@ -343,6 +370,7 @@ def format_inbox(headers: list[dict]) -> str:
         f"{h['id']}  {h['ts']}  from {h['from']}: {h['subject']}"
         + ("  (read)" if h.get("read") else "")
         + ("  (failed)" if h.get("failed") else "")
+        + (f"  [{h['attachments']} file{'s' if h['attachments'] != 1 else ''}]" if h.get("attachments") else "")
         for h in headers
     )
 
@@ -365,6 +393,51 @@ def known_agents() -> dict[str, str]:
     return agents
 
 
+# name -> (description, parameters) of the comms tools; shared by comms_tools() and the stubs in ibc/tools.py
+COMMS_TOOL_DEFS: dict[str, tuple[str, dict]] = {
+    "blackboard_post": (
+        "Post a note to the shared blackboard that all agents and the human can read.",
+        params(
+            topic=string("Short topic, e.g. 'monthly-report'. Use the same topic for related notes."),
+            text=string("The note"),
+            required=["topic", "text"],
+        ),
+    ),
+    "blackboard_read": (
+        "Read the latest blackboard entries, optionally for one topic. With no entries it lists the topics.",
+        params(
+            topic=string("Only entries with this topic (empty for all)"),
+            limit=integer("Maximum number of entries, default 20"),
+        ),
+    ),
+    "send_mail": (
+        "Send a direct message to another agent's inbox (or to 'human').",
+        params(
+            to=string("Receiver agent name, see list_agents"),
+            subject=string("Subject line"),
+            body=string("Message text"),
+            reply_to=string("Id of the message this replies to, if any"),
+            attachments=array(string("File id"), "Ids of stored files to attach (see file_upload)"),
+            required=["to", "subject", "body"],
+        ),
+    ),
+    "check_inbox": (
+        "Fetch your new agent mail (full messages). Fetched messages are marked read.",
+        params(),
+    ),
+    "read_mail": (
+        "Open a message by id again, including ones already fetched.",
+        params(message_id=string("Message id from check_inbox"), required=["message_id"]),
+    ),
+    "list_agents": (
+        "List the other agents you can send mail to.",
+        params(),
+    ),
+}
+
+COMMS_TOOL_NAMES = frozenset(COMMS_TOOL_DEFS)
+
+
 def comms_tools(agent_name: str):
     """The blackboard and mail tools for one agent. The sender is always `agent_name`."""
 
@@ -379,14 +452,17 @@ def comms_tools(agent_name: str):
         entries = board.read(topic=topic or None, limit=limit)
         return {"entries": entries} if entries else {"entries": [], "topics": board.topics()}
 
-    def send_mail(to: str, subject: str, body: str, reply_to: str = "") -> dict:
+    def send_mail(to: str, subject: str, body: str, reply_to: str = "", attachments: list[str] | None = None) -> dict:
         to = to.strip().lower()
         if to == agent_name:
             raise ValueError("You can't send mail to yourself")
         if to not in known_agents():
             raise ValueError(f"Unknown agent {to!r}. Known: {', '.join(sorted(known_agents()))}")
-        message = Mailbox.send(agent_name, to, subject, body, reply_to=reply_to or None)
-        return {"sent": True, "id": message["id"], "to": to}
+        message = Mailbox.send(agent_name, to, subject, body, reply_to=reply_to or None, attachments=attachments)
+        result = {"sent": True, "id": message["id"], "to": to}
+        if message.get("attachments"):
+            result["attachments"] = [a["id"] for a in message["attachments"]]
+        return result
 
     def check_inbox() -> dict:
         # deliver unread mail in full and mark it read, so the same message is never handled twice
@@ -401,50 +477,15 @@ def comms_tools(agent_name: str):
     def list_agents() -> dict:
         return {name: desc for name, desc in known_agents().items() if name != agent_name}
 
+    handlers = {
+        "blackboard_post": blackboard_post,
+        "blackboard_read": blackboard_read,
+        "send_mail": send_mail,
+        "check_inbox": check_inbox,
+        "read_mail": read_mail,
+        "list_agents": list_agents,
+    }
     return [
-        PythonFunctionTool(
-            "blackboard_post",
-            "Post a note to the shared blackboard that all agents and the human can read.",
-            params(
-                topic=string("Short topic, e.g. 'monthly-report'. Use the same topic for related notes."),
-                text=string("The note"),
-                required=["topic", "text"],
-            ),
-            blackboard_post,
-        ),
-        PythonFunctionTool(
-            "blackboard_read",
-            "Read the latest blackboard entries, optionally for one topic. With no entries it lists the topics.",
-            params(
-                topic=string("Only entries with this topic (empty for all)"),
-                limit=integer("Maximum number of entries, default 20"),
-            ),
-            blackboard_read,
-        ),
-        PythonFunctionTool(
-            "send_mail",
-            "Send a direct message to another agent's inbox (or to 'human').",
-            params(
-                to=string("Receiver agent name, see list_agents"),
-                subject=string("Subject line"),
-                body=string("Message text"),
-                reply_to=string("Id of the message this replies to, if any"),
-                required=["to", "subject", "body"],
-            ),
-            send_mail,
-        ),
-        PythonFunctionTool(
-            "check_inbox",
-            "Fetch your new agent mail (full messages). Fetched messages are marked read.",
-            params(),
-            check_inbox,
-        ),
-        PythonFunctionTool(
-            "read_mail",
-            "Open a message by id again, including ones already fetched.",
-            params(message_id=string("Message id from check_inbox"), required=["message_id"]),
-            read_mail,
-        ),
-        PythonFunctionTool("list_agents", "List the other agents you can send mail to.", params(),
-                           list_agents),
+        PythonFunctionTool(name, description, parameters, handlers[name])
+        for name, (description, parameters) in COMMS_TOOL_DEFS.items()
     ]

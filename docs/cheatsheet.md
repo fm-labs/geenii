@@ -165,7 +165,7 @@ geenii supervisor stop web
 ### `geenii worker` — Run agents unattended
 
 A worker answers the mail of one agent. Tool calls are denied unless `--approve` allows them.
-Mail and the blackboard are stored in `~/.geenii` (or `GEENII_HOME`).
+Mail, the blackboard and shared files are stored in `~/.geenii` (or `GEENII_HOME`).
 
 ```bash
 geenii worker serve research --approve all     # run a worker (foreground)
@@ -175,6 +175,9 @@ geenii worker inbox                            # your mail ('human')
 geenii worker list                             # running workers
 geenii worker post notes "Done for today."     # shared blackboard
 geenii worker blackboard --topic notes
+geenii worker send research "data" "Summarize this" -a ./data.csv   # attach a file
+geenii worker files list research              # an agent's filebox
+geenii worker files get f_3f9c…                # save a shared file
 ```
 
 ### `geenii info` — Show application info

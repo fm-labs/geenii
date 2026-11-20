@@ -73,7 +73,7 @@ def test_list_returns_unread_headers_oldest_first():
     assert [h["id"] for h in headers] == [first["id"], second["id"]]
     assert headers[0] == {
         "id": first["id"], "ts": first["ts"], "from": "human", "subject": "one", "reply_to": None,
-        "read": False, "failed": False,
+        "read": False, "failed": False, "attachments": 0,
     }
 
 
