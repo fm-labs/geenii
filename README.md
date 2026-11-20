@@ -69,3 +69,6 @@ See the [Docker guide](docs/user-guide/docker.md).
 Copyright (C) 2025-2026 fm-labs
 
 Licensed under the [GNU General Public License v3.0 or later](LICENSE).
+
+Contributions require agreeing to the Contributor License Agreement — see [CONTRIBUTING.md](CONTRIBUTING.md).
+The geenii name and logos are covered by the [trademark policy](TRADEMARKS.md).
