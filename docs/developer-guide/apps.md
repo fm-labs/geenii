@@ -6,7 +6,7 @@ are supported:
 | Type         | Runtime               | Default entry point                  | Launch command                  |
 |--------------|-----------------------|--------------------------------------|---------------------------------|
 | `statichtml` | Python `http.server`  | `index.html`                         | `python3 -m http.server $PORT`  |
-| `python`     | Python                | `main.py`, `app.py` or `server.py`   | `<python> $main`                |
+| `python`     | Python + uv           | `main.py`, `app.py` or `server.py`   | `<venv>/bin/python $main` (venv set up with uv) |
 | `node`       | Node.js               | `index.js`                           | `npm start` or `node $main`     |
 | `binary`     | None (compiled)       | *(must be set)*                      | `./$main`                       |
 | `container`  | Docker                | `Dockerfile`                         | `docker build` + `docker run`   |
@@ -84,6 +84,7 @@ versions are strings; a number (e.g. `1`) is read as one, `null` is invalid.
 | `port`        | `null`      | Preferred port (auto-allocated if omitted)           |
 | `env`         | `{}`        | Environment variables passed to the process          |
 | `sandbox`     | `false`     | Run inside Docker sandbox (not yet wired)            |
+| `python`      | `null`      | `python` apps: the interpreter for the app's virtualenv, as uv's `--python` takes it (`"3.12"`, `">=3.11"`); uv downloads it if needed |
 | `autostart`   | `false`     | Default for starting the app when the daemon starts or discovers it, once the app is enabled; the user's [app settings](#app-settings) override it |
 
 Extra fields are allowed — the manifest uses `extra = "allow"` so
@@ -182,12 +183,37 @@ relative paths resolve correctly. It binds to all network interfaces.
 
 ### `python`
 
-Runs `<python> <main>` in the app directory. `main` defaults to the first
-of `main.py`, `app.py` or `server.py` that exists (else `main.py`). The
-interpreter is the app's own virtualenv (`.venv/` or `venv/`) if present,
-otherwise `python3` from `PATH`. Dependencies are not installed
-automatically. `PYTHONUNBUFFERED=1` is set (unless the manifest `env`
-overrides it) so output reaches the logs line by line.
+Runs `<python> <main>` in the app directory, always in a virtualenv of its
+own, never in the daemon's environment. `main` defaults to the first of
+`main.py`, `app.py` or `server.py` that exists (else `main.py`).
+
+If the app ships a virtualenv (`.venv/` or `venv/`), its interpreter is used
+as is. Otherwise geenii keeps a managed virtualenv for the app in
+`$GEENII_CACHE_DIR/app-venvs/<name>-<hash>`, one per app directory and
+manifest `python` version. The launch command (`sh -c`, one supervised
+process) creates and syncs it with [uv](https://docs.astral.sh/uv/) on every
+start, then execs the app. Install output goes to the app's logs. The first
+start takes a few seconds; later starts and restarts are a no-op sync
+(well under a second). The dependencies come from the first of:
+
+| App files                    | Setup                                                        |
+|------------------------------|--------------------------------------------------------------|
+| `pyproject.toml` + `uv.lock` | `uv sync --frozen --no-dev --no-install-project` (exactly the locked versions) |
+| `pyproject.toml`             | `uv venv` + `uv pip install -r pyproject.toml` (no lockfile is written into the app) |
+| `requirements.txt`           | `uv venv` + `uv pip install -r requirements.txt`             |
+| PEP 723 metadata in `main`   | `uv run --script` (uv keeps that environment in its own cache) |
+| none of these                | `uv venv` (an empty venv)                                    |
+
+Python apps without their own virtualenv need `uv` on the daemon's `PATH`;
+starting one without it fails with an error naming it. The managed venvs are
+not removed automatically: delete `$GEENII_CACHE_DIR/app-venvs` (and run
+`uv cache clean` for PEP 723 scripts) to reclaim the space.
+
+The app's `env` gets `VIRTUAL_ENV` and `PATH` (venv `bin/` first) for the
+venv, so `python`, `pip` and console scripts the app spawns resolve to it,
+and an empty `PYTHONPATH`. These override the daemon's values, which the
+supervisor would otherwise merge in. `PYTHONUNBUFFERED=1` is set (unless the
+manifest `env` overrides it) so output reaches the logs line by line.
 
 ### `node`
 
@@ -258,8 +284,9 @@ config = app.to_service_config(port=9100)
 - `name` is `app.service_name` (`app-<name>`); the prefix keeps app
   services apart from other services in `services.json`
 - `cmd` is the launch command described above
-- `env` holds only the app's own variables (manifest `env`, `PORT`,
-  `PYTHONUNBUFFERED` for python apps); the supervisor merges them into its
+- `env` holds only the app's own variables (manifest `env`, `PORT`, and
+  for python apps `PYTHONUNBUFFERED` plus the venv's `VIRTUAL_ENV`, `PATH`
+  and an empty `PYTHONPATH`); the supervisor merges them into its
   own environment when it spawns the process
 - `cwd` is the app directory
 

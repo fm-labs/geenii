@@ -71,8 +71,9 @@ geenii apps start <NAME> [--port PORT] [--dir DIR]
 ```
 
 Start an app as a background service of the daemon. Static HTML apps launch
-`python3 -m http.server`, python apps run `<python> <main>` (using the app's
-`.venv` if present), node apps run `npm start` or `node <main>`, binaries
+`python3 -m http.server`, python apps run `<python> <main>` in their own
+virtualenv (the app's `.venv` if present, else one geenii creates and syncs
+with uv from `uv.lock`, `pyproject.toml` or `requirements.txt`), node apps run `npm start` or `node <main>`, binaries
 execute directly, and container apps build their Dockerfile and run the image
 with the app's port forwarded to port 80 in the container (needs Docker).
 Link apps (experimental) open their URL in the browser of the machine the

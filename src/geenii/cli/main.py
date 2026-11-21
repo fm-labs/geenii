@@ -14,6 +14,7 @@ from geenii.cli.mcp_cli import mcp as mcp_cli
 from geenii.cli.models_cli import models as models_cli
 from geenii.cli.pm_cli import pm as pm_cli
 from geenii.cli.projects_cli import projects as projects_cli
+from geenii.cli.sandbox_cli import sandbox as sandbox_cli
 from geenii.cli.scheduler_cli import scheduler as scheduler_cli
 from geenii.cli.server_cli import server as server_cli
 from geenii.cli.skills_cli import skills as skills_cli
@@ -125,6 +126,7 @@ geecli.add_command(skills_cli)
 geecli.add_command(daemon_cli)
 geecli.add_command(pm_cli)
 geecli.add_command(projects_cli)
+geecli.add_command(sandbox_cli)
 geecli.add_command(scheduler_cli)
 geecli.add_command(server_cli)
 geecli.add_command(supervisor_cli)

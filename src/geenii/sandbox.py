@@ -1,4 +1,5 @@
 import abc
+import logging
 import os
 import subprocess
 import time
@@ -6,9 +7,12 @@ import uuid
 from os.path import dirname
 from typing import Literal
 
-from geenii.config import GEENII_CACHE_DIR
+from geenii import config
 
 SANDBOX_PYTHON3_BASEIMAGE = "python:3.14-slim"
+SANDBOX_IMAGE_PREFIX = "geenii-sandbox-"
+
+logger = logging.getLogger(__name__)
 
 
 def run_docker_subprocess(command: list[str], timeout: int = 30, env: dict | None = None) -> tuple[int, str, str]:
@@ -22,8 +26,8 @@ def run_docker_subprocess(command: list[str], timeout: int = 30, env: dict | Non
     Returns:
         tuple[int, str, str]: A tuple containing the exit code, stdout, and stderr.
     """
-    print("RUN COMMAND:", command)
-    print("COMMAND ENV", env)
+    # Never log ENV: it can hold secrets
+    logger.debug(f"Running command: {command}")
 
     _env = os.environ.copy()
     if env is not None:
@@ -60,10 +64,10 @@ def build_sandbox_image(
     :return:
     """
     # sandbox_docker_file = os.path.join(app_dir, "sandbox.Dockerfile")
-    sandbox_docker_file = os.path.join(GEENII_CACHE_DIR, "sandboxes", sandbox_id, "Dockerfile")
+    sandbox_docker_file = os.path.join(config.GEENII_CACHE_DIR, "sandboxes", sandbox_id, "Dockerfile")
     os.makedirs(dirname(sandbox_docker_file), exist_ok=True)
     overwrite = True
-    image_name = "geenii-sandbox-" + sandbox_id
+    image_name = SANDBOX_IMAGE_PREFIX + sandbox_id
 
     if not dockerlines or len(dockerlines) == 0:
         raise ValueError(f"dockerlines is not defined for sandbox {sandbox_id}")
@@ -73,15 +77,11 @@ def build_sandbox_image(
             f.write(dockerlines)
 
     command = ["docker", "build", "-t", image_name, "-f", sandbox_docker_file, app_dir]
-    print(f"Running command: {' '.join(command)}")
     start_time = time.time()
     rc, stdout, stderr = run_docker_subprocess(command, timeout=3600, env=env)
-    end_time = time.time()
-    print(f"Command finished in {end_time - start_time:.8f} seconds with exit code {rc}")
+    logger.debug(f"Image build finished in {time.time() - start_time:.2f}s with exit code {rc}")
     if rc != 0:
-        print(stdout)
-        print(stderr)
-        raise ValueError(f"Error building docker image: {image_name}")
+        raise ValueError(f"Error building docker image {image_name}:\n{stdout}{stderr}")
     return image_name
 
 
@@ -149,7 +149,7 @@ class Sandbox(abc.ABC):
         )
 
     def run(self) -> tuple[int, str, str]:
-        container_name = "geenii-sandbox-" + self.sandbox_id
+        container_name = SANDBOX_IMAGE_PREFIX + self.sandbox_id
         if self.image_name is None:
             raise ValueError("Sandbox image does not exist")
 
@@ -165,7 +165,8 @@ class Sandbox(abc.ABC):
                 command.extend(["-v", mount])
 
         # Mount a tmpfs for /tmp to allow write operations without affecting the host filesystem
-        command.extend(["-v", "tmpfs:/tmp"])
+        # (`-v tmpfs:/tmp` would be a named volume called "tmpfs", shared by all sandboxes)
+        command.extend(["--tmpfs", "/tmp"])
 
         # Readonly root filesystem
         command.append("--read-only")
@@ -216,10 +217,11 @@ class Sandbox(abc.ABC):
         # Add gateway host
         command.extend(["--add-host", "host.docker.internal:host-gateway"])
 
-        # Add environment vars
+        # Add environment vars: `-e NAME` without a value makes docker take it from its own env
+        # (set by run_docker_subprocess), so values don't show in the argv, process list or logs
         if self.env is not None:
-            for k, v in self.env.items():
-                command.extend(["-e", f"{k}={v}"])
+            for k in self.env:
+                command.extend(["-e", k])
 
         command.append(self.image_name)
         cmd = self.command()
@@ -230,11 +232,12 @@ class Sandbox(abc.ABC):
         else:
             command.extend(cmd)
 
-        print(f"Running command: {' '.join(command)}")
         start_time = time.time()
-        result = run_docker_subprocess(command, timeout=self.timeout)
-        end_time = time.time()
-        print(f"Command finished in {end_time - start_time:.8f} seconds with exit code {result[0]}")
+        result = run_docker_subprocess(command, timeout=self.timeout, env=self.env)
+        if result[0] == -1:
+            # Timed out (or docker failed): killing the docker CLI leaves the container running
+            subprocess.run(["docker", "rm", "-f", container_name], capture_output=True, check=False)
+        logger.debug(f"Sandbox run finished in {time.time() - start_time:.2f}s with exit code {result[0]}")
         return result
 
 

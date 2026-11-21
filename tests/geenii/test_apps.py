@@ -11,7 +11,16 @@ import pytest
 from click.testing import CliRunner
 
 from geenii import config
-from geenii.apps import AppRegistry, AppType, GeeAppManifest, infer_manifest, save_app_settings, write_manifest
+from geenii.apps import (
+    PYTHON_LAUNCH_SCRIPTS,
+    AppRegistry,
+    AppType,
+    GeeAppManifest,
+    app_venv_dir,
+    infer_manifest,
+    save_app_settings,
+    write_manifest,
+)
 from geenii.cli import apps_cli
 from geenii.daemon.client import DaemonClient
 from geenii.daemon.host import ProcessHost
@@ -28,6 +37,8 @@ def user_home(tmp_path, monkeypatch):
     """Keep the user settings (app settings) out of the real ~/.geenii. Returns the settings file path."""
     # a dot dir: tests that scan tmp_path for apps skip it
     monkeypatch.setattr(config, "GEENII_USER_HOME", str(tmp_path / ".home"))
+    # ...and the managed venvs of python apps out of the real cache dir
+    monkeypatch.setattr(config, "GEENII_CACHE_DIR", str(tmp_path / ".cache"))
     return config.user_settings_path()
 
 
@@ -116,6 +127,64 @@ def test_infer_python_app(tmp_path):
     (tmp_path / "app.py").write_text("")
     manifest = infer_manifest(str(tmp_path), "x")
     assert manifest.type == AppType.PYTHON and manifest.main == "app.py"
+
+
+def _python_service(tmp_path, files, **manifest):
+    app_dir = _make_app(str(tmp_path), "py", files)
+    write_manifest(app_dir, GeeAppManifest(name="py", title="Py", type="python", **manifest))
+    registry = AppRegistry([str(tmp_path)])
+    registry.reload()
+    return app_dir, registry.require("py").to_service_config(port=9300)
+
+
+@pytest.mark.parametrize(
+    "files, kind",
+    [
+        ({"main.py": "", "pyproject.toml": "", "uv.lock": "", "requirements.txt": ""}, "uv.lock"),
+        ({"main.py": "", "pyproject.toml": "", "requirements.txt": ""}, "pyproject.toml"),
+        ({"main.py": "", "requirements.txt": ""}, "requirements.txt"),
+        ({"main.py": "# /// script\n# dependencies = []\n# ///\n"}, "script"),
+        ({"main.py": ""}, "plain"),
+    ],
+)
+def test_python_app_runs_in_a_managed_venv(tmp_path, files, kind):
+    app_dir, conf = _python_service(tmp_path, files, python="3.12")
+    venv = app_venv_dir(app_dir, "py", "3.12")
+    assert venv.startswith(os.path.join(config.GEENII_CACHE_DIR, "app-venvs", "py-"))
+    assert conf.cmd == ["sh", "-c", PYTHON_LAUNCH_SCRIPTS[kind], "sh", venv, "3.12", os.path.realpath(app_dir), "main.py"]
+    assert conf.env["PYTHONPATH"] == "" and conf.env["PYTHONUNBUFFERED"] == "1"
+    if kind == "script":
+        assert conf.env["VIRTUAL_ENV"] == ""
+    else:
+        assert conf.env["VIRTUAL_ENV"] == venv
+        assert conf.env["PATH"].split(os.pathsep)[0] == os.path.join(venv, "bin")
+    assert ("UV_PROJECT_ENVIRONMENT" in conf.env) == (kind == "uv.lock")
+
+
+def test_python_app_venv_depends_on_dir_and_python(tmp_path):
+    assert app_venv_dir(str(tmp_path / "a"), "x") != app_venv_dir(str(tmp_path / "b"), "x")
+    assert app_venv_dir(str(tmp_path / "a"), "x") != app_venv_dir(str(tmp_path / "a"), "x", "3.12")
+
+
+def test_python_app_with_own_venv_uses_it(tmp_path):
+    app_dir = _make_app(str(tmp_path), "py", {"main.py": ""})
+    python = os.path.join(app_dir, ".venv", "bin", "python")
+    os.makedirs(os.path.dirname(python))
+    with open(python, "w"):
+        pass
+    os.chmod(python, 0o755)
+    write_manifest(app_dir, GeeAppManifest(name="py", title="Py", type="python"))
+    registry = AppRegistry([str(tmp_path)])
+    registry.reload()
+    conf = registry.require("py").to_service_config()
+    assert conf.cmd == [python, "main.py"]
+    assert conf.env["VIRTUAL_ENV"] == os.path.join(app_dir, ".venv")
+
+
+def test_python_app_without_uv_fails_clearly(tmp_path, monkeypatch):
+    monkeypatch.setattr("geenii.apps.shutil.which", lambda _: None)
+    with pytest.raises(FileNotFoundError, match="'uv' is needed"):
+        _python_service(tmp_path, {"main.py": ""})
 
 
 def test_service_config_has_only_app_env(tmp_path):

@@ -228,4 +228,9 @@ Everything under `$GEENII_CACHE_DIR/logs/`:
   env (values of names containing `password`, `secret`, `api_key` or `token`,
   or with a `_`-separated part `pass`, `passwd` or `pat`, e.g. `GH_PAT`, are
   redacted), working directory and result. Treat as sensitive.
-- `tools.log`, `scheduler.log`, `supervisor.log` — rotating component logs.
+- `geenii-<command>.log` (e.g. `geenii-agent.log`, `geenii-daemon.log`) —
+  rotating application logs, one per CLI command (`GEENII_LOG_NAME`
+  overrides the name; `GEENII_LOGGING=rich` disables the file).
+
+See the [logging developer guide](../developer-guide/logging.md) for the
+complete list.

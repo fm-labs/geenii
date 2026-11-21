@@ -1,7 +1,9 @@
+import hashlib
 import logging
 import os
 import random
 import re
+import shutil
 import socket
 from enum import Enum
 import webbrowser
@@ -24,6 +26,9 @@ CONTAINER_IMAGE_PREFIX = "geenii-app-"
 # Docker repository name component: lowercase alnum, single separators, no leading/trailing ones
 CONTAINER_IMAGE_RE = re.compile(r"[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*")
 ENV_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+APP_VENVS_DIRNAME = "app-venvs"  # under GEENII_CACHE_DIR: managed virtualenvs of python apps
+# PEP 723 inline script metadata block
+SCRIPT_METADATA_RE = re.compile(r"^# /// script\s*$", re.MULTILINE)
 
 
 def _find_python_main(app_dir: str) -> str | None:
@@ -42,14 +47,49 @@ def _port_is_free(port: int) -> bool:
     return True
 
 
-def _python_executable(app_dir: str) -> str:
-    """The app's own virtualenv interpreter if it has one, else python3 from PATH"""
+def _own_venv_python(app_dir: str) -> str | None:
+    """The interpreter of a virtualenv the app ships itself (.venv or venv), if any"""
     for venv in (".venv", "venv"):
         for rel in (("bin", "python"), ("Scripts", "python.exe")):
             candidate = os.path.join(app_dir, venv, *rel)
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                 return candidate
-    return "python3"
+    return None
+
+
+def app_venv_dir(app_dir: str, name: str, python: str | None = None) -> str:
+    """The managed virtualenv of a python app: one per app directory and python version"""
+    key = f"{os.path.realpath(app_dir)}\0{python or ''}"
+    digest = hashlib.sha256(key.encode()).hexdigest()[:12]
+    return os.path.join(config.GEENII_CACHE_DIR, APP_VENVS_DIRNAME, f"{name}-{digest}")
+
+
+def _has_script_metadata(path: str) -> bool:
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return SCRIPT_METADATA_RE.search(f.read(64 * 1024)) is not None
+    except OSError:
+        return False
+
+
+# Launch scripts for python apps, run by `sh -c` as one supervised process: set up the app's
+# virtualenv with uv, then exec the app. The scripts are constants; every value is a positional
+# arg, so nothing from the manifest or the app path is parsed by the shell.
+#   $1 venv dir, $2 python request (may be empty), $3 app dir, $4 main
+_UV_VENV = 'uv venv --quiet --allow-existing ${2:+--python "$2"} "$1"'
+_EXEC_APP = 'exec "$1/bin/python" "$4"'
+PYTHON_LAUNCH_SCRIPTS = {
+    # uv.lock: install exactly the locked dependencies (the project itself isn't installed: main
+    # is run from the app dir)
+    "uv.lock": f'uv sync --quiet --frozen --no-dev --no-install-project --project "$3" ${{2:+--python "$2"}} && {_EXEC_APP}',
+    # pyproject.toml without a lock: its dependencies, without writing a lockfile into the app dir
+    "pyproject.toml": f'{_UV_VENV} && uv pip install --quiet --python "$1/bin/python" -r "$3/pyproject.toml" && {_EXEC_APP}',
+    "requirements.txt": f'{_UV_VENV} && uv pip install --quiet --python "$1/bin/python" -r "$3/requirements.txt" && {_EXEC_APP}',
+    # PEP 723 script: uv keeps its environment (in the uv cache)
+    "script": 'exec uv run --quiet --no-project --script ${2:+--python "$2"} "$4"',
+    # No dependencies: an empty venv, so the app still doesn't see the daemon's packages
+    "plain": f"{_UV_VENV} && {_EXEC_APP}",
+}
 
 
 class AppType(str, Enum):
@@ -82,6 +122,9 @@ class GeeAppManifest(pydantic.BaseModel):
     port: int | None = None
     env: dict[str, str] = pydantic.Field(default_factory=dict)
     sandbox: bool = False
+    # Python apps: the interpreter to create the app's virtualenv with, as uv's `--python`
+    # takes it (e.g. "3.12", ">=3.11"); uv downloads it if needed. None: any python found
+    python: str | None = None
     # Default for starting the app when the daemon starts or discovers it; the user's
     # app settings (AppSettings.autostart) override it
     autostart: bool = False
@@ -233,10 +276,7 @@ class GeeApp(pydantic.BaseModel):
             env["PORT"] = str(port)
 
         if app_type == AppType.PYTHON:
-            main = main or _find_python_main(self.path) or "main.py"
-            # Unbuffered so output reaches the logs line by line
-            env.setdefault("PYTHONUNBUFFERED", "1")
-            return [_python_executable(self.path), main], env
+            return self._python_launch_command(main, env), env
 
         if app_type == AppType.NODE:
             main = main or "index.js"
@@ -270,6 +310,67 @@ class GeeApp(pydantic.BaseModel):
             return ["python", "-m", "webbrowser", main], env
 
         raise ValueError(f"Unknown app type: {app_type}")
+
+    def _python_launch_command(self, main: str | None, env: dict[str, str]) -> list[str]:
+        """Run the app in its own virtualenv, never in the daemon's environment.
+
+        An app that ships a `.venv`/`venv` runs with that interpreter as before. Otherwise a
+        managed virtualenv under GEENII_CACHE_DIR/app-venvs is created and synced with uv on every
+        start (a no-op when nothing changed), from `uv.lock`, `pyproject.toml`, `requirements.txt`
+        or PEP 723 script metadata in MAIN, in that order. ENV gets the venv's VIRTUAL_ENV and PATH
+        and an empty PYTHONPATH, overriding the daemon's values that the supervisor merges in.
+        """
+        main = main or _find_python_main(self.path) or "main.py"
+        # Unbuffered so output reaches the logs line by line
+        env.setdefault("PYTHONUNBUFFERED", "1")
+        env["PYTHONPATH"] = ""
+        env.pop("PYTHONHOME", None)
+
+        own_python = _own_venv_python(self.path)
+        if own_python is not None:
+            venv_dir = os.path.dirname(os.path.dirname(own_python))
+            self._set_venv_env(env, venv_dir, os.path.dirname(own_python))
+            return [own_python, main]
+
+        if shutil.which("uv") is None:
+            raise FileNotFoundError(
+                f"App '{self.name}' is a python app without its own virtualenv: 'uv' is needed to create one "
+                "(https://docs.astral.sh/uv/)"
+            )
+
+        app_dir = os.path.realpath(self.path)
+        python = self.manifest.python or ""
+        venv_dir = app_venv_dir(app_dir, self.name, python or None)
+        # The supervisor runs os.path.expandvars on every arg
+        for value in (app_dir, venv_dir, python, main):
+            if "$" in value:
+                raise ValueError(f"App '{self.name}': '$' is not allowed in {value!r}")
+
+        if os.path.isfile(os.path.join(app_dir, "uv.lock")) and os.path.isfile(os.path.join(app_dir, "pyproject.toml")):
+            kind = "uv.lock"
+            # uv sync creates the venv at UV_PROJECT_ENVIRONMENT instead of <app>/.venv
+            env["UV_PROJECT_ENVIRONMENT"] = venv_dir
+        elif os.path.isfile(os.path.join(app_dir, "pyproject.toml")):
+            kind = "pyproject.toml"
+        elif os.path.isfile(os.path.join(app_dir, "requirements.txt")):
+            kind = "requirements.txt"
+        elif _has_script_metadata(os.path.join(app_dir, main)):
+            kind = "script"
+        else:
+            kind = "plain"
+
+        if kind == "script":
+            # The venv is uv's; only keep the daemon's VIRTUAL_ENV from leaking into uv's discovery
+            env["VIRTUAL_ENV"] = ""
+        else:
+            self._set_venv_env(env, venv_dir, os.path.join(venv_dir, "bin"))
+        return ["sh", "-c", PYTHON_LAUNCH_SCRIPTS[kind], "sh", venv_dir, python, app_dir, main]
+
+    @staticmethod
+    def _set_venv_env(env: dict[str, str], venv_dir: str, bin_dir: str) -> None:
+        """Activate VENV_DIR for the app and anything it spawns (`python`, `pip`, console scripts)"""
+        env["VIRTUAL_ENV"] = venv_dir
+        env["PATH"] = os.pathsep.join(p for p in (bin_dir, os.environ.get("PATH", "")) if p)
 
     def _container_launch_command(self, port: int | None, env: dict[str, str]) -> list[str]:
         """`docker build` then `docker run` as one supervised process.

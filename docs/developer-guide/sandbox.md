@@ -209,6 +209,12 @@ registry.register(
 )
 ```
 
+## Command line
+
+`geenii sandbox run {python|bash|node} DIR [SCRIPT]` builds and runs a
+sandbox from the shell, with the limits above as options. `geenii sandbox
+list` and `rm` manage the images. See [geenii sandbox](../cli-reference/sandbox.md).
+
 ## Standalone use
 
 The low-level `run_docker_sandbox_python` function can be used outside the

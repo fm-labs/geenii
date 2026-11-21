@@ -89,6 +89,10 @@ geenii
 │   └── gc [--max-age AGE]        # remove the logs of all old finished processes
 ├── projects
 │   └── list                      # projects configured in settings.json
+├── sandbox
+│   ├── run RUNTIME DIR [SCRIPT]  # run code in a Docker sandbox (python, bash, node)
+│   ├── list                      # sandbox images
+│   └── rm ID... | --all          # remove sandbox images
 ├── scheduler
 │   ├── start                     # alias for `daemon start --scheduler-config`
 │   ├── status                    # live task state (or the config file offline)
@@ -142,6 +146,7 @@ geenii
 - [flow](flow.md) — run and inspect flows (step pipelines)
 - [pm](pm.md) — manage background processes
 - [projects](projects.md) — list configured projects
+- [sandbox](sandbox.md) — run code in a Docker sandbox
 - [scheduler](scheduler.md) — manage and run the task scheduler
 - [server](server.md) — start, stop and inspect the HTTP server (API + web UI)
 - [supervisor](supervisor.md) — keep long-running processes up

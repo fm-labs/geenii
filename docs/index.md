@@ -78,6 +78,8 @@ Internals for contributors and library consumers.
   persistence implementations.
 - **[Usage Tracking](developer-guide/usage-tracking.md)** — how token usage
   is recorded per completion, what is (not) tracked, and the `/usage` command.
+- **[Logging](developer-guide/logging.md)** — what gets logged where and
+  when: Python logging setup, JSONL logs, process and service output.
 - **[Caching](developer-guide/caching.md)** — the `@cached` function cache,
   MCP client and session caches, prompt caching, and the cache directory.
 - **[HTTP Server](developer-guide/server.md)** — the FastAPI `/api/v1` API:
