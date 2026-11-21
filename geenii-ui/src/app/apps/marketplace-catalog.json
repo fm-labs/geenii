@@ -11,6 +11,7 @@
       "type": "statichtml",
       "tags": ["notes", "productivity"],
       "size_kb": 340,
+      "icon_url": "/assets/marketplace/markdown-notes.svg",
       "bundle_url": "https://example.com/apps/markdown-notes-1.2.0.zip",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
@@ -23,6 +24,7 @@
       "type": "node",
       "tags": ["tasks", "productivity"],
       "size_kb": 2150,
+      "icon_url": "/assets/marketplace/kanban-board.svg",
       "bundle_url": "https://example.com/apps/kanban-board-0.9.1.zip",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
@@ -35,6 +37,7 @@
       "type": "python",
       "tags": ["data", "charts"],
       "size_kb": 1280,
+      "icon_url": "/assets/marketplace/csv-explorer.svg",
       "bundle_url": "https://example.com/apps/csv-explorer-2.0.3.zip",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
@@ -47,6 +50,7 @@
       "type": "statichtml",
       "tags": ["timer", "productivity"],
       "size_kb": 95,
+      "icon_url": "/assets/marketplace/pomodoro.svg",
       "bundle_url": "https://example.com/apps/pomodoro-1.0.0.zip",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
@@ -59,6 +63,7 @@
       "type": "python",
       "tags": ["development", "api"],
       "size_kb": 610,
+      "icon_url": "/assets/marketplace/api-mock-server.svg",
       "bundle_url": "https://example.com/apps/api-mock-server-0.4.2.zip",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
@@ -71,6 +76,7 @@
       "type": "binary",
       "tags": ["images", "media"],
       "size_kb": 8420,
+      "icon_url": "/assets/marketplace/image-resizer.svg",
       "bundle_url": "https://example.com/apps/image-resizer-1.4.0.zip",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     }

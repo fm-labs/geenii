@@ -58,6 +58,13 @@ export const useAppIconUrl = (name: string): string => {
 /** Message of a failed request (the server's Problem detail) */
 export const requestError = (err: any): string => err?.response?.data?.detail || err?.message || 'Unknown error'
 
+/** Whether the app matches a search query (name, title, description or type; an empty query matches all) */
+export const matchesAppQuery = (app: GeeAppInfo, query: string) => {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  return [app.name, app.title, app.description, app.type].some((v) => v?.toLowerCase().includes(q))
+}
+
 /** Whether the app has a process (running, or being (re)started by the supervisor) */
 export const isActive = (app: GeeAppInfo) => app.status === 'running' || app.status === 'starting' || app.status === 'error'
 

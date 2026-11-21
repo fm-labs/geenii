@@ -3,14 +3,12 @@ import { LoaderIcon, PlayIcon, SettingsIcon, SquareIcon } from 'lucide-react'
 import { cn } from 'cn'
 import { Skeleton } from '@/components/ui/skeleton.tsx'
 import { useNavigate } from '@/app-router.tsx'
-import { AppAction, GeeAppInfo, isActive, requestError, useAppAction, useAppIconUrl } from '@/app/apps/apps-api.ts'
+import {
+  AppAction, GeeAppInfo, isActive, matchesAppQuery, requestError, useAppAction, useAppIconUrl,
+} from '@/app/apps/apps-api.ts'
 import { AppStatusDot, DaemonNotRunning, Notice } from '@/app/apps/apps-components.tsx'
 
-export const matchesAppQuery = (app: GeeAppInfo, query: string) => {
-  const q = query.trim().toLowerCase()
-  if (!q) return true
-  return [app.name, app.title, app.description, app.type].some((v) => v?.toLowerCase().includes(q))
-}
+export { matchesAppQuery }
 
 export const appPageUrl = (app: GeeAppInfo) => `/apps/${encodeURIComponent(app.name)}`
 

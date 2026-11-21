@@ -1,10 +1,11 @@
 import React from 'react'
-import { CheckIcon, DownloadIcon, SearchIcon, StoreIcon } from 'lucide-react'
+import { CheckIcon, DownloadIcon, LayoutGridIcon, StoreIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card.tsx'
-import { AppType, GeeAppInfo } from '@/app/apps/apps-api.ts'
+import { AppType, GeeAppInfo, useAppIconUrl } from '@/app/apps/apps-api.ts'
 import catalogJson from '@/app/apps/marketplace-catalog.json'
+import { cn } from 'cn'
 
 /** An app bundle in the marketplace catalog */
 export type CatalogApp = {
@@ -16,6 +17,8 @@ export type CatalogApp = {
   type: AppType
   tags: string[]
   size_kb: number
+  /** URL of the app's icon (SVG or image); without one, the local app's icon or a generic one is shown */
+  icon_url?: string
   /** Zip with the app directory (manifest.json at its root) */
   bundle_url: string
   sha256: string
@@ -39,15 +42,31 @@ const matches = (app: CatalogApp, query: string) => {
   return [app.name, app.title, app.description, app.author, app.type, ...app.tags].some((v) => v.toLowerCase().includes(q))
 }
 
+/** The catalog app's icon, else the local app's (if it is there), else a generic icon */
+const CatalogAppIcon = ({ app, existing }: { app: CatalogApp, existing?: GeeAppInfo }) => {
+  const localIconUrl = useAppIconUrl(app.name)
+  const src = app.icon_url || (existing ? localIconUrl : null)
+  const [failed, setFailed] = React.useState(false)
+  React.useEffect(() => setFailed(false), [src])
+  return (
+    <div className={cn('flex size-12 shrink-0 items-center justify-center rounded-xl border bg-card p-2',
+      existing && !existing.enabled && 'opacity-50 grayscale')}>
+      {src && !failed
+        ? <img src={src} alt="" className="size-full object-contain" draggable={false} onError={() => setFailed(true)} />
+        : <LayoutGridIcon className="size-6 text-muted-foreground" strokeWidth={1.5} />}
+    </div>
+  )
+}
+
 /**
- * Apps from the marketplace catalog. A dummy view: installing a bundle is not implemented yet.
+ * Apps from the marketplace catalog, filtered by `query`. A dummy view: installing a bundle is not implemented yet.
  * `apps` are the local apps, to mark catalog apps that are already there.
  */
-const MarketplaceView = ({ apps, onDone }: {
+const MarketplaceView = ({ apps, query = '', onDone }: {
   apps: GeeAppInfo[]
+  query?: string
   onDone: (message: string, warn?: boolean) => void
 }) => {
-  const [query, setQuery] = React.useState('')
   const local = React.useMemo(() => new Map(apps.map((a) => [a.name, a])), [apps])
   const shown = CATALOG.apps.filter((a) => matches(a, query))
 
@@ -57,36 +76,28 @@ const MarketplaceView = ({ apps, onDone }: {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="relative w-full max-w-xs">
-          <SearchIcon size={14} className="absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search the marketplace"
-            className="h-8 w-full rounded-md border bg-transparent pr-2 pl-8 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          />
-        </div>
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <StoreIcon size={12} /> {CATALOG.apps.length} apps · catalog updated {new Date(CATALOG.updated).toLocaleDateString()}
-        </span>
-      </div>
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <StoreIcon size={12} /> {CATALOG.apps.length} apps · catalog updated {new Date(CATALOG.updated).toLocaleDateString()}
+      </span>
 
-      {shown.length === 0 && <div className="text-sm text-muted-foreground">No marketplace apps match “{query}”.</div>}
+      {shown.length === 0 && <div className="text-sm text-muted-foreground">No marketplace apps match “{query.trim()}”.</div>}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {shown.map((app) => {
           const existing = local.get(app.name)
           return (
             <Card key={app.name} className="gap-3">
-              <CardHeader>
-                <CardTitle className="flex items-start justify-between gap-2 text-base">
-                  <span className="truncate">{app.title}</span>
-                  <Badge variant="outline" className="font-mono">{app.type}</Badge>
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  {app.author} · v{app.version} · {fmtSize(app.size_kb)}
-                </CardDescription>
+              <CardHeader className="flex items-start gap-3">
+                <CatalogAppIcon app={app} existing={existing} />
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <CardTitle className="flex items-start justify-between gap-2 text-base">
+                    <span className="truncate">{app.title}</span>
+                    <Badge variant="outline" className="font-mono">{app.type}</Badge>
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    {app.author} · v{app.version} · {fmtSize(app.size_kb)}
+                  </CardDescription>
+                </div>
               </CardHeader>
               <CardContent className="flex flex-1 flex-col gap-2 text-sm">
                 <p className="line-clamp-3">{app.description}</p>

@@ -1,12 +1,16 @@
 import React from 'react'
-import { DownloadIcon, FolderSyncIcon, LoaderIcon, PlusIcon, RefreshCwIcon, SettingsIcon, Trash2Icon } from 'lucide-react'
+import {
+  DownloadIcon, FolderSyncIcon, LoaderIcon, PlusIcon, RefreshCwIcon, SearchIcon, SettingsIcon, Trash2Icon, XIcon,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import {
   Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog.tsx'
 import { useNavigate } from '@/app-router.tsx'
-import { GeeAppInfo, requestError, useAddApp, useApps, useSetAppSetting } from '@/app/apps/apps-api.ts'
+import {
+  GeeAppInfo, matchesAppQuery, requestError, useAddApp, useAppIconUrl, useApps, useSetAppSetting,
+} from '@/app/apps/apps-api.ts'
 import { Input } from '@/components/ui/input.tsx'
 import { Label } from '@/components/ui/label.tsx'
 import { cn } from 'cn'
@@ -119,12 +123,16 @@ const ALL_TABS: { id: AppsTab, label: string, title: string }[] = [
 
 const TABS = ALL_TABS.filter(({ id }) => id !== 'marketplace' || FEATURE_APPS_MARKETPLACE)
 
-/** Install (enable) or uninstall (disable and stop) an app; the app's files stay where they are */
+/**
+ * Install (enable) or uninstall (disable and stop) an app; the app's files stay where they are.
+ * After an install, it opens the app page.
+ */
 const InstallButton = ({ app, daemonRunning, onDone }: {
   app: GeeAppInfo
   daemonRunning: boolean
   onDone: (message: string, warn?: boolean) => void
 }) => {
+  const navigate = useNavigate()
   const setAppSetting = useSetAppSetting()
   const [busy, setBusy] = React.useState(false)
   const install = !app.enabled
@@ -133,9 +141,11 @@ const InstallButton = ({ app, daemonRunning, onDone }: {
     setBusy(true)
     try {
       await setAppSetting(app.name, 'enabled', install)
-      onDone(install
-        ? `Installed "${app.title}"; start it from the launcher.`
-        : `Uninstalled "${app.title}"; it is stopped and listed under Available.`)
+      if (install) {
+        navigate(`/apps/${encodeURIComponent(app.name)}`)
+      } else {
+        onDone(`Uninstalled "${app.title}"; it is stopped and listed under Available.`)
+      }
     } catch (err) {
       onDone(`Could not ${install ? 'install' : 'uninstall'} "${app.title}": ${requestError(err)}`, true)
     } finally {
@@ -230,29 +240,46 @@ const AppSettingsDialog = ({ app, daemonRunning, onDone }: {
   )
 }
 
-const AppRow = ({ app, daemonRunning, onDone }: {
+/** A grid card for one app: icon, title, status and description, install and settings */
+const AppCard = ({ app, daemonRunning, onDone }: {
   app: GeeAppInfo
   daemonRunning: boolean
   onDone: (message: string, warn?: boolean) => void
 }) => {
   const navigate = useNavigate()
+  const iconUrl = useAppIconUrl(app.name)
+  const open = () => navigate(`/apps/${encodeURIComponent(app.name)}`)
   return (
-    <div className="app-card flex flex-row items-center justify-between gap-4 rounded-lg border p-4">
-      <div className="min-w-0">
-        <h3 className="flex items-center gap-2 font-bold">
-          {app.enabled && <AppStatusDot app={app} className="size-3" />}
-          <button type="button" className="truncate text-left hover:underline" title="Open the app"
-                  onClick={() => navigate(`/apps/${encodeURIComponent(app.name)}`)}>
-            {app.title}
-          </button>
-          {app.enabled && <AppStatusBadge app={app} />}
-        </h3>
-        <p className="text-muted-foreground">{app.description || 'No description available'}</p>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {!app.enabled && <InstallButton app={app} daemonRunning={daemonRunning} onDone={onDone} />}
+    <div className="app-card flex flex-col gap-3 rounded-lg border p-4">
+      <div className="flex items-start gap-3">
+        <button type="button" title="Open the app" onClick={open}
+                className={cn('relative flex size-12 shrink-0 items-center justify-center rounded-xl border bg-card p-2',
+                  !app.enabled && 'opacity-50 grayscale')}>
+          <img src={iconUrl} alt="" className="size-full object-contain" draggable={false} />
+          {app.enabled && <AppStatusDot app={app} className="absolute -top-0.5 -right-0.5 size-3 ring-2 ring-background" />}
+        </button>
+        <div className="min-w-0 flex-1">
+          <h3 className="flex items-center gap-2 font-bold">
+            <button type="button" className="min-w-0 truncate text-left hover:underline" title="Open the app" onClick={open}>
+              {app.title}
+            </button>
+          </h3>
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-xs text-muted-foreground">
+            <Badge variant="outline" className="font-mono">{app.type}</Badge>
+            <span>v{app.version}</span>
+            {app.enabled && <AppStatusBadge app={app} />}
+          </div>
+        </div>
         <AppSettingsDialog app={app} daemonRunning={daemonRunning} onDone={onDone} />
       </div>
+      <p className={cn('line-clamp-2 flex-1 text-sm', !app.description && 'text-muted-foreground')}>
+        {app.description || 'No description available'}
+      </p>
+      {!app.enabled && (
+        <div className="flex justify-end">
+          <InstallButton app={app} daemonRunning={daemonRunning} onDone={onDone} />
+        </div>
+      )}
     </div>
   )
 }
@@ -263,6 +290,7 @@ const AppsSettings = () => {
   const { data, error, loading, reload } = useApps()
   const [notice, setNotice] = React.useState<{ text: string, warn?: boolean } | null>(null)
   const [rescanning, setRescanning] = React.useState(false)
+  const [query, setQuery] = React.useState('')
   const daemonRunning = !!data?.daemon.running
 
   const apps = React.useMemo(() => [...(data?.apps ?? [])].sort((a, b) => a.title.localeCompare(b.title)), [data])
@@ -273,7 +301,7 @@ const AppsSettings = () => {
   const counts: Record<AppsTab, number> = {
     installed: byTab.installed.length, available: byTab.available.length, marketplace: MARKETPLACE_COUNT,
   }
-  const shown = tab === 'marketplace' ? [] : byTab[tab]
+  const shown = tab === 'marketplace' ? [] : byTab[tab].filter((a) => matchesAppQuery(a, query))
 
   const onDone = (text: string, warn?: boolean) => {
     setNotice({ text, warn })
@@ -315,7 +343,25 @@ const AppsSettings = () => {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+              placeholder={tab === 'marketplace' ? 'Search the marketplace…' : 'Filter apps…'}
+              aria-label="Filter apps"
+              className="h-8 w-48 pr-7 pl-8 [&::-webkit-search-cancel-button]:hidden"
+            />
+            {query && (
+              <button type="button" aria-label="Clear the filter" onClick={() => setQuery('')}
+                      className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <XIcon className="size-3.5" />
+              </button>
+            )}
+          </div>
           <Button size="sm" variant="ghost" onClick={() => reload()} disabled={loading}>
             <RefreshCwIcon className={loading ? 'animate-spin' : ''} /> Refresh
           </Button>
@@ -337,19 +383,19 @@ const AppsSettings = () => {
       {data && !daemonRunning && <DaemonNotRunning what="app settings can't be changed" />}
       {data && tab !== 'marketplace' && shown.length === 0 && (
         <div className="text-sm text-muted-foreground">
-          {tab === 'installed'
+          {query.trim() ? <>No apps match “{query.trim()}”.</> : tab === 'installed'
             ? byTab.available.length > 0 ? 'No apps installed. Install one from the Available tab.' : 'No apps installed.'
             : 'No other apps found. Use Add App to add one, then Rescan.'}
         </div>
       )}
 
       {FEATURE_APPS_MARKETPLACE && tab === 'marketplace' && (
-        <div role="tabpanel"><MarketplaceView apps={apps} onDone={(text, warn) => setNotice({ text, warn })} /></div>
+        <div role="tabpanel"><MarketplaceView apps={apps} query={query} onDone={(text, warn) => setNotice({ text, warn })} /></div>
       )}
 
       {tab !== 'marketplace' && (
-        <div role="tabpanel" className="flex flex-col gap-y-4">
-          {shown.map((app) => <AppRow key={app.name} app={app} daemonRunning={daemonRunning} onDone={onDone} />)}
+        <div role="tabpanel" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {shown.map((app) => <AppCard key={app.name} app={app} daemonRunning={daemonRunning} onDone={onDone} />)}
         </div>
       )}
     </div>

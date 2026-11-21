@@ -115,11 +115,11 @@ const AppPage = () => {
     <MainLayout>
       <MainContent>
         <div className="flex flex-col gap-4">
-          <div>
-            <Button size="sm" variant="ghost" className="-ml-2 text-muted-foreground" onClick={() => navigate('/apps')}>
-              <ArrowLeftIcon /> Apps
-            </Button>
-          </div>
+          {/*<div>*/}
+          {/*  <Button size="sm" variant="ghost" className="-ml-2 text-muted-foreground" onClick={() => navigate('/apps')}>*/}
+          {/*    <ArrowLeftIcon /> Apps*/}
+          {/*  </Button>*/}
+          {/*</div>*/}
 
           {error && (
             <div className="rounded-lg border border-destructive/50 p-4 text-sm text-destructive">
