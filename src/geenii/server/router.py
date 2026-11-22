@@ -18,6 +18,7 @@ from geenii.server.supervisor_routes import router as supervisor_router
 from geenii.server.stats_routes import router as stats_router
 from geenii.server.tools_routes import router as tools_router
 from geenii.server.ff import router as ff_router
+from geenii.server.browser_ext import router as browser_ext_router
 
 # from geeniid.server.routes.route_settings import router as settings_router
 # from geeniid.server.routes.route_skills import router as skills_router
@@ -47,7 +48,8 @@ app_router.include_router(skills_router, prefix=API_ROUTE_PREFIX, dependencies=[
 app_router.include_router(stats_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(projects_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 app_router.include_router(settings_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
-app_router.include_router(ff_router)
+# app_router.include_router(ff_router)
+# app_router.include_router(browser_ext_router)
 # app_router.include_router(chat_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 # app_router.include_router(scheduler_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
 # app_router.include_router(settings_router, prefix=API_ROUTE_PREFIX, dependencies=[Security(dep_current_user)])
