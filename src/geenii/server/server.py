@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from geenii.config import APP_VERSION, MCP_AUTOLOAD, WWW_DIR
+from geenii.config import APP_VERSION, MCP_AUTOLOAD, WWW_DIR, get_cors_settings
 from geenii.datamodels import Problem
 from geenii.g import init_global_agent_registry, init_global_skill_registry
 from geenii.ibc.tools import init_builtin_ibc_tools_stubs
@@ -168,12 +168,16 @@ async def unhandled_exception_middleware(request: Request, call_next):
 
 
 # Note: Middlewares are executed in reverse order of addition (LIFO)
+# CORS is configured in the `cors` section of settings.json (read once at startup, see config.get_cors_settings)
+_cors = get_cors_settings()
+logging.info(f"CORS allowed origins: {_cors['allow_origins']} (regex: {_cors['allow_origin_regex']})")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors["allow_origins"],
+    allow_origin_regex=_cors["allow_origin_regex"],
+    allow_credentials=_cors["allow_credentials"],
+    allow_methods=_cors["allow_methods"],
+    allow_headers=_cors["allow_headers"],
 )
 # # Request Logger Middleware
 # app.add_middleware(

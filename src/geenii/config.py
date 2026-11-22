@@ -7,6 +7,7 @@ import threading
 from collections.abc import Callable
 from os.path import realpath
 from pathlib import Path
+from typing import Any
 
 import dotenv
 
@@ -119,6 +120,24 @@ REDIS_URI = _envvar("REDIS_URI", "")
 #     return GEENII_DATA_DIR
 
 
+# Default `cors` section of settings.json, passed to the server's CORSMiddleware.
+# Origins are full origins (scheme://host[:port]), "*" allows any origin.
+DEFAULT_CORS_SETTINGS: dict = {
+    "allow_origins": [
+        "http://localhost:33311",  # web UI and Firefox sidebar served by the server itself
+        "tauri://localhost",  # desktop app on macOS and Linux
+        "http://tauri.localhost",  # desktop app on Windows
+        "http://localhost:1430",  # desktop app dev server (vite, see geenii-ui/src-tauri/tauri.conf.json)
+    ],
+    # desktop app sites served by its geenii: scheme (geenii://localhost/<siteId>/..., see geenii-ui/src-tauri/src/lib.rs);
+    # on Windows custom schemes are served as http://<scheme>.localhost
+    "allow_origin_regex": r"^(geenii://[A-Za-z0-9.-]+|http://geenii\.localhost)$",
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+    "allow_credentials": False,
+}
+
+
 def read_user_settings() -> dict:
     settings_path = user_settings_path()
     default_settings = {
@@ -129,6 +148,7 @@ def read_user_settings() -> dict:
         "skill_dirs": [],
         "projects": {},  # "/path/to/project/dir": {"trusted": true}
         "plugin_dirs": [],  # ["/path/to/plugin/module/",]
+        "cors": dict(DEFAULT_CORS_SETTINGS),
     }
     if os.path.exists(settings_path):
         try:
@@ -313,3 +333,35 @@ def apps_dirs() -> list[str]:
 def project_skills_dir() -> str:
     """Where `geenii skills install` puts skills"""
     return os.path.join(GEENII_WORKING_DIR, ".geenii", "skills")
+
+
+def get_cors_settings() -> dict[str, Any]:
+    """The `cors` section of the user settings, merged over DEFAULT_CORS_SETTINGS.
+    Invalid values are ignored (the default is used and a warning is printed)."""
+    section = read_user_settings().get("cors")
+    result = {k: (list(v) if isinstance(v, list) else v) for k, v in DEFAULT_CORS_SETTINGS.items()}
+    if section is None:
+        return result
+    if not isinstance(section, dict):
+        print(f"Invalid 'cors' settings (expected an object), using defaults: {section!r}")
+        return result
+    for key in ("allow_origins", "allow_methods", "allow_headers"):
+        if key in section:
+            value = section[key]
+            if isinstance(value, list) and all(isinstance(v, str) for v in value):
+                result[key] = value
+            else:
+                print(f"Invalid 'cors.{key}' setting (expected a list of strings), using default: {value!r}")
+    if "allow_origin_regex" in section:
+        value = section["allow_origin_regex"]
+        if value is None or isinstance(value, str):
+            result["allow_origin_regex"] = value or None
+        else:
+            print(f"Invalid 'cors.allow_origin_regex' setting (expected a string), using default: {value!r}")
+    if "allow_credentials" in section:
+        value = section["allow_credentials"]
+        if isinstance(value, bool):
+            result["allow_credentials"] = value
+        else:
+            print(f"Invalid 'cors.allow_credentials' setting (expected a boolean), using default: {value!r}")
+    return result
