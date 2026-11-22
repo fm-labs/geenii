@@ -24,6 +24,7 @@ import { settingsForms } from '@/app/console/settings-forms.ts'
 import Header from '@/components/header.tsx'
 import AudioSettings from '@/app/console/components/audio-settings.tsx'
 import { data } from '@/app/console/settings-navdata.tsx'
+import { useTheme } from '@/components/theme-provider.tsx'
 
 
 const DisabledFeatureSettingsView = () => {
@@ -43,18 +44,19 @@ const DisabledFeatureSettingsView = () => {
 
 const UserSettingsView = () => {
   const [activeTab, setActiveTab] = React.useState("Profile");
+  const { setAppearance } = useTheme();
 
   const activeTabElement = React.useMemo(() => {
     switch (activeTab) {
       case "Appearance":
-        return <SettingsFormView schema={settingsForms["appearance"][0]} uiSchema={settingsForms["appearance"][1]} />;
+        return <SettingsFormView key="appearance" namespace="appearance" schema={settingsForms["appearance"][0]} uiSchema={settingsForms["appearance"][1]} onSaved={setAppearance} />;
       case "Profile":
-        return <SettingsFormView schema={settingsForms["profile"][0]} uiSchema={settingsForms["profile"][1]} />;
+        return <SettingsFormView key="profile" namespace="profile" schema={settingsForms["profile"][0]} uiSchema={settingsForms["profile"][1]} />;
       // case "Default Models":
       //   if (!FEATURE_AI_ENABLED) {
       //     return <DisabledFeatureSettingsView />;
       //   }
-      //   return <SettingsFormView schema={settingsForms["default_models"][0]} uiSchema={settingsForms["default_models"][1]} />;
+      //   return <SettingsFormView key="defaultModels" namespace="defaultModels" schema={settingsForms["default_models"][0]} uiSchema={settingsForms["default_models"][1]} />;
       // case "MCP":
       //   if (!FEATURE_MCP_ENABLED) {
       //     return <DisabledFeatureSettingsView />;
@@ -82,7 +84,7 @@ const UserSettingsView = () => {
       default:
         return <DisabledFeatureSettingsView />;
     }
-  }, [activeTab]);
+  }, [activeTab, setAppearance]);
 
     return (
         <div>

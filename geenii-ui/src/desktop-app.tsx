@@ -4,6 +4,7 @@ import ServerContextProvider from './context/server-context-provider.tsx'
 import AppRouter from './app-router.tsx'
 import { ThemeProvider } from '@/components/theme-provider.tsx'
 import { ApiProvider } from '@/context/api-context.tsx'
+import AppearanceSettingsSync from '@/components/appearance-settings-sync.tsx'
 import './tailwind.css'
 import './App.scss'
 import TauriWrapper from '@/components/tauri/TauriWrapper.tsx'
@@ -12,11 +13,12 @@ import DesktopStartupGate from '@/components/tauri/DesktopStartupGate.tsx'
 const DesktopApp = () => {
   return (
     <>
-      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+      <ThemeProvider defaultTheme="system" storageKey="geenii-theme">
         {/* waits for Tauri IPC, the server (download/start) and its API */}
         <DesktopStartupGate>
           <ServerContextProvider>
             <ApiProvider>
+              <AppearanceSettingsSync />
               <AppContextProvider>
                 <TauriWrapper>
                   <AppRouter />

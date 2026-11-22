@@ -1,4 +1,6 @@
 import { RJSFSchema } from '@rjsf/utils'
+import { COLOR_SCHEMES, DEFAULT_COLOR_SCHEME } from '@/components/color-schemes.ts'
+import ColorSchemeWidget from '@/app/console/components/color-scheme-widget.tsx'
 
 /** PROFILE SETTINGS **/
 const profileSettingsSchema: RJSFSchema = {
@@ -69,6 +71,12 @@ const appearanceSettingsSchema: RJSFSchema = {
       enum: ["light", "dark", "system"],
       default: "system",
     },
+    colorScheme: {
+      type: "string",
+      title: "Color Scheme",
+      enum: COLOR_SCHEMES.map((s) => s.value),
+      default: DEFAULT_COLOR_SCHEME,
+    },
     fontFamily: {
       type: "string",
       title: "Font Family",
@@ -80,7 +88,7 @@ const appearanceSettingsSchema: RJSFSchema = {
       title: "Font Size",
       minimum: 10,
       maximum: 24,
-      default: 14,
+      default: 16,
     },
   },
 };
@@ -88,6 +96,9 @@ const appearanceSettingsSchema: RJSFSchema = {
 const appearanceSettingsUiSchema = {
   theme: {
     "ui:widget": "select",
+  },
+  colorScheme: {
+    "ui:widget": ColorSchemeWidget,
   },
   fontFamily: {
     "ui:widget": "select",
@@ -110,9 +121,27 @@ const appearanceSettingsUiSchema = {
   },
 };
 
+/** AUDIO SETTINGS **/
+const audioSettingsSchema: RJSFSchema = {
+  title: "Audio Settings",
+  type: "object",
+  properties: {
+    echoCancellation: { type: "boolean", title: "Echo Cancellation", default: true },
+    noiseSuppression: { type: "boolean", title: "Noise Suppression", default: true },
+    autoGainControl: { type: "boolean", title: "Automatic Gain Control", default: true },
+  },
+};
+
+const audioSettingsUiSchema = {
+  echoCancellation: { "ui:widget": "checkbox" },
+  noiseSuppression: { "ui:widget": "checkbox" },
+  autoGainControl: { "ui:widget": "checkbox" },
+};
+
 
 export const settingsForms = {
   "appearance": [appearanceSettingsSchema, appearanceSettingsUiSchema],
   "profile": [profileSettingsSchema, profileSettingsUiSchema],
+  "audio": [audioSettingsSchema, audioSettingsUiSchema],
   "default_models": [aiModelSettingsSchema, aiModelSettingsUiSchema],
 }

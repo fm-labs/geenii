@@ -5,6 +5,7 @@ import ServerContextProvider from './context/server-context-provider.tsx'
 import AppRouter from './app-router.tsx'
 import { ThemeProvider } from '@/components/theme-provider.tsx'
 import { ApiProvider } from '@/context/api-context.tsx'
+import AppearanceSettingsSync from '@/components/appearance-settings-sync.tsx'
 import './tailwind.css'
 import './App.scss'
 
@@ -12,9 +13,10 @@ const WebApp = () => {
 
   return (
     <>
-      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+      <ThemeProvider defaultTheme="system" storageKey="geenii-theme">
         <ServerContextProvider>
           <ApiProvider>
+            <AppearanceSettingsSync />
             <AppContextProvider>
               <AppRouter />
             </AppContextProvider>
