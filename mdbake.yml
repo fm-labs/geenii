@@ -1,0 +1,8 @@
+site_name: geenii
+docs_dir: docs
+site_dir: dist/docs
+middleware:
+  - mdbake.builtin.draft
+  - path: mdbake.builtin.frontmatter_defaults:FrontmatterDefaults
+    options:
+      defaults: {author: geenii}
