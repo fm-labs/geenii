@@ -29,6 +29,7 @@ class AgentSpec(pydantic.BaseModel):
     scope: Literal["global", "project", "user"] = "user"
     working_dir: str | None = None  # only for project scope
     allowed_dirs: list[str] | None = None  # only for project scope
+    icon: str | None = None # icon url
 
     # @property
     # def working_dir(self) -> str | None:
