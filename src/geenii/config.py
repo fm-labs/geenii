@@ -18,7 +18,7 @@ def _envvar(var: str, default: str | None = None) -> str: # | None:
     return os.environ.get(var, default)
 
 
-APP_VERSION = "0.4.1"
+APP_VERSION = "0.4.2"
 
 GEENII_USER_HOME = get_user_home_dir()
 GEENII_WORKING_DIR = realpath(_envvar("GEENII_WORKING_DIR", os.getcwd()))
