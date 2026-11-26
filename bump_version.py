@@ -84,12 +84,12 @@ if __name__ == "__main__":
             {"escape": "true"},
         ),
         ("VERSION", "", write_version_to_file, None),
-        ("geenii-ui/package.json", "version", bump_version_json, None),
-        ("geenii-ui/src-tauri/tauri.conf.json", "version", bump_version_json, None)
+        #("geenii-ui/package.json", "version", bump_version_json, None),
+        #("geenii-ui/src-tauri/tauri.conf.json", "version", bump_version_json, None)
     ]
     for file_path, key, bump_func, extra in files:
         bump_func(file_path, key, new_version, extra)
 
-    print("You need to run 'pnpm install' in the ui/ directory to update the lockfile after bumping the version.")
-    print("You need to run 'pnpm tauri build' in the ui/ directory to rebuild the Tauri app after bumping the version.")
+    #print("You need to run 'pnpm install' in the ui/ directory to update the lockfile after bumping the version.")
+    #print("You need to run 'pnpm tauri build' in the ui/ directory to rebuild the Tauri app after bumping the version.")
     print("You need to run 'uv sync' in the root directory to update the lockfile after bumping the version.")
