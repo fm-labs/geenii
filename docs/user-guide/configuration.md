@@ -115,7 +115,19 @@ definition file; the CLI can override it per-run with `--model`.
   "language": "en-US",
   "environment": {},
   "skill_dirs": [],
-  "projects": {}
+  "projects": {},
+  "cors": {
+    "allow_origins": [
+      "http://localhost:33311",
+      "tauri://localhost",
+      "http://tauri.localhost",
+      "http://localhost:1430"
+    ],
+    "allow_origin_regex": "^(geenii://[A-Za-z0-9.-]+|http://geenii\\.localhost)$",
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+    "allow_credentials": false
+  }
 }
 ```
 
@@ -134,6 +146,21 @@ definition file; the CLI can override it per-run with `--model`.
   directory: `{"/path/to/app": {"enabled": true, "autostart": true}}`. Apps
   without an entry are disabled. See
   [apps.md](../developer-guide/apps.md#app-settings).
+- **`cors`** — CORS settings of the HTTP server (`geenii server`), passed to
+  Starlette's `CORSMiddleware`. Read once at server start, so restart the server
+  after changing it. Any key left out keeps its default (shown above), and an
+  invalid value falls back to its default with a warning. `allow_origins` takes
+  full origins (`scheme://host[:port]`, e.g. `http://localhost:1430`), and `"*"`
+  allows every origin. `allow_origin_regex` matches origins by regular
+  expression (e.g. `"^moz-extension://.*$"`). The defaults allow the server itself
+  (`http://localhost:33311`, also the Firefox sidebar), the desktop app
+  (`tauri://localhost` on macOS and Linux, `http://tauri.localhost` on Windows)
+  and the desktop app's Vite dev server (`http://localhost:1430`). The default
+  `allow_origin_regex` allows the desktop app's sites served by its `geenii:`
+  scheme (`geenii://localhost`, `http://geenii.localhost` on Windows); set it to
+  `null` to turn that off. Setting `allow_origins` or `allow_origin_regex`
+  replaces the default, so keep the entries you still need.
+  Any other browser client served from another origin must be added here.
 - `theme`, `notifications`, `language`, `environment` are reserved for the
   UI/server. Example configs in the wild may contain additional keys
   (`providers`, `defaultProvider`, `skillRepositories`); these are currently
