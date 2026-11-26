@@ -1,5 +1,7 @@
 # g33n11
 
+(geenii)
+
 A local-first, privacy-first orchestration framework for AI agents.
 
 Unified API over local and remote LLM providers, agents defined as plain
